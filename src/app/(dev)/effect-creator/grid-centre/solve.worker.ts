@@ -9,7 +9,7 @@ import { anchorBakeOf, anchorFromBake, assignSizes, type AnchorBake, type Centre
 import { classFrameNodes, shapeFamilyOf, type ShapeFamily } from '@/lib/effect/grid-magnet-class'
 import { defaultLanding } from '@/lib/effect/units/judge'
 import { DEFAULT_PITCH_MM, MASS_DEPTH_MM, PADDING_FLOOR_MM } from '@/lib/effect/grid-magnet-spec'
-import { makeSizer, sizeRange } from '@/lib/effect/grid-magnet-bridge'
+import { contourCacheKey, makeSizer, sizeRange } from '@/lib/effect/grid-magnet-bridge'
 import type { Contour } from '@/lib/effect/types'
 
 interface SolveRequest {
@@ -60,7 +60,9 @@ function bakeOf(
   return hit
 }
 
-function anchorFnFor(
+/** Exported so the separation gate can prove the drawn witness IS layout's selected witness —
+ *  it must call the real bake, not a stand-in. */
+export function anchorFnFor(
   sized: (mm: number) => import('@/lib/effect/types').Contour, cfg: GridConfig, cfgSig: string, shapeSig2: string,
 ): ((mm: number) => import('@/lib/effect/types').Pt) | undefined {
   const mode = (cfg.centreMode ?? 2) as CentreMode
@@ -82,19 +84,9 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
   const { id, base, offsetMM, cfg, mode, manualBand, sizeMM, stepSel } = e.data
   try {
     const sized = makeSizer(base, offsetMM)
-    // Full-content hash over EVERY ring — outer and each hole, with ring boundaries. Hashing the
-    // outer ring alone let two contours with the same outline and different holes share a bake.
-    let h = 0
-    const feed = (pts: ReadonlyArray<import('@/lib/effect/types').Pt>) => {
-      h = (Math.imul(h, 31) + pts.length) | 0
-      for (const [x, y] of pts) {
-        h = (Math.imul(h, 31) + Math.round(x * 1000)) | 0
-        h = (Math.imul(h, 31) + Math.round(y * 1000)) | 0
-      }
-    }
-    feed(base.outer.pts)
-    for (const hole of base.holes) feed(hole.pts)
-    const sig = JSON.stringify([offsetMM, base.outer.pts.length, base.holes.length, h])
+    // Cache identity is the shape itself — every ring, exactly. A rolling hash of ring counts
+    // collided: two contours with the same outline and different holes shared a bake.
+    const sig = contourCacheKey(base, offsetMM)
     if (sig !== shapeSig) { shapeSig = sig; rungCache.clear(); }
     const cfgSig = JSON.stringify(cfg)
     if (manualBand && sizeMM > 0) {
@@ -109,10 +101,11 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       // band's range (centre-rules seating); each is solved WHOLE by wrapGroup to its exact
       // contact size. Composition only: the wrap engine is transferred untouched.
       const band = BANDS.find((b) => b.id === mode) ?? BANDS[0]
+      const anchorAt = anchorFnFor(sized, cfg, cfgSig, sig)
       const key = JSON.stringify([cfgSig, band.id])
       let solve = rungCache.get(key)
       if (!solve) {
-        solve = wrapBandLadder(sized, cfg, band.minMM, band.maxMM, MIN_EFFECT_MM, anchorFnFor(sized, cfg, cfgSig, sig))
+        solve = wrapBandLadder(sized, cfg, band.minMM, band.maxMM, MIN_EFFECT_MM, anchorAt)
         rungCache.set(key, solve)
         if (rungCache.size > FITS_CAP) rungCache.delete(rungCache.keys().next().value!)
       }
@@ -149,7 +142,12 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       // never an offer.
       const bestSeatedMM = solve.bestSeated?.revealMM ?? band.minMM
       const contour = sized(bestSeatedMM)
-      const grid = computeGrid(contour, cfg)
+      // The witness DRAWN is the witness layout SELECTED. Re-solving here without the baked centre
+      // drew a different population under the same label — evidence of a solve nobody made.
+      const base0 = computeGrid(contour, anchorAt ? { ...cfg, centreOverrideMM: anchorAt(bestSeatedMM) } : cfg)
+      const grid = solve.bestSeated
+        ? { ...base0, anchors: assignSizes(solve.bestSeated.points, (cfg.plan ?? 'all6') as MagnetPlan) }
+        : base0
       ctx.postMessage({ id, model: {
         contour, grid, effSize: bestSeatedMM, ladder: [], idx: 0, segments: grid.segments,
         offers: [], diagnostic: { reason: 'no-lawful-offer', bestSeatedMM },

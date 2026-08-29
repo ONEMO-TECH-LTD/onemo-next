@@ -84,10 +84,8 @@ export default function GridLab() {
   /** Centre-mode switch — which centre drives anchoring and balance. */
   /** Engine mode — 1 wrap ladder (band offers) · 2 free + snap (continuous). */
   const [centreMode, setCentreMode] = usePersisted('centreMode', CENTRE_MODE)
-  /** Positioning law — voting vs centre-rules (parity-locked, no voting). */
   /** Governor — which mass rules in Masses mode. */
   const [governor, setGovernor] = usePersisted('governor', GOVERNOR)
-  /** Voting dominance order — which force rules the placement vote. */
   const [plan, setPlan] = useState<MagnetPlan>('all6')
   /** Off: seated spots only. On: every position the shape was judged against. */
   const [showLattice, setShowLattice] = useState(true)
@@ -129,7 +127,6 @@ export default function GridLab() {
   const [stepSel, setStepSel] = useState<number | null>(null)
   /** Manual scale inside the band's range; null = the ladder rules. */
   const [bandScale, setBandScale] = useState<number | null>(null)
-  /** Snap scan step — admin-tunable for testing; default from spec. */
   /** Manual grid calibration — a forced registration (mm), or null for the engine's auto pick. */
   const [manual, setManual] = useState<{ x: number; y: number } | null>(null)
   const [coverage, setCoverage] = useState<'full' | 'perimeter'>('perimeter')

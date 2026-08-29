@@ -11,7 +11,7 @@ import { holds, prepare } from '@/lib/grid-engine/compute/geometry'
 import type { Band } from '../grid-magnet-spec'
 import { MIN_ANCHORS } from '../grid-magnet-spec'
 import {
-  bbox, edgeDistMM, edgeDistToContourMM, pointInContour, pointInOuter,
+  bbox, edgeDistMM, edgeDistToContourMM, pointInOuter,
 } from '../foundation/geometry'
 import {
   BANDS, DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS, PADDING_FLOOR_MM, POSITIONING, SNAP_STEP_MM,

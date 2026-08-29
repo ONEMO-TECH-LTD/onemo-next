@@ -134,7 +134,6 @@ export interface GridConfig {
   massDepthMM?: number
   /** Centre mode — 0 box · 1 core · 2 masses · 3 weight · 4 deep · 5 top. */
   centreMode?: number
-  /** Registration mode. 1 = centre-rules parity, the only mode. */
   /** Registration mode. 1 = centre-rules parity — the only mode. Voting (0) was deleted in S2. */
   positioning?: number
   /** Which mass rules in Masses mode — 0 smallest · 1 deepest · 2 top. */

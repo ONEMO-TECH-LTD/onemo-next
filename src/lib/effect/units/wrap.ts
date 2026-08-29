@@ -142,17 +142,3 @@ export function wrapGroup(
   }
 }
 
-/**
- * Add `count` magnets and wrap the shape around them.
- *
- * CENTRE FIRST, exactly as Centre-rules does it: the lattice is not searched, it is PINNED — the
- * magnet group's own middle is placed on the governed centre (a single magnet's centre on it, a
- * pair's midpoint on it, a 2x2's middle cell on it). Deviation from the centre is therefore zero
- * by construction, not by preference.
- *
- * WRAP SECOND: with the group pinned, the only free variable is size. The shape is shrunk to the
- * smallest size at which every magnet is still held — so it is centred AND wrapped, and the size
- * is the one that achieves both. Nothing slides off the centre to buy a tighter wrap, and nothing
- * grows past its wrap to buy centring.
- */
-/** The wrapped answer as the canvas draws it. Display only — nothing is decided here. */

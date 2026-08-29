@@ -19,8 +19,8 @@ import { wrapGroup } from '../units/wrap'
 import { wrapBandLadder } from '../grid-magnet-wrap-compute'
 import { contourCentroidOf } from '../units/centring'
 import { safeSegments } from '../units/segment'
-import { makeSizer } from '../grid-magnet-bridge'
-import type { Contour, Pt } from '../types'
+import { contourCacheKey, makeSizer } from '../grid-magnet-bridge'
+import type { Contour, GridConfig, Pt } from '../types'
 
 const LIB = join(process.cwd(), 'src/lib/effect')
 const PAGE = join(process.cwd(), 'src/app/(dev)/effect-creator/grid-centre/page.tsx')
@@ -433,13 +433,37 @@ describe('6 — a supplied hole is material boundary, not decoration', () => {
     expect(inHole.map((sg) => sg.centreMM), 'a legal-area centre inside a hole').toEqual([])
   })
 
-  it('an outline offset carries the holes with it', () => {
-    expect(makeSizer(donut(192), 5)(192).holes.length).toBe(1)
+  it('a nonzero outline offset moves outer and hole boundaries by that offset only', () => {
+    // The previous version fed donut(192) into a sizer whose input contract is NORMALIZED to 1mm,
+    // then asserted only holes.length. It could not see the operand: the code offset each hole by
+    // the whole product SIZE instead of the offset, which deleted every hole at every real size.
+    const sized = makeSizer(donut(1), 5)(192)
+    const width = (pts: ReadonlyArray<Pt>) => {
+      const xs = pts.map((p) => p[0])
+      return Math.max(...xs) - Math.min(...xs)
+    }
+    expect(sized.holes, 'a nonzero offset deleted the hole').toHaveLength(1)
+    expect(width(sized.outer.pts), 'the outline must grow by the offset on both sides').toBeCloseTo(202, 1)
+    expect(width(sized.holes[0].pts), 'the hole must shrink by the offset on both sides').toBeCloseTo(110, 1)
   })
 
-  it('two contours sharing an outline but differing in holes are not the same shape', () => {
-    const worker = readFileSync(join(process.cwd(), 'src/app/(dev)/effect-creator/grid-centre/solve.worker.ts'), 'utf8')
-    expect(worker, 'the cache signature must feed every hole ring, not just the outer').toMatch(/for \(const hole of base\.holes\) feed\(hole\.pts\)/)
+  it('cache identity is the shape itself — hole position, hole size, ring order and offset all count', () => {
+    // The previous version grepped the worker's source. QA emptied the hashing function's body and
+    // it stayed green, and a 32-bit rolling hash cannot carry "full-content identity" anyway.
+    const square: Pt[] = [[0, 0], [1, 0], [1, 1], [0, 1]]
+    const a: Contour = { outer: { pts: square }, holes: [{ pts: ring(0.4, 0.5, 0.2) }] }
+    const same: Contour = { outer: { pts: [...square] }, holes: [{ pts: [...a.holes[0].pts] }] }
+    const cases: Array<[string, Contour]> = [
+      ['hole position', { outer: { pts: square }, holes: [{ pts: ring(0.6, 0.5, 0.2) }] }],
+      ['hole size', { outer: { pts: square }, holes: [{ pts: ring(0.4, 0.5, 0.25) }] }],
+      ['ring order', { outer: { pts: [...square].reverse() }, holes: a.holes }],
+      ['hole count', { outer: { pts: square }, holes: [] }],
+    ]
+    expect(contourCacheKey(same, 0), 'identical content must share one key').toBe(contourCacheKey(a, 0))
+    for (const [what, other] of cases) {
+      expect(contourCacheKey(other, 0), `${what} must change the key`).not.toBe(contourCacheKey(a, 0))
+    }
+    expect(contourCacheKey(a, 5), 'the outline offset must change the key').not.toBe(contourCacheKey(a, 0))
   })
 
   it('wrap never places the group inside a supplied hole', () => {
@@ -509,6 +533,41 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
     expect(Object.keys(solve)).toEqual(['offers', 'bestSeated'])
     // The witness is a REVEAL size, not a wrapped offer: it carries no contact size at all.
     expect(solve.offers.some((o) => (o as unknown as { points?: unknown }).points !== undefined)).toBe(false)
+  })
+
+  it('on an empty band the shell DRAWS the witness layout selected, not a fresh solve', async () => {
+    // The shell used to re-run computeGrid without the baked centre, so the population labelled
+    // "calibration witness" was a solve nobody made. Pre-fix this band drew 2 magnets at a
+    // different phase while layout had selected 4.
+    const star: Contour = (() => {
+      const pts: Pt[] = []
+      for (let i = 0; i < 10; i++) {
+        const t = (i / 10) * Math.PI * 2 - Math.PI / 2
+        const r = (i % 2 === 0 ? 0.5 : 0.22) * (i === 4 ? 0.78 : 1)
+        pts.push([0.5 + r * Math.cos(t), 0.5 + r * Math.sin(t)] as Pt)
+      }
+      return { outer: { pts }, holes: [] }
+    })()
+    const cfg: GridConfig = { paddingMM: 12, pitchMM: 48, positioning: 1, centreMode: 2, governor: 0 }
+    const posted: Array<{ model: { grid: { anchors: Array<{ p: Pt }> }; diagnostic?: unknown } | null }> = []
+    const stub = { onmessage: null as ((e: { data: unknown }) => void) | null, postMessage: (m: unknown) => { posted.push(m as never) } }
+    const g = globalThis as { self?: unknown }
+    const prev = g.self
+    g.self = stub
+    try {
+      const worker = await import('@/app/(dev)/effect-creator/grid-centre/solve.worker')
+      stub.onmessage!({ data: { id: 1, base: star, offsetMM: 0, cfg, mode: 4, sizeMM: 0, stepSel: null } })
+      const model = posted[0]?.model
+      expect(model, 'the worker posted no model').toBeTruthy()
+      expect(model!.diagnostic, 'this band must be empty, or the test proves nothing').toBeTruthy()
+      const sized = makeSizer(star, 0)
+      const solve = wrapBandLadder(sized, cfg, 168, 216, 24, worker.anchorFnFor(sized, cfg, JSON.stringify(cfg), 'gate'))
+      expect(solve.offers.length, 'this band must hold no offers').toBe(0)
+      expect(model!.grid.anchors.map((a) => a.p), 'the drawn population is not the selected witness')
+        .toEqual(solve.bestSeated!.points)
+    } finally {
+      g.self = prev
+    }
   })
 
   it('the shell never labels the witness a fit', () => {

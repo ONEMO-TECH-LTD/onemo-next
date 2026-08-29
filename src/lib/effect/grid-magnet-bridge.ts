@@ -45,9 +45,20 @@ export function makeSizer(base: Contour, offsetMM: number): (mm: number) => Cont
     const o = insetRingMM(c.outer.pts, offsetMM, 'round')
     // A positive offset grows the outline and SHRINKS every hole by the same amount — a hole is a
     // boundary, so an inset moves it inward from the material's point of view.
-    const holes = c.holes.map((h) => insetRingMM(h.pts, -mm, 'round')).filter((h): h is Pt[] => !!h && h.length >= 3)
+    const holes = c.holes.map((h) => insetRingMM(h.pts, -offsetMM, 'round')).filter((h): h is Pt[] => !!h && h.length >= 3)
     return o && o.length >= 3 ? { outer: { pts: o }, holes: holes.map((pts) => ({ pts })) } : c
   }
+}
+
+/** Cache identity for a prepared shape: the exact rings and the offset, not a summary of them.
+ *  A hash of ring counts collides — two different hole positions keyed the same and returned the
+ *  wrong cached sizer. */
+export function contourCacheKey(base: Contour, offsetMM: number): string {
+  return JSON.stringify([
+    offsetMM,
+    base.outer.pts,
+    base.holes.map((hole) => hole.pts),
+  ])
 }
 
 /** Finished-cutout path: alpha mask (image px, y-down) → traced outline → base contour

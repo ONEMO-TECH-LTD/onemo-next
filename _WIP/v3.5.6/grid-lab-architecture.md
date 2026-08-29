@@ -25,7 +25,7 @@ completion**:
 - **DEFERRED — S5–S10, not authorised and not planned in this build.** The cutover deletion, then
   the judge, layout populations, centring table, Spec/admin authority, the acceptance run, and
   **last of all the API bundle** — which waits until the engine is correct, not merely callable. These titles
-  exist only to show what S1–S4 must not make harder. No S5–S9 code, decomposition, acceptance claim
+  exist only to show what S1–S4 must not make harder. No S5–S10 code, decomposition, acceptance claim
   or cutover is part of this build.
 
 Doing S1–S4 first is a sequencing judgement, not a scope reduction: every deferred rule lands *inside* a
@@ -63,8 +63,7 @@ src/lib/effect/
   geometry-truth.ts        KEEP   repo-wide, not engine-owned
   offset.ts                KEEP   repo-wide Clipper wrapper
   foundation/              NEW    primitives with ≥2 unit consumers
-                                  bbox · area · centroid · point-in-contour · nearest-edge
-                                  lattice · seat predicate · erosion
+                                  bbox · point-in-contour · nearest-edge
   units/                   NEW    self-sufficient; NEVER import each other
     segment/               ← safeSegments: legal contour, islands, masses, segment box
     classifier/            ← grid-magnet-class.ts + the catalogue matcher, completed
@@ -153,13 +152,15 @@ scope, and they are why the headless claim is made about the cluster and not the
 
 | moved unchanged (L6) | lines | deleted | lines |
 |---|---|---|---|
-| seat predicate + edge index | 165 | the two old routes | 2183 |
-| `safeSegments` | 248 | `wrap`/`wrapFlap`/`unheldOf` chain | 375 |
-| centring: anchors, governors, bake | 138 | band walk + `fitSizeInBand` + `bandSnapPoints` | 76 |
-| centre-rules parity registration | 30 | `computeGrid` voting branch | 62 |
-| Clipper wrap solve | 157 | voting scorer, weights, `centeringRef` | ~55 |
-| spec · shape normalisation | 192 | | |
+| `safeSegments` | 248 | the two old routes | 2183 |
+| centring: anchors, governors, bake | 138 | `wrap`/`wrapFlap`/`unheldOf` chain | 375 |
+| centre-rules parity registration | 30 | band walk + `fitSizeInBand` + `bandSnapPoints` | 76 |
+| Clipper wrap solve | 157 | `computeGrid` voting branch | 62 |
+| spec · shape normalisation | 192 | voting scorer, weights, `centeringRef` | ~55 |
 | `library/` — untouched, own law | 1693 | | |
+
+The seat predicate is **not** in that column. It moved to `layout` and it changed: the private
+ring-field shortcut it carried was deleted, and hole-aware containment replaced the outer-ring rule.
 
 Twelve destinations from four files: `grid-magnet-compute` splits four ways, `grid-magnet-logic`
 three, the door two, the wrap module three. **What makes the moves checkable:** the catalogue oracle
@@ -388,8 +389,8 @@ stage is authorised.
 
 - **Relocating `geometry-truth.ts` / `offset.ts`** — repo-wide, not engine-owned.
 - **Relocating `library/`** — 28 gates reference its paths; the move buys nothing.
-- **Freezing the output contract** before reading its real caller — deferred; recorded in
-  `v3.5.6-pipeline-brief.md` §7.
+- **Freezing the output contract before the engine is correct** — deferred to S10. The engine owns
+  that contract; no external caller is in this lane.
 - **Pinning active function bodies by hash** — the library's owner-file pin was the end of a
   specific attack; it is not a general structural tool.
 - **A full gate suite up front** — the derived-zone matrix lands in S2; the rest follow their

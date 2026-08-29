@@ -9,7 +9,6 @@
 // Nothing here holds policy: no threshold, no ranking, no choice. Measurement only.
 
 import type { BBox, Contour, Pt } from '../types'
-import { prepare, holds } from '@/lib/grid-engine/compute/geometry'
 
 export function bbox(pts: ReadonlyArray<Pt>): BBox {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
