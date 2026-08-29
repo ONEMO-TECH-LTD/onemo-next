@@ -7,12 +7,11 @@ import { resolve } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { LIBRARY_FAMILIES, specOf } from '../library/class-registry'
 import { registryIntegrity } from '../library/integrity'
-import { SPACING_MODES, sample96 } from '../library/rules'
 import { transformLayout, frameKeyOf, canonicalNode, transformLayout as tl } from '../library/transforms'
 import { resolveSelection, selectVariant, draftLayoutId } from '../library/selection'
 import { TRIANGLE_LAYOUTS } from '../library/corpus-triangle'
-import { triangleGeometry, canonicalTriangleId, perimeterRuns, perimeterNodes, fullNodes, boundsOf, selfSymmetries, D4, assertTrianglePopulation, type LatticeNode, type TriangleLayout } from '../library/triangle-geometry'
-import { triangleById, triangleFrame, trianglePerimeter96 } from '../library/triangle-frames'
+import { triangleGeometry, canonicalTriangleId, fullNodes, boundsOf, selfSymmetries, D4, assertTrianglePopulation, type LatticeNode, type TriangleLayout } from '../library/triangle-geometry'
+import { triangleById, triangleFrame } from '../library/triangle-frames'
 import { TRIANGLE_TYPES, triangleTypeOf, uprightView, trianglesOfType, restsFlat, isActive } from '../library/triangle-types'
 import { draftId, draftIntegrity, type LibraryDraft } from '../library/drafts'
 import { panelOptionsResolved, selectionForFamily, type PanelOption } from '../library/options'
@@ -20,10 +19,10 @@ import { startAdd, startEdit, saveEdit, deleteEdit, toggleNodeAt, type LibraryEd
 import { materializeSelection, materializeResolved } from '../library/materialize'
 import { librarySurface } from '../library/surface'
 import { catalogue } from '../library/catalogue'
+
+import { boardPositions, CANON_LAYOUT } from '../library/canon'
+import { bandOfFrame } from '../library/rules'
 import type { LibraryFrame, LibrarySelection } from '../library/types'
-import { SQUARE_FRAMES } from '../library/corpus-square'
-import { RECTANGLE_FRAMES } from '../library/corpus-rectangle'
-import { DIAMOND_FRAMES } from '../library/corpus-diamond'
 import { libraryStageModel } from '../grid-magnet-library-bridge'
 import { classifyShape } from '../grid-magnet-class'
 import { MANUFACTURING_TOLERANCE_MM } from '../geometry-truth'
@@ -45,29 +44,38 @@ const materializeDraftResolved = (
   drafts: readonly LibraryDraft[] = [],
 ) => materializeResolved(resolveSelection(selection, drafts, pitchMM), nodes, pitchMM)
 
-const FRAME_KEYS = ['1x1', '2x2', '3x3', '4x4', '5x5']
+/** The square frames the board holds at a lattice — derived, never a typed list: the board is a
+ *  fixed 384x480mm of legal area, so a coarser pitch reaches it with fewer positions. */
+const squareKeysAt = (pitchMM: number) => {
+  const { cols, rows } = boardPositions(pitchMM)
+  return Array.from({ length: Math.min(cols, rows) }, (_, i) => `${i + 1}x${i + 1}`)
+}
 const framesAt = (classId: string, pitchMM: number) => {
   const spec = specOf(classId)
   return spec.types.flatMap((type) => spec.variants(type.id, pitchMM).map((variant) => variant.frame))
 }
 const sel = (over: Partial<LibrarySelection> = {}): LibrarySelection => ({
-  classId: 'square', frameKey: '3x3', layoutId: 'perimeter',
+  classId: 'square', frameKey: '3x3', layoutId: CANON_LAYOUT,
   view: { transpose: false, flipX: false, flipY: false }, ...over,
 })
 
 describe('corpus completeness — removal must fail these', () => {
-  it('exactly the five canonical square frame keys', () => {
-    expect(SQUARE_FRAMES.map(frameKeyOf).sort()).toEqual([...FRAME_KEYS].sort())
+  it('the square frames are exactly the ones the board holds at that lattice', () => {
+    // 17x21 at 24mm, 9x11 at 48, 5x6 at 96 — the board is a fixed 384x480mm of legal area, so a
+    // coarser lattice reaches the same board with fewer positions. A typed list would be wrong at
+    // two of the three pitches.
+    for (const pitch of [24, 48, 96])
+      expect(framesAt('square', pitch).map(frameKeyOf).sort(), `square @${pitch}`)
+        .toEqual([...squareKeysAt(pitch)].sort())
   })
-  it('exactly 16 square layouts as the panel and the pipeline see them', () => {
-    // 12 literal semantic populations in the corpus + the 4 computed 96mm modes.
-    expect(SQUARE_FRAMES.reduce((n, f) => n + f.layouts.length, 0)).toBe(12)
-    expect(framesAt('square', 48).reduce((n, f) => n + f.layouts.length, 0)).toBe(16)
+  it('one population per frame, and it is the full grid', () => {
+    for (const pitch of [24, 48, 96]) for (const f of framesAt('square', pitch)) {
+      expect(f.layouts, `square ${frameKeyOf(f)} @${pitch}`).toHaveLength(1)
+      expect(f.layouts[0].nodes).toHaveLength(f.cols * f.rows)
+    }
   })
-  it('square class: every frame is even, 1x1..5x5, square kind', () => {
-    const seen = new Set<string>()
-    for (const f of SQUARE_FRAMES) { expect(f.cols).toBe(f.rows); seen.add(f.cols + 'x' + f.rows) }
-    for (const n of [1, 2, 3, 4, 5]) expect(seen.has(n + 'x' + n)).toBe(true)
+  it('every square frame is square', () => {
+    for (const pitch of [24, 48, 96]) for (const f of framesAt('square', pitch)) expect(f.cols).toBe(f.rows)
   })
 })
 
@@ -92,7 +100,7 @@ describe('classifier goldens — library and engine taxonomies stay distinct', (
     const xs = a1.outlineMM.map((q) => q[0]), ys = a1.outlineMM.map((q) => q[1])
     expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(24, 6)
     expect(Math.max(...ys) - Math.min(...ys)).toBeCloseTo(24, 6)
-    const a2 = libraryPreview(sel({ classId: 'square', frameKey: '3x3', layoutId: 'perimeter' }), 48)
+    const a2 = libraryPreview(sel({ classId: 'square', frameKey: '3x3', layoutId: CANON_LAYOUT }), 48)
     const xs2 = a2.outlineMM.map((q) => q[0]), ys2 = a2.outlineMM.map((q) => q[1])
     expect(Math.max(...xs2) - Math.min(...xs2)).toBeCloseTo(120, 6)
     expect(Math.max(...ys2) - Math.min(...ys2)).toBeCloseTo(120, 6)
@@ -229,12 +237,14 @@ describe('one resolved population at every caller', () => {
 describe('bridge — stable IDs, wrapGroup-ready arrangement, Stage composition', () => {
   it('arrangement carries stable IDs and mm nodes', () => {
     const a = libraryArrangement(sel(), 48)
-    expect(a).toMatchObject({ sourceFrameKey: '3x3', frameKey: '3x3', layoutId: 'perimeter', frameCols: 3, frameRows: 3 })
+    expect(a).toMatchObject({ sourceFrameKey: '3x3', frameKey: '3x3', layoutId: CANON_LAYOUT, frameCols: 3, frameRows: 3 })
     expect(libraryPreview(sel(), 48)).toMatchObject({ classId: 'square' })
-    expect(a.nodesMM.length).toBe(8)
+    // the canon is the full grid: nine magnets, interiors included
+    expect(a.nodesMM.length).toBe(9)
   })
   it('unknown IDs fail loudly — no silent 1x1 retarget (QA F3)', () => {
-    expect(() => libraryArrangement(sel({ frameKey: '9x9' }), 48)).toThrow('unknown frameKey')
+    // 10x10 is beyond the 9x11 board at this lattice, so it is a genuinely unknown frame
+    expect(() => libraryArrangement(sel({ frameKey: '10x10' }), 48)).toThrow('unknown frameKey')
     expect(() => libraryArrangement(sel({ layoutId: 'nope' }), 48)).toThrow('unknown layoutId')
   })
   it('transpose exposes the truthful actual frame identity (QA F3)', () => {
@@ -245,7 +255,7 @@ describe('bridge — stable IDs, wrapGroup-ready arrangement, Stage composition'
   })
   it('stage model composes the arrangement; lattice stays the canvas own', () => {
     const m = libraryStageModel(librarySurface(sel(), [], null, 48).materialized, 48)
-    expect(m.grid.anchors.length).toBe(8)
+    expect(m.grid.anchors.length).toBe(9)
     expect(m.grid.pitchCentreMM).toBe(48)
     expect(m.grid.spotRadiusMM).toBe(12)
     expect(m.grid.lattice).toEqual([[0, 96]])
@@ -261,63 +271,67 @@ describe('bridge — stable IDs, wrapGroup-ready arrangement, Stage composition'
   })
 })
 
-describe('interior rule and the belt mode', () => {
-  it('4x4 carries NO interior magnet in any layout (Dan, 08-25)', () => {
-    const f = SQUARE_FRAMES.find((x) => x.cols === 4 && x.rows === 4)!
-    for (const l of f.layouts) for (const [x, y] of l.nodes)
-      expect(x === 0 || x === 3 || y === 0 || y === 3, `4x4 ${l.name} interior ${x},${y}`).toBe(true)
-    expect(f.layouts.map((l) => l.name)).not.toContain('full')
+describe('the canon is the full grid, interiors included', () => {
+  // This replaces "4x4 carries NO interior magnet in any layout (Dan, 08-25)", which froze a bug: the
+  // canon list Dan reviewed that day reads "4x4 - full 16, ring 12, corners 4", and 3x3 and 5x5 both
+  // carried their full grid. The corpus had dropped 4x4's alone. The belt that empties a middle is an
+  // engine filter now, applied on top, never a stored library layout.
+  it('4x4 carries its full sixteen, the four interior nodes included', () => {
+    const f = framesAt('square', 48).find((x) => x.cols === 4 && x.rows === 4)!
+    expect(f.layouts).toHaveLength(1)
+    expect(f.layouts[0].nodes).toHaveLength(16)
+    const interior = f.layouts[0].nodes.filter(([x, y]) => x > 0 && x < 3 && y > 0 && y < 3)
+    expect(interior).toHaveLength(4)
   })
-  it('belt is a spacing mode: every frame above 1x1 carries perimeter and perimeter-96', () => {
-    for (const f of SQUARE_FRAMES.filter((x) => x.cols > 1)) {
-      const names = framesAt('square', 48).find((x) => x.cols === f.cols && x.rows === f.rows)!.layouts.map((l) => l.name)
-      expect(names).toContain('perimeter')
-      expect(names).toContain('perimeter-96')
-    }
+  it('the library publishes no filter as a layout', () => {
+    for (const classId of LIBRARY_FAMILIES) for (const pitch of [24, 48, 96])
+      for (const f of framesAt(classId, pitch)) {
+        const names = f.layouts.map((l) => l.name)
+        expect(names, `${classId} ${frameKeyOf(f)} @${pitch}`).not.toContain('perimeter')
+        expect(names).not.toContain('perimeter-96')
+        expect(names).not.toContain('corners')
+      }
   })
 })
 
 describe('rectangle class', () => {
-  it('carries exactly its ruled frames', () => {
-    expect(framesAt('rectangle', 48).map(frameKeyOf).sort()).toEqual(['1x2', '1x3', '1x4', '1x5', '2x3', '2x4', '2x5', '3x4', '3x5', '4x5', '4x6', '5x6'].sort())
+  it('carries every tall frame the board holds at that lattice', () => {
+    // canonical form is TALL (cols < rows); the wide orientation is the matcher turning the record
+    for (const pitch of [24, 48, 96]) {
+      const { cols, rows } = boardPositions(pitch)
+      const want: string[] = []
+      for (let c = 1; c <= cols; c++) for (let r = c + 1; r <= rows; r++) want.push(`${c}x${r}`)
+      expect(framesAt('rectangle', pitch).map(frameKeyOf).sort(), `rectangle @${pitch}`).toEqual(want.sort())
+    }
   })
-  it('every frame offers a perimeter, and only 3+ line frames carry an interior full', () => {
-    for (const f of framesAt('rectangle', 48)) {
-      const names = f.layouts.map((l) => l.name)
-      expect(names).toContain('perimeter')
-      const hasFull = names.includes('full')
-      expect(hasFull).toBe(f.cols >= 3 && f.rows >= 3)
-      for (const l of f.layouts) if (l.name !== 'full')
-        for (const [x, y] of l.nodes)
-          expect(x === 0 || x === f.cols - 1 || y === 0 || y === f.rows - 1,
-            `${frameKeyOf(f)} ${l.name} interior ${x},${y}`).toBe(true)
+  it('every rectangle frame carries one population, its full grid', () => {
+    for (const pitch of [24, 48, 96]) for (const f of framesAt('rectangle', pitch)) {
+      expect(f.layouts, `${frameKeyOf(f)} @${pitch}`).toHaveLength(1)
+      expect(f.layouts[0].nodes).toHaveLength(f.cols * f.rows)
     }
   })
 })
 
 describe('diamond class', () => {
-  it('carries the ruled rings', () => {
-    expect(framesAt('diamond', 48).map(frameKeyOf)).toEqual(['1x1', '3x3', '5x5', '7x7'])
+  it('carries every odd patch the board holds at that lattice', () => {
+    for (const pitch of [24, 48, 96]) {
+      const { cols, rows } = boardPositions(pitch)
+      const side = Math.min(cols, rows)
+      const want: string[] = []
+      for (let n = 1; (n - 1) * 2 + 1 <= side; n++) { const p = (n - 1) * 2 + 1; want.push(`${p}x${p}`) }
+      expect(framesAt('diamond', pitch).map(frameKeyOf).sort(), `diamond @${pitch}`).toEqual(want.sort())
+    }
   })
-  it('uses the SHARED layout vocabulary — full / perimeter / perimeter-96 / corners', () => {
-    for (const f of framesAt('diamond', 48).slice(1)) {
-      const k = (f.cols - 1) / 2
-      const names = f.layouts.map((l) => l.name)
-      expect(names).toContain('full')
-      expect(names).toContain('perimeter')
-      const per = f.layouts.find((l) => l.name === 'perimeter')!
-      expect(per.nodes.length).toBe(4 * k)
-      for (const [x, y] of per.nodes) expect(Math.abs(x - k) + Math.abs(y - k)).toBe(k)
-      // 'full' means the same thing in every class: every node inside the region. On a diamond
-      // that is the whole Manhattan disc, NOT the ring plus one centre magnet — the hardcoded
-      // ring+centre left the inner nodes bare and made a class-special out of a shared word.
-      const full = f.layouts.find((l) => l.name === 'full')!
-      const disc: string[] = []
-      for (let y = 0; y < f.rows; y++) for (let x = 0; x < f.cols; x++)
-        if (Math.abs(x - k) + Math.abs(y - k) <= k) disc.push(x + ',' + y)
-      expect(full.nodes.map(([x, y]) => x + ',' + y).sort()).toEqual(disc.sort())
-      expect(full.nodes.length).toBe(2 * k * k + 2 * k + 1)
-      expect(full.note).toContain('Full grid only')
+  it('the population is the Manhattan mask of its square patch — a preset, not canon', () => {
+    for (const f of framesAt('diamond', 48)) {
+      const r = (f.cols - 1) / 2
+      expect(f.layouts).toHaveLength(1)
+      for (const [x, y] of f.layouts[0].nodes)
+        expect(Math.abs(x - r) + Math.abs(y - r), `${frameKeyOf(f)} ${x},${y}`).toBeLessThanOrEqual(r)
+      const inside: Array<[number, number]> = []
+      for (let x = 0; x < f.cols; x++) for (let y = 0; y < f.rows; y++)
+        if (Math.abs(x - r) + Math.abs(y - r) <= r) inside.push([x, y])
+      expect(f.layouts[0].nodes).toHaveLength(inside.length)
     }
   })
 })
@@ -352,12 +366,13 @@ describe('selection resolution — one owner, no guessing in the view', () => {
     // Guessing here produced a 'safeSel' that still carried the bad classId and threw when the
     // pipeline resolved it. Only the LAYOUT is carried across frames, by design.
     expect(() => resolveSelection(sel({ classId: 'nope' as never }), [], 48)).toThrow('unknown classId')
-    expect(() => resolveSelection(sel({ frameKey: '9x9' }), [], 48)).toThrow('unknown frameKey')
+    // 9x9 is a real square frame now; 10x10 is beyond the 9x11 board at this lattice
+    expect(() => resolveSelection(sel({ frameKey: '10x10' }), [], 48)).toThrow('unknown frameKey')
   })
 
   it('the strict materializer still refuses the same input — the two are not merged', () => {
     expect(() => materializeSelection(sel({ classId: 'diamond', frameKey: '1x1', layoutId: 'perimeter' }), 48)).toThrow('unknown layoutId')
-    expect(() => materializeSelection(sel({ frameKey: '9x9' }), 48)).toThrow('unknown frameKey')
+    expect(() => materializeSelection(sel({ frameKey: '10x10' }), 48)).toThrow('unknown frameKey')
   })
 
   it('a draft identity resolves only for its own class AND frame AND name', () => {
@@ -382,123 +397,6 @@ describe('selection resolution — one owner, no guessing in the view', () => {
     expect(() => resolveSelection(
       sel({ classId: 'square', frameKey: '3x3', layoutId: draftLayoutId('deleted') }), [], 48,
     )).toThrow('library: unknown draft deleted in 3x3')
-  })
-})
-
-describe('the 96mm spacing mode is computed policy, one rule for every class', () => {
-  const key = (n: readonly [number, number]) => n[0] + ',' + n[1]
-  it('the corpus stores no 96mm population — it is derived, never hand-written', () => {
-    for (const frames of [SQUARE_FRAMES, RECTANGLE_FRAMES, DIAMOND_FRAMES])
-      for (const f of frames) expect(f.layouts.map((l) => l.name)).not.toContain('perimeter-96')
-  })
-
-  it('a frame with a perimeter always offers the 96mm mode, and it is a subset of that perimeter', () => {
-    for (const fam of LIBRARY_FAMILIES) for (const f of framesAt(fam, 48)) {
-      const per = f.layouts.find((l) => l.name === 'perimeter')
-      const s96 = f.layouts.find((l) => l.name === 'perimeter-96')
-      if (!per) { expect(s96).toBeUndefined(); continue }
-      expect(s96, `${fam} ${frameKeyOf(f)}`).toBeDefined()
-      const ring = new Set(per.nodes.map(key))
-      for (const n of s96!.nodes) expect(ring.has(key(n)), `${fam} ${frameKeyOf(f)} ${key(n)}`).toBe(true)
-      expect(s96!.nodes.length).toBeLessThanOrEqual(per.nodes.length)
-    }
-  })
-
-  it('every 96mm population keeps every extreme — an extreme is never left bare', () => {
-    for (const fam of LIBRARY_FAMILIES) for (const f of framesAt(fam, 48)) {
-      const s96 = f.layouts.find((l) => l.name === 'perimeter-96')
-      if (!s96) continue
-      const got = new Set(s96.nodes.map(key))
-      const per = f.layouts.find((l) => l.name === 'perimeter')!
-      for (const e of convexHull(per.nodes))
-        expect(got.has(key(e)), `${fam} ${frameKeyOf(f)} missing ${key(e)}`).toBe(true)
-    }
-  })
-
-  it('96mm is a physical distance — the stride is 96/pitch nodes, far end always kept', () => {
-    const run = (n: number, p = 48) => [...sample96(n, p)].sort((a, b) => a - b)
-    expect(run(4)).toEqual([0, 2, 3])
-    expect(run(5)).toEqual([0, 2, 4])
-    expect(run(6)).toEqual([0, 2, 4, 5])
-    expect(run(5, 96)).toEqual([0, 1, 2, 3, 4])   // one node per 96mm: every node
-    expect(run(5, 24)).toEqual([0, 4])            // four nodes per 96mm
-    expect(() => sample96(5, 36)).toThrow('unsupported at pitch')
-  })
-
-  it('the panel and the canvas see the SAME magnets, at every pitch, for every class', () => {
-    // The 96mm population is a physical distance, so it depends on the pitch. Composing it once
-    // at 48 and repairing it at draw time meant every reader BEFORE the repair — the resolver,
-    // the option layer, the orientation dedupe — counted a different set from the one on
-    // screen: 28 shapes disagreed at 24mm and 96mm. Nothing visibly broke only because those
-    // classes are symmetric.
-    let checked = 0
-    for (const fam of LIBRARY_FAMILIES) {
-      const spec = specOf(fam)
-      for (const pitch of [24, 48, 96]) {
-        const open = spec.open(sel(), pitch)
-        for (const t of spec.types) for (const v of spec.variants(t.id, pitch)) {
-          for (const layout of v.frame.layouts) {
-            const s = { ...selectVariant(open, v), layoutId: layout.name }
-            const drawn = materializeSelection(s, pitch)
-            const transformed = transformLayout(v.frame, layout, s.view)
-            const expected = transformed.nodes.map(([x, y]) =>
-              [x * pitch, (transformed.rows - 1 - y) * pitch] as const)
-            expect(drawn.nodesMM, `${fam} ${v.id} ${layout.name} @${pitch}`).toEqual(expected)
-            checked++
-          }
-        }
-      }
-    }
-    expect(checked).toBeGreaterThan(200)
-  })
-
-  it('the population follows the pitch tier, and the label does not (Dan: 96 is fixed)', () => {
-    const at = (p: number) => framesAt('square', p).find((x) => x.cols === 5)!
-      .layouts.find((l) => l.name === 'perimeter-96')!.nodes.length
-    expect([at(24), at(48), at(96)]).toEqual([4, 8, 16])
-    expect(SPACING_MODES.map((m) => m.label)).toEqual(['48 mm', '96 mm'])
-  })
-
-  it('a non-divisible ring pairs instead of leaning — square 4x4 exactly', () => {
-    // Walked clockwise, each side indexes from its own start, so the short closing interval
-    // lands as four balanced adjacent pairs rather than biased to one absolute direction.
-    const f = framesAt('square', 48).find((x) => x.cols === 4)!
-    const got = f.layouts.find((l) => l.name === 'perimeter-96')!.nodes.map(key).sort()
-    expect(got).toEqual(['0,0', '0,1', '0,3', '1,3', '2,0', '3,0', '3,2', '3,3'].sort())
-  })
-
-  it('every square 96 population is closed under a quarter turn', () => {
-    for (const f of framesAt('square', 48).filter((x) => x.cols > 1)) {
-      const s96 = f.layouts.find((l) => l.name === 'perimeter-96')
-      if (!s96) continue
-      const got = new Set(s96.nodes.map(key))
-      for (const [x, y] of s96.nodes)
-        expect(got.has(key([f.rows - 1 - y, x])), `${frameKeyOf(f)} rotate ${key([x, y])}`).toBe(true)
-    }
-  })
-
-  it('the ruled populations follow from that one rule', () => {
-    const n96 = (fam: 'square' | 'rectangle' | 'diamond', c: number, r: number) =>
-      framesAt(fam, 48).find((f) => f.cols === c && f.rows === r)!
-        .layouts.find((l) => l.name === 'perimeter-96')!.nodes.length
-    expect(n96('square', 3, 3)).toBe(4)
-    expect(n96('square', 4, 4)).toBe(8)
-    expect(n96('square', 5, 5)).toBe(8)
-    expect(n96('rectangle', 1, 4)).toBe(3)
-    expect(n96('rectangle', 3, 4)).toBe(6)
-    expect(n96('rectangle', 4, 6)).toBe(10)
-    expect(n96('diamond', 3, 3)).toBe(4)
-    expect(n96('diamond', 7, 7)).toBe(8)
-  })
-
-  it('the diamond vocabulary is complete on every ring, corners are exactly the vertices', () => {
-    for (const f of framesAt('diamond', 48).slice(1)) {
-      const names = f.layouts.map((l) => l.name)
-      for (const n of ['full', 'perimeter', 'perimeter-96', 'corners']) expect(names, frameKeyOf(f)).toContain(n)
-      const corners = f.layouts.find((l) => l.name === 'corners')!
-      const perimeter = f.layouts.find((l) => l.name === 'perimeter')!
-      expect(corners.nodes.map(key).sort()).toEqual(convexHull(perimeter.nodes).map(key).sort())
-    }
   })
 })
 
@@ -577,9 +475,9 @@ describe('triangle — the three-point layout universe', () => {
 
   it('the retired vocabulary never reaches the UI, and no name is two words', () => {
     const first = TRIANGLE_LAYOUTS.find((t) => triangleTypeOf(t) === 'pyramid')!
-    const ff = triangleFrame(first, 48)
+    const ff = triangleFrame(first)
     const labels = panelOptionsFor({ classId: 'triangle', geometryId: first.id, frameKey: frameKeyOf(ff),
-      layoutId: 'corners', view: { transpose: false, flipX: false, flipY: false } }, [], 48)
+      layoutId: CANON_LAYOUT, view: { transpose: false, flipX: false, flipY: false } }, [], 48)
       .types.map((o) => o.label)
     expect(labels).toEqual(['Pyramid', 'Arrowhead', 'Mountain', 'Needle', 'Wedge', 'Flag'])
     for (const l of labels) expect(l.includes(' '), l).toBe(false)
@@ -641,51 +539,29 @@ describe('triangle — populations', () => {
   const key = (n: LatticeNode) => n[0] + ',' + n[1]
   const some = TRIANGLE_LAYOUTS.filter((_, i) => i % 7 === 0)
 
-  it('perimeter is exactly the union of the three gcd edge runs', () => {
-    for (const t of some) {
-      const runs = perimeterRuns(t.vertices).flat().map(key)
-      expect([...new Set(perimeterNodes(t.vertices).map(key))].sort()).toEqual([...new Set(runs)].sort())
-    }
-  })
-
-  it('full is every lattice node inside or on the triangle, and contains the perimeter', () => {
+  // The perimeter, corners and 96mm populations left with the filters: they are the engine's to apply
+  // on top of the canon, not the library's to publish. What survives is the canon itself.
+  it('the population is every lattice node the three vertices enclose, and nothing else', () => {
     for (const t of some) {
       const full = new Set(fullNodes(t.vertices).map(key))
-      for (const n of perimeterNodes(t.vertices)) expect(full.has(key(n)), t.id).toBe(true)
+      const f = triangleFrame(t)
+      expect(f.layouts, t.id).toHaveLength(1)
+      expect(new Set(f.layouts[0].nodes.map((n) => key(n as LatticeNode)))).toEqual(full)
       const b = boundsOf([...t.vertices])
       expect(full.size).toBeLessThanOrEqual(b.cols * b.rows)
+      for (const v of t.vertices) expect(full.has(key(v)), `${t.id} vertex missing`).toBe(true)
     }
   })
 
-  it('corners are exactly the three vertices', () => {
-    for (const t of some) {
-      const f = triangleFrame(t, 48)
-      expect(f.layouts.find((l) => l.name === 'corners')!.nodes.map(key).sort())
-        .toEqual([...t.vertices].map(key).sort())
-    }
-  })
-
-  it('96 is a subset of perimeter, keeps every vertex, and follows the pitch', () => {
-    for (const t of some) {
-      const per = new Set(perimeterNodes(t.vertices).map(key))
-      for (const pitch of [24, 48, 96]) {
-        const s96 = trianglePerimeter96(t, pitch)
-        for (const n of s96) expect(per.has(key(n)), `${t.id} @${pitch}`).toBe(true)
-        for (const v of t.vertices) expect(s96.map(key)).toContain(key(v))
-      }
-      expect(trianglePerimeter96(t, 96).length).toBeGreaterThanOrEqual(trianglePerimeter96(t, 24).length)
-    }
-  })
-
-  it('a balanced symmetric type stays mirror-balanced — a non-divisible run cannot make it lean', () => {
+  it('a symmetric type stays mirror-balanced', () => {
     for (const t of TRIANGLE_LAYOUTS.filter((x) => triangleTypeOf(x) === 'pyramid')) {
-      const s96 = new Set(trianglePerimeter96(t, 48).map(key))
+      const pop = new Set(fullNodes(t.vertices).map(key))
       for (const f of selfSymmetries(t.vertices)) {
         const img = t.vertices.map(f)
         const tx = Math.min(...img.map((q) => q[0])), ty = Math.min(...img.map((q) => q[1]))
-        for (const n of [...s96].map((s) => s.split(',').map(Number) as [number, number])) {
+        for (const n of [...pop].map((s) => s.split(',').map(Number) as [number, number])) {
           const [x, y] = f(n)
-          expect(s96.has(key([x - tx, y - ty])), `${t.id} asymmetric`).toBe(true)
+          expect(pop.has(key([x - tx, y - ty])), `${t.id} asymmetric`).toBe(true)
         }
       }
     }
@@ -694,8 +570,8 @@ describe('triangle — populations', () => {
 
 describe('triangle — the outline is derived from the magnets, at exactly 12mm', () => {
   const PAD = 12
-  const triSel = (id: string, layoutId = 'corners'): LibrarySelection => {
-    const f = triangleFrame(TRIANGLE_LAYOUTS.find((t) => t.id === id)!, 48)
+  const triSel = (id: string, layoutId = CANON_LAYOUT): LibrarySelection => {
+    const f = triangleFrame(TRIANGLE_LAYOUTS.find((t) => t.id === id)!)
     return { classId: 'triangle', geometryId: id, frameKey: frameKeyOf(f), layoutId,
       view: { transpose: false, flipX: false, flipY: false } }
   }
@@ -710,7 +586,9 @@ describe('triangle — the outline is derived from the magnets, at exactly 12mm'
       const a = libraryArrangement(sel, 48)
       const outline = libraryPreview(sel, 48).outlineMM
       const hull = a.nodesMM
-      expect(hull.length).toBe(3)
+      // the canon is every node the three vertices enclose, so the count varies by geometry; what this
+      // test proves is the clearance law, and the three vertices are checked below
+      expect(hull.length).toBeGreaterThanOrEqual(3)
       // every magnet sits at least the padding inside the outline
       for (const m of hull) {
         let best = Infinity
@@ -745,7 +623,7 @@ describe('triangle — the outline is derived from the magnets, at exactly 12mm'
   })
 
   it('moving one corner changes the derived triangle outline', () => {
-    const selection = triSel('tri:0,0;0,2;2,0', 'corners')
+    const selection = triSel('tri:0,0;0,2;2,0', CANON_LAYOUT)
     const before = materializeDraftResolved(selection, [[0, 0], [0, 2], [2, 0]], 48)
     const after = materializeDraftResolved(selection, [[0, 0], [0, 2], [2, 1]], 48)
     expect(before.error).toBeNull(); expect(after.error).toBeNull()
@@ -760,25 +638,25 @@ describe('triangle — the outline is derived from the magnets, at exactly 12mm'
 
   it('a triangle selection without a geometry fails loud', () => {
     expect(() => libraryArrangement(
-      { classId: 'triangle', frameKey: '3x3', layoutId: 'corners', view: { transpose: false, flipX: false, flipY: false } }, 48,
+      { classId: 'triangle', frameKey: '3x3', layoutId: CANON_LAYOUT, view: { transpose: false, flipX: false, flipY: false } }, 48,
     )).toThrow('carries no geometryId')
     expect(() => triangleById('tri:nope')).toThrow('unknown triangle geometry')
   })
 
   it('draft identity carries the geometry, so two layouts on one frame cannot cross', () => {
-    const [a, b] = TRIANGLE_LAYOUTS.filter((t) => frameKeyOf(triangleFrame(t, 48)) === '3x4').slice(0, 2)
+    const [a, b] = TRIANGLE_LAYOUTS.filter((t) => frameKeyOf(triangleFrame(t)) === '3x4').slice(0, 2)
     expect(draftId('triangle', '3x4', 'mine', a.id)).not.toBe(draftId('triangle', '3x4', 'mine', b.id))
   })
 })
 
 describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
-  const sel3 = (id: string, layoutId = 'corners'): LibrarySelection => {
-    const f = triangleFrame(TRIANGLE_LAYOUTS.find((t) => t.id === id)!, 48)
+  const sel3 = (id: string, layoutId = CANON_LAYOUT): LibrarySelection => {
+    const f = triangleFrame(TRIANGLE_LAYOUTS.find((t) => t.id === id)!)
     return { classId: 'triangle', geometryId: id, frameKey: frameKeyOf(f), layoutId,
       view: { transpose: false, flipX: false, flipY: false } }
   }
   const one = (type: string) => TRIANGLE_LAYOUTS.find((t) => triangleTypeOf(t) === type)!
-  const frameOf = (id: string) => triangleFrame(TRIANGLE_LAYOUTS.find((t) => t.id === id)!, 48)
+  const frameOf = (id: string) => triangleFrame(TRIANGLE_LAYOUTS.find((t) => t.id === id)!)
 
   it('F1 — a population being drawn never throws, and says why it is not saveable', () => {
     const id = one('wedge').id
@@ -804,8 +682,8 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
 
   it('F3 — every layout exposes exactly its distinct views, with one active and unique labels', () => {
     for (const t of TRIANGLE_LAYOUTS) {
-      const f = triangleFrame(t, 48)
-      const corners = f.layouts.find((l) => l.name === 'corners')!
+      const f = triangleFrame(t)
+      const corners = { name: 'vertices', nodes: [...t.vertices] }
       const distinct = new Set<string>()
       for (const transpose of [false, true]) for (const flipX of [false, true]) for (const flipY of [false, true]) {
         const r = tl(f, corners, { transpose, flipX, flipY })
@@ -828,7 +706,7 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
     // own corners have fewer
     const peak = TRIANGLE_LAYOUTS.find((t) => triangleTypeOf(t) === 'pyramid'
       && panelOptionsFor(sel3(t.id), [], 48).orientations.length < 8)!
-    const f = triangleFrame(peak, 48)
+    const f = triangleFrame(peak)
     const asym: Array<[number, number]> = [[0, 0], [0, f.rows - 1], [f.cols - 1, f.rows - 1]]
     const draft = {
       id: draftId('triangle', frameKeyOf(f), 'asym', peak.id), className: 'triangle',
@@ -950,8 +828,8 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
 })
 
 describe('triangle — a corner is a corner, and it opens the right way up', () => {
-  const sel3 = (id: string, layoutId = 'corners'): LibrarySelection => {
-    const f = triangleFrame(TRIANGLE_LAYOUTS.find((t) => t.id === id)!, 48)
+  const sel3 = (id: string, layoutId = CANON_LAYOUT): LibrarySelection => {
+    const f = triangleFrame(TRIANGLE_LAYOUTS.find((t) => t.id === id)!)
     return { classId: 'triangle', geometryId: id, frameKey: frameKeyOf(f), layoutId,
       view: { transpose: false, flipX: false, flipY: false } }
   }
@@ -959,8 +837,9 @@ describe('triangle — a corner is a corner, and it opens the right way up', () 
     // The shared sharp-outline producer must preserve the triangle's three supporting corners
     // while keeping every magnet at least the released padding inside them.
     let checked = 0
+    const seen = new Set<string>()
     for (const t of TRIANGLE_LAYOUTS) {
-      const f = triangleFrame(t, 48)
+      const f = triangleFrame(t)
       for (const layoutId of f.layouts.map((l) => l.name)) {
         for (const view of [{ transpose: false, flipX: false, flipY: false },
           { transpose: true, flipX: true, flipY: false }]) {
@@ -977,10 +856,14 @@ describe('triangle — a corner is a corner, and it opens the right way up', () 
             expect(best, `${t.id} ${layoutId}`).toBeGreaterThanOrEqual(12 - MANUFACTURING_TOLERANCE_MM)
             checked++
           }
+          seen.add(t.id + '|' + view.transpose)
         }
       }
     }
-    expect(checked).toBeGreaterThan(2000)
+    // Coverage is stated as the sweep it performed, not as a magic number: every geometry in both
+    // views, and every magnet in each. A typed floor silently passed when the population shrank.
+    expect(seen.size).toBe(TRIANGLE_LAYOUTS.length * 2)
+    expect(checked).toBeGreaterThanOrEqual(TRIANGLE_LAYOUTS.length * 2 * 3)
   })
 
   it('every triangle chip measures the one produced outline', () => {
@@ -989,8 +872,11 @@ describe('triangle — a corner is a corner, and it opens the right way up', () 
       const selection = { ...variant.selection, layoutId: variant.frame.layouts[0].name, view: variant.view }
       const outline = materializeSelection(selection, 48).outlineMM
       const xs = outline.map(([x]) => x), ys = outline.map(([, y]) => y)
+      // the chip reads "B<band> · <width>×<height>" — the band is per pitch, so it is computed, never
+      // written into a frame's name: the same 5x5 is B3 at 24mm, B5 at 48 and B9 at 96
       expect(variant.label, variant.id).toBe(
-        Math.round(Math.max(...xs) - Math.min(...xs)) + '×'
+        'B' + bandOfFrame(variant.frame, 48) + ' · '
+        + Math.round(Math.max(...xs) - Math.min(...xs)) + '×'
         + Math.round(Math.max(...ys) - Math.min(...ys)),
       )
     }
@@ -1032,9 +918,9 @@ describe('triangle — a corner is a corner, and it opens the right way up', () 
     // Naming turns against the STORED form let a layout sit upright with 'mirror diagonal'
     // pressed — this fails on any build that labels relative to the canonical form.
     for (const t of TRIANGLE_LAYOUTS.slice(0, 12)) {
-      const f = triangleFrame(t, 48)
+      const f = triangleFrame(t)
       const sel: LibrarySelection = { classId: 'triangle', geometryId: t.id, frameKey: frameKeyOf(f),
-        layoutId: 'corners', view: uprightView(t) }
+        layoutId: CANON_LAYOUT, view: uprightView(t) }
       const opts = panelOptionsFor(sel, [], 48).orientations
       expect(opts[0].label, t.id).toBe('0°')
       expect(opts[0].active, t.id).toBe(true)
@@ -1258,9 +1144,9 @@ describe('the class spec is portable, and nothing outside it knows a class by na
 })
 
 describe('authoring transitions — the five the page used to spell out itself', () => {
-  const triSel = (id: string, layoutId = 'corners'): LibrarySelection => {
+  const triSel = (id: string, layoutId = CANON_LAYOUT): LibrarySelection => {
     const t = triangleById(id)
-    return { classId: 'triangle', geometryId: id, frameKey: frameKeyOf(triangleFrame(t, 48)),
+    return { classId: 'triangle', geometryId: id, frameKey: frameKeyOf(triangleFrame(t)),
       layoutId, view: uprightView(t) }
   }
 
@@ -1292,7 +1178,7 @@ describe('authoring transitions — the five the page used to spell out itself',
     // and the same for a triangle, where the outline is derived from the drawn magnets
     const t = triangleById('tri:0,0;0,2;2,0')
     const tsel: LibrarySelection = { classId: 'triangle', geometryId: t.id,
-      frameKey: frameKeyOf(triangleFrame(t, 48)), layoutId: 'corners', view: uprightView(t) }
+      frameKey: frameKeyOf(triangleFrame(t)), layoutId: CANON_LAYOUT, view: uprightView(t) }
     const tsaved = saveEdit(tsel, [], { name: 'probe', nodes: [[0, 0], [0, 2], [2, 0]] }, 48)
     expect(tsaved.ok).toBe(true)
     if (!tsaved.ok) return
@@ -1310,17 +1196,15 @@ describe('authoring transitions — the five the page used to spell out itself',
     }
   })
 
-  it('a custom seeds from what is ON SCREEN at this pitch, not the canonical 48mm set', () => {
-    const s = sel({ frameKey: '5x5', layoutId: 'perimeter-96' })
-    // the 96mm mode is physical: at 24mm it keeps every fourth node, at 48 every other
-    expect(startEdit(s, [], 24).nodes.length).toBe(4)
-    expect(startEdit(s, [], 48).nodes.length).toBe(8)
-    expect(startEdit(s, [], 96).nodes.length).toBe(16)
-    expect(startEdit(s, [], 48).name).toBe('perimeter-96-custom')
+  it('a custom seeds from the canon on screen, at every pitch', () => {
+    const s = sel({ frameKey: '5x5', layoutId: CANON_LAYOUT })
+    // the canon is the frame's full grid, so a 5x5 seeds 25 wherever it is offered
+    for (const pitch of [24, 48, 96]) expect(startEdit(s, [], pitch).nodes.length, `@${pitch}`).toBe(25)
+    expect(startEdit(s, [], 48).name).toBe(CANON_LAYOUT + '-custom')
   })
 
   it('a click in a TRANSPOSED view lands on the canonical node, and clicking again removes it', () => {
-    const s = sel({ classId: 'rectangle', frameKey: '2x3', layoutId: 'perimeter',
+    const s = sel({ classId: 'rectangle', frameKey: '2x3', layoutId: CANON_LAYOUT,
       view: { transpose: true, flipX: false, flipY: false } })
     // shown 3 wide x 2 tall; the far column, top row, is canonical [0,2]
     const once = toggleNodeAt(s, [], { name: 'x', nodes: [] }, [96, 48], 48)
@@ -1355,7 +1239,7 @@ describe('authoring transitions — the five the page used to spell out itself',
 
   it('delete removes only THIS geometry’s draft, even when another shares the frame and the name', () => {
     // two distinct triangles on one frame: same frameKey, same draft name, different shapes
-    const pair = TRIANGLE_LAYOUTS.filter((t) => frameKeyOf(triangleFrame(t, 48)) === '3x4' && isActive(t)).slice(0, 2)
+    const pair = TRIANGLE_LAYOUTS.filter((t) => frameKeyOf(triangleFrame(t)) === '3x4' && isActive(t)).slice(0, 2)
     expect(pair).toHaveLength(2)
     const mk = (t: typeof pair[number]) => {
       const s = triSel(t.id)

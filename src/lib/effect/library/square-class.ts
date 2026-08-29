@@ -1,5 +1,4 @@
-import { frameOf } from './canon'
-import { boardPositions } from '../grid-magnet-spec'
+import { boardPositions, frameOf } from './canon'
 import { registryClass } from './registry-class'
 import type { LibraryFrame } from './types'
 

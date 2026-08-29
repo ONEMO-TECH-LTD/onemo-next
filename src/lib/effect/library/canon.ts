@@ -19,19 +19,31 @@
 // was mine on 2026-08-25 and it read "no generation AT SOLVE TIME", which is a different claim —
 // what was rejected then was a solve-time generator filtering patterns per family.
 
+import { BOARD_HEIGHT_MM, BOARD_WIDTH_MM } from '../grid-magnet-spec'
 import type { LibraryFrame } from './types'
 
-type Node = readonly [number, number]
+type Pt = readonly [number, number]
+
+/** How many positions of a given lattice the board holds, per axis. The board is fixed in
+ *  millimetres, so this is the one place the two are converted: 17x21 at 24mm, 9x11 at 48, 5x6 at
+ *  96. Spec states the millimetres and does no arithmetic. */
+export function boardPositions(pitchMM: number): { cols: number; rows: number } {
+  if (!Number.isFinite(pitchMM) || pitchMM <= 0) throw new Error('library: bad pitch ' + pitchMM)
+  return {
+    cols: Math.floor(BOARD_WIDTH_MM / pitchMM) + 1,
+    rows: Math.floor(BOARD_HEIGHT_MM / pitchMM) + 1,
+  }
+}
 
 /** THE CANON — every node of the frame. */
-export function fullNodes(cols: number, rows: number): Node[] {
-  const out: Node[] = []
+export function fullNodes(cols: number, rows: number): Pt[] {
+  const out: Pt[] = []
   for (let x = 0; x < cols; x++) for (let y = 0; y < rows; y++) out.push([x, y])
   return out
 }
 
 /** AN APPROVED SHAPE — the diamond is the square patch within Manhattan reach of its centre. */
-export function diamondMask(cols: number, nodes: readonly Node[]): Node[] {
+export function diamondMask(cols: number, nodes: readonly Pt[]): Pt[] {
   const r = (cols - 1) / 2
   return nodes.filter(([x, y]) => Math.abs(x - r) + Math.abs(y - r) <= r)
 }
@@ -42,7 +54,7 @@ export const CANON_LAYOUT = 'full'
 export const SINGLE_LAYOUT = 'single'
 
 /** A frame as the library publishes it: its canon population, and nothing else. */
-export function frameOf(cols: number, rows: number, mask?: (nodes: readonly Node[]) => Node[]): LibraryFrame {
+export function frameOf(cols: number, rows: number, mask?: (nodes: readonly Pt[]) => Pt[]): LibraryFrame {
   const nodes = mask ? mask(fullNodes(cols, rows)) : fullNodes(cols, rows)
   return { cols, rows, layouts: [{ name: nodes.length === 1 ? SINGLE_LAYOUT : CANON_LAYOUT, nodes }] }
 }

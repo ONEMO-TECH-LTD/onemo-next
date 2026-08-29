@@ -27,19 +27,13 @@ export const MIN_EFFECT_MM = 24
 export const FIELD_COLUMNS = 9
 export const FIELD_ROWS = 11
 
-/** The board in MILLIMETRES of legal area — the span the outermost magnet centres may occupy.
- *  This is the fixed fact; how many POSITIONS it holds depends on the lattice being used, so a
- *  coarser pitch reaches the same board with fewer of them (Dan, 2026-08-29: the sparser tier is
- *  "the same lattice just sparser"). Reading the position count as pitch-free published layouts
- *  that could not physically sit on the board. */
-export const BOARD_WIDTH_MM = (FIELD_COLUMNS - 1) * DEFAULT_PITCH_MM
-export const BOARD_HEIGHT_MM = (FIELD_ROWS - 1) * DEFAULT_PITCH_MM
-
-/** How many positions of a given lattice the board holds, per axis. */
-export const boardPositions = (pitchMM: number) => ({
-  cols: Math.floor(BOARD_WIDTH_MM / pitchMM) + 1,
-  rows: Math.floor(BOARD_HEIGHT_MM / pitchMM) + 1,
-})
+/** The board in MILLIMETRES of legal area — the span the outermost magnet centres may occupy. It is
+ *  the fixed fact; how many POSITIONS it holds depends on the lattice in use, so a coarser pitch
+ *  reaches the same board with fewer of them (Dan, 2026-08-29: the sparser tier is "the same lattice
+ *  just sparser"). Reading the position count as pitch-free published layouts that could not
+ *  physically sit on the board. The conversion lives in library/canon.ts — spec states values. */
+export const BOARD_WIDTH_MM = 384
+export const BOARD_HEIGHT_MM = 480
 
 /** DEFECT, filed not fixed: the engine's size ceiling reads this for BOTH axes, so it models the
  *  board as square and caps every shape at 420mm. A portrait shape can lawfully reach 504mm. */

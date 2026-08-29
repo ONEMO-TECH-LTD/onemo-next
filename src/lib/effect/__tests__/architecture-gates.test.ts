@@ -800,17 +800,17 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     for (const path of governed)
       expect(source(path), path).not.toMatch(/\bpadMM\b/)
   })
-  it('STEP 4: catalogue V2 has exact readonly data-only records and frozen identity', () => {
+  it('STEP 4: catalogue V3 has exact readonly data-only records and frozen identity', () => {
     type Exact = Readonly<{
       classId: string; typeId: string; id: string; label: string; pitchMM: number; corners: 'sharp' | 'bevel' | 'round'
       nodesMM: readonly (readonly [number, number])[]; outlineMM: readonly (readonly [number, number])[]
       widthMM: number; heightMM: number; frameCols: number; frameRows: number
-      bandId: number | null; legalWidthMM: number; legalHeightMM: number
+      bandId: number; legalWidthMM: number; legalHeightMM: number
     }>
     type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false
     const exact: Equal<CatalogueEntry, Exact> = true
     expect(exact).toBe(true)
-    expect(CATALOGUE_FORMAT_VERSION).toBe(2)
+    expect(CATALOGUE_FORMAT_VERSION).toBe(3)
     const entries = catalogue(48)
     const keys = ['classId', 'typeId', 'id', 'label', 'pitchMM', 'corners', 'nodesMM', 'outlineMM', 'widthMM', 'heightMM', 'frameCols', 'frameRows', 'bandId', 'legalWidthMM', 'legalHeightMM'].sort()
     for (const pitchMM of [24, 48, 96]) for (const entry of catalogue(pitchMM)) {
