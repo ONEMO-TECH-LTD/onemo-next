@@ -31,28 +31,13 @@ import {
 } from './units/layout'
 import { wrapGroup } from './units/wrap'
 import { layoutsForFrame } from './grid-magnet-library-catalogue'
-import { makeSizer } from './grid-magnet-shape'
 import { viewIdOf } from './units/layout'
 
-/** WHAT SIZE TO MEASURE AT — the only difference between the bench's two controls.
- *  A band asks the pipeline to solve for the size where the shape fills it; manual states the size
- *  outright. Manual is NOT a bypass: it classifies, matches, seats, records omission and wraps
- *  through the same chain and answers to the same laws (product law: "free/manual and the band run
- *  one engine"). It supplies a measurement, not a verdict. */
-export type PipelineEnvelope =
-  | Readonly<{ kind: 'band'; bandId: number }>
-  | Readonly<{ kind: 'manual'; sizeMM: number }>
-
-/** DATA ONLY. The door used to take `(mm) => Contour` and an anchor function, which meant the
- *  request could not be serialised, replayed, compared or sent across a worker boundary as a
- *  value — so there was no single door, only a call convention. The shape arrives as its stored
- *  contour and the sizer is built inside. */
 export interface PipelineRequest {
-  /** The normalized contour, longest side 1mm — the shape as it is stored. */
-  readonly base: Contour
-  /** Outline offset in mm, applied by the sizer. */
-  readonly offsetMM?: number
-  readonly envelope: PipelineEnvelope
+  /** The shape at any size — the one thing the caller owns. */
+  readonly sized: (mm: number) => Contour
+  /** Which band to solve. The band is the measurement anchor and the range, per Dan's step 2. */
+  readonly bandId: number
   readonly pitchMM?: number
   readonly paddingMM?: number
   readonly centreMode?: number
@@ -60,6 +45,9 @@ export interface PipelineRequest {
   readonly massDepthMM?: number
   /** The outline is a true circle — judge against the analytic curve, not its flattened chords. */
   readonly circle?: boolean
+  /** The governed centre at any size. Supplied by the bench (baked once per shape); derived here
+   *  when absent, so a headless caller needs nothing but a shape. */
+  readonly anchorAtMM?: (mm: number) => Pt
 }
 
 /** A position the layout asked for and the material refused. Recorded, never silent — Dan,
@@ -109,10 +97,6 @@ export interface PipelineResult {
   /** Set when the pipeline could not classify at all, and why. An empty list with no reason would
    *  be indistinguishable from a library that holds nothing. */
   readonly reason?: string
-  /** Echoed so a consumer can rebuild the shape at any size without re-deriving the request. */
-  readonly baseContour: Contour
-  readonly offsetMM: number
-  readonly spotRadiusMM: number
 }
 
 /** Local offsets about a group's own middle — the form wrapGroup takes. */
@@ -136,51 +120,57 @@ function legalSpanMM(points: readonly Pt[]): number {
  * four and keep only the highest-count one, deleting three lawful registrations before wrap ever
  * saw them, which is the max-count prefilter the brief forbids by name.
  */
-/** The frame a shape carries at one size — the same measurement the classifier reads. */
-function frameAtMM(
-  sized: (mm: number) => Contour, sizeMM: number, radiusMM: number, depthMM: number, pitchMM: number,
-): { cols: number; rows: number } | null {
-  return frameOfMasses(safeSegments(sized(sizeMM), radiusMM, depthMM, 'light'), pitchMM)
+/** The LEGAL span a shape shows at one size — the region a magnet CENTRE may occupy, which is what
+ *  a band is defined on (Dan, 2026-08-29: "the range in which the shape is must be measured by
+ *  inner legal area"). Deliberately NOT the mass union: that is a deeper probe (16mm against the
+ *  magnet's own 12mm), so calibrating a band against it would target a ceiling the shape can never
+ *  reach — every shape failed to reach its own band, including a plain square. Band and frame are
+ *  two different measurements of the same shape and each keeps its own. */
+function legalSpanAtMM(
+  sized: (mm: number) => Contour, sizeMM: number, radiusMM: number, depthMM: number,
+): number | null {
+  const segments = safeSegments(sized(sizeMM), radiusMM, depthMM, 'light')
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const segment of segments) {
+    if (segment.bbox.minX < minX) minX = segment.bbox.minX
+    if (segment.bbox.minY < minY) minY = segment.bbox.minY
+    if (segment.bbox.maxX > maxX) maxX = segment.bbox.maxX
+    if (segment.bbox.maxY > maxY) maxY = segment.bbox.maxY
+  }
+  return minX === Infinity ? null : Math.max(maxX - minX, maxY - minY)
 }
 
 /**
- * THE SIZE AT WHICH THIS SHAPE CARRIES THE BAND'S POSITIONS — solved, not assumed.
+ * THE SIZE AT WHICH THIS SHAPE FILLS THE BAND — solved, not assumed.
  *
- * THE BAND IS THE FRAME. "A band says how many magnet positions the shape can carry across its
- * dominant axis: B1 holds one, B2 two, B3 three" (spec, from Dan's ruling). So the target is a
- * POSITION COUNT, and it is solved against the very measurement the classifier then reads — the
- * live-mass frame. Two earlier targets each mixed two rulers and each was wrong:
+ * The band is a range of LEGAL span, and sizes are OUTLINE sizes. Converting one to the other by
+ * taking the rim off both sides is exact only for an axis-aligned outline: measured at B4's top
+ * size of 215mm, a square shows 182mm of live span (B4, right) while a star shows 120mm (B3,
+ * three bands adrift), so the star was classified far below the band it was asked for and could
+ * never be offered a B4 layout (QA F1b).
  *
- *   - the band's OUTLINE ceiling: outline-minus-rim is the legal span only for an axis-aligned
- *     shape, so a star classified three bands adrift;
- *   - the band's LEGAL ceiling: the mesh quantises in ~2mm steps, so it overshot 191 to 192 —
- *     four pitches, FIVE positions — and asking for B4 returned a 5x5 frame whose every layout
- *     belongs to B5, with 72 attempts where one band can only mean one frame. Worse, legal span
- *     and live mass are different probes, so the frame read one position lower again on a star.
+ * Live span grows monotonically with size — the shape scales while the 12mm rim does not — so the
+ * size that reaches the band's ceiling is found by bisection on the same measurement the classifier
+ * then uses. This is a bounded measurement solve on ONE quantity, not the deleted candidate sweep:
+ * nothing is seated, wrapped or compared here.
  *
- * One quantity, one probe, no conversion. The frame grows monotonically with size, so the smallest
- * size carrying the band's count is a bisection. Null when the shape never carries that many
- * positions at any size the board allows — an honest answer, not a silent wrong one.
+ * Null when the shape cannot reach the band at any size the board allows — an honest answer, not a
+ * silent classification at the wrong size.
  */
 function calibrateSizeForBand(
-  sized: (mm: number) => Contour, positions: number, radiusMM: number, depthMM: number,
-  pitchMM: number, ceilingMM: number,
+  sized: (mm: number) => Contour, targetSpanMM: number, radiusMM: number, depthMM: number,
+  ceilingMM: number,
 ): number | null {
-  const dominantAt = (mm: number): number => {
-    const f = frameAtMM(sized, mm, radiusMM, depthMM, pitchMM)
-    return f ? Math.max(f.cols, f.rows) : 0
-  }
-  if (dominantAt(ceilingMM) < positions) return null
   let lo = MIN_EFFECT_MM, hi = ceilingMM
+  if ((legalSpanAtMM(sized, hi, radiusMM, depthMM) ?? 0) < targetSpanMM) return null
   for (let i = 0; i < 40 && hi - lo > 0.05; i++) {
     const mid = (lo + hi) / 2
-    if (dominantAt(mid) < positions) lo = mid; else hi = mid
+    if ((legalSpanAtMM(sized, mid, radiusMM, depthMM) ?? 0) < targetSpanMM) lo = mid; else hi = mid
   }
-  return dominantAt(hi) === positions ? hi : null
+  return hi
 }
 
 export function runPipeline(request: PipelineRequest): PipelineResult {
-  const sized = makeSizer(request.base, request.offsetMM ?? 0)
   const pitchMM = request.pitchMM ?? DEFAULT_PITCH_MM
   // The released rim is the law and it is locked; a caller that says nothing gets 12, never the
   // admin slider's floor (Dan, 2026-08-29: "point it to the last locked number").
@@ -188,36 +178,31 @@ export function runPipeline(request: PipelineRequest): PipelineResult {
   const radiusMM = spotRadiusOf(padMM)
   // FAIL LOUD. An unknown band silently became B1, so asking for band 999 and band 1 returned
   // byte-identical answers — a wrong question answered confidently is worse than an error.
-  const envelope = request.envelope
-  const band = envelope.kind === 'band' ? BANDS.find((b) => b.id === envelope.bandId) : undefined
-  if (envelope.kind === 'band' && !band)
-    throw new Error('pipeline: unknown band ' + envelope.bandId)
+  const band = BANDS.find((b) => b.id === request.bandId)
+  if (!band) throw new Error('pipeline: unknown band ' + request.bandId)
   // The band is a LEGAL range; sizes are OUTLINE sizes, so it converts through this shape's own
   // rim. A diamond and a square in one band do not share an outline range.
-  const ceilingMM = fieldSpanMM(padMM) + SIZE_CEIL_MARGIN_MM
-  const span = band ? bandOuterMM(band, padMM) : { minMM: MIN_EFFECT_MM, maxMM: ceilingMM }
+  const span = bandOuterMM(band, padMM)
 
   // STEP 1 + 2 — measure where the shape actually FILLS the band, not where its outline happens to
   // be. The size is solved against the same live-span measurement the frame is then read from, so
   // the two cannot disagree.
   const depthMM = Math.max(radiusMM, request.massDepthMM ?? MASS_DEPTH_MM)
-  const calibratedMM = band
-    ? calibrateSizeForBand(sized, band.id, radiusMM, depthMM, pitchMM, ceilingMM)
-    : envelope.kind === 'manual' ? envelope.sizeMM : null
+  const calibratedMM = calibrateSizeForBand(request.sized, band.maxMM, radiusMM, depthMM,
+    fieldSpanMM(padMM) + SIZE_CEIL_MARGIN_MM)
   if (calibratedMM === null)
     return { frame: null, classifiedAtMM: span.maxMM, pitchMM, anchorMM: null, segments: [], attempts: [],
-      reason: 'this shape never carries ' + (band ? band.id : '?') + ' magnet positions across at any size the board allows',
-      baseContour: request.base, offsetMM: request.offsetMM ?? 0, spotRadiusMM: radiusMM }
+      reason: 'shape cannot reach band ' + band.id + ' at any size the board allows' }
   const classifiedAtMM = calibratedMM
-  const contour = sized(classifiedAtMM)
+  const contour = request.sized(classifiedAtMM)
   const segments = safeSegments(contour, radiusMM, depthMM, 'full')
   const frame = frameOfMasses(segments, pitchMM)
 
   const bb = bbox(contour.outer.pts)
   const boxC: Pt = [(bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2]
   const mode = (request.centreMode ?? CENTRE_MODE) as CentreMode
-  const anchorFn: (mm: number) => Pt = ((mm: number) => {
-    const c = sized(mm)
+  const anchorFn: (mm: number) => Pt = request.anchorAtMM ?? ((mm: number) => {
+    const c = request.sized(mm)
     const segs = safeSegments(c, radiusMM, depthMM, 'light')
     const cb = bbox(c.outer.pts)
     const centre: Pt = [(cb.minX + cb.maxX) / 2, (cb.minY + cb.maxY) / 2]
@@ -235,8 +220,7 @@ export function runPipeline(request: PipelineRequest): PipelineResult {
 
   if (!frame || !fits)
     return { frame, classifiedAtMM, pitchMM, anchorMM, segments, attempts: [],
-      reason: !frame ? 'no live mass to classify' : 'the outline admits no seat at all',
-      baseContour: request.base, offsetMM: request.offsetMM ?? 0, spotRadiusMM: radiusMM }
+      reason: !frame ? 'no live mass to classify' : 'the outline admits no seat at all' }
 
   const wcfg: WrapConfig = {
     pitchMM, paddingMM: padMM, centreMode: request.centreMode, governor: request.governor,
@@ -266,7 +250,7 @@ export function runPipeline(request: PipelineRequest): PipelineResult {
       // real thing the pipeline tried, and dropping it made the bench claim four grid positions
       // while rendering two (QA F3a).
       const wrap = seatedMM.length
-        ? wrapGroup(sized, wcfg, localise(seatedMM).group, MIN_EFFECT_MM, span.maxMM)
+        ? wrapGroup(request.sized, wcfg, localise(seatedMM).group, MIN_EFFECT_MM, span.maxMM)
         : null
       attempts.push({
         entryId: match.entry.id,
@@ -285,8 +269,7 @@ export function runPipeline(request: PipelineRequest): PipelineResult {
       })
     }
   }
-  return { frame, classifiedAtMM, pitchMM, anchorMM, segments, attempts,
-    baseContour: request.base, offsetMM: request.offsetMM ?? 0, spotRadiusMM: radiusMM }
+  return { frame, classifiedAtMM, pitchMM, anchorMM, segments, attempts }
 }
 
 export { legalOfOuterMM }

@@ -2,15 +2,11 @@
 // Wiring only — values from spec, geometry from compute, answers from the engine.
 
 import { contourFromShape } from './geometry-truth'
-import { makeSizer } from './grid-magnet-shape'
-export { makeSizer, contourCacheKey } from './grid-magnet-shape'
 import { traceContourRaw } from './contour'
-
+import { insetRingMM } from './offset'
+import { scaleContour } from './grid-magnet-compute'
 import { flattenShape, type VShape } from '@/lib/vector-core'
 import type { Contour, Pt } from './types'
-import type { PipelineResult } from './pipeline'
-import { assignSizes } from './grid-magnet-logic'
-import type { MagnetPlan, SafeSegment } from './types'
 import {
   fieldSpanMM,
   latticeOver,
@@ -39,6 +35,30 @@ export function normBaseContour(vs: VShape, maskHeightPx: number): Contour | nul
   const norm = (pts: ReadonlyArray<Pt>): Pt[] => pts.map(([x, y]) => [x / FLATTEN_REF_MM, y / FLATTEN_REF_MM] as Pt)
   // Every ring normalises. Dropping holes here deleted them before the engine ever saw them.
   return { outer: { pts: norm(c.outer.pts) }, holes: c.holes.map((h) => ({ pts: norm(h.pts) })) }
+}
+
+/** Sizer for one base contour: real-mm contour at any longest side, outline offset applied. */
+export function makeSizer(base: Contour, offsetMM: number): (mm: number) => Contour {
+  return (mm: number): Contour => {
+    const c = scaleContour(base, mm)
+    if (!offsetMM) return c
+    const o = insetRingMM(c.outer.pts, offsetMM, 'round')
+    // A positive offset grows the outline and SHRINKS every hole by the same amount — a hole is a
+    // boundary, so an inset moves it inward from the material's point of view.
+    const holes = c.holes.map((h) => insetRingMM(h.pts, -offsetMM, 'round')).filter((h): h is Pt[] => !!h && h.length >= 3)
+    return o && o.length >= 3 ? { outer: { pts: o }, holes: holes.map((pts) => ({ pts })) } : c
+  }
+}
+
+/** Cache identity for a prepared shape: the exact rings and the offset, not a summary of them.
+ *  A hash of ring counts collides — two different hole positions keyed the same and returned the
+ *  wrong cached sizer. */
+export function contourCacheKey(base: Contour, offsetMM: number): string {
+  return JSON.stringify([
+    offsetMM,
+    base.outer.pts,
+    base.holes.map((hole) => hole.pts),
+  ])
 }
 
 /** Finished-cutout path: alpha mask (image px, y-down) → traced outline → base contour
@@ -106,108 +126,3 @@ export function seatedSpots(grid: GridResult): FieldSpot[] {
   return grid.anchors.map((a) => ({ x: a.p[0], y: a.p[1], r: grid.spotRadiusMM, held: true }))
 }
 
-/** One row of the pipeline's ledger, as the bench draws it. Every fact the attempt recorded
- *  reaches the card: a count alone made distinct attempts look like repeated duplicates, and the
- *  positions the material refused were thrown away between the engine and the screen. */
-export interface LedgerRow {
-  readonly attemptId: string
-  readonly classId: string
-  readonly frameCols: number
-  readonly frameRows: number
-  readonly label: string
-  readonly viewId: string
-  readonly registration: string
-  readonly attempted: number
-  readonly count: number
-  readonly omittedMM: readonly Pt[]
-  readonly sizeMM: number | null
-  readonly landedBandId: number | null
-  readonly outcome: 'fit' | 'no-fit'
-  readonly offMM: number | null
-}
-
-/** Which registration, in words — two rows can carry the same size and count and still be
- *  different products (a 4x4 dropping a column reads like one dropping a row). */
-function registrationName(offset: readonly [number, number]): string {
-  if (offset[0] === 0 && offset[1] === 0) return 'grid on centre'
-  if (offset[1] === 0) return 'grid half-step across'
-  if (offset[0] === 0) return 'grid half-step down'
-  return 'grid half-step across and down'
-}
-
-export function ledgerOf(result: PipelineResult): LedgerRow[] {
-  return result.attempts.map((a) => ({
-    attemptId: a.attemptId,
-    classId: a.classId,
-    frameCols: a.frameCols,
-    frameRows: a.frameRows,
-    label: a.label,
-    viewId: a.viewId,
-    registration: registrationName(a.registrationMM),
-    attempted: a.attempted,
-    count: a.wrap ? a.wrap.count : a.seatedMM.length,
-    omittedMM: a.omitted.map(({ pointMM }) => pointMM),
-    sizeMM: a.wrap ? a.wrap.sizeMM : null,
-    landedBandId: a.landedBandId,
-    outcome: a.wrap ? 'fit' : 'no-fit',
-    offMM: a.wrap ? a.wrap.centreOffMM : null,
-  }))
-}
-
-/** Every lattice position across the shape at this size, on the governed registration. */
-function latticeOverContour(contour: Contour, pitchMM: number, anchor: Pt): Pt[] {
-  const xs = contour.outer.pts.map((p) => p[0]), ys = contour.outer.pts.map((p) => p[1])
-  const region = {
-    minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys),
-  }
-  return latticeOver(region, pitchMM, [
-    ((anchor[0] - region.minX) % pitchMM + pitchMM) % pitchMM,
-    ((anchor[1] - region.minY) % pitchMM + pitchMM) % pitchMM,
-  ])
-}
-
-/** THE BENCH MODEL — the pipeline's result as the canvas draws it. Assembly only: it chooses
- *  nothing. With no selection it returns the classified shape and an empty magnet set, so the
- *  bench shows what the pipeline found without promoting one answer, which is what the raw MVP
- *  requires (a default landing IS a ranking). */
-export function benchModel(
-  result: PipelineResult, selectedAttemptId: string | null, plan: MagnetPlan,
-): {
-  contour: Contour; grid: GridResult; effSize: number; ladder: LedgerRow[]
-  selectedAttemptId: string | null; segments: readonly SafeSegment[]
-  offMM: number | null; frame: { cols: number; rows: number } | null; reason?: string
-} {
-  const ladder = ledgerOf(result)
-  const chosen = selectedAttemptId == null ? null
-    : result.attempts.find((a) => a.attemptId === selectedAttemptId && a.wrap) ?? null
-  const sized = makeSizer(result.baseContour, result.offsetMM)
-  const sizeMM = chosen?.wrap ? chosen.wrap.sizeMM : result.classifiedAtMM
-  const contour = sized(sizeMM)
-  const points = chosen?.wrap ? chosen.wrap.points : []
-  const anchor = chosen?.wrap ? chosen.wrap.anchorMM : (result.anchorMM ?? [0, 0] as Pt)
-  return {
-    contour,
-    grid: {
-      anchors: assignSizes(points.map(([x, y]) => [x, y] as Pt), plan),
-      pitchCentreMM: result.pitchMM,
-      // THE LATTICE IS THE SHAPE'S, NOT THE SELECTION'S. It is every position this grid offers on
-      // this shape at this size, and it must be visible before anything is picked — returning an
-      // empty list left the board blank on a shape that was loaded and classified.
-      lattice: latticeOverContour(contour, result.pitchMM, anchor),
-      phaseMM: [0, 0],
-      panMM: [0, 0],
-      spotRadiusMM: result.spotRadiusMM,
-      contactsMM: chosen?.wrap ? chosen.wrap.points.filter((_, i) => (chosen.wrap!.gapsMM[i] ?? Infinity) <= 0.6) : [],
-      segments: [...result.segments],
-      centresMM: [anchor],
-      centreMainMM: anchor,
-    },
-    effSize: sizeMM,
-    ladder,
-    selectedAttemptId: chosen ? chosen.attemptId : null,
-    segments: result.segments,
-    offMM: chosen?.wrap ? chosen.wrap.centreOffMM : null,
-    frame: result.frame ? { cols: result.frame.cols, rows: result.frame.rows } : null,
-    reason: result.reason,
-  }
-}

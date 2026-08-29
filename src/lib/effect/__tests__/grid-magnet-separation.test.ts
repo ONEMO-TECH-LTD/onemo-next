@@ -129,15 +129,10 @@ describe('2 — traffic is one-way', () => {
     'grid-magnet-class.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/foundation\/[a-z-]+$/, /^\.\/units\/[a-z-]+$/],
     'grid-magnet-library-bridge.ts': [/^\.\/types$/, /^\.\/grid-magnet[a-z-]*$/, /^\.\/library[/a-z-]*$/, /^\.\/foundation\/[a-z-]+$/],
     'grid-magnet-library-catalogue.ts': [/^\.\/types$/, /^\.\/grid-magnet[a-z-]*$/, /^\.\/library[/a-z-]*$/],
-    // The bridge is the DISPLAY ADAPTER: it turns a pipeline result into what the canvas draws,
-    // so it reads the pipeline's types, the shape owner it shares with the pipeline, and the magnet
-    // sizing it renders with. It computes no answer of its own.
-    'grid-magnet-bridge.ts': [/^\.\/types$/, /^\.\/geometry-truth$/, /^\.\/contour$/, /^\.\/offset$/, /^\.\/grid-magnet$/, /^\.\/grid-magnet-compute$/, /^\.\/grid-magnet-shape$/, /^\.\/pipeline$/, /^\.\/grid-magnet-logic$/, /^@\/lib\/vector-core$/],
-    // The shape owner: one job — stored contour, size, stable identity.
-    'grid-magnet-shape.ts': [/^\.\/types$/, /^\.\/offset$/],
+    'grid-magnet-bridge.ts': [/^\.\/types$/, /^\.\/geometry-truth$/, /^\.\/contour$/, /^\.\/offset$/, /^\.\/grid-magnet$/, /^\.\/grid-magnet-compute$/, /^@\/lib\/vector-core$/],
     // THE PIPELINE: shared vocabulary, spec, foundation, the units it sequences, and the matcher.
     // It may NOT reach the library directly — that boundary is the adapter's whole job.
-    'pipeline.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/foundation\/[a-z-]+$/, /^\.\/units\/[a-z-]+$/, /^\.\/grid-magnet-library-catalogue$/, /^\.\/grid-magnet-shape$/],
+    'pipeline.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/foundation\/[a-z-]+$/, /^\.\/units\/[a-z-]+$/, /^\.\/grid-magnet-library-catalogue$/],
   }
 
   it('every module file imports only from its allow-list', () => {
@@ -308,9 +303,7 @@ describe('2d — the real shells are governed too', () => {
   // expires when the pipeline lands. Pinned exactly, so a stray import fails even where edges exist.
   const SHELL_UNIT_EDGES: Array<[string, readonly string[]]> = [
     [PAGE, []],
-    // The worker holds NO unit edges at all now: it is transport. It calls one door and one
-    // display adapter, which is the whole point of the cutover.
-    [WORKER, []],
+    [WORKER, ['@/lib/effect/units/centring']],
   ]
 
   it('the page and worker hold exactly their pinned unit edges', () => {
@@ -575,7 +568,7 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
       }
       return { outer: { pts }, holes: [] }
     }
-    const solve = runPipeline({ base: star(1), envelope: { kind: 'band', bandId: 4 }, paddingMM: 12, pitchMM: 48 })
+    const solve = runPipeline({ sized: star, bandId: 4, paddingMM: 12, pitchMM: 48 })
     expect(solve.attempts.length, 'this band must produce attempts, or the test proves nothing').toBeGreaterThan(0)
     for (const a of solve.attempts.filter((x) => x.wrap))
       expect(a.landedBandId, a.entryId + ' wrapped without a band label').not.toBeNull()
@@ -587,7 +580,7 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
     // The engine built four lawful registrations and returned ONE, by seat count. Measured on a
     // 168mm square at 12mm padding it kept 16 magnets and destroyed the 12, 12 and 9 before wrap
     // saw them — the max-count prefilter the brief forbids by name. The pipeline tries all four.
-    const solve = runPipeline({ base: sq(1), envelope: { kind: 'band', bandId: 4 }, paddingMM: 12, pitchMM: 48 })
+    const solve = runPipeline({ sized: sq, bandId: 4, paddingMM: 12, pitchMM: 48 })
     const byEntry = new Map<string, Set<string>>()
     for (const a of solve.attempts) {
       const key = a.entryId + '/' + a.viewId
@@ -610,7 +603,7 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
       }
       return { outer: { pts }, holes: [] }
     }
-    const solve = runPipeline({ base: star(1), envelope: { kind: 'band', bandId: 4 }, paddingMM: 12, pitchMM: 48 })
+    const solve = runPipeline({ sized: star, bandId: 4, paddingMM: 12, pitchMM: 48 })
     const withOmissions = solve.attempts.filter((a) => a.omitted.length)
     expect(withOmissions.length, 'a concave star must refuse some positions, or this proves nothing').toBeGreaterThan(0)
     for (const a of solve.attempts) {
@@ -639,12 +632,9 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
     ], 48)).toMatchObject({ cols: 3, rows: 3, widthMM: 96, heightMM: 96 })
   })
 
-  it('COUNTEREXAMPLE: the band IS the frame — B4 means four positions across, never five', () => {
-    // Two bugs this kills. Restore `classifiedAtMM = span.maxMM` and a star classifies three bands
-    // adrift, because outline-minus-rim is not the legal span for a pointed shape. Target the
-    // band's 191mm CEILING instead of its frame and the mesh's ~2mm quantum overshoots to 192 —
-    // four pitches, FIVE positions — so asking for B4 returned a 5x5 frame carrying only B5
-    // layouts, and 72 attempts where one band can only mean one frame.
+  it('COUNTEREXAMPLE: a pointed shape is calibrated by measured legal span, not outline arithmetic', () => {
+    // Restore `classifiedAtMM = span.maxMM` and this dies. A star at B4's nominal outline top shows
+    // only ~120mm of legal span — three bands adrift — so it could never be offered a B4 layout.
     const star = (mm: number): Contour => {
       const pts: Pt[] = []
       for (let i = 0; i < 10; i++) {
@@ -654,7 +644,7 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
       }
       return { outer: { pts }, holes: [] }
     }
-    const solve = runPipeline({ base: star(1), envelope: { kind: 'band', bandId: 4 }, paddingMM: 12, pitchMM: 48 })
+    const solve = runPipeline({ sized: star, bandId: 4, paddingMM: 12, pitchMM: 48 })
     expect(solve.frame, 'the star must classify').not.toBeNull()
     const segs = safeSegments(star(solve.classifiedAtMM), 12, 16, 'light')
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
@@ -663,12 +653,9 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
       maxX = Math.max(maxX, sg.bbox.maxX); maxY = Math.max(maxY, sg.bbox.maxY)
     }
     const legalSpan = Math.max(maxX - minX, maxY - minY)
-    // B4 = four positions across = three pitches = 144mm of legal span, measured, not assumed.
-    expect(legalSpan, 'B4 must be reached at three pitches of legal span').toBeGreaterThanOrEqual(144)
-    expect(legalSpan, 'and must not spill into the next band').toBeLessThan(192)
-    expect(solve.frame!.cols, 'the dominant axis IS the band').toBe(4)
-    for (const a of solve.attempts)
-      expect(Math.max(a.frameCols, a.frameRows), a.attemptId + ' is not a B4 frame').toBe(4)
+    expect(legalSpan, 'calibration must reach the band ceiling').toBeGreaterThanOrEqual(190)
+    // and it must have had to grow PAST the naive outline conversion to get there
+    expect(solve.classifiedAtMM).toBeGreaterThan(bandOuterMM(BANDS[3], 12).maxMM)
   }, 60_000)
 
   it('COUNTEREXAMPLE: a registration that seats nothing is still reported', () => {
@@ -682,9 +669,10 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
       }
       return { outer: { pts }, holes: [] }
     }
-    const solve = runPipeline({ base: tiny(1), envelope: { kind: 'band', bandId: 2 }, paddingMM: 12, pitchMM: 48 })
-    expect(solve.attempts.length, 'the library must offer this frame something').toBeGreaterThan(0)
+    const solve = runPipeline({ sized: tiny, bandId: 1, paddingMM: 12, pitchMM: 48 })
     expect(solve.attempts.length % 4, 'every match must appear at all four registrations').toBe(0)
+    expect(solve.attempts.some((a) => a.seatedMM.length === 0),
+      'a band-1 circle cannot seat a half-step registration — that row must still exist').toBe(true)
     for (const a of solve.attempts)
       expect(a.seatedMM.length + a.omitted.length, a.attemptId).toBe(a.attempted)
   }, 60_000)
@@ -692,15 +680,15 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
   it('COUNTEREXAMPLE: an unknown band fails loud instead of becoming B1', () => {
     // Restore `?? BANDS[0]` and this dies. Asking for band 999 and band 1 returned identical
     // answers — a wrong question answered confidently.
-    expect(() => runPipeline({ base: sq(1), envelope: { kind: 'band', bandId: 999 }, paddingMM: 12, pitchMM: 48 }))
+    expect(() => runPipeline({ sized: sq, bandId: 999, paddingMM: 12, pitchMM: 48 }))
       .toThrow('pipeline: unknown band 999')
   })
 
   it('COUNTEREXAMPLE: every attempt carries a stable identity, so nothing is chosen by position', () => {
     // Restore index-based selection and this dies: ids must be unique and stable across runs, which
     // is what lets the shell select without ranking.
-    const a = runPipeline({ base: sq(1), envelope: { kind: 'band', bandId: 3 }, paddingMM: 12, pitchMM: 48 })
-    const b = runPipeline({ base: sq(1), envelope: { kind: 'band', bandId: 3 }, paddingMM: 12, pitchMM: 48 })
+    const a = runPipeline({ sized: sq, bandId: 3, paddingMM: 12, pitchMM: 48 })
+    const b = runPipeline({ sized: sq, bandId: 3, paddingMM: 12, pitchMM: 48 })
     const ids = a.attempts.map((x) => x.attemptId)
     expect(new Set(ids).size, 'attempt ids must be unique').toBe(ids.length)
     expect(b.attempts.map((x) => x.attemptId), 'and stable between runs').toEqual(ids)
@@ -708,45 +696,10 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
       expect(x.attemptId).toBe(x.entryId + '|' + x.viewId + '|' + x.registrationMM.join(','))
   }, 60_000)
 
-  it('COUNTEREXAMPLE: the pipeline request is DATA — serialisable, and replays identically', () => {
-    // The door used to take a `(mm) => Contour` closure and an anchor function, so there was no
-    // single door at all, only a call convention: the request could not cross a worker boundary as
-    // a value, be cached by identity, replayed or compared.
-    const request = { base: sq(1), envelope: { kind: 'band' as const, bandId: 3 }, paddingMM: 12, pitchMM: 48 }
-    expect(() => structuredClone(request)).not.toThrow()
-    const a = runPipeline(request)
-    const b = runPipeline(structuredClone(request))
-    expect(b.attempts.map((x) => x.attemptId)).toEqual(a.attempts.map((x) => x.attemptId))
-    expect(b.attempts.map((x) => x.wrap?.sizeMM ?? null)).toEqual(a.attempts.map((x) => x.wrap?.sizeMM ?? null))
-  }, 60_000)
-
-  it('COUNTEREXAMPLE: manual is not a bypass — it answers to the same chain as the band', () => {
-    // Product law: free/manual and the band run ONE engine. Manual used to call computeGrid while
-    // the band called the pipeline, so the two could disagree about the same shape at the same size.
-    // Manual supplies a measurement; it does not supply a verdict.
-    const band = runPipeline({ base: sq(1), envelope: { kind: 'band', bandId: 3 }, paddingMM: 12, pitchMM: 48 })
-    const manual = runPipeline({
-      base: sq(1), envelope: { kind: 'manual', sizeMM: band.classifiedAtMM }, paddingMM: 12, pitchMM: 48,
-    })
-    expect(manual.frame, 'manual must classify').toEqual(band.frame)
-    expect(manual.attempts.map((a) => a.attemptId)).toEqual(band.attempts.map((a) => a.attemptId))
-    expect(manual.attempts.map((a) => a.seatedMM.length)).toEqual(band.attempts.map((a) => a.seatedMM.length))
-    expect(manual.attempts.map((a) => a.omitted.length)).toEqual(band.attempts.map((a) => a.omitted.length))
-  }, 60_000)
-
-  it('the worker is TRANSPORT: one door, and no engine of its own', () => {
-    const worker = readFileSync(join(process.cwd(), 'src/app/(dev)/effect-creator/grid-centre/solve.worker.ts'), 'utf8')
-    expect((worker.match(/runPipeline\(/g) ?? []).length, 'exactly one door call').toBe(1)
-    // Every name below was the worker doing the engine's job: a second solve path, its own bake,
-    // its own band resolution, its own display assembly.
-    expect(worker).not.toMatch(/computeGrid|manualBand|wrapGrid|anchorBakeOf|anchorFromBake|BANDS\[0\]/)
-    expect(worker).not.toMatch(/grid-magnet-(compute|logic|wrap-compute)/)
-  })
-
   it('the pipeline runs headless and sorts nothing', () => {
     // This lane's deliverable is an engine that answers from a plain test with no browser. It also
     // must not order: ordering is judgement, and Dan scoped it after the raw MVP.
-    const solve = runPipeline({ base: sq(1), envelope: { kind: 'band', bandId: 3 }, paddingMM: 12, pitchMM: 48 })
+    const solve = runPipeline({ sized: sq, bandId: 3, paddingMM: 12, pitchMM: 48 })
     expect(solve.frame, 'the pipeline must classify the shape').not.toBeNull()
     const sizes = solve.attempts.filter((a) => a.wrap).map((a) => a.wrap!.sizeMM)
     const ascending = [...sizes].sort((a, b) => a - b)
@@ -764,11 +717,10 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
     // unselectable, so the canvas cannot draw one — the two are enforced together.
     const page = readFileSync(join(process.cwd(), 'src/app/(dev)/effect-creator/grid-centre/page.tsx'), 'utf8')
     expect(page).not.toMatch(/nothing fully fits in this band/)
-    expect(page).toMatch(/'no-fit'/)
-    expect(page, 'an unfitted row must be unselectable').toMatch(/disabled=\{row\.outcome === 'no-fit'\}/)
-    expect(page, 'and unclickable even so').toMatch(/if \(row\.outcome === 'fit'\)/)
-    // Omission is lawful; SILENT omission is not. The card states how many the material refused;
-    // the raw millimetre coordinates were debug output printed onto a product surface.
-    expect(page, 'the card must report what the material refused').toMatch(/refused by the material/)
+    expect(page).toMatch(/no fit/)
+    expect(page, 'an unfitted row must be unselectable').toMatch(/disabled=\{row\.sizeMM == null\}/)
+    expect(page, 'and unclickable even so').toMatch(/if \(row\.sizeMM != null\)/)
+    // Omission is lawful; SILENT omission is not — what the material refused reaches the screen.
+    expect(page, 'the shell must show what the material refused').toMatch(/row\.omitted/)
   })
 })
