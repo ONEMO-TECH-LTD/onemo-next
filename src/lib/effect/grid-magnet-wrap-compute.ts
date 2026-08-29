@@ -13,7 +13,7 @@
 import type { BandRung, BandSolve, Contour, GridConfig, GridResult, Pt, WrapAt, WrapConfig } from './types'
 import { DEFAULT_PITCH_MM, MAGNET_DIA_SMALL_MM, MAGNET_DIA_LARGE_MM, PADDING_FLOOR_MM } from './grid-magnet-spec'
 import { computeGrid } from './grid-magnet'
-import { bbox } from './foundation/geometry'
+import { bbox, edgeDistToContourMM } from './foundation/geometry'
 import { contourCentroidOf } from './units/centring'
 import { spotRadiusOf } from './units/layout'
 import { safeSegments } from './units/segment'
@@ -22,7 +22,7 @@ import { CENTRE_MODE, GOVERNOR, MASS_DEPTH_MM } from './grid-magnet-spec'
 import type { CentreMode, Governor } from './types'
 import { wrapGroup } from './units/wrap'
 import { inBand, orderOffers } from './units/judge'
-import { bestSeatedCandidate, fallbackRevealSizes } from './units/layout'
+import { applyCoverage, bestSeatedCandidate, completeSeating, fallbackRevealSizes } from './units/layout'
 
 
 /** mm → integer microns; Clipper64 is integer-robust. */
@@ -107,7 +107,27 @@ export function wrapBandLadder(
     anchorAtMM: anchorFn,
   }
   const seen = new Set<string>()
+  const shipped = new Set<string>()
   const rungs: BandRung[] = []
+  /** Re-seat at the solved size. The count and the per-magnet gaps describe the completed
+   *  population; the size, the origin and the centre deviation are wrap's and stay untouched —
+   *  nothing moved, the material simply supports more seats than the reveal had found. */
+  const completeAt = (sz: (mm: number) => Contour, at: WrapAt, pitchMM: number, padMM: number): WrapAt => {
+    const contour = sz(at.sizeMM)
+    // Complete against the material, then hand it back to the SAME coverage rule the reveal used —
+    // otherwise completing quietly refills the interior the perimeter belt exists to empty.
+    const filled = completeSeating(contour, at.points, pitchMM, padMM)
+    const pts = applyCoverage(filled, cfg.perimeterOnly ?? true, pitchMM).seated
+    if (pts.length === at.points.length
+      && pts.every((p, i) => p[0] === at.points[i][0] && p[1] === at.points[i][1])) return at
+    const radius = spotRadiusOf(padMM)
+    return {
+      ...at,
+      count: pts.length,
+      points: pts,
+      gapsMM: pts.map((q) => Math.max(0, edgeDistToContourMM(contour, q) - radius)),
+    }
+  }
   const witnesses: Array<{ revealMM: number; points: Pt[] }> = []
   for (const mm of fallbackRevealSizes(loMM, hiMM)) {
     const pts = computeGrid(sized(mm), anchorAtMM ? { ...scanCfg, centreOverrideMM: anchorAtMM(mm) } : scanCfg).anchors.map((a) => a.p)
@@ -123,9 +143,17 @@ export function wrapBandLadder(
     const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1])
     const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2
     const group = pts.map(([x, y]) => [x - cx, y - cy] as Pt)
-    const at = wrapGroup(sized, wcfg, group, minMM, hiMM)
-    if (!at) continue
-    if (!inBand(at.sizeMM, loMM, hiMM)) continue   // judge: another band owns it
+    const solved = wrapGroup(sized, wcfg, group, minMM, hiMM)
+    if (!solved) continue
+    if (!inBand(solved.sizeMM, loMM, hiMM)) continue   // judge: another band owns it
+    // The set was revealed at `mm` and the shape then shrank onto it. Ask the material once more,
+    // at the size that actually shipped, so no lattice position sits empty inside it.
+    const at = completeAt(sized, solved, pitch, Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM))
+    // Two reveals can complete to the same answer, so identity is settled on what SHIPS, not on
+    // what was scanned — otherwise the same layout is offered several times over.
+    const settled = at.sizeMM.toFixed(2) + '|' + at.points.map((p) => `${p[0].toFixed(2)},${p[1].toFixed(2)}`).sort().join(';')
+    if (shipped.has(settled)) continue
+    shipped.add(settled)
     rungs.push({ at, revealMM: mm })
   }
   return { offers: orderOffers(rungs), bestSeated: bestSeatedCandidate(witnesses) }

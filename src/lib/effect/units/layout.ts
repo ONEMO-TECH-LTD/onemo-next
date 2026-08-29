@@ -273,6 +273,31 @@ export function fallbackRevealSizes(loMM: number, hiMM: number): number[] {
   return out
 }
 
+/** COMPLETE THE SEATING AT THE SIZE THAT SHIPPED.
+ *
+ *  A population is revealed while the shape is scanned, then wrap SHRINKS the shape onto it. The
+ *  set was therefore chosen at a bigger size and never re-examined at the smaller one, so lattice
+ *  positions that hold at the final size sat empty — a magnet-shaped hole inside the material with
+ *  nothing on it. Measured before the fix: an L at 168mm offered six magnets while six further
+ *  positions on its own phase would each have held one.
+ *
+ *  Adds only what the material itself supports: same lattice, same phase, same seat rule the
+ *  reveal used. It never moves a magnet and never changes the size — the group stays exactly as
+ *  wrap left it, and the shape still wraps it, because every added seat passes the same
+ *  containment test the existing ones did. */
+export function completeSeating(
+  contourMM: Contour, seated: ReadonlyArray<Pt>, pitchMM: number, padMM: number,
+): Pt[] {
+  if (!seated.length) return [...seated]
+  const fits = makeContourSeatPredicate(contourMM, spotRadiusOf(padMM))
+  if (!fits) return [...seated]
+  const bb = bbox(contourMM.outer.pts)
+  const [ax, ay] = seated[0]
+  const held = (p: Pt) => seated.some((q) => Math.abs(q[0] - p[0]) < 0.5 && Math.abs(q[1] - p[1]) < 0.5)
+  const added = latticeOver(bb, pitchMM, [ax - bb.minX, ay - bb.minY]).filter((p) => !held(p) && fits(p))
+  return [...seated, ...added]
+}
+
 /** Selecting the calibration witness is layout's too: the candidate the material carries most of.
  *  It is evidence, never an offer — judge alone decides what is lawful. */
 export function bestSeatedCandidate<T extends { points: ReadonlyArray<Pt> }>(
