@@ -141,4 +141,3 @@ export function wrapGroup(
     gapsMM: pts.map((q) => Math.max(0, edgeDistToContourMM(sized(hi), q) - radius)),
   }
 }
-

@@ -142,12 +142,12 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       // never an offer.
       const bestSeatedMM = solve.bestSeated?.revealMM ?? band.minMM
       const contour = sized(bestSeatedMM)
-      // The witness DRAWN is the witness layout SELECTED. Re-solving here without the baked centre
-      // drew a different population under the same label — evidence of a solve nobody made.
-      const base0 = computeGrid(contour, anchorAt ? { ...cfg, centreOverrideMM: anchorAt(bestSeatedMM) } : cfg)
-      const grid = solve.bestSeated
-        ? { ...base0, anchors: assignSizes(solve.bestSeated.points, (cfg.plan ?? 'all6') as MagnetPlan) }
-        : base0
+      // The witness DRAWN is the witness layout SELECTED — one solve, at the same baked centre the
+      // ladder used. Re-solving WITHOUT that centre drew a different population under the same
+      // label: evidence of a solve nobody made.
+      const grid = computeGrid(contour, anchorAt
+        ? { ...cfg, centreOverrideMM: anchorAt(bestSeatedMM) }
+        : cfg)
       ctx.postMessage({ id, model: {
         contour, grid, effSize: bestSeatedMM, ladder: [], idx: 0, segments: grid.segments,
         offers: [], diagnostic: { reason: 'no-lawful-offer', bestSeatedMM },
