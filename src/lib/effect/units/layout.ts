@@ -250,20 +250,6 @@ export function applyCoverage(
   return { seated, interior: [] }
 }
 
-/** The fallback population is LAYOUT'S, not the sequencer's. It generates candidate sizes across
- *  the band from the ruled snap step — never a private threshold invented at the call site. */
-export function fallbackRevealSizes(loMM: number, hiMM: number): number[] {
-  const out: number[] = []
-  for (let mm = loMM; mm <= hiMM + 1e-9; mm += SNAP_STEP_MM) out.push(mm)
-  return out
-}
-
-/** Selecting the calibration witness is layout's too: the candidate the material carries most of.
- *  It is evidence, never an offer — judge alone decides what is lawful. */
-export function bestSeatedCandidate<T extends { points: ReadonlyArray<Pt> }>(
-  candidates: ReadonlyArray<T>,
-): T | null {
-  let best: T | null = null
-  for (const c of candidates) if (!best || c.points.length > best.points.length) best = c
-  return best
-}
+// fallbackRevealSizes and bestSeatedCandidate are DELETED with the sweep that called them: one
+// generated a size per millimetre across a band, the other picked the fullest seating as a
+// calibration witness. Both existed only to serve discovery, and the pipeline looks layouts up.

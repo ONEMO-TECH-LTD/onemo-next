@@ -392,8 +392,6 @@ const catalogueAdapterViolations = (code = source(CATALOGUE_ADAPTER)): string[] 
       && Object.entries(expected).every(([name, typeOnly]) => parts.get(name) === typeOnly)
     if (specifier === './library') {
       if (!exact({ catalogue: false, CatalogueEntry: true })) violations.push(specifier)
-    } else if (specifier === './grid-magnet-class') {
-      if (!exact({ classifyShape: false, shapeFamilyOf: false })) violations.push(specifier)
     } else if (specifier === './types') {
       if (!exact({ Pt: true })) violations.push(specifier)
     } else violations.push(specifier)
