@@ -21,19 +21,14 @@ interface SolveRequest {
   /** Manual scale/pan: solve directly at sizeMM with cfg (carries forcePhaseMM). */
   manualBand?: boolean
   sizeMM: number
-  snapStep: number
   stepSel: number | null
-  /** Free + snap: every slider move presses the shape onto the revealed magnets. */
-  snapWrap?: boolean
-  /** The slider's window when snapping — stops (distinct pressed sizes) are computed for it. */
-  snapWindow?: [number, number]
 }
 
 const ctx = self as unknown as Worker
 
-// Computed once = computed. Per-size solves are keyed by shape + config and reused across
-// free-slider moves, manual band scaling, re-walks and the idle prefetcher; a new shape
-// clears everything.
+// Computed once = computed. Per-shape bakes and per-band solves are keyed by shape + config and
+// reused across interactions; a new shape clears everything. The per-size walk cache and the idle
+// prefetcher this comment used to describe were deleted with the rigid fallback.
 let shapeSig = ''
 const rungCache = new Map<string, BandSolve>()
 // ANCHOR BAKE — the centre measured ONCE per shape (at the largest size, all material present)

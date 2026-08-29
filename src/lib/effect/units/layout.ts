@@ -7,10 +7,11 @@
 // The voting sweep is gone (step 4a): centre-rules parity is the only registration path.
 
 import type { BBox, Contour, GridConfig, Pt, SafeSegment } from '../types'
+import { holds, prepare } from '@/lib/grid-engine/compute/geometry'
 import type { Band } from '../grid-magnet-spec'
 import { MIN_ANCHORS } from '../grid-magnet-spec'
 import {
-  bbox, edgeDistMM, edgeDistToContourMM, makeCircleSeatPredicate, makeSeatPredicate, pointInContour,
+  bbox, edgeDistMM, edgeDistToContourMM, pointInContour, pointInOuter,
 } from '../foundation/geometry'
 import {
   BANDS, DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS, PADDING_FLOOR_MM, POSITIONING, SNAP_STEP_MM,
@@ -78,6 +79,68 @@ export function bandOf(sizeMM: number): Band | null {
 }
 
 
+// Placement eligibility is LAYOUT'S: a seat predicate says where a magnet MAY go, which is policy,
+// not measurement. It composes foundation's public primitives; the edge index stays private there.
+// QA F3 is right — keeping a private shortcut is no reason to hold policy in foundation.
+/**
+ * Seat predicate for one outline: centre at least `spotRadiusMM` from every boundary point,
+ * tangency passing by equality (exact integer arithmetic, micron quantum).
+ * A float prescreen answers the clear cases; only points within a guard band of the exact
+ * threshold fall through to the integer test — the answer never changes, only the cost.
+ * Null for a degenerate outline.
+ */
+export function makeSeatPredicate(
+  outer: ReadonlyArray<Pt>,
+  spotRadiusMM: number,
+): ((pt: Pt) => boolean) | null {
+  const QUANTUM = 0.001
+  const GUARD = 0.05
+  let prep: ReturnType<typeof prepare>
+  try { prep = prepare(outer, QUANTUM) } catch { return null }
+  const rQ = Math.round(spotRadiusMM / QUANTUM)
+  return (pt: Pt) => {
+    // The ring-field lower bound is gone with the move: it read foundation's private edge index,
+    // and a private shortcut is not a reason to hold policy in foundation (QA F3). edgeDistMM is
+    // itself bucketed and indexed, so this costs a query the shortcut sometimes skipped and returns
+    // the identical answer — the float guard and the exact `holds` fallback are untouched.
+    const d = edgeDistMM(outer, pt)
+    if (d > spotRadiusMM + GUARD) return pointInOuter(pt, outer)
+    if (d < spotRadiusMM - GUARD) return false
+    return holds(prep, [Math.round(pt[0] / QUANTUM), Math.round(pt[1] / QUANTUM)], rQ)
+  }
+}
+
+/**
+ * Seat predicate for a TRUE CIRCLE (centre c, radius R): the disc of radius r fits iff
+ * |p−c|² ≤ (R−r)² — integer microns, tangency by equality. A flattened polygon's chords sit
+ * microns inside the curve and wrongly refuse the zero-margin case; the analytic form cannot.
+ */
+export function makeCircleSeatPredicate(
+  cx: number, cy: number, R: number, spotRadiusMM: number,
+): ((pt: Pt) => boolean) | null {
+  const QUANTUM = 0.001
+  const q = (v: number) => Math.round(v / QUANTUM)
+  const slack = q(R) - q(spotRadiusMM)
+  if (slack < 0) return null
+  const cqx = q(cx), cqy = q(cy), s2 = slack * slack
+  return (pt: Pt) => {
+    const dx = q(pt[0]) - cqx, dy = q(pt[1]) - cqy
+    return dx * dx + dy * dy <= s2
+  }
+}
+
+/** Seat predicate over a whole CONTOUR: a centre must clear the outline and every hole by the spot
+ *  radius. The outer-ring predicate above cannot see a hole at all. */
+export function makeContourSeatPredicate(
+  contour: Contour, spotRadiusMM: number,
+): ((pt: Pt) => boolean) | null {
+  const outerFits = makeSeatPredicate(contour.outer.pts, spotRadiusMM)
+  if (!outerFits) return null
+  if (!contour.holes.length) return outerFits
+  return (pt: Pt) => outerFits(pt)
+    && !contour.holes.some((h) => pointInOuter(pt, h.pts) || edgeDistMM(h.pts, pt) < spotRadiusMM)
+}
+
 const mod = (v: number, m: number) => ((v % m) + m) % m
 
 /** What layout decided — placement only; the caller turns it into the engine's result. */
@@ -119,12 +182,11 @@ export function registerLayout(
 
   // Eligibility is over the whole CONTOUR: a centre must clear the outline AND every supplied
   // hole. The outer-ring predicate cannot see a hole, which is how a magnet landed inside one.
-  const clear = (p: Pt) => pointInContour(p, contourMM)
-    && contourMM.holes.every((h) => edgeDistMM(h.pts, p) >= spotRadiusOf(pad))
-  const outerFits = cfg.circle
+  // ONE eligibility rule, used. The hole test used to be written out again here beside the shared
+  // predicate — the same duplication this refactor removes, inside the fix for it.
+  const fits = cfg.circle
     ? makeCircleSeatPredicate(cx, cy, Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY) / 2, spotRadiusOf(pad))
-    : makeSeatPredicate(outer, spotRadiusOf(pad))
-  const fits = outerFits && (contourMM.holes.length ? (p: Pt) => outerFits(p) && clear(p) : outerFits)
+    : makeContourSeatPredicate(contourMM, spotRadiusOf(pad))
 
   const { segments, centres, ruleTarget } = given
 

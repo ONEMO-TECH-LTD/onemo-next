@@ -14,7 +14,7 @@ import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 import { computeGrid } from '../grid-magnet'
 import { scaleContour } from '../grid-magnet-compute'
-import { makeContourSeatPredicate } from '../foundation/geometry'
+import { makeContourSeatPredicate } from '../units/layout'
 import { wrapGroup } from '../units/wrap'
 import { wrapBandLadder } from '../grid-magnet-wrap-compute'
 import { contourCentroidOf } from '../units/centring'
@@ -183,12 +183,30 @@ const UNIT_ALLOWED = [
 ]
 
 describe('2b — the units are self-sufficient', () => {
-  it('every unit file imports only shared vocabulary, spec or foundation', () => {
+  // The repo-wide exact-arithmetic kernel is pinned to LAYOUT ONLY — it backs the seat predicate's
+  // exact tangency test. Pinning beats widening the global list: another unit reaching for it fails.
+  const EXTERNAL_KERNEL_EDGE: Record<string, readonly string[]> = {
+    'layout.ts': ['@/lib/grid-engine/compute/geometry'],
+  }
+
+  it('every unit file imports only shared vocabulary, spec, foundation or its pinned kernel edge', () => {
     for (const f of unitFiles()) {
+      const pinned = EXTERNAL_KERNEL_EDGE[f] ?? []
       const bad = moduleRefsOf(readFileSync(join(UNITS_DIR, f), 'utf8'))
-        .filter((i) => !UNIT_ALLOWED.some((rx) => rx.test(i)))
+        .filter((i) => !UNIT_ALLOWED.some((rx) => rx.test(i)) && !pinned.includes(i))
       expect(bad, `units/${f} reaches outside its allow-list: ${bad.join(' · ')}`).toEqual([])
     }
+  })
+
+  it('foundation exposes exactly the measurement primitives — nothing that decides', () => {
+    const text = readFileSync(join(LIB, 'foundation/geometry.ts'), 'utf8')
+    const names: string[] = []
+    walkAst(text, (n) => {
+      if (ts.isFunctionDeclaration(n) && n.name
+          && n.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) names.push(n.name.text)
+    })
+    expect(names.sort(), 'the foundation export set is pinned: placement policy lives in its unit')
+      .toEqual(['bbox', 'edgeDistMM', 'edgeDistToContourMM', 'pointInContour', 'pointInOuter'])
   })
 
   it('no unit imports another unit', () => {
@@ -260,6 +278,12 @@ describe('2c — the foundation holds primitives only', () => {
         if (ts.isCallExpression(n) && /\.sort$/.test(n.expression.getText())) hits.push('sort()')
         if (ts.isFunctionDeclaration(n) && n.name && /^(rank|score|prefer|best|choose|pick|order)/i.test(n.name.text))
           hits.push(n.name.text)
+        // Arrow and function-expression policy hides from a FunctionDeclaration-only check — QA
+        // added `export const chooseBest = (a, b) => ...` and it passed. Secondary tripwire only:
+        // the pinned export set above is what actually closes this.
+        if (ts.isVariableDeclaration(n) && n.initializer
+            && (ts.isArrowFunction(n.initializer) || ts.isFunctionExpression(n.initializer))
+            && /^(rank|score|prefer|best|choose|pick|order)/i.test(n.name.getText())) hits.push(n.name.getText())
       })
       expect(hits, `foundation/${f} contains policy: ${hits.join(' · ')}`).toEqual([])
     }
@@ -270,6 +294,32 @@ describe('2c — the foundation holds primitives only', () => {
       const bad = moduleRefsOf(readFileSync(join(FOUNDATION, f), 'utf8'))
         .filter((i) => /\/units\/|grid-magnet-(compute|logic|class|bridge)$/.test(i))
       expect(bad, `foundation/${f} depends on something above it: ${bad.join(' · ')}`).toEqual([])
+    }
+  })
+})
+
+describe('2d — the real shells are governed too', () => {
+  const PAGE = join(process.cwd(), 'src/app/(dev)/effect-creator/grid-centre/page.tsx')
+  const WORKER = join(process.cwd(), 'src/app/(dev)/effect-creator/grid-centre/solve.worker.ts')
+  // The page reaches NO unit. The worker holds one temporary edge — judge's default landing — which
+  // expires when the pipeline lands. Pinned exactly, so a stray import fails even where edges exist.
+  const SHELL_UNIT_EDGES: Array<[string, readonly string[]]> = [
+    [PAGE, []],
+    [WORKER, ['@/lib/effect/units/judge', '@/lib/effect/units/centring']],
+  ]
+
+  it('the page and worker hold exactly their pinned unit edges', () => {
+    for (const [file, pinned] of SHELL_UNIT_EDGES) {
+      const edges = [...new Set(moduleRefsOf(readFileSync(file, 'utf8')).filter((i) => /\/units\//.test(i)))].sort()
+      expect(edges, `${file.split('/').pop()} unit edges must equal the pinned set`).toEqual([...pinned].sort())
+    }
+  })
+
+  it('neither shell reaches a unit through a side-effect or dynamic import', () => {
+    for (const [file, pinned] of SHELL_UNIT_EDGES) {
+      const refs = moduleRefsOf(readFileSync(file, 'utf8')).filter((i) => /\/units\/|\/foundation\//.test(i))
+      const bad = refs.filter((i) => !pinned.includes(i))
+      expect(bad, `${file.split('/').pop()} reaches ${bad.join(' · ')}`).toEqual([])
     }
   })
 })
@@ -315,10 +365,15 @@ describe('4 — no surface restates a released value', () => {
 })
 
 describe('4b — the law sliders take their bounds from spec, never literals', () => {
-  it('padding and snap-step sliders use identifiers for min', () => {
-    const text = pageText()
-    expect(text).toMatch(/label="Magnet padding[^/]*min=\{PADDING_FLOOR_MM\}/)
-    expect(text).toMatch(/label="Snap step"[^/]*min=\{SNAP_STEP_MM\}[^/]*max=\{MIN_EFFECT_MM\}/)
+  it('the padding slider takes its bounds from spec, never a literal', () => {
+    expect(pageText()).toMatch(/label="Magnet padding[^/]*min=\{PADDING_FLOOR_MM\}/)
+  })
+
+  it('the dead Snap step control is gone from the shell', () => {
+    // Its engine path went with the rigid walk. A control that changes nothing is worse than a
+    // missing one: it tells the operator a dial exists that the engine no longer reads.
+    expect(pageText(), 'Snap step is still rendered').not.toMatch(/label="Snap step"/)
+    expect(pageText(), 'Snap step state survives').not.toMatch(/\bsnapStep\b/)
   })
 })
 

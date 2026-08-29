@@ -5,7 +5,7 @@ import { edgeDistMM } from './foundation/geometry'
 
 // Moved to foundation/geometry.ts (S2 step 1). Re-exported so no consumer changes in the move.
 export { bbox } from './foundation/geometry'
-export { makeSeatPredicate, makeCircleSeatPredicate } from './foundation/geometry'
+export { makeSeatPredicate, makeCircleSeatPredicate } from './units/layout'
 export { spotRadiusOf, fieldSpanMM, latticeAt, latticeOver } from './units/layout'
 export { centroidOf } from './units/centring'
 

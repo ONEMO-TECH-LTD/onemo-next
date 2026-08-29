@@ -21,7 +21,7 @@ import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
 import { DEFAULT_PITCH_MM, type BandSnapPoint, type GridResult, type MagnetPlan, type SafeSegment } from '@/lib/effect/grid-magnet'
-import { BANDS, CENTRE_MODE, GOVERNOR, MASS_DEPTH_CEIL_MM, MASS_DEPTH_FLOOR_MM, MASS_DEPTH_MM, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_FLOOR_MM, PHASE_STEP_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, SNAP_STEP_MM } from '@/lib/effect/grid-magnet-spec'
+import { BANDS, CENTRE_MODE, GOVERNOR, MASS_DEPTH_CEIL_MM, MASS_DEPTH_FLOOR_MM, MASS_DEPTH_MM, MIN_EFFECT_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_FLOOR_MM, PHASE_STEP_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-magnet-spec'
 import { fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-magnet-bridge'
 
 /** Bench test libraries — static assets, listed by a committed manifest. */
@@ -130,7 +130,6 @@ export default function GridLab() {
   /** Manual scale inside the band's range; null = the ladder rules. */
   const [bandScale, setBandScale] = useState<number | null>(null)
   /** Snap scan step — admin-tunable for testing; default from spec. */
-  const [snapStep, setSnapStep] = usePersisted('snapStep', SNAP_STEP_MM)
   /** Manual grid calibration — a forced registration (mm), or null for the engine's auto pick. */
   const [manual, setManual] = useState<{ x: number; y: number } | null>(null)
   const [coverage, setCoverage] = useState<'full' | 'perimeter'>('perimeter')
@@ -152,14 +151,14 @@ export default function GridLab() {
   /** Baseline handling: "save" stamps the current dials as the working default; "reset" restores
    *  the saved baseline, or spec defaults when none was saved. */
   const saveDefaults = () => {
-    try { localStorage.setItem('grid-centre.defaults', JSON.stringify({ pad, phaseStep, massDepth, centreMode, governor, snapStep })) } catch { }
+    try { localStorage.setItem('grid-centre.defaults', JSON.stringify({ pad, phaseStep, massDepth, centreMode , governor })) } catch { }
   }
   const resetDefaults = () => {
     let d = {
-      pad: RELEASED_PADDING_MM, phaseStep: PHASE_STEP_MM, massDepth: MASS_DEPTH_MM, centreMode: CENTRE_MODE, governor: GOVERNOR, snapStep: SNAP_STEP_MM,
+      pad: RELEASED_PADDING_MM, phaseStep: PHASE_STEP_MM, massDepth: MASS_DEPTH_MM, centreMode: CENTRE_MODE, governor: GOVERNOR,
     }
     try { const raw = localStorage.getItem('grid-centre.defaults'); if (raw) d = { ...d, ...JSON.parse(raw) } } catch { }
-    setPad(d.pad); setPadLock(1); setPhaseStep(d.phaseStep); setMassDepth(d.massDepth); setCentreMode(d.centreMode); setGovernor(d.governor); setSnapStep(d.snapStep)
+    setPad(d.pad); setPadLock(1); setPhaseStep(d.phaseStep); setMassDepth(d.massDepth); setCentreMode(d.centreMode); setGovernor(d.governor)
   }
 
   const [magic, setMagic] = useState<MagicState>(null)
@@ -320,14 +319,14 @@ export default function GridLab() {
       mode,
       manualBand,
       sizeMM: manualBand ? (bandScale ?? effSizeRef.current ?? BANDS[0].minMM) : 0,
-      snapStep, stepSel,
+      stepSel,
     }
     if (busyRef.current) { queuedRef.current = msg; setSolving(true); return }
     busyRef.current = true
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, pitch, pad, phaseStep, massDepth, centreMode, governor, manual, bandScale, enPhaseN, plan, mode, stepSel, snapStep, coverage])
+  }, [base, src, preset, pitch, pad, phaseStep, massDepth, centreMode, governor, manual, bandScale, enPhaseN, plan, mode, stepSel, coverage])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -484,7 +483,6 @@ export default function GridLab() {
                   set={(n) => setBandScale(Math.min(b.maxMM, Math.max(b.minMM, n)))}
                   min={b.minMM} max={b.maxMM} />
               })()}
-              <Slider label="Snap step" unit="mm" v={snapStep} set={setSnapStep} min={SNAP_STEP_MM} max={MIN_EFFECT_MM} />
             </>}
             <div className="gl-field"><span>Grid pitch · released tiers</span>
               <div className="gl-seg">

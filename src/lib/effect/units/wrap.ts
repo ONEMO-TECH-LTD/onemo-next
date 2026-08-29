@@ -126,7 +126,7 @@ export function wrapGroup(
     const m = (lo + hi) / 2
     if (heldAt(m)) hi = m; else lo = m
   }
-  const origin = heldAt(hi) ?? heldAt(hi)
+  const origin = heldAt(hi)
   if (!origin) return null
   const anchor = anchorAt(hi)
   const pts = g.map(([lx, ly]) => [origin[0] + lx, origin[1] + ly] as Pt)

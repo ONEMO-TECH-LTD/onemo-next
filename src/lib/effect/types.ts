@@ -134,7 +134,8 @@ export interface GridConfig {
   massDepthMM?: number
   /** Centre mode — 0 box · 1 core · 2 masses · 3 weight · 4 deep · 5 top. */
   centreMode?: number
-  /** Positioning law — 0 voting · 1 centre rules (parity-locked, no voting). */
+  /** Registration mode. 1 = centre-rules parity, the only mode. */
+  /** Registration mode. 1 = centre-rules parity — the only mode. Voting (0) was deleted in S2. */
   positioning?: number
   /** Which mass rules in Masses mode — 0 smallest · 1 deepest · 2 top. */
   governor?: number
@@ -143,10 +144,6 @@ export interface GridConfig {
   centreOverrideMM?: Pt
   /** 'light' skips island outlines (display-only work) — used by walk-internal solves. */
   segmentsDetail?: 'full' | 'light'
-  /** Voting dominance order — which force rules, admin-picked; spec default when absent. */
-  votingOrder?: number
-  /** Per-size solve reuse for band walks — owned by the caller (the worker). */
-  solveCache?: Map<number, GridResult>
   plan?: MagnetPlan
   perimeterOnly?: boolean // default true — perimeter belt drops surrounded interior nodes
   /** The outline is a true circle: judge against the analytic curve, not its flattened chords. */
