@@ -1,0 +1,67 @@
+ We agreed to make one surgical change inside the restored working engine—not build a
+  replacement pipeline.
+
+  The working baseline already does:
+
+  band range → size sweep → segment → centre/bake → four registrations → per-position
+  seating → belt → dedupe → exact wrap → band membership → ordering/default → manual
+  controls/lattice
+
+  What must be built:
+
+  1. Catalogue authority first
+      - Mark every entry as canon or preset.
+      - Square and rectangle full-frame layouts are automatic canon.
+      - Diamond and triangle are explicit presets only—never automatic candidates.
+
+  2. Repair classification
+      - Derive the ordered grid frame from the union of live usable masses.
+      - Do not use outer shape bounds, governing mass, aspect ratio, or a 1–5 cap.
+      - Keep segmentation unchanged.
+
+  3. Connect the canon matcher
+      - Match by pitch plus ordered frame.
+      - Return the square/rectangle canon layout in the correct orientation.
+      - One optimal layout first—not every preset and not every D4 view.
+
+  4. Insert that optimal into the existing ladder
+      - Existing centring and baking remain unchanged.
+      - Existing per-position seating rejects positions the material cannot hold.
+      - Record omissions.
+      - Send the surviving population whole into the unchanged wrap solver.
+      - Preserve band membership, ordering/default selection, belt, manual pan, controls,
+        and lattice.
+
+  5. Retain the sweep as next-best
+      - Canon is attempted first.
+      - If canon cannot solve, the existing sweep supplies next-best alternatives.
+      - The sweep is not deleted; it stops being the primary discovery mechanism.
+
+  The safe execution order is incremental:
+
+  1. Prove the restored baseline.
+  2. Add catalogue canon/preset truth.
+  3. Correct classifier without changing runtime answers.
+  4. Add canon-only matcher without changing runtime answers.
+  5. Feed its result into the existing ladder alongside the sweep.
+  6. Prove canon-first visually and end-to-end.
+  7. Demote the sweep to next-best only after the canon path is proven.
+
+  One unresolved technical detail remains: at what exact body size inside a requested band
+  the frame is classified. We must not invent another “band-top calibration.” During
+  integration, use the existing band sweep to measure/classify candidates; replace that
+  cost only after the canon path is correct and proven.
+
+  Explicitly forbidden:
+
+  - No wholesale cutover.
+  - No new parallel engine or attempt-ledger UI.
+  - No automatic triangle/diamond presets.
+  - No 13-layout/52-attempt D4 explosion.
+  - No deletion of sweep, judge, default landing, belt, manual controls, pan, or lattice.
+  - No modification of centring or wrap.
+  - No population mutation or re-seating after wrap.
+
+  Done means: a requested band classifies the usable frame, retrieves the correct square/
+  rectangle canon, attempts it first through the existing engine, preserves every existing
+  working behavior, and uses the sweep only when canon cannot solve.
