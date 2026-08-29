@@ -20,9 +20,9 @@ import { safeSegments } from './units/segment'
 import { centeringAnchors, governMass } from './units/centring'
 import { CENTRE_MODE, GOVERNOR, MASS_DEPTH_MM } from './grid-magnet-spec'
 import type { CentreMode, Governor } from './types'
-import { gapsToContourMM, wrapGroup } from './units/wrap'
+import { wrapGroup } from './units/wrap'
 import { inBand, orderOffers } from './units/judge'
-import { bestSeatedCandidate, completeSeating, fallbackRevealSizes, revealIdentity, shippedIdentity } from './units/layout'
+import { bestSeatedCandidate, fallbackRevealSizes } from './units/layout'
 
 
 /** mm → integer microns; Clipper64 is integer-robust. */
@@ -107,41 +107,25 @@ export function wrapBandLadder(
     anchorAtMM: anchorFn,
   }
   const seen = new Set<string>()
-  const shipped = new Set<string>()
   const rungs: BandRung[] = []
-  /** Re-seat at the solved size: LAYOUT decides the population, WRAP measures the gaps, and this
-   *  seam only puts the answer back together. Size, origin and centre deviation are wrap's and stay
-   *  untouched — nothing moved; the material simply supports more seats than the reveal had found. */
-  const completeAt = (sz: (mm: number) => Contour, at: WrapAt, pitchMM: number, padMM: number): WrapAt => {
-    const contour = sz(at.sizeMM)
-    const pts = completeSeating(contour, at.points, pitchMM, padMM, cfg.perimeterOnly ?? true)
-    if (pts.length === at.points.length
-      && pts.every((p, i) => p[0] === at.points[i][0] && p[1] === at.points[i][1])) return at
-    return { ...at, count: pts.length, points: pts, gapsMM: gapsToContourMM(contour, pts, spotRadiusOf(padMM)) }
-  }
   const witnesses: Array<{ revealMM: number; points: Pt[] }> = []
   for (const mm of fallbackRevealSizes(loMM, hiMM)) {
     const pts = computeGrid(sized(mm), anchorAtMM ? { ...scanCfg, centreOverrideMM: anchorAtMM(mm) } : scanCfg).anchors.map((a) => a.p)
     if (!pts.length) continue
     witnesses.push({ revealMM: mm, points: pts })
-    const id = revealIdentity(pts, pitch)
+    // Layout identity: the seated pattern in lattice units, origin-free.
+    let mx = Infinity, my = Infinity
+    for (const p of pts) { if (p[0] < mx) mx = p[0]; if (p[1] < my) my = p[1] }
+    const id = pts.map((p) => Math.round((p[0] - mx) / pitch) + ',' + Math.round((p[1] - my) / pitch)).sort().join(';')
     if (seen.has(id)) continue
     seen.add(id)
     // Local offsets about the group's own middle — wrapGroup pins that middle on the anchor.
     const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1])
     const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2
     const group = pts.map(([x, y]) => [x - cx, y - cy] as Pt)
-    const solved = wrapGroup(sized, wcfg, group, minMM, hiMM)
-    if (!solved) continue
-    const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
-    // The set was revealed at `mm` and the shape then shrank onto it. Ask the material once more,
-    // at the size that actually shipped, so no lattice position sits empty inside it.
-    const at = completeAt(sized, solved, pitch, pad)
+    const at = wrapGroup(sized, wcfg, group, minMM, hiMM)
+    if (!at) continue
     if (!inBand(at.sizeMM, loMM, hiMM)) continue   // judge: another band owns it
-    // Two reveals can complete to the same answer, so what is OFFERED is deduped on what ships.
-    const settled = shippedIdentity(at.sizeMM, at.points)
-    if (shipped.has(settled)) continue
-    shipped.add(settled)
     rungs.push({ at, revealMM: mm })
   }
   return { offers: orderOffers(rungs), bestSeated: bestSeatedCandidate(witnesses) }
