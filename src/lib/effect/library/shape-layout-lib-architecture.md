@@ -14,7 +14,7 @@ separate structure with different goals and gets its own law when its structure 
 What binds them is the CONTRACT below, not shared structure.
 
 ## LAW 0 — THE OUTPUT CONTRACT OUTRANKS EVERYTHING
-The catalogue record is the product of the library and the input to the classifier. Its V1
+The catalogue record is the product of the library and the input to the classifier. Its V3
 shape is frozen:
 
     type CatalogueEntry = Readonly<{
@@ -22,19 +22,27 @@ shape is frozen:
       pitchMM: number; corners: CornerMode
       nodesMM: readonly PointMM[]; outlineMM: readonly PointMM[]
       widthMM: number; heightMM: number; frameCols: number; frameRows: number
+      bandId: number; legalWidthMM: number; legalHeightMM: number
     }>
+
+V3 added no capability the classifier has to interpret: bandId and the legal box are MEASURED off
+nodesMM by one owner (rules.ts) so no consumer re-derives them, and bandId is never null because a
+frame the board cannot hold at that lattice is not published at all.
 
 Five standing gates (activated when the catalogue lands):
 1. EXACT TYPE — compile-time equality of CatalogueEntry against the V1 shape via an Equal<>
    type assertion in the gate file (catches added/removed/optionalised/widened fields), plus a
    readonly-keys assertion.
-2. EXACT KEYS — every produced record at 24/48/96 has exactly the twelve keys.
+2. EXACT KEYS — every produced record at 24/48/96 has exactly the fifteen keys.
 3. DATA ONLY — recursive validation: no undefined, functions, symbols, bigint, getters,
    non-finite numbers or non-plain objects; JSON.parse(JSON.stringify(entry)) equals entry.
-4. VERSIONED IDENTITY — CATALOGUE_FORMAT_VERSION = 1 and a checked-in manifest
-   (catalogue-identity.v1.json) freezing per entry: id, classId, typeId, corners,
-   frameCols, frameRows, and lexicographically sorted 48mm nodesMM. Unique ids and an
-   identical id set at all three pitches. Changing type, keys, version or manifest is a DAN
+4. VERSIONED IDENTITY — CATALOGUE_FORMAT_VERSION = 3 and a checked-in manifest
+   (catalogue-identity.v3.json) freezing per entry: id, classId, typeId, corners,
+   frameCols, frameRows, and lexicographically sorted nodesMM. Unique ids, and the manifest is
+   keyed BY PITCH: the board is a fixed 384 x 480mm of legal area, so 24mm holds 17 x 21
+   positions, 48mm holds 9 x 11 and 96mm holds 5 x 6 — the three pitches legitimately publish
+   different sets, and the V1 claim of one identical set across pitches described a library that
+   generated frames the board could not hold. Changing type, keys, version or manifest is a DAN
    RULING, never a refactor.
 5. MATCHER ROUND-TRIP — every entry's outline classifies with finite fields AND
    catalogueCandidates(entry.outlineMM, pitch) returns that entry's id. shapeFamily is NOT
@@ -46,8 +54,8 @@ Five standing gates (activated when the catalogue lands):
 | zone | contains | runtime imports allowed |
 |---|---|---|
 | 0 contracts | types.ts, class-contract.ts | type-only imports from zone 0 and approved external type modules; no runtime imports |
-| 1 corpus | literal corpus-*.ts | zone 0, type-only |
-| 2 pure mechanics | geometry.ts, transforms.ts, outline.ts, rules.ts, selection-transition.ts | zone 0; grid-magnet-spec constants; offset.ts |
+| 1 corpus | literal corpus-*.ts — the authored triangle geometries only; square, rectangle and diamond canon is GENERATED from the board (canon.ts, zone 2) | zone 0, type-only |
+| 2 pure mechanics | geometry.ts, transforms.ts, outline.ts, rules.ts, canon.ts, selection-transition.ts | zone 0; grid-magnet-spec constants; offset.ts |
 | 3 classes | one self-contained class package per class + shared constructor | zones 0-2; NEVER another concrete class package |
 | 4 registry | class-registry.ts only | zones 0 and 3, registration only |
 | 5 services | selection/options/authoring/materialize/catalogue/drafts | zones 0, 2, 4, same-zone services; never corpus or concrete classes |
@@ -95,8 +103,13 @@ are out of scope. Never regex over source lines.
     file); an AST meta-gate over test files rejects structural tautologies (expect(X).toEqual(X),
     literal-truth assertions). Comment truth beyond these exact checks is QA responsibility and
     is never claimed as machine-proven.
-11. DATA IS LITERAL AND READONLY — corpus entries immutable (readonly types, as-const);
-    derived values never stored beside their sources.
+11. DATA IS LITERAL AND READONLY WHERE IT IS AUTHORED — corpus entries immutable (readonly
+    types, as-const); derived values never stored beside their sources. What is AUTHORED is what
+    a person chose: the triangle's three vertices. A frame's canon population is arithmetic off
+    rows and columns and is generated, never typed out — "written out, never generated" was our
+    own sentence, not a ruling (Dan, 2026-08-29: "the library can be easier set ... they can be
+    generated no problem just by inputting number of rows and columns"). The gate proves the
+    generator by reproducing every population it replaced, record for record.
 12. ONE MATERIALISATION PATH — corpus layouts, drafts, admin preview and catalogue share the
     same variant lookup, transform, y-flip, outline producer and size measurement; gated by
     exact node/outline equality through each caller at 24/48/96.

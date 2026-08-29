@@ -31,7 +31,7 @@ export const FIELD_ROWS = 11
  *  the fixed fact; how many POSITIONS it holds depends on the lattice in use, so a coarser pitch
  *  reaches the same board with fewer of them (Dan, 2026-08-29: the sparser tier is "the same lattice
  *  just sparser"). Reading the position count as pitch-free published layouts that could not
- *  physically sit on the board. The conversion lives in library/canon.ts — spec states values. */
+ *  physically sit on the board. The conversion lives in library/geometry.ts — spec states values. */
 export const BOARD_WIDTH_MM = 384
 export const BOARD_HEIGHT_MM = 480
 

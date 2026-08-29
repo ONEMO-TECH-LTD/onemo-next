@@ -19,7 +19,7 @@ const BRIDGE = join(ROOT, 'grid-magnet-library-bridge.ts')
 const CATALOGUE_ADAPTER = join(ROOT, 'grid-magnet-library-catalogue.ts')
 const LAW = join(LIBRARY, 'shape-layout-lib-architecture.md')
 const ARCH_GATE = join(TESTS, 'architecture-gates.test.ts')
-const LAW_SHA256 = 'ead93d033a2b639926fc642f506bfa2bac24b95ddda9b88e0729dfd97b76a9f6'
+const LAW_SHA256 = '125310a44ee4d6ac186368b496fba8e79d548dfaa7b07dbce7324a4d675c3efa'
 /** The transition owner is 25 lines that change ~never, and three gates in a row proved that
  *  checking its SHAPE leaves its BODIES free: policy was smuggled out through renamed helpers,
  *  through require(), and finally through globalThis, each time with the shape intact. The law
