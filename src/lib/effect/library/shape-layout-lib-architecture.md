@@ -14,30 +14,39 @@ separate structure with different goals and gets its own law when its structure 
 What binds them is the CONTRACT below, not shared structure.
 
 ## LAW 0 — THE OUTPUT CONTRACT OUTRANKS EVERYTHING
-The catalogue record is the product of the library and the input to the classifier. Its V3
+The catalogue record is the product of the library and the input to the classifier. Its V4
 shape is frozen:
 
     type CatalogueEntry = Readonly<{
-      classId: LibraryFamily; typeId: string; id: string; label: string
+      classId: LibraryFamily; catalogueRole: 'canon' | 'preset'
+      typeId: string; id: string; label: string
       pitchMM: number; corners: CornerMode
       nodesMM: readonly PointMM[]; outlineMM: readonly PointMM[]
       widthMM: number; heightMM: number; frameCols: number; frameRows: number
       bandId: number; legalWidthMM: number; legalHeightMM: number
     }>
 
-V3 added no capability the classifier has to interpret: bandId and the legal box are MEASURED off
-nodesMM by one owner (rules.ts) so no consumer re-derives them, and bandId is never null because a
-frame the board cannot hold at that lattice is not published at all.
+V4 adds ONE classifier-facing fact, and it is eligibility: a `canon` record — square and rectangle —
+may be offered automatically, because the frame IS the class and a classified shape maps onto exactly
+one of them. A `preset` record — diamond and triangle — is a node subset on those same rectangular
+frames and is reachable only when it is explicitly asked for (Dan, 2026-08-29: "the canon is square
+and rectangle the rest are layouts for us to have for potential presets"). It is a FIELD because a
+name cannot carry eligibility: with only classId to go on, a matcher keyed on the frame returned one
+square and twelve triangle presets for a 4x4 and the engine wrapped all thirteen.
+
+V3's fields remain what they were: bandId and the legal box are MEASURED off nodesMM by one owner
+(rules.ts) so no consumer re-derives them, and bandId is never null because a frame the board cannot
+hold at that lattice is not published at all.
 
 Five standing gates (activated when the catalogue lands):
-1. EXACT TYPE — compile-time equality of CatalogueEntry against the V3 shape via an Equal<>
+1. EXACT TYPE — compile-time equality of CatalogueEntry against the V4 shape via an Equal<>
    type assertion in the gate file (catches added/removed/optionalised/widened fields), plus a
    readonly-keys assertion.
-2. EXACT KEYS — every produced record at 24/48/96 has exactly the fifteen keys.
+2. EXACT KEYS — every produced record at 24/48/96 has exactly the sixteen keys.
 3. DATA ONLY — recursive validation: no undefined, functions, symbols, bigint, getters,
    non-finite numbers or non-plain objects; JSON.parse(JSON.stringify(entry)) equals entry.
-4. VERSIONED IDENTITY — CATALOGUE_FORMAT_VERSION = 3 and a checked-in manifest
-   (catalogue-identity.v3.json) freezing per entry: id, classId, typeId, corners,
+4. VERSIONED IDENTITY — CATALOGUE_FORMAT_VERSION = 4 and a checked-in manifest
+   (catalogue-identity.v4.json) freezing per entry: id, classId, catalogueRole, typeId, corners,
    frameCols, frameRows, and lexicographically sorted nodesMM. Unique ids, and the manifest is
    keyed BY PITCH: the board is a fixed 384 x 480mm of legal area, so 24mm holds 17 x 21
    positions, 48mm holds 9 x 11 and 96mm holds 5 x 6 — the three pitches legitimately publish

@@ -110,6 +110,17 @@ describe('canon and presets — what the engine may offer by itself', () => {
     }
   })
 
+  it('the canon roster is EXACTLY the canon records — complete, not merely filtered', () => {
+    // Uniqueness alone proves nothing about completeness: a roster that drops a real canon record
+    // still has one population per surviving frame. QA's .slice(1) mutation stayed green against
+    // the old assertion, so the roster could silently lose a layout the engine must offer.
+    for (const pitchMM of [24, 48, 96]) {
+      const expected = catalogue(pitchMM).filter((entry) => entry.catalogueRole === 'canon')
+      expect(canonCatalogue(pitchMM).map((entry) => entry.id), 'complete canon roster @' + pitchMM)
+        .toEqual(expected.map((entry) => entry.id))
+    }
+  })
+
   it('ONE canon population per frame — the answer to a classified frame is not a pile', () => {
     // A frame has exactly one canon layout. Thirteen was the symptom of the missing role.
     for (const pitchMM of [24, 48, 96]) {
