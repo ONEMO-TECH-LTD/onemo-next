@@ -115,7 +115,13 @@ export function panelOptionsResolved(
   // a saved custom layout is deduped from ITS OWN population, not from the corpus layout the
   // resolver falls back to for a draft (QA F2)
   const visible: LibraryLayout = draft ? { name: draftLayoutId(draft.name), nodes: draft.nodes } : layout
-  const orientations = orientationOptions(sel, frame, visible, spec, spec.baseView(sel, pitchMM))
+  // A class whose RECORDS own their orientation resolves the row itself — the rectangle's portrait
+  // and landscape are two frames, so the choice is a selection, not a transform. Everything else
+  // keeps the transform-based row.
+  const owned = spec.orientationChoices?.(sel, pitchMM) ?? null
+  const orientations = owned
+    ? owned.map((choice) => ({ id: choice.id, label: choice.label, active: choice.active, disabled: choice.disabled, next: choice.next }))
+    : orientationOptions(sel, frame, visible, spec, spec.baseView(sel, pitchMM))
   const variantId = variant.id
   const layoutSel = (name: string): LibrarySelection => ({ ...sel, layoutId: name })
 
@@ -134,7 +140,7 @@ export function panelOptionsResolved(
       active: v.id === variantId, next: selectVariant(sel, v),
     })),
     // a class with no named views of its own, and no turn that changes the picture, offers none
-    orientations: spec.orientations.length || orientations.length > 1 ? orientations : [],
+    orientations: owned || spec.orientations.length || orientations.length > 1 ? orientations : [],
     layouts: [
       ...frame.layouts.map((l) => ({
         id: l.name, label: l.name, active: sel.layoutId === l.name, next: layoutSel(l.name),

@@ -857,11 +857,27 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     }
   }, 30_000)
   it('STEP 4: classifier matcher round-trips every catalogue entry at every pitch', () => {
-    for (const pitchMM of [24, 48, 96]) for (const item of classifiedLibraryCatalogue(pitchMM)) {
-      const shape = item.shapeClass
-      const numericFields = [shape.cx, shape.cy, shape.band, shape.widthMM, shape.heightMM, shape.fill, shape.frame.cols, shape.frame.rows, shape.frame.capacity]
-      expect(numericFields.every(Number.isFinite), item.entry.id).toBe(true)
-      expect(catalogueCandidates(item.entry.outlineMM.map(([x, y]) => [x, y]), pitchMM).some((entry) => entry.id === item.entry.id), item.entry.id).toBe(true)
+    // Grouped, not looped. The matcher's key is (shapeFamily, cx, cy), so every record sharing a
+    // key must come back from ONE query — asserting the whole group's id set is stronger coverage
+    // than asking each record for itself, and it turns an O(n^2) walk (the gate reclassified the
+    // entire catalogue once per entry) into one query per distinct key. The quadratic was the
+    // gate's, never the caller's: one production lookup is O(n).
+    for (const pitchMM of [24, 48, 96]) {
+      const groups = new Map<string, { ids: Set<string>; outline: readonly (readonly [number, number])[] }>()
+      for (const item of classifiedLibraryCatalogue(pitchMM)) {
+        const shape = item.shapeClass
+        const numericFields = [shape.cx, shape.cy, shape.band, shape.widthMM, shape.heightMM, shape.fill, shape.frame.cols, shape.frame.rows, shape.frame.capacity]
+        expect(numericFields.every(Number.isFinite), item.entry.id).toBe(true)
+        const key = item.shapeFamily + '|' + shape.cx + '|' + shape.cy
+        const group = groups.get(key)
+        if (group) group.ids.add(item.entry.id)
+        else groups.set(key, { ids: new Set([item.entry.id]), outline: item.entry.outlineMM })
+      }
+      expect(groups.size, 'the catalogue must hold groups @' + pitchMM).toBeGreaterThan(0)
+      for (const [key, group] of groups) {
+        const returned = catalogueCandidates(group.outline.map(([x, y]) => [x, y]), pitchMM).map((entry) => entry.id)
+        expect(new Set(returned), key + ' @' + pitchMM).toEqual(group.ids)
+      }
     }
   }, 20_000)
   it('STEP 5: surface, bridge, barrel, and shell use the contract boundary', () => {

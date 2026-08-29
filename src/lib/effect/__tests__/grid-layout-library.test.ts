@@ -121,6 +121,91 @@ describe('canon and presets — what the engine may offer by itself', () => {
     }
   })
 
+  it('subtype and orientation are INDEPENDENT axes', () => {
+    // Folding them together into six composite ids destroyed the distinction: you could no longer
+    // ask what subtype a frame is without parsing a name, and a 2x5 and a 5x2 stopped being the
+    // same kind of thing. Subtype is the minor axis; orientation is which way round it sits.
+    expect(specOf('rectangle').types.map((t) => t.id)).toEqual(['frame', 'banner', 'slim'])
+    const subtypeOf = (key: string) => {
+      const entry = canonCatalogue(48).find((e) => e.frameCols + 'x' + e.frameRows === key)!
+      return entry.typeId
+    }
+    expect(subtypeOf('2x5'), 'portrait banner').toBe('banner')
+    expect(subtypeOf('5x2'), 'landscape banner — same subtype').toBe('banner')
+    expect(subtypeOf('1x4')).toBe('slim')
+    expect(subtypeOf('4x1')).toBe('slim')
+    expect(subtypeOf('3x4')).toBe('frame')
+    expect(subtypeOf('4x3')).toBe('frame')
+  })
+
+  it('the Orientation row selects the transposed RECORD, not a view', () => {
+    // Dan asked for the toggle to select separate layouts. It stays; what changed is that it moves
+    // the selection to the other frame and leaves the view at identity, because the target frame
+    // already carries its own orientation.
+    const portrait = { classId: 'rectangle', frameKey: '3x4', layoutId: CANON_LAYOUT, view: { transpose: false, flipX: false, flipY: false } }
+    const row = panelOptionsFor(portrait, [], 48).orientations
+    expect(row.map((o) => o.label)).toEqual(['portrait', 'landscape'])
+    expect(row.find((o) => o.label === 'portrait')!.active, '3x4 is portrait').toBe(true)
+    const toLandscape = row.find((o) => o.label === 'landscape')!.next
+    expect(toLandscape.frameKey, 'landscape resolves the transposed frame').toBe('4x3')
+    expect(toLandscape.view, 'and the view stays identity — the frame owns the orientation')
+      .toEqual({ transpose: false, flipX: false, flipY: false })
+    // and back again
+    const back = panelOptionsFor(toLandscape, [], 48).orientations.find((o) => o.label === 'portrait')!.next
+    expect(back.frameKey).toBe('3x4')
+    // the subtype survives the turn
+    expect(canonCatalogue(48).find((e) => e.frameCols + 'x' + e.frameRows === '4x3')!.typeId)
+      .toBe(canonCatalogue(48).find((e) => e.frameCols + 'x' + e.frameRows === '3x4')!.typeId)
+  })
+
+  it('a turn the board cannot hold is offered but disabled, never an illegal record', () => {
+    // 3x10 fits a 9-wide board; 10x3 does not. The choice must not silently land somewhere else,
+    // and it must not create a record the board cannot carry.
+    const tall = { classId: 'rectangle', frameKey: '3x10', layoutId: CANON_LAYOUT, view: { transpose: false, flipX: false, flipY: false } }
+    const landscape = panelOptionsFor(tall, [], 48).orientations.find((o) => o.label === 'landscape')!
+    expect(canonCatalogue(48).some((e) => e.frameCols === 10), 'no 10-wide record exists').toBe(false)
+    if (landscape.disabled) expect(landscape.next.frameKey).toBe('3x10')
+    else expect(landscape.next.frameKey, 'lands on a real same-subtype landscape frame')
+      .toMatch(/^\d+x\d+$/)
+  })
+
+  it('square, diamond and triangle keep the transform-based orientation row', () => {
+    // Only the rectangle owns its orientation through records. Nothing else changed.
+    for (const family of ['square', 'diamond'] as const) {
+      const s = selectionForFamily(sel(), family, 48)
+      const labels = panelOptionsFor(s, [], 48).orientations.map((o) => o.label)
+      expect(labels.every((l) => l !== 'portrait' && l !== 'landscape'), family).toBe(true)
+    }
+  })
+
+  it('the canon table holds BOTH sides of square — recognition is a proportion', () => {
+    // A shape is classified by its proportion against the canon table, before any size exists. With
+    // tall-only records every proportion was 1.00 or greater, so a landscape shape's ratio matched
+    // nothing: half of all shapes were unrecognisable by construction. Delete the turned frame from
+    // rectangleFrames and this dies.
+    for (const pitchMM of [24, 48, 96]) {
+      const canon = canonCatalogue(pitchMM)
+      const wide = canon.filter((e) => e.frameCols > e.frameRows)
+      const tall = canon.filter((e) => e.frameRows > e.frameCols)
+      expect(wide.length, 'landscape canon @' + pitchMM).toBeGreaterThan(0)
+      expect(tall.length, 'portrait canon @' + pitchMM).toBeGreaterThan(0)
+      // every ratio below 1 is a landscape record, every ratio above is portrait — the table spans
+      // both sides, which is what makes a nearest-proportion match possible at all
+      const ratios = canon.map((e) => e.frameRows / e.frameCols)
+      expect(Math.min(...ratios), 'a proportion below 1 exists @' + pitchMM).toBeLessThan(1)
+      expect(Math.max(...ratios), 'a proportion above 1 exists @' + pitchMM).toBeGreaterThan(1)
+    }
+  })
+
+  it('a turned frame is published only where the board can hold it', () => {
+    // The board is 9 wide and 11 tall, so 3x10 is a real product and 10x3 is not. Publishing the
+    // turn unconditionally would put layouts on the board that cannot physically sit there.
+    const keys = new Set(canonCatalogue(48).map((e) => e.frameCols + 'x' + e.frameRows))
+    expect(keys.has('3x10'), 'portrait 3x10 fits the board').toBe(true)
+    expect(keys.has('10x3'), '10 columns exceed the board').toBe(false)
+    expect(keys.has('3x4') && keys.has('4x3'), 'both orientations where both fit').toBe(true)
+  })
+
   it('ONE canon population per frame — the answer to a classified frame is not a pile', () => {
     // A frame has exactly one canon layout. Thirteen was the symptom of the missing role.
     for (const pitchMM of [24, 48, 96]) {
@@ -351,13 +436,26 @@ describe('the canon is the full grid, interiors included', () => {
 })
 
 describe('rectangle class', () => {
-  it('carries every tall frame the board holds at that lattice', () => {
-    // canonical form is TALL (cols < rows); the wide orientation is the matcher turning the record
+  it('carries BOTH orientations of every frame the board holds at that lattice', () => {
+    // Portrait and landscape are separate layouts (Dan, 2026-08-30), not one record and a view
+    // toggle. Recognition compares a shape's proportion against the canon table, so the table must
+    // hold both sides of 1.00 — with tall-only records every entry was 1.00 or taller and a wide
+    // shape's 0.71 matched nothing at all. A turned frame exists only where the board can hold it:
+    // the board is 9 wide and 11 tall, so 3x10 is published and 10x3 is not.
     for (const pitch of [24, 48, 96]) {
       const { cols, rows } = boardPositions(pitch)
       const want: string[] = []
-      for (let c = 1; c <= cols; c++) for (let r = c + 1; r <= rows; r++) want.push(`${c}x${r}`)
+      for (let c = 1; c <= cols; c++) for (let r = c + 1; r <= rows; r++) {
+        want.push(`${c}x${r}`)
+        if (r <= cols && c <= rows) want.push(`${r}x${c}`)
+      }
       expect(framesAt('rectangle', pitch).map(frameKeyOf).sort(), `rectangle @${pitch}`).toEqual(want.sort())
+      // and both sides of square are genuinely present at the released pitch
+      if (pitch === 48) {
+        const keys = new Set(framesAt('rectangle', pitch).map(frameKeyOf))
+        expect(keys.has('3x4'), 'portrait 3x4').toBe(true)
+        expect(keys.has('4x3'), 'landscape 4x3').toBe(true)
+      }
     }
   })
   it('every rectangle frame carries one population, its full grid', () => {
@@ -797,7 +895,8 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
       // of saying a turn already on the row
       expect(new Set(labels).size, type).toBe(labels.length)
     }
-    // and a class with its own vocabulary keeps it
+    // The rectangle keeps its own vocabulary, and it is now RECORD-OWNED: portrait and landscape
+    // are two frames, so the row selects between them instead of transforming one.
     const rect = selectionForFamily(sel(), 'rectangle', 48)
     expect(panelOptionsFor(rect, [], 48).orientations.map((o) => o.label)).toEqual(['portrait', 'landscape'])
   })

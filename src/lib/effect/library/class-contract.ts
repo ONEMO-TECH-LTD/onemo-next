@@ -46,7 +46,20 @@ export interface ClassSpec {
   validateDraft(draft: DraftShape, frame: LibraryFrame): string[]
 }
 
+/** One choice on the Orientation row, resolved by the CLASS. A class whose records own their
+ *  orientation returns these; one whose orientation is a view returns null and keeps the
+ *  transform-based row. The panel renders either without knowing which it is looking at. */
+export interface ClassOrientationChoice {
+  readonly id: string
+  readonly label: string
+  readonly active: boolean
+  readonly disabled?: boolean
+  readonly next: LibrarySelection
+}
+
 export interface ClassControls {
+  /** Record-owned orientation, or null to use the transform-based row. */
+  orientationChoices?(sel: LibrarySelection, pitchMM: number): readonly ClassOrientationChoice[] | null
   open(current: LibrarySelection, pitchMM: number): LibrarySelection
   orientations: readonly { id: string; view: LibraryTransform }[]
   baseView(sel: LibrarySelection, pitchMM: number): LibraryTransform
