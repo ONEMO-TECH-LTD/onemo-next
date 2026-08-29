@@ -1,11 +1,18 @@
-import { SQUARE_FRAMES } from './corpus-square'
-import { box96, withSpacingModes } from './rules'
+import { frameOf } from './canon'
+import { boardPositions } from '../grid-magnet-spec'
 import { registryClass } from './registry-class'
+import type { LibraryFrame } from './types'
+
+/** SQUARE — canon. Every square frame the board holds at this lattice, at full coverage. */
+function squareFrames(pitchMM: number): readonly LibraryFrame[] {
+  const { cols, rows } = boardPositions(pitchMM)
+  return Array.from({ length: Math.min(cols, rows) }, (_, i) => frameOf(i + 1, i + 1))
+}
 
 export const squareClass = registryClass({
   classId: 'square',
   types: [{ id: 'box', label: 'box' }],
-  frames: (pitchMM) => SQUARE_FRAMES.map((frame) => withSpacingModes(frame, pitchMM, box96)),
+  frames: (pitchMM) => squareFrames(pitchMM),
   typeOfFrame: () => 'box',
   label: (frame) => frame.cols + '×' + frame.rows,
   orientations: [],

@@ -10,7 +10,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import LibraryPanel from './LibraryPanel'
 import { libraryStageModel } from '@/lib/effect/grid-magnet-library-bridge'
 import {
-  DEFAULT_LIBRARY_SELECTION, LIBRARY_FAMILIES, selectionForFamily, librarySurface, DRAFT_STORE_KEY, bandIdOfMM,
+  DEFAULT_LIBRARY_SELECTION, LIBRARY_FAMILIES, selectionForFamily, librarySurface, DRAFT_STORE_KEY,
   startAdd as libStartAdd, startEdit as libStartEdit, saveEdit as libSaveEdit,
   deleteEdit as libDeleteEdit, toggleNodeAt,
   type LibraryDraft, type LibraryEdit, type LibrarySelection,
@@ -426,7 +426,7 @@ export default function GridLab() {
           </div>
           {libraryState ? <LibraryPanel setSel={setLibrarySel} Fold={Fold} options={libraryState.options}
             boxMM={{ w: libraryState.materialized.widthMM, h: libraryState.materialized.heightMM }}
-            bandId={bandIdOfMM(Math.max(libraryState.materialized.widthMM, libraryState.materialized.heightMM))}
+            bandId={libraryState.materialized.bandId}
             showBox={showBox} setShowBox={setShowBox} edit={edit} setEdit={setEdit}
             editError={libraryModel?.error ?? null}
             isDraft={libraryState?.isDraft ?? false}

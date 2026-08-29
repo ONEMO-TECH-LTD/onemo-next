@@ -8,6 +8,7 @@
 
 import { specOf } from './class-registry'
 import type { ClassVariant, LibraryClass } from './class-contract'
+import { CANON_LAYOUT } from './canon'
 import { pickLayout } from './selection-transition'
 import { frameKeyOf } from './transforms'
 import type { LibraryDraft } from './drafts'
@@ -16,7 +17,7 @@ import type { LibraryFamily, LibraryFrame, LibraryLayout, LibrarySelection } fro
 /** A hand-authored layout is named in a selection as 'draft:<name>'. One place, one spelling. */
 const DRAFT_PREFIX = 'draft:'
 export const DEFAULT_LIBRARY_SELECTION: LibrarySelection = {
-  classId: 'square', frameKey: '3x3', layoutId: 'perimeter',
+  classId: 'square', frameKey: '3x3', layoutId: CANON_LAYOUT,
   view: { transpose: false, flipX: false, flipY: false },
 }
 export const draftLayoutId = (name: string): string => DRAFT_PREFIX + name

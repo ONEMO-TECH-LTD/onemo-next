@@ -5,9 +5,8 @@
 
 import { specOf } from './class-registry'
 import type { LibraryClass } from './class-contract'
-import { SPACING_MODES, isSpacingMode } from './rules'
 import { frameKeyOf, transformLayout, viewName } from './transforms'
-import { draftLayoutId, pickLayout, selectVariant, type ResolvedSelection } from './selection'
+import { draftLayoutId, selectVariant, type ResolvedSelection } from './selection'
 import type { LibraryDraft } from './drafts'
 import type {
   LibraryFamily, LibraryFrame, LibraryLayout, LibrarySelection, LibraryTransform,
@@ -35,10 +34,9 @@ export interface PanelOptions {
    *  geometry, so there is one block and not two. */
   frames: PanelOption[]
   orientations: PanelOption[]
-  /** The populations this frame carries, plus the admin's own saved ones. */
+  /** The frame's canon population, plus the admin's own saved ones. The belt, the corners and
+   *  the 96mm spacing are not offered here: they are filters the engine applies (Dan, 08-29). */
   layouts: PanelOption[]
-  /** The two physical spacings, with the ones this frame cannot serve marked. */
-  spacing: PanelOption[]
 }
 
 /** The eight lattice views, as the library's own transform. */
@@ -120,7 +118,6 @@ export function panelOptionsResolved(
   const orientations = orientationOptions(sel, frame, visible, spec, spec.baseView(sel, pitchMM))
   const variantId = variant.id
   const layoutSel = (name: string): LibrarySelection => ({ ...sel, layoutId: name })
-  const has = (name: string) => frame.layouts.some((l) => l.name === name)
 
   return {
     // a class with one type offers no choice, so its chip is inert. WHICH controls are inert is
@@ -138,22 +135,14 @@ export function panelOptionsResolved(
     })),
     // a class with no named views of its own, and no turn that changes the picture, offers none
     orientations: spec.orientations.length || orientations.length > 1 ? orientations : [],
-    // the 96mm mode is reached from the Spacing row, so it is not also a layout chip
     layouts: [
-      ...frame.layouts.filter((l) => !isSpacingMode(l.name) || l.name === SPACING_MODES[0].layoutId).map((l) => ({
-        id: l.name, label: l.name,
-        active: sel.layoutId === l.name || (l.name === SPACING_MODES[0].layoutId && isSpacingMode(sel.layoutId)),
-        next: layoutSel(l.name),
+      ...frame.layouts.map((l) => ({
+        id: l.name, label: l.name, active: sel.layoutId === l.name, next: layoutSel(l.name),
       })),
       ...drafts.filter((d) => spec.draftMatches(d, sel, frameKeyOf(frame))).map((d) => ({
         id: d.id, label: d.name, custom: true,
         active: sel.layoutId === draftLayoutId(d.name), next: layoutSel(draftLayoutId(d.name)),
       })),
     ],
-    spacing: SPACING_MODES.map((m) => ({
-      id: m.layoutId, label: m.label, disabled: !has(m.layoutId),
-      active: sel.layoutId === m.layoutId,
-      next: layoutSel(has(m.layoutId) ? m.layoutId : pickLayout(frame, m.layoutId)),
-    })),
   }
 }

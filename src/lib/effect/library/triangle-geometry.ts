@@ -76,21 +76,6 @@ export function canonicalTriangleId(vertices: readonly LatticeNode[]): string {
   return 'tri:' + best
 }
 
-const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b))
-
-/** Every exact lattice node on the closed segment a..b, endpoints included, in order. */
-function edgeRun(a: LatticeNode, b: LatticeNode): LatticeNode[] {
-  const dx = b[0] - a[0], dy = b[1] - a[1]
-  const g = gcd(Math.abs(dx), Math.abs(dy)) || 1
-  const step: LatticeNode = [dx / g, dy / g]
-  return Array.from({ length: g + 1 }, (_, i) => [a[0] + step[0] * i, a[1] + step[1] * i] as LatticeNode)
-}
-
-/** The perimeter as three DIRECTED runs, so a sampler indexes each side from its own start. */
-export function perimeterRuns(v: TriangleLayout['vertices']): LatticeNode[][] {
-  return [edgeRun(v[0], v[1]), edgeRun(v[1], v[2]), edgeRun(v[2], v[0])]
-}
-
 const key = (n: LatticeNode) => n[0] + ',' + n[1]
 const dedupe = (ns: readonly LatticeNode[]): LatticeNode[] => {
   const seen = new Set<string>(); const out: LatticeNode[] = []
@@ -98,7 +83,6 @@ const dedupe = (ns: readonly LatticeNode[]): LatticeNode[] => {
   return out
 }
 
-export const perimeterNodes = (v: TriangleLayout['vertices']): LatticeNode[] => dedupe(perimeterRuns(v).flat())
 
 /** Every lattice node inside or on the triangle — exact half-plane test, no rasterising. */
 export function fullNodes(v: TriangleLayout['vertices']): LatticeNode[] {

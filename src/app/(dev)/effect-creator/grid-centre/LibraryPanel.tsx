@@ -19,7 +19,7 @@ export default function LibraryPanel({
   options: PanelOptions
   boxMM: { w: number; h: number }
   /** The band this layout sits in at its own size; null past the last band. */
-  bandId: number | null
+  bandId: number
   showBox: boolean
   setShowBox: (v: boolean) => void
   edit: LibraryEdit | null
@@ -40,8 +40,8 @@ export default function LibraryPanel({
     <>
       <div className="gl-card gl-libsize">
         <b>{Math.round(boxMM.w)}×{Math.round(boxMM.h)}</b><span>mm</span>
-        <span className={`gl-libband${bandId === null ? ' gl-libband-none' : ''}`}>
-          {bandId === null ? 'no band' : `B${bandId}`}
+        <span className="gl-libband">
+          {`B${bandId}`}
         </span>
         <button className="gl-libdim" aria-pressed={showBox} onClick={() => setShowBox(!showBox)}>dimensions</button>
       </div>
@@ -80,11 +80,8 @@ export default function LibraryPanel({
           ))}
           <button className="gl-libadd" onClick={startAdd}><b>+</b></button>
         </div>
-        <div className="gl-field" style={{ marginTop: 9, opacity: (edit || opts.spacing.some((o) => o.active)) ? 1 : 0.45 }}><span>Spacing</span>
+        <div className="gl-field" style={{ marginTop: 9 }}><span>Custom</span>
           <div className="gl-seg">
-            {opts.spacing.map((o) => (
-              <button key={o.id} aria-pressed={pressed(o)} disabled={o.disabled} onClick={() => go(o)}>{o.label}</button>
-            ))}
             <button aria-pressed={!!edit} onClick={startEdit}>custom</button>
           </div>
         </div>

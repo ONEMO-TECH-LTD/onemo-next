@@ -8,6 +8,7 @@
 
 import { outlineFromLayout } from './outline'
 import { boundsMM, placeMM } from './geometry'
+import { bandOfFrame } from './rules'
 import { resolveSelection, type ResolvedSelection } from './selection'
 import { frameKeyOf } from './transforms'
 import type { LibrarySelection, PointMM } from './types'
@@ -23,6 +24,10 @@ export interface MaterializedLibrary {
   frameCols: number
   frameRows: number
   layoutId: string
+  /** The band this frame sits in at this lattice, from its CANON population — never from the
+   *  outline's outer size, and never from a draft's edited nodes: editing must not silently move
+   *  the chip between bands. Non-null: a published frame with no band is a producer bug. */
+  bandId: number
   nodesMM: readonly PointMM[]
   outlineMM: readonly PointMM[]
   widthMM: number
@@ -43,6 +48,9 @@ export function materializeResolved(
   // 96mm is physical, and the FRAME already carries the population for this pitch — every
   // reader sees the same magnets rather than the panel counting one set and the canvas another.
   const p = placeMM(frame, nodes ? { name: 'draft', nodes } : layout, safeSel.view, pitchMM)
+  const band = bandOfFrame(frame, pitchMM)
+  if (band === null) throw new Error('library: ' + frameKeyOf(frame) + ' at ' + pitchMM + 'mm has no released band')
+  const bandId = band
   const outlineOf = (ns: readonly PointMM[]) => outlineFromLayout(ns, variant.outline)
   /** The one record. Only the outline it wraps, its layout name, why it is not a shape yet and
    *  where to look when nothing is drawn ever differ between the three cases. */
@@ -51,7 +59,7 @@ export function materializeResolved(
   ): MaterializedLibrary => ({
     classId,
     sourceFrameKey: frameKeyOf(frame), frameKey: p.cols + 'x' + p.rows,
-    frameCols: p.cols, frameRows: p.rows, layoutId,
+    frameCols: p.cols, frameRows: p.rows, layoutId, bandId,
     nodesMM: p.nodesMM, outlineMM, ...boundsMM(outlineMM), error, seedMM,
   })
 

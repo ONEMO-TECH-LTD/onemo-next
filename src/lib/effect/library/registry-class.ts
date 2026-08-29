@@ -1,5 +1,5 @@
 import type { ClassControls, ClassSpec, ClassType, ClassVariant, DraftIdentity, DraftShape, LibraryClass, OutlineRecipe } from './class-contract'
-import { pickLayout } from './selection-transition'
+import { bandOfFrame } from './rules'
 import { frameKeyOf } from './transforms'
 import type { LibraryFamily, LibraryFrame, LibrarySelection, LibraryTransform } from './types'
 
@@ -35,11 +35,16 @@ export function boundsAndDuplicateErrors(draft: DraftShape, frame: LibraryFrame)
 }
 
 export function registryClass(config: RegistryClassConfig): LibraryClass {
-  const variant = (frame: LibraryFrame, typeId: string): ClassVariant => ({
-    typeId, id: frameKeyOf(frame), label: config.label(frame), frame, view: none,
-    outline: config.outline,
-    selection: { classId: config.classId, frameKey: frameKeyOf(frame) },
-  })
+  const variant = (frame: LibraryFrame, typeId: string, pitchMM: number): ClassVariant => {
+    const band = bandOfFrame(frame, pitchMM)
+    return {
+      typeId, id: frameKeyOf(frame),
+      label: (band === null ? '' : 'B' + band + ' · ') + config.label(frame),
+      frame, view: none,
+      outline: config.outline,
+      selection: { classId: config.classId, frameKey: frameKeyOf(frame) },
+    }
+  }
   const variantFrame = (sel: LibrarySelection, pitchMM: number) => {
     const frame = config.frames(pitchMM).find((candidate) => frameKeyOf(candidate) === sel.frameKey)
     if (!frame) throw new Error('library: unknown frameKey ' + sel.frameKey)
@@ -51,11 +56,11 @@ export function registryClass(config: RegistryClassConfig): LibraryClass {
     variants: (typeId, pitchMM) => {
       assertTypeId(config.classId, config.types, typeId)
       return config.frames(pitchMM).filter((frame) => config.typeOfFrame(frame) === typeId)
-        .map((frame) => variant(frame, typeId))
+        .map((frame) => variant(frame, typeId, pitchMM))
     },
     variantOf: (sel, pitchMM) => {
       const frame = variantFrame(sel, pitchMM)
-      return variant(frame, config.typeOfFrame(frame))
+      return variant(frame, config.typeOfFrame(frame), pitchMM)
     },
     validateDraft: (draft, frame) => [
       ...boundsAndDuplicateErrors(draft, frame),
@@ -65,7 +70,7 @@ export function registryClass(config: RegistryClassConfig): LibraryClass {
   const controls: ClassControls = {
     open: (current, pitchMM) => {
       const frame = config.frames(pitchMM)[0]
-      return { ...current, classId: config.classId, geometryId: undefined, frameKey: frameKeyOf(frame), layoutId: pickLayout(frame, 'perimeter'), view: none }
+      return { ...current, classId: config.classId, geometryId: undefined, frameKey: frameKeyOf(frame), layoutId: frame.layouts[0].name, view: none }
     },
     orientations: config.orientations,
     baseView: () => none,

@@ -10,7 +10,7 @@
 // would disagree the first time a corpus changed. The class IS the declaration — this reads it.
 
 import { catalogue } from './catalogue'
-import { aspectOf, bandIdOfMM, legalExtentMM } from './rules'
+import { bandIdOfMM, legalExtentMM } from './rules'
 import type { LibraryFamily } from './types'
 
 export interface ClassBandRange {
@@ -25,10 +25,7 @@ export interface ClassBandRange {
   /** The allowance this class wears — how much outline it adds over its own skeleton. */
   readonly allowanceMinMM: number
   readonly allowanceMaxMM: number
-  /** The legal-box ratios these layouts occupy — the key a shape's own legal box matches against.
-   *  Infinity where a layout is a single line of magnets and has no width. */
-  readonly aspectMin: number
-  readonly aspectMax: number
+  /** How many layouts this class holds in this band. */
   readonly layouts: number
 }
 
@@ -37,18 +34,16 @@ const round = (n: number) => Math.round(n * 10) / 10
 /** Every class's size range per band, at one pitch. Bands a class does not reach are absent —
  *  an absent cell is an answer ("this class has no layout at that skeleton"), not a gap. */
 export function classBandRanges(pitchMM: number): readonly ClassBandRange[] {
-  const cells = new Map<string, { classId: LibraryFamily; bandId: number; legal: number[]; outline: number[]; aspect: number[] }>()
+  const cells = new Map<string, { classId: LibraryFamily; bandId: number; legal: number[]; outline: number[] }>()
   for (const entry of catalogue(pitchMM)) {
-    if (entry.bandId === null) continue
     const key = entry.classId + '|' + entry.bandId
     let cell = cells.get(key)
     if (!cell) {
-      cell = { classId: entry.classId, bandId: entry.bandId, legal: [], outline: [], aspect: [] }
+      cell = { classId: entry.classId, bandId: entry.bandId, legal: [], outline: [] }
       cells.set(key, cell)
     }
     cell.legal.push(legalExtentMM(entry.nodesMM))
     cell.outline.push(Math.max(entry.widthMM, entry.heightMM))
-    cell.aspect.push(aspectOf(entry.legalWidthMM, entry.legalHeightMM))
   }
   return Object.freeze([...cells.values()]
     .sort((a, b) => a.bandId - b.bandId || a.classId.localeCompare(b.classId))
@@ -63,8 +58,6 @@ export function classBandRanges(pitchMM: number): readonly ClassBandRange[] {
         outlineMaxMM: round(Math.max(...cell.outline)),
         allowanceMinMM: round(Math.min(...allowances)),
         allowanceMaxMM: round(Math.max(...allowances)),
-        aspectMin: round(Math.min(...cell.aspect)),
-        aspectMax: round(Math.max(...cell.aspect)),
         layouts: cell.outline.length,
       })
     }))

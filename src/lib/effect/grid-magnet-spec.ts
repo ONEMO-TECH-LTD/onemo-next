@@ -20,8 +20,30 @@ export const RELEASED_PADDING_MM = 12
 /** Smallest effect — one 24mm cell. */
 export const MIN_EFFECT_MM = 24
 
-/** Field positions per axis (9×9). */
-export const FIELD_POSITIONS_PER_AXIS = 9
+/** THE BOARD — 9 columns by 11 rows (Dan, 2026-08-29: "the max grid is rectangular 9 columns and
+ *  10-11 rows" / "next step in 96mm grid is 9x11 — so this can be max size for now"). It is the
+ *  ONLY cap: "we don't have to limit the grid engine at all, it calculates and spits out anything".
+ *  The garment's own receiver canvas is 7x9 regular and 9x11 at most. */
+export const FIELD_COLUMNS = 9
+export const FIELD_ROWS = 11
+
+/** The board in MILLIMETRES of legal area — the span the outermost magnet centres may occupy.
+ *  This is the fixed fact; how many POSITIONS it holds depends on the lattice being used, so a
+ *  coarser pitch reaches the same board with fewer of them (Dan, 2026-08-29: the sparser tier is
+ *  "the same lattice just sparser"). Reading the position count as pitch-free published layouts
+ *  that could not physically sit on the board. */
+export const BOARD_WIDTH_MM = (FIELD_COLUMNS - 1) * DEFAULT_PITCH_MM
+export const BOARD_HEIGHT_MM = (FIELD_ROWS - 1) * DEFAULT_PITCH_MM
+
+/** How many positions of a given lattice the board holds, per axis. */
+export const boardPositions = (pitchMM: number) => ({
+  cols: Math.floor(BOARD_WIDTH_MM / pitchMM) + 1,
+  rows: Math.floor(BOARD_HEIGHT_MM / pitchMM) + 1,
+})
+
+/** DEFECT, filed not fixed: the engine's size ceiling reads this for BOTH axes, so it models the
+ *  board as square and caps every shape at 420mm. A portrait shape can lawfully reach 504mm. */
+export const FIELD_POSITIONS_PER_AXIS = FIELD_COLUMNS
 
 /** Extra size past the board's span so a shape can pad past the outermost spots (408 → 420). */
 export const SIZE_CEIL_MARGIN_MM = 12
@@ -47,6 +69,10 @@ export const MIN_ANCHORS = 2
  *  inside it that can hold anything. Sixteen triangle records sat one band too high for exactly
  *  that reason, and a diamond's outline overstates its legal extent by 10mm at 2×2 alone.
  *
+ *  Runs to B11 because that is the board: 9 columns spans 384mm of legal area and 11 rows spans
+ *  480mm, and the board is the only cap (Dan, 2026-08-29). The table DESCRIBES the board; it is not
+ *  licence to generate at the top of it.
+ *
  *  Ends 1mm shy of the next start so no size lives in two bands. Values only — the 48mm repeat is
  *  asserted by the separation gate, so the table cannot drift off the rule. */
 export const BAND_STEP_MM = 48
@@ -61,6 +87,8 @@ export const BANDS: ReadonlyArray<Band> = Object.freeze([
   Object.freeze({ id: 7, minMM: 288, maxMM: 335 }),
   Object.freeze({ id: 8, minMM: 336, maxMM: 383 }),
   Object.freeze({ id: 9, minMM: 384, maxMM: 431 }),
+  Object.freeze({ id: 10, minMM: 432, maxMM: 479 }),
+  Object.freeze({ id: 11, minMM: 480, maxMM: 527 }),
 ])
 
 /** Snap scan size step. */

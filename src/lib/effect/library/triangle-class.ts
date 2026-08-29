@@ -1,5 +1,6 @@
 import type { ClassType, ClassVariant, DraftShape, LibraryClass, OutlineRecipe } from './class-contract'
 import { assertTypeId, boundsAndDuplicateErrors } from './registry-class'
+import { bandOfFrame } from './rules'
 import { selectVariant } from './selection-transition'
 import { frameKeyOf } from './transforms'
 import { TRIANGLE_TYPES, restsFlat, triangleTypeOf, trianglesOfType, uprightView, type TriangleProductType } from './triangle-types'
@@ -26,12 +27,13 @@ const sizeOf = (triangle: TriangleLayout, pitchMM: number) => {
   return Math.round(widthMM) + '×' + Math.round(heightMM)
 }
 
-const asVariant = (triangle: TriangleLayout, pitchMM: number, index?: number, frame = triangleFrame(triangle, pitchMM)): ClassVariant => {
+const asVariant = (triangle: TriangleLayout, pitchMM: number, index?: number, frame = triangleFrame(triangle)): ClassVariant => {
   const size = sizeOf(triangle, pitchMM)
+  const band = bandOfFrame(frame, pitchMM)
   return {
     typeId: triangleTypeOf(triangle),
     id: triangle.id,
-    label: size,
+    label: (band === null ? '' : 'B' + band + ' · ') + size,
     ...(index === undefined ? {} : { accessibleLabel: label[triangleTypeOf(triangle)] + ' ' + (index + 1) + ' · ' + size + 'mm' + (restsFlat(triangle) ? '' : ' · diagonal') }),
     frame,
     view: uprightView(triangle),
@@ -61,7 +63,7 @@ export const triangleClass: LibraryClass = {
   },
   variantOf: (sel, pitchMM) => {
     const triangle = triangleBySelection(sel)
-    const frame = triangleFrame(triangle, pitchMM)
+    const frame = triangleFrame(triangle)
     const frameKey = frameKeyOf(frame)
     if (frameKey !== sel.frameKey) throw new Error('library: frameKey ' + sel.frameKey + ' does not match geometry ' + triangle.id + ' (' + frameKey + ')')
     return asVariant(triangle, pitchMM, undefined, frame)

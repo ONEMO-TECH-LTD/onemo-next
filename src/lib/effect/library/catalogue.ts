@@ -6,8 +6,9 @@ import type { LibraryFamily, PointMM } from './types'
 import { bandIdOfMM, legalBoxMM } from './rules'
 export { bandIdOfMM } from './rules'
 
-/** v2 adds `bandId` — the band a record occupies at its own canonical size. */
-export const CATALOGUE_FORMAT_VERSION = 2
+/** v3: one canon population per frame, pitch-aware frames, and a band that is never null.
+ *  No new fields — the semantics and the identity set changed, which is what the version says. */
+export const CATALOGUE_FORMAT_VERSION = 3
 
 export type CatalogueEntry = Readonly<{
   classId: LibraryFamily
@@ -22,8 +23,9 @@ export type CatalogueEntry = Readonly<{
   heightMM: number
   frameCols: number
   frameRows: number
-  /** The band this layout occupies — read off its LEGAL box, not its outline. */
-  bandId: number | null
+  /** The band this layout occupies — read off its LEGAL box, not its outline. A published record
+   *  always has one: a frame the board cannot hold at this lattice is not published at all. */
+  bandId: number
   /** The legal box itself: the span the magnets occupy. Its longer side gives the band; the ratio
    *  between the sides says which shapes can wear this layout. */
   legalWidthMM: number
@@ -41,6 +43,9 @@ export function catalogue(pitchMM: number): readonly CatalogueEntry[] {
         const selection = { ...selected, layoutId: layout.name }
         const materialized = materializeSelection(selection, pitchMM)
         const legal = legalBoxMM(materialized.nodesMM)
+        const bandId = bandIdOfMM(Math.max(legal.widthMM, legal.heightMM))
+        if (bandId === null)
+          throw new Error('library: ' + materialized.frameKey + ' at ' + pitchMM + 'mm has no released band')
         entries.push(Object.freeze({
           classId, typeId: type.id,
           id: [classId, type.id, variant.id, layout.name, selection.view.transpose ? 't' : 'n', selection.view.flipX ? 'x' : 'n', selection.view.flipY ? 'y' : 'n'].map(encodeURIComponent).join('/'),
@@ -49,7 +54,7 @@ export function catalogue(pitchMM: number): readonly CatalogueEntry[] {
           nodesMM: materialized.nodesMM, outlineMM: materialized.outlineMM,
           widthMM: materialized.widthMM, heightMM: materialized.heightMM,
           frameCols: materialized.frameCols, frameRows: materialized.frameRows,
-          bandId: bandIdOfMM(Math.max(legal.widthMM, legal.heightMM)),
+          bandId,
           legalWidthMM: legal.widthMM, legalHeightMM: legal.heightMM,
         }))
       }
