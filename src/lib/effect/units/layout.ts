@@ -92,6 +92,17 @@ export function bandOuterMM(band: Band, padMM: number): { minMM: number; maxMM: 
 }
 
 
+/** THE SEAT ARITHMETIC QUANTUM — one micron, the resolution both seat predicates decide in.
+ *
+ *  Polygon and analytic-circle seating promise the SAME exact boundary semantics: tangency passes
+ *  by equality. They can only keep that promise if they round the same way, and this was declared
+ *  privately inside each of them — two numbers that nothing compared, free to drift apart and make
+ *  the two tests disagree about a magnet sitting exactly on the line.
+ *
+ *  Private and implementation-only. It is arithmetic resolution, not a released value, so it does
+ *  not belong in spec and nothing outside these predicates has any business reading it. */
+const SEAT_QUANTUM_MM = 0.001
+
 // Placement eligibility is LAYOUT'S: a seat predicate says where a magnet MAY go, which is policy,
 // not measurement. It composes foundation's public primitives; the edge index stays private there.
 // QA F3 is right — keeping a private shortcut is no reason to hold policy in foundation.
@@ -106,11 +117,10 @@ export function makeSeatPredicate(
   outer: ReadonlyArray<Pt>,
   spotRadiusMM: number,
 ): ((pt: Pt) => boolean) | null {
-  const QUANTUM = 0.001
   const GUARD = 0.05
   let prep: ReturnType<typeof prepare>
-  try { prep = prepare(outer, QUANTUM) } catch { return null }
-  const rQ = Math.round(spotRadiusMM / QUANTUM)
+  try { prep = prepare(outer, SEAT_QUANTUM_MM) } catch { return null }
+  const rQ = Math.round(spotRadiusMM / SEAT_QUANTUM_MM)
   return (pt: Pt) => {
     // The ring-field lower bound is gone with the move: it read foundation's private edge index,
     // and a private shortcut is not a reason to hold policy in foundation (QA F3). edgeDistMM is
@@ -119,7 +129,7 @@ export function makeSeatPredicate(
     const d = edgeDistMM(outer, pt)
     if (d > spotRadiusMM + GUARD) return pointInOuter(pt, outer)
     if (d < spotRadiusMM - GUARD) return false
-    return holds(prep, [Math.round(pt[0] / QUANTUM), Math.round(pt[1] / QUANTUM)], rQ)
+    return holds(prep, [Math.round(pt[0] / SEAT_QUANTUM_MM), Math.round(pt[1] / SEAT_QUANTUM_MM)], rQ)
   }
 }
 
@@ -131,8 +141,7 @@ export function makeSeatPredicate(
 export function makeCircleSeatPredicate(
   cx: number, cy: number, R: number, spotRadiusMM: number,
 ): ((pt: Pt) => boolean) | null {
-  const QUANTUM = 0.001
-  const q = (v: number) => Math.round(v / QUANTUM)
+  const q = (v: number) => Math.round(v / SEAT_QUANTUM_MM)
   const slack = q(R) - q(spotRadiusMM)
   if (slack < 0) return null
   const cqx = q(cx), cqy = q(cy), s2 = slack * slack
