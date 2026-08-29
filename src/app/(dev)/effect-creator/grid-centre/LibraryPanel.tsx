@@ -11,13 +11,15 @@ import type { LibraryEdit, LibrarySelection, PanelOption, PanelOptions } from '@
 type FoldComponent = (p: { title: ReactNode; children: ReactNode }) => ReactElement
 
 export default function LibraryPanel({
-  setSel, Fold, options, boxMM, showBox, setShowBox, editError,
+  setSel, Fold, options, boxMM, bandId, showBox, setShowBox, editError,
   edit, setEdit, saveEdit, deleteEdit, startAdd, startEdit, isDraft,
 }: {
   setSel: (next: LibrarySelection) => void
   Fold: FoldComponent
   options: PanelOptions
   boxMM: { w: number; h: number }
+  /** The band this layout sits in at its own size; null past the last band. */
+  bandId: number | null
   showBox: boolean
   setShowBox: (v: boolean) => void
   edit: LibraryEdit | null
@@ -38,6 +40,9 @@ export default function LibraryPanel({
     <>
       <div className="gl-card gl-libsize">
         <b>{Math.round(boxMM.w)}×{Math.round(boxMM.h)}</b><span>mm</span>
+        <span className={`gl-libband${bandId === null ? ' gl-libband-none' : ''}`}>
+          {bandId === null ? 'no band' : `B${bandId}`}
+        </span>
         <button className="gl-libdim" aria-pressed={showBox} onClick={() => setShowBox(!showBox)}>dimensions</button>
       </div>
       <Fold title="Type">

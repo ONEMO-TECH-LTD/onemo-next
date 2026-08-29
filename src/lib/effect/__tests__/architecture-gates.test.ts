@@ -800,18 +800,19 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     for (const path of governed)
       expect(source(path), path).not.toMatch(/\bpadMM\b/)
   })
-  it('STEP 4: catalogue V1 has exact readonly data-only records and frozen identity', () => {
+  it('STEP 4: catalogue V2 has exact readonly data-only records and frozen identity', () => {
     type Exact = Readonly<{
       classId: string; typeId: string; id: string; label: string; pitchMM: number; corners: 'sharp' | 'bevel' | 'round'
       nodesMM: readonly (readonly [number, number])[]; outlineMM: readonly (readonly [number, number])[]
       widthMM: number; heightMM: number; frameCols: number; frameRows: number
+      bandId: number | null
     }>
     type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false
     const exact: Equal<CatalogueEntry, Exact> = true
     expect(exact).toBe(true)
-    expect(CATALOGUE_FORMAT_VERSION).toBe(1)
+    expect(CATALOGUE_FORMAT_VERSION).toBe(2)
     const entries = catalogue(48)
-    const keys = ['classId', 'typeId', 'id', 'label', 'pitchMM', 'corners', 'nodesMM', 'outlineMM', 'widthMM', 'heightMM', 'frameCols', 'frameRows'].sort()
+    const keys = ['classId', 'typeId', 'id', 'label', 'pitchMM', 'corners', 'nodesMM', 'outlineMM', 'widthMM', 'heightMM', 'frameCols', 'frameRows', 'bandId'].sort()
     for (const pitchMM of [24, 48, 96]) for (const entry of catalogue(pitchMM)) {
       expect(Object.keys(entry).sort()).toEqual(keys)
       assertDataOnly(entry)
@@ -855,7 +856,7 @@ describe('Shape-Layout Library Law — activation schedule', () => {
   it('STEP 5: surface, bridge, barrel, and shell use the contract boundary', () => {
     expect(barrelExports()).toEqual({
       types: ['CatalogueEntry', 'CornerMode', 'LibraryDraft', 'LibraryEdit', 'LibraryFamily', 'LibrarySelection', 'LibrarySurface', 'MaterializedLibrary', 'PanelOption', 'PanelOptions'],
-      values: ['CATALOGUE_FORMAT_VERSION', 'DEFAULT_LIBRARY_SELECTION', 'DRAFT_STORE_KEY', 'LIBRARY_FAMILIES', 'catalogue', 'deleteEdit', 'librarySurface', 'saveEdit', 'selectionForFamily', 'startAdd', 'startEdit', 'toggleNodeAt'],
+      values: ['CATALOGUE_FORMAT_VERSION', 'DEFAULT_LIBRARY_SELECTION', 'DRAFT_STORE_KEY', 'LIBRARY_FAMILIES', 'bandIdOfMM', 'catalogue', 'deleteEdit', 'librarySurface', 'saveEdit', 'selectionForFamily', 'startAdd', 'startEdit', 'toggleNodeAt'],
       wildcards: [],
       aliases: [],
     })

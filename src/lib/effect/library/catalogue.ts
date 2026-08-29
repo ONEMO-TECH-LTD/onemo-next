@@ -3,8 +3,11 @@ import { selectVariant } from './selection'
 import { materializeSelection } from './materialize'
 import type { CornerMode } from './class-contract'
 import type { LibraryFamily, PointMM } from './types'
+import { bandIdOfMM } from './rules'
+export { bandIdOfMM } from './rules'
 
-export const CATALOGUE_FORMAT_VERSION = 1
+/** v2 adds `bandId` — the band a record occupies at its own canonical size. */
+export const CATALOGUE_FORMAT_VERSION = 2
 
 export type CatalogueEntry = Readonly<{
   classId: LibraryFamily
@@ -19,6 +22,8 @@ export type CatalogueEntry = Readonly<{
   heightMM: number
   frameCols: number
   frameRows: number
+  /** The band this layout occupies at its canonical size; null past the last band. */
+  bandId: number | null
 }>
 
 export function catalogue(pitchMM: number): readonly CatalogueEntry[] {
@@ -39,6 +44,7 @@ export function catalogue(pitchMM: number): readonly CatalogueEntry[] {
           nodesMM: materialized.nodesMM, outlineMM: materialized.outlineMM,
           widthMM: materialized.widthMM, heightMM: materialized.heightMM,
           frameCols: materialized.frameCols, frameRows: materialized.frameRows,
+          bandId: bandIdOfMM(Math.max(materialized.widthMM, materialized.heightMM)),
         }))
       }
     }

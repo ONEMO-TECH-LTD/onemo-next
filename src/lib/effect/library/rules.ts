@@ -2,6 +2,17 @@
 // Owns the fixed spacing vocabulary and pitch-aware 96mm samplers; no UI or class taxonomy.
 
 import type { LibraryFrame, LibraryLayout } from './types'
+import { BANDS } from '../grid-magnet-spec'
+
+/** THE BAND OF A LAYOUT — read off its dominant axis. The rule has one home in the engine spec
+ *  (every 48mm is a new band), so the band the engine asks for and the band the catalogue groups
+ *  by are the same band by construction, not by agreement.
+ *
+ *  This is where a layout SITS at its canonical outline. What band an ANSWER lands in is decided by
+ *  the wrap on the real shape — the catalogue groups, it does not adjudicate. */
+export function bandIdOfMM(sizeMM: number): number | null {
+  return BANDS.find((b) => sizeMM >= b.minMM && sizeMM <= b.maxMM)?.id ?? null
+}
 
 type Node = readonly [number, number]
 

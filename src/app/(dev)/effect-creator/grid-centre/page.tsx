@@ -10,7 +10,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import LibraryPanel from './LibraryPanel'
 import { libraryStageModel } from '@/lib/effect/grid-magnet-library-bridge'
 import {
-  DEFAULT_LIBRARY_SELECTION, LIBRARY_FAMILIES, selectionForFamily, librarySurface, DRAFT_STORE_KEY,
+  DEFAULT_LIBRARY_SELECTION, LIBRARY_FAMILIES, selectionForFamily, librarySurface, DRAFT_STORE_KEY, bandIdOfMM,
   startAdd as libStartAdd, startEdit as libStartEdit, saveEdit as libSaveEdit,
   deleteEdit as libDeleteEdit, toggleNodeAt,
   type LibraryDraft, type LibraryEdit, type LibrarySelection,
@@ -425,6 +425,7 @@ export default function GridLab() {
           </div>
           {libraryState ? <LibraryPanel setSel={setLibrarySel} Fold={Fold} options={libraryState.options}
             boxMM={{ w: libraryState.materialized.widthMM, h: libraryState.materialized.heightMM }}
+            bandId={bandIdOfMM(Math.max(libraryState.materialized.widthMM, libraryState.materialized.heightMM))}
             showBox={showBox} setShowBox={setShowBox} edit={edit} setEdit={setEdit}
             editError={libraryModel?.error ?? null}
             isDraft={libraryState?.isDraft ?? false}
@@ -1059,6 +1060,8 @@ const CSS = `
 .gl-lib button:hover{border-color:var(--ink-3)}
 .gl-lib button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
 .gl-lib button[aria-pressed=true] b,.gl-lib button[aria-pressed=true] span{color:#fff}
+.gl-libband{font:700 11px var(--mono);letter-spacing:.06em;color:var(--accent);background:var(--fill);border-radius:4px;padding:3px 7px;align-self:center}
+.gl-libband-none{color:var(--ink-3)}
 .gl-libsize{display:flex;align-items:center;gap:8px;padding:12px 14px;min-height:52px;flex-wrap:wrap}
 .gl-libsize b{font:700 26px var(--mono);letter-spacing:.01em;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1}
 .gl-libsize span{font:600 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);line-height:1;align-self:center}

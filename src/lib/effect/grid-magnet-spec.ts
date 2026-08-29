@@ -33,14 +33,26 @@ export const MAGNET_DIA_LARGE_MM = 8
 /** Fewest seated magnets the perimeter belt may thin down to. */
 export const MIN_ANCHORS = 2
 
-/** Size bands, ends 1mm shy so no size lives in two bands. B5 keeps its ceiling. */
-export interface Band { readonly id: 1 | 2 | 3 | 4 | 5; readonly minMM: number; readonly maxMM: number }
+/** SIZE BANDS — **every 48mm is a new band** (Dan, 2026-08-29). One magnet pitch per band from the
+ *  smallest effect up; each end 1mm shy of the next start so no size lives in two bands.
+ *
+ *  Written out as values because spec holds values, never arithmetic — the 48mm repeat is asserted
+ *  by the separation gate instead, so the table cannot drift off the rule.
+ *
+ *  The five that used to be here stopped at 264 and left everything larger homeless: twelve library
+ *  records among them, two of which are slim shapes only 73mm and 75mm across their short axis. */
+export const BAND_STEP_MM = 48
+export interface Band { readonly id: number; readonly minMM: number; readonly maxMM: number }
 export const BANDS: ReadonlyArray<Band> = Object.freeze([
-  Object.freeze({ id: 1 as const, minMM: 24, maxMM: 71 }),
-  Object.freeze({ id: 2 as const, minMM: 72, maxMM: 119 }),
-  Object.freeze({ id: 3 as const, minMM: 120, maxMM: 167 }),
-  Object.freeze({ id: 4 as const, minMM: 168, maxMM: 215 }),
-  Object.freeze({ id: 5 as const, minMM: 216, maxMM: 264 }),
+  Object.freeze({ id: 1, minMM: 24, maxMM: 71 }),
+  Object.freeze({ id: 2, minMM: 72, maxMM: 119 }),
+  Object.freeze({ id: 3, minMM: 120, maxMM: 167 }),
+  Object.freeze({ id: 4, minMM: 168, maxMM: 215 }),
+  Object.freeze({ id: 5, minMM: 216, maxMM: 263 }),
+  Object.freeze({ id: 6, minMM: 264, maxMM: 311 }),
+  Object.freeze({ id: 7, minMM: 312, maxMM: 359 }),
+  Object.freeze({ id: 8, minMM: 360, maxMM: 407 }),
+  Object.freeze({ id: 9, minMM: 408, maxMM: 455 }),
 ])
 
 /** Snap scan size step. */
