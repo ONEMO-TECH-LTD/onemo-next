@@ -3,15 +3,16 @@
 **Scope.** The v3.5.6 cluster: `src/lib/effect/grid-magnet*`, `src/lib/effect/library/`, and the
 `grid-centre` bench. **Out of scope, retained:** the Session 59 engine (`src/lib/effect/grid.ts`,
 `grid-core.ts`, the `grid-lab` route) — a separate public door. Naming both "Grid Lab" is how the
-studio integrates the wrong one.
+a later integrator picks up the wrong one.
 
 Target structure and the staged plan to reach it. Not yet true of the code.
 
 **The product pipeline it serves** — what each step delivers and what the classifier owes — is
 `v3.5.6-pipeline-brief.md`. This document is the code structure only.
 
-**Goal.** The engine exports headless into the studio backend to define sizes and manufacturing
-layouts. One callable pipeline, no browser, no cross-dependencies, UI a shell.
+**Goal.** The engine becomes a clean, self-contained unit that runs headless — one callable entry
+point, no browser, no cross-dependencies, UI a shell. **Export-ready is the deliverable.** Who
+integrates it, and when, is not this lane's scope.
 
 **Two phases, and only the second one is "finished".** Completion is not defined by this document — it
 is defined by `v3.5.6-current-brief.md` §12, Dan's acceptance contract, and by the five steps in
@@ -213,7 +214,7 @@ common fallback path, the y-flip and classifier corrections, and the shell-to-ad
 
 **Must not touch** — `library/**`, `geometry-truth.ts`, `offset.ts`, the Session 59 engine, and every
 deferred product decision: the class→centring mapping, the 96mm judge, full layout populations,
-scoring and Fit modes, band boundaries, the activation set, control wording, the studio wire format. No
+scoring and Fit modes, band boundaries, the activation set, control wording, the output contract. No
 new control, threshold, ranking or golden.
 
 **A deviation is:** a changed production file outside the allowlist · a new file outside the four target
@@ -377,7 +378,7 @@ stage is authorised.
 
 - **Relocating `geometry-truth.ts` / `offset.ts`** — repo-wide, not engine-owned.
 - **Relocating `library/`** — 28 gates reference its paths; the move buys nothing.
-- **Freezing the studio wire format** before reading its real caller — deferred; recorded in
+- **Freezing the output contract** before reading its real caller — deferred; recorded in
   `v3.5.6-pipeline-brief.md` §7.
 - **Pinning active function bodies by hash** — the library's owner-file pin was the end of a
   specific attack; it is not a general structural tool.
