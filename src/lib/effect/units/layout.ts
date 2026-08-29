@@ -92,15 +92,7 @@ export function bandOuterMM(band: Band, padMM: number): { minMM: number; maxMM: 
 }
 
 
-/** THE SEAT ARITHMETIC QUANTUM — one micron, the resolution both seat predicates decide in.
- *
- *  Polygon and analytic-circle seating promise the SAME exact boundary semantics: tangency passes
- *  by equality. They can only keep that promise if they round the same way, and this was declared
- *  privately inside each of them — two numbers that nothing compared, free to drift apart and make
- *  the two tests disagree about a magnet sitting exactly on the line.
- *
- *  Private and implementation-only. It is arithmetic resolution, not a released value, so it does
- *  not belong in spec and nothing outside these predicates has any business reading it. */
+/** Integer-micron resolution shared by polygon and analytic-circle seating. */
 const SEAT_QUANTUM_MM = 0.001
 
 // Placement eligibility is LAYOUT'S: a seat predicate says where a magnet MAY go, which is policy,

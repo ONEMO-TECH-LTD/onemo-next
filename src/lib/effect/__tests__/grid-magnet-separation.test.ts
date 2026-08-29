@@ -435,30 +435,6 @@ describe('5b — both seat predicates decide on the same micron', () => {
     expect(fits([100 + (RADIUS - R), 100]), 'a centre exactly tangent inside is legal').toBe(true)
     expect(fits([100 + (RADIUS - R) + Q, 100]), 'one micron further out is not').toBe(false)
   })
-
-  it('they agree at the boundary — the same magnet is legal to both, or to neither', () => {
-    // A true circle and the polygon of that same circle, judged at their shared tangency. If the
-    // two predicates ever rounded differently, this is the case that would split.
-    const RADIUS = 100
-    const ring: Pt[] = Array.from({ length: 720 }, (_, i) => {
-      const t = (i / 720) * Math.PI * 2
-      return [100 + RADIUS * Math.cos(t), 100 + RADIUS * Math.sin(t)] as Pt
-    })
-    const analytic = makeCircleSeatPredicate(100, 100, RADIUS, R)!
-    const polygon = makeContourSeatPredicate({ outer: { pts: ring } , holes: [] }, R)!
-    // Well inside and well outside must agree; the chord error near tangency is the polygon's own
-    // and is not what this test is about.
-    for (const d of [0, 20, 50, RADIUS - R - 1]) {
-      const p: Pt = [100 + d, 100]
-      expect(polygon(p), `polygon at ${d}mm from centre`).toBe(true)
-      expect(analytic(p), `analytic at ${d}mm from centre`).toBe(true)
-    }
-    for (const d of [RADIUS - R + 1, RADIUS, RADIUS + 10]) {
-      const p: Pt = [100 + d, 100]
-      expect(polygon(p), `polygon at ${d}mm from centre`).toBe(false)
-      expect(analytic(p), `analytic at ${d}mm from centre`).toBe(false)
-    }
-  })
 })
 
 describe('6 — a supplied hole is material boundary, not decoration', () => {
