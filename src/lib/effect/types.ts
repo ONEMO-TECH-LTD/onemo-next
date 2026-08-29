@@ -126,16 +126,12 @@ export interface BandSolve {
 export interface GridConfig {
   pitchMM?: number
   paddingMM?: number
-  /** How finely the lattice slides under the shape when searching registrations. */
-  phaseStepMM?: number
   /** Manual calibration: force this registration (mm phase) instead of searching. */
   forcePhaseMM?: Pt
   /** Clearance a region must survive to count as a mass for centring. */
   massDepthMM?: number
   /** Centre mode — 0 box · 1 core · 2 masses · 3 weight · 4 deep · 5 top. */
   centreMode?: number
-  /** Registration mode. 1 = centre-rules parity — the only mode. Voting (0) was deleted in S2. */
-  positioning?: number
   /** Which mass rules in Masses mode — 0 smallest · 1 deepest · 2 top. */
   governor?: number
   /** Baked governed centre for this size (anchor bake) — skips per-size anchor derivation.

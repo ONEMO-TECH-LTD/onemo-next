@@ -548,7 +548,7 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
       }
       return { outer: { pts }, holes: [] }
     })()
-    const cfg: GridConfig = { paddingMM: 12, pitchMM: 48, positioning: 1, centreMode: 2, governor: 0 }
+    const cfg: GridConfig = { paddingMM: 12, pitchMM: 48, centreMode: 2, governor: 0 }
     const posted: Array<{ model: { grid: { anchors: Array<{ p: Pt }> }; diagnostic?: unknown } | null }> = []
     const stub = { onmessage: null as ((e: { data: unknown }) => void) | null, postMessage: (m: unknown) => { posted.push(m as never) } }
     const g = globalThis as { self?: unknown }

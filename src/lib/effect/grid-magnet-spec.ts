@@ -43,13 +43,6 @@ export const BANDS: ReadonlyArray<Band> = Object.freeze([
   Object.freeze({ id: 5 as const, minMM: 216, maxMM: 264 }),
 ])
 
-/** Registration search phase step — how finely the lattice slides under the shape.
- *  RULED 2026-08-18: continuous 1mm registration — Dan tested the dial and locked 1mm; the
- *  per-band selection is correct for the first time with it. 12 (the cell increment) remains
- *  an admin test value, not the law. */
-export const PHASE_STEP_MM = 1
-export const PHASE_STEP_FLOOR_MM = 1
-
 /** Snap scan size step. */
 export const SNAP_STEP_MM = 1
 
@@ -59,10 +52,6 @@ export const SNAP_STEP_MM = 1
 export const MASS_DEPTH_MM = 16
 export const MASS_DEPTH_FLOOR_MM = 12
 export const MASS_DEPTH_CEIL_MM = 24
-
-/** Positioning law — 0 voting (count/centring/coverage compete across swept slides) ·
- *  1 centre rules (grid locked to the centre by parity; seats pick among 4 parity slides). */
-export const POSITIONING = 1
 
 /** Governor — which mass rules in Masses mode: 0 smallest · 1 deepest · 2 top (gravity) ·
  *  3 top-small (upper-half smallest, else topmost). */

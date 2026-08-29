@@ -272,11 +272,14 @@ size range"*) is structural, not a convention that can drift.
 Foundation, segment, centring, layout, wrap, judge — existing bodies moved, not rewritten. The legal-area contour becomes
 contour-aware: outer eroded, every supplied hole inflated and subtracted by the same radius, and
 `Contour.holes` preserved through scaling and sizing. `applyCoverage` → layout (it
-changes the population). `assignSizes` → adapters (it shapes output). The wrap module drops its six
-rebuilt primitives and its false header. **Replace the hand-listed contents of
+changes the population). *(`assignSizes` → adapters is **S3** — it shapes output, and `adapters/`
+does not exist until S3 creates it. Naming it here was this section's own misfiling.)* The wrap
+module drops its six rebuilt primitives and its false header. **Replace the hand-listed contents of
 `grid-magnet-separation.test.ts` with the one derived-zone import matrix, in place.** No second gate
-file is created; the only other test touched in S1–S4 is `catalogue-solver-oracle.test.ts`, rewired to
-the real pipeline and extended with the classifier audit.
+file is created. *(The only other test touched in S1–S4 is `catalogue-solver-oracle.test.ts`, but not
+here: the **pipeline** it would be rewired to is S3's deliverable and the **classifier audit** is
+S4's. Both are named in their own stages' Done-when; naming them in S2 was this section's own
+misfiling.)*
 
 **The empty band is answered by the units, not by an escape hatch.** Today it falls back into the
 old walk and shows the size that seats the most magnets, loose — the rigid gate and band-only wrap
@@ -297,17 +300,23 @@ The pipeline decides none of this: it sequences layout → wrap → judge and pa
 With that landed, `fitSizeInBand`, `bandWalk`, `bandFit`, `maxPressMM` and the idle prefetcher have
 no caller and are deleted in S2.
 *Done when:* the bench still solves and the oracle stays green · a supplied donut keeps its hole
-through the pipeline · an `automatic` envelope reports the nearest lawful offer where one exists,
-otherwise `offers` is empty and the `no-lawful-offer` diagnostic carries only a calibration witness ·
-a unit→unit import fails the suite.
+through the pipeline · an empty band returns `offers: []` with a `no-lawful-offer` diagnostic
+carrying only a calibration witness, and the shell draws the population layout selected ·
+`fitSizeInBand`, `bandWalk`, `bandFit`, `maxPressMM`, the idle prefetcher, the voting axis and the
+dead placement-step dial are gone · a unit→unit import fails the suite.
+*(The `automatic` envelope's nearest-lawful-offer behaviour is **S3's** Done-when — the envelope is
+created there. Gating S2 on it was this section's own misfiling.)*
 
 **S3 · One pipeline, one shell seam.** One serialisable call whose search envelope —
 `manual | band | automatic` — changes *candidate enumeration only*; segment, class, centre, layout,
 wrap and judge are the same calls in every mode. The worker becomes transport and cache. The shell
 gets an adapter surface (`createGridRequest`, `gridViewModel`, `libraryViewModel`) and loses its
 direct engine imports.
-*Done when:* the pipeline runs from a Node test with no worker, the oracle calls it instead of
-rebuilding the composition, and the mutation proof runs against the **real** page and worker.
+S3 also takes the two moves S2 named but could not make: `assignSizes` → adapters, and the
+oracle rewired to call the pipeline instead of rebuilding the composition.
+*Done when:* the pipeline runs from a Node test with no worker, the `automatic` envelope reports the
+nearest lawful offer where one exists, the oracle calls the pipeline instead of rebuilding the
+composition, and the mutation proof runs against the **real** page and worker.
 
 **S4 · The classifier, complete.** Catalogue-backed classifier (method below), the y-flip repair, the
 decision trace and the standing audit. *(The generic layout fallback lands in S2; the 96mm arc and the

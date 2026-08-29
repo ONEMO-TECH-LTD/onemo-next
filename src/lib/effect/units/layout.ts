@@ -14,7 +14,7 @@ import {
   bbox, edgeDistMM, edgeDistToContourMM, pointInOuter,
 } from '../foundation/geometry'
 import {
-  BANDS, DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS, PADDING_FLOOR_MM, POSITIONING, SNAP_STEP_MM,
+  BANDS, DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS, PADDING_FLOOR_MM, SNAP_STEP_MM,
 } from '../grid-magnet-spec'
 
 /** Split seated nodes into perimeter belt and fully-surrounded interior. */
@@ -150,7 +150,7 @@ interface LayoutPlacement {
   outer: ReadonlyArray<Pt>; fits: ((p: Pt) => boolean) | null
   segments: SafeSegment[]; centres: Pt[]; ruleTarget: Pt
   bestSeated: Pt[]; bestOx: number; bestOy: number; bestKx: number; bestKy: number
-  mainCentre: Pt; positioning: number
+  mainCentre: Pt
 }
 
 /** THE WRAP LAW (Dan, 2026-08-20: "0 flap means magnets and edges touch"): wrap is each
@@ -190,10 +190,8 @@ export function registerLayout(
 
   const { segments, centres, ruleTarget } = given
 
-  // THE shape's centres — chosen by the centre-mode switch (logic's table). Every returned
-  // point anchors the slide walk; single-target modes also fix the balance target.
-  const positioning = cfg.positioning ?? POSITIONING
-  // Under CENTRE RULES one point rules outright; Masses names it via the governor switch.
+  // THE shape's centre — chosen by the centre-mode switch. Centre rules is the only registration
+  // path, so this one point rules outright; Masses names it via the governor switch.
 
   let bestSeated: Pt[] = []
   let bestOx = 0, bestOy = 0, bestKx = 0, bestKy = 0
@@ -205,7 +203,7 @@ export function registerLayout(
     bestKx = mod(bestOx - (bb.maxX - bb.minX) / 2, pitch)
     bestKy = mod(bestOy - (bb.maxY - bb.minY) / 2, pitch)
     bestSeated = latticeAt(bb, pitch, bestOx, bestOy).filter(fits)
-  } else if (fits && positioning === 1) {
+  } else if (fits) {
     // CENTRE RULES — no voting. Parity is DERIVED from the bbox axis classes (canon §4/§6):
     // each axis's class fixes its magnet-line count, odd count puts a NODE on the centre,
     // even count puts the GAP on it — so a 108x91 (class 2x2) shape is judged as a 2x2 frame
@@ -239,7 +237,7 @@ export function registerLayout(
   }
 
   return { bb, pitch, reach, plan, perimeterOnly, outer, fits, segments, centres, ruleTarget,
-    bestSeated, bestOx, bestOy, bestKx, bestKy, mainCentre, positioning }
+    bestSeated, bestOx, bestOy, bestKx, bestKy, mainCentre }
 }
 
 /** Perimeter belt: with >4 seated, drop fully-surrounded interior nodes, never below the minimum. */

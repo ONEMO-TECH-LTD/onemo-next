@@ -70,7 +70,7 @@ export function wrapGrid(
  * THE BAND LADDER, size-first (Dan's reversal, 2026-08-25): the band is the input, the count is
  * the output. Nothing here invents a layout and nothing walks a gate:
  *
- *   1 · REVEAL — at each scanned size, centre-rules seating (the existing engine, positioning 1)
+ *   1 · REVEAL — at each scanned size, centre-rules seating (the existing engine)
  *       says which magnets the material carries. The layout is read off the material, not chosen.
  *   2 · WRAP — each distinct revealed layout is handed WHOLE to `wrapGroup`, the proven solver:
  *       the group starts centred on the governed anchor and shifts only the minimum a lawful
@@ -86,7 +86,7 @@ export function wrapBandLadder(
   anchorAtMM?: (mm: number) => Pt,
 ): BandSolve {
   const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
-  const scanCfg: GridConfig = { ...cfg, positioning: 1, segmentsDetail: 'light', forcePhaseMM: undefined }
+  const scanCfg: GridConfig = { ...cfg, segmentsDetail: 'light', forcePhaseMM: undefined }
   // Sequencer's job: derive the governed centre ONCE and hand it to wrap, which never computes
   // one for itself. Falls back to the same governed centre the old wrap derived internally, so the
   // answer is unchanged — the derivation simply moved to the caller.

@@ -96,7 +96,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       const contour = sized(sizeMM)
       const grid = computeGrid(contour, aFn ? { ...cfg, centreOverrideMM: aFn(sizeMM) } : cfg)
       ctx.postMessage({ id, model: { contour, grid, effSize: sizeMM, ladder: [], idx: 0, segments: grid.segments } })
-    } else if ((cfg.positioning ?? 0) === 1) {
+    } else {
       // THE REVERSAL — band in, count out. The material reveals each distinct layout across the
       // band's range (centre-rules seating); each is solved WHOLE by wrapGroup to its exact
       // contact size. Composition only: the wrap engine is transferred untouched.
@@ -152,9 +152,6 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         contour, grid, effSize: bestSeatedMM, ladder: [], idx: 0, segments: grid.segments,
         offers: [], diagnostic: { reason: 'no-lawful-offer', bestSeatedMM },
       } })
-    } else {
-      // Non-positioning is unreachable: the page hardcodes positioning 1 and voting is deleted.
-      ctx.postMessage({ id, model: null, error: 'positioning must be 1 — voting was removed in S2' })
     }
   } catch (err) {
     ctx.postMessage({ id, model: null, error: String((err as Error)?.message ?? err) })
