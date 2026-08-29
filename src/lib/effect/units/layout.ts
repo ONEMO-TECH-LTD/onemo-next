@@ -287,6 +287,7 @@ export function fallbackRevealSizes(loMM: number, hiMM: number): number[] {
  *  containment test the existing ones did. */
 export function completeSeating(
   contourMM: Contour, seated: ReadonlyArray<Pt>, pitchMM: number, padMM: number,
+  perimeterOnly: boolean,
 ): Pt[] {
   if (!seated.length) return [...seated]
   const fits = makeContourSeatPredicate(contourMM, spotRadiusOf(padMM))
@@ -295,7 +296,24 @@ export function completeSeating(
   const [ax, ay] = seated[0]
   const held = (p: Pt) => seated.some((q) => Math.abs(q[0] - p[0]) < 0.5 && Math.abs(q[1] - p[1]) < 0.5)
   const added = latticeOver(bb, pitchMM, [ax - bb.minX, ay - bb.minY]).filter((p) => !held(p) && fits(p))
-  return [...seated, ...added]
+  // Completing without re-thinning refills the interior the belt exists to empty — a square's 3x3
+  // came back as 9 instead of 8. Completion and coverage are ONE population decision, so they are
+  // one call, and the sequencer cannot land the first without the second.
+  return applyCoverage([...seated, ...added], perimeterOnly, pitchMM).seated
+}
+
+/** A seated pattern's identity, origin-free — the same arrangement anywhere on the lattice is the
+ *  same arrangement. What the scan dedupes on. */
+export function revealIdentity(points: ReadonlyArray<Pt>, pitchMM: number): string {
+  let mx = Infinity, my = Infinity
+  for (const p of points) { if (p[0] < mx) mx = p[0]; if (p[1] < my) my = p[1] }
+  return points.map((p) => Math.round((p[0] - mx) / pitchMM) + ',' + Math.round((p[1] - my) / pitchMM)).sort().join(';')
+}
+
+/** What actually SHIPS: this size, these positions. Two different reveals can complete to one
+ *  answer, and offering it twice is noise, not choice. */
+export function shippedIdentity(sizeMM: number, points: ReadonlyArray<Pt>): string {
+  return sizeMM.toFixed(2) + '|' + points.map((p) => `${p[0].toFixed(2)},${p[1].toFixed(2)}`).sort().join(';')
 }
 
 /** Selecting the calibration witness is layout's too: the candidate the material carries most of.

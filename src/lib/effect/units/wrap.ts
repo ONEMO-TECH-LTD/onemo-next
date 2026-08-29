@@ -82,6 +82,15 @@ function pickOrigin(valid: Paths64, towards: Pt): Pt {
   return best
 }
 
+/** Each magnet's gap past its own margined edge — the wrap measurement, in ONE place. The
+ *  sequencer needs it again when the population is completed at the shipped size, and a second
+ *  copy of this expression is exactly the duplication this module was split to remove. */
+export function gapsToContourMM(
+  contour: Contour, points: ReadonlyArray<Pt>, radiusMM: number,
+): number[] {
+  return points.map((q) => Math.max(0, edgeDistToContourMM(contour, q) - radiusMM))
+}
+
 /**
  * Solve ONE explicit arrangement: the tightest centred wrap for exactly these magnets.
  *
@@ -138,6 +147,6 @@ export function wrapGroup(
     points: pts,
     originMM: origin,
     anchorMM: anchor,
-    gapsMM: pts.map((q) => Math.max(0, edgeDistToContourMM(sized(hi), q) - radius)),
+    gapsMM: gapsToContourMM(sized(hi), pts, radius),
   }
 }
