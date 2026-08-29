@@ -1,13 +1,13 @@
 // solve.worker.ts — runs the grid solve off the main thread. Pure dispatch: the same
 // bridge/engine calls the page used to make inline, nothing computed here.
 
-import { BANDS, bandOuterMM, computeGrid, MIN_EFFECT_MM, type GridConfig } from '@/lib/effect/grid-magnet'
+import { BANDS, bandOuterMM, computeGrid, type GridConfig } from '@/lib/effect/grid-magnet'
 import { wrapGrid, type WrapConfig } from '@/lib/effect/grid-magnet-wrap-compute'
 import { runPipeline, type PipelineResult } from '@/lib/effect/pipeline'
 import { bbox, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet-compute'
 import { contourCentroidOf } from '@/lib/effect/units/centring'
 import { anchorBakeOf, anchorFromBake, assignSizes, type AnchorBake, type CentreMode, type Governor, type MagnetPlan } from '@/lib/effect/grid-magnet-logic'
-import { DEFAULT_PITCH_MM, MASS_DEPTH_MM, PADDING_FLOOR_MM } from '@/lib/effect/grid-magnet-spec'
+import { MASS_DEPTH_MM, PADDING_FLOOR_MM } from '@/lib/effect/grid-magnet-spec'
 import { contourCacheKey, makeSizer, sizeRange } from '@/lib/effect/grid-magnet-bridge'
 import type { Contour } from '@/lib/effect/types'
 
@@ -124,6 +124,13 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         omitted: a.omitted.length,
         attempted: a.attempted,
         landedBandId: a.landedBandId,
+        // WHICH registration, in words. Two rows can carry the same size and count and still be
+        // different products — a 4x4 dropping a column reads identically to one dropping a row —
+        // so the row must say which grid position it sat at, or the ledger looks like duplicates.
+        registration: a.registrationMM[0] === 0 && a.registrationMM[1] === 0 ? 'grid on centre'
+          : a.registrationMM[1] === 0 ? 'grid half-step across'
+          : a.registrationMM[0] === 0 ? 'grid half-step down'
+          : 'grid half-step across and down',
       }))
       const frame = solve.frame
       const recog = frame

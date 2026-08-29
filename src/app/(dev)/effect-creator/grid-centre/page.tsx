@@ -266,7 +266,7 @@ export default function GridLab() {
   type LedgerRow = {
     sizeMM: number | null; count: number; offMM: number | null
     label: string; classId: string; transposed: boolean
-    omitted: number; attempted: number; landedBandId: number | null
+    omitted: number; attempted: number; landedBandId: number | null; registration: string
   }
   type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: LedgerRow[]; idx: number; segments: SafeSegment[]; stops?: Array<{ press: number; reveal: number }>; offMM?: number; recog?: { cols: number; rows: number; segWmm: number; segHmm: number }; diagnostic?: { reason: string } }
   const [model, setModel] = useState<Model | null>(null)
@@ -469,9 +469,9 @@ export default function GridLab() {
                     ? `manual scale · ${Math.round(bandScale)} mm — tap a step or the band chip to return`
                     : model
                     ? model.ladder.some((r) => r.sizeMM != null)
-                      ? `${model.recog ? `this shape is ${model.recog.cols}×${model.recog.rows} · ` : ''}${Math.round(model.effSize)} mm · ${model.grid.anchors.length}⌾${model.offMM != null ? ` · off-centre ${model.offMM.toFixed(1)}mm` : ''} · ${model.ladder.filter((r) => r.sizeMM != null).length} of ${model.ladder.length} tried layouts fitted`
+                      ? `${model.recog ? `this shape is ${model.recog.cols}×${model.recog.rows} · ` : ''}${Math.round(model.effSize)} mm · ${model.grid.anchors.length}⌾${model.offMM != null ? ` · off-centre ${model.offMM.toFixed(1)}mm` : ''} · ${model.ladder.filter((r) => r.sizeMM != null).length} of ${model.ladder.length} attempts fitted · ${new Set(model.ladder.map((r) => r.label + (r.transposed ? '/t' : ''))).size} layouts × 4 grid positions`
                       : model.ladder.length
-                        ? `${model.recog ? `this shape is ${model.recog.cols}×${model.recog.rows} · ` : ''}the library offered ${model.ladder.length} layouts and the material refused every one`
+                        ? `${model.recog ? `this shape is ${model.recog.cols}×${model.recog.rows} · ` : ''}the library offered ${new Set(model.ladder.map((r) => r.label)).size} layouts and the material refused every one`
                         : `${model.recog ? `this shape is ${model.recog.cols}×${model.recog.rows} · ` : ''}the library holds no layout for this grid`
                     : '—'}
               </div>
@@ -482,7 +482,7 @@ export default function GridLab() {
                 {model.ladder.map((row, i) =>
                   <button key={i} aria-pressed={bandScale === null && i === model.idx}
                     disabled={row.sizeMM == null}
-                    title={`${row.label}${row.transposed ? ' · turned' : ''} · ${row.count} of ${row.attempted} seated${row.omitted ? ` · ${row.omitted} refused by the material` : ''}`}
+                    title={`${row.label}${row.transposed ? ' · turned' : ''} · ${row.registration} · ${row.count} of ${row.attempted} seated${row.omitted ? ` · ${row.omitted} refused by the material` : ''}`}
                     onClick={() => { if (row.sizeMM != null) { setStepSel(i); setBandScale(null) } }}>
                     <b>{row.sizeMM == null ? 'no fit' : `${row.sizeMM} mm`}</b>
                     <span>{row.count}⌾{row.omitted ? ` −${row.omitted}` : ''}{row.landedBandId != null && row.landedBandId !== mode ? ` · B${row.landedBandId}` : ''}</span>
@@ -505,7 +505,12 @@ export default function GridLab() {
             <LockNum label="Magnet padding · per spot" unit="mm" v={pad} set={setPad}
               min={PADDING_FLOOR_MM} max={PADDING_CEIL_MM} locked={padLock} setLocked={setPadLock}
               released={RELEASED_PADDING_MM} />
-            <div className="gl-field"><span>Coverage</span>
+            {/* The belt does NOT act on the band path any more: the MVP hands wrap the library's
+                layout whole, and thinning it is a refinement Dan deferred until the raw pipeline is
+                proven ("perimeter and 96mm are already in the engine, we just need to refactor and
+                wire them later when the MVP is done"). It still governs manual calibration, so the
+                control stays and says where it applies rather than sitting there doing nothing. */}
+            <div className="gl-field"><span>Coverage · manual calibration only until the belt is rewired</span>
               <div className="gl-seg">
                 {([['full', 'Full grid'], ['perimeter', 'Perimeter belt']] as ['full' | 'perimeter', string][]).map(([c, l]) =>
                   <button key={c} aria-pressed={coverage === c} onClick={() => setCoverage(c)}>{l}</button>)}
