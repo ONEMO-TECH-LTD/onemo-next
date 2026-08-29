@@ -11,7 +11,7 @@ import { holds, prepare } from '@/lib/grid-engine/compute/geometry'
 import type { Band } from '../grid-magnet-spec'
 import { MIN_ANCHORS } from '../grid-magnet-spec'
 import {
-  bbox, edgeDistMM, edgeDistToContourMM, pointInOuter,
+  bbox, edgeDistMM, pointInOuter,
 } from '../foundation/geometry'
 import {
   BANDS, DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS, PADDING_FLOOR_MM, SNAP_STEP_MM,
@@ -167,18 +167,6 @@ interface LayoutPlacement {
   mainCentre: Pt
 }
 
-/** THE WRAP LAW (Dan, 2026-08-20: "0 flap means magnets and edges touch"): wrap is each
- *  disc PRESSED against the outline. The force is the mean of every seated disc's own gap
- *  past its margined edge (spot + allowance) — zero when every disc that can touch does.
- *  Enforced through the dominance tiers, not preferred. */
-function pressExcessMM(contour: Contour, seated: ReadonlyArray<Pt>, reach: number): number {
-  if (!seated.length) return 0
-  let sum = 0
-  for (const s of seated) sum += Math.max(0, edgeDistToContourMM(contour, s) - reach)
-  return sum / seated.length
-}
-
-
 /** Registration + population: which lattice nodes the material supports, and which survive
  *  coverage. The caller shapes the result — layout decides placement, nothing else. */
 export function registerLayout(
@@ -229,24 +217,20 @@ export function registerLayout(
     const clsOf = (side: number) => bandOf(legalOfOuterMM(side, pad))?.id ?? BANDS[BANDS.length - 1].id
     const canX = clsOf(bb.maxX - bb.minX) % 2 === 1 ? bxc : bxc + half
     const canY = clsOf(bb.maxY - bb.minY) % 2 === 1 ? byc : byc + half
-    const otherX = canX === bxc ? bxc + half : bxc
-    const otherY = canY === byc ? byc + half : byc
     // canon = how many axes carry their class-derived parity (2 = the full canonical frame).
-    const cands: Array<[number, number, number]> = [
-      [canX, canY, 2], [otherX, canY, 1], [canX, otherY, 1], [otherX, otherY, 0],
-    ]
-    let best: { seats: number; canon: number; excess: number } | null = null
-    for (const [px, py, canon] of cands) {
-      const ox = mod(px, pitch), oy = mod(py, pitch)
-      const seat = latticeAt(bb, pitch, ox, oy).filter(fits)
-      if (!seat.length) continue
-      const excess = pressExcessMM(contourMM, seat, reach)
-      const wins = !best
-        || seat.length > best.seats
-        || (seat.length === best.seats && canon > best.canon)
-        || (seat.length === best.seats && canon === best.canon && excess < best.excess)
-      if (wins) { best = { seats: seat.length, canon, excess }; bestSeated = seat; bestOx = ox; bestOy = oy }
-    }
+    // THE MAX-COUNT WINNER IS DELETED (Dan, 2026-08-29: "no max-count prefilter · no hidden
+    // winner · never hide a lawful result because another has a higher count"). It built all four
+    // of these, compared seat counts, then canonical parity, then press excess, and returned ONE —
+    // three lawful registrations destroyed before wrap ever saw them. Measured on a 168mm square at
+    // 12mm padding it kept 16 magnets and silently dropped the 12, 12 and 9.
+    //
+    // Registration is the PIPELINE's to enumerate now, and it tries all four. What remains here is
+    // the door's display seating, and it takes the CANONICAL parity — the one Dan's centre-rules
+    // law names (odd line count puts a node on the centre, even puts the gap on it). That is a
+    // stated rule rather than a hidden contest, and it decides nothing the pipeline offers.
+    const ox = mod(canX, pitch), oy = mod(canY, pitch)
+    bestSeated = latticeAt(bb, pitch, ox, oy).filter(fits)
+    bestOx = ox; bestOy = oy
     mainCentre = ruleTarget
   }
 

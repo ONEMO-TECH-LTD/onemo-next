@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 import { CLASS_SPECS, LIBRARY_FAMILIES, specOf } from '../library/class-registry'
 import { outlineFromLayout } from '../library/outline'
 import { CATALOGUE_FORMAT_VERSION, catalogue, type CatalogueEntry } from '../library/catalogue'
-import { catalogueCandidates, classifiedLibraryCatalogue } from '../grid-magnet-library-catalogue'
+import { catalogueAt, layoutsForFrame } from '../grid-magnet-library-catalogue'
 import { selectVariant } from '../library/selection'
 import { materializeSelection } from '../library/materialize'
 
@@ -855,14 +855,36 @@ describe('Shape-Layout Library Law — activation schedule', () => {
         .toEqual([expected.widthMM, expected.heightMM, expected.frameCols, expected.frameRows])
     }
   }, 30_000)
-  it('STEP 4: classifier matcher round-trips every catalogue entry at every pitch', () => {
-    for (const pitchMM of [24, 48, 96]) for (const item of classifiedLibraryCatalogue(pitchMM)) {
-      const shape = item.shapeClass
-      const numericFields = [shape.cx, shape.cy, shape.band, shape.widthMM, shape.heightMM, shape.fill, shape.frame.cols, shape.frame.rows, shape.frame.capacity]
-      expect(numericFields.every(Number.isFinite), item.entry.id).toBe(true)
-      expect(catalogueCandidates(item.entry.outlineMM.map(([x, y]) => [x, y]), pitchMM).some((entry) => entry.id === item.entry.id), item.entry.id).toBe(true)
+  it('STEP 4: the matcher round-trips every catalogue entry on its own frame, at every pitch', () => {
+    // The round trip is the compatibility contract, and its KEY changed with the pipeline: the old
+    // one asked the matcher for an entry's own OUTLINE and hoped the invented shape-family agreed.
+    // Now an entry must come back for the frame it declares — the only structure there is.
+    for (const pitchMM of [24, 48, 96]) for (const entry of catalogueAt(pitchMM)) {
+      const onOwnFrame = layoutsForFrame(entry.frameCols, entry.frameRows, pitchMM)
+      expect(onOwnFrame.some((m) => m.entry.id === entry.id && !m.transposed), entry.id + ' @' + pitchMM).toBe(true)
+      // and it must be reachable TURNED, from the transposed frame — that is what serves a
+      // landscape shape out of a canonical-tall library without publishing both orientations.
+      const turned = layoutsForFrame(entry.frameRows, entry.frameCols, pitchMM)
+      expect(turned.some((m) => m.entry.id === entry.id), entry.id + ' turned @' + pitchMM).toBe(true)
     }
   }, 20_000)
+  it('STEP 4: the matcher returns EVERY entry sharing a frame — no winner, no frozen count', () => {
+    // Several entries legitimately share one frame (a square, a diamond and triangles on a 5×5).
+    // Returning one would be the invented filter the pipeline forbids. This proves all of them come
+    // back with distinct identities, and it grows with the catalogue instead of freezing a number.
+    const byFrame = new Map<string, string[]>()
+    for (const entry of catalogueAt(48)) {
+      const key = entry.frameCols + 'x' + entry.frameRows
+      byFrame.set(key, [...(byFrame.get(key) ?? []), entry.id])
+    }
+    const shared = [...byFrame.entries()].filter(([, ids]) => ids.length > 1)
+    expect(shared.length, 'the catalogue must hold a multi-entry frame for this gate to mean anything').toBeGreaterThan(0)
+    for (const [key, ids] of shared) {
+      const [cols, rows] = key.split('x').map(Number)
+      const returned = layoutsForFrame(cols, rows, 48).filter((m) => !m.transposed).map((m) => m.entry.id)
+      for (const id of ids) expect(returned, key).toContain(id)
+    }
+  })
   it('STEP 5: surface, bridge, barrel, and shell use the contract boundary', () => {
     expect(barrelExports()).toEqual({
       types: ['CatalogueEntry', 'ClassBandRange', 'CornerMode', 'LibraryDraft', 'LibraryEdit', 'LibraryFamily', 'LibrarySelection', 'LibrarySurface', 'MaterializedLibrary', 'PanelOption', 'PanelOptions'],

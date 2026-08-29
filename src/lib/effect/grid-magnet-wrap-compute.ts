@@ -12,17 +12,10 @@
 
 import type { BandRung, BandSolve, Contour, GridConfig, GridResult, Pt, WrapAt, WrapConfig } from './types'
 import { DEFAULT_PITCH_MM, MAGNET_DIA_SMALL_MM, MAGNET_DIA_LARGE_MM, PADDING_FLOOR_MM } from './grid-magnet-spec'
-import { computeGrid } from './grid-magnet'
 import { bbox } from './foundation/geometry'
-import { contourCentroidOf } from './units/centring'
-import { spotRadiusOf } from './units/layout'
-import { safeSegments } from './units/segment'
-import { centeringAnchors, governMass } from './units/centring'
 import { CENTRE_MODE, GOVERNOR, MASS_DEPTH_MM } from './grid-magnet-spec'
 import type { CentreMode, Governor } from './types'
 import { wrapGroup } from './units/wrap'
-import { inBand, orderOffers } from './units/judge'
-import { bestSeatedCandidate, fallbackRevealSizes } from './units/layout'
 
 
 /** mm → integer microns; Clipper64 is integer-robust. */
@@ -66,67 +59,12 @@ export function wrapGrid(
   }
 }
 
-/**
- * THE BAND LADDER, size-first (Dan's reversal, 2026-08-25): the band is the input, the count is
- * the output. Nothing here invents a layout and nothing walks a gate:
- *
- *   1 · REVEAL — at each scanned size, centre-rules seating (the existing engine)
- *       says which magnets the material carries. The layout is read off the material, not chosen.
- *   2 · WRAP — each distinct revealed layout is handed WHOLE to `wrapGroup`, the proven solver:
- *       the group starts centred on the governed anchor and shifts only the minimum a lawful
- *       tighter wrap demands, bisected to the exact contact size. At that size the lawful region
- *       has collapsed — the binding magnets are pressed, a gap is impossible by construction.
- *   3 · BAND MEMBERSHIP — a layout whose contact size falls outside the band belongs to another
- *       band and is not offered here (ruled 08-24).
- *
- * Composition only: computeGrid and wrapGroup are used as they are, byte-untouched.
- */
-export function wrapBandLadder(
-  sized: (mm: number) => Contour, cfg: GridConfig, loMM: number, hiMM: number, minMM: number,
-  anchorAtMM?: (mm: number) => Pt,
-): BandSolve {
-  const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
-  const scanCfg: GridConfig = { ...cfg, segmentsDetail: 'light', forcePhaseMM: undefined }
-  // Sequencer's job: derive the governed centre ONCE and hand it to wrap, which never computes
-  // one for itself. Falls back to the same governed centre the old wrap derived internally, so the
-  // answer is unchanged — the derivation simply moved to the caller.
-  const anchorFn: (mm: number) => Pt = anchorAtMM ?? ((mm: number) => {
-    const outer = sized(mm).outer.pts
-    const r = spotRadiusOf(Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM))
-    const segs = safeSegments(sized(mm), r, Math.max(r, cfg.massDepthMM ?? MASS_DEPTH_MM), 'light')
-    const bb = bbox(outer)
-    const boxC: Pt = [(bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2]
-    const cands = centeringAnchors((cfg.centreMode ?? CENTRE_MODE) as CentreMode, segs, boxC, contourCentroidOf(sized(mm)))
-    if (((cfg.centreMode ?? CENTRE_MODE) as number) !== 2) return cands[0] ?? boxC
-    const masses = segs.flatMap((x) => (x.masses.length ? x.masses : [x]))
-    return governMass(masses, (cfg.governor ?? GOVERNOR) as Governor, (bb.minY + bb.maxY) / 2)?.centreMM ?? cands[0] ?? boxC
-  })
-  const wcfg: WrapConfig = {
-    pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM,
-    centreMode: cfg.centreMode, governor: cfg.governor, massDepthMM: cfg.massDepthMM,
-    anchorAtMM: anchorFn,
-  }
-  const seen = new Set<string>()
-  const rungs: BandRung[] = []
-  const witnesses: Array<{ revealMM: number; points: Pt[] }> = []
-  for (const mm of fallbackRevealSizes(loMM, hiMM)) {
-    const pts = computeGrid(sized(mm), anchorAtMM ? { ...scanCfg, centreOverrideMM: anchorAtMM(mm) } : scanCfg).anchors.map((a) => a.p)
-    if (!pts.length) continue
-    witnesses.push({ revealMM: mm, points: pts })
-    // Layout identity: the seated pattern in lattice units, origin-free.
-    let mx = Infinity, my = Infinity
-    for (const p of pts) { if (p[0] < mx) mx = p[0]; if (p[1] < my) my = p[1] }
-    const id = pts.map((p) => Math.round((p[0] - mx) / pitch) + ',' + Math.round((p[1] - my) / pitch)).sort().join(';')
-    if (seen.has(id)) continue
-    seen.add(id)
-    // Local offsets about the group's own middle — wrapGroup pins that middle on the anchor.
-    const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1])
-    const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2
-    const group = pts.map(([x, y]) => [x - cx, y - cy] as Pt)
-    const at = wrapGroup(sized, wcfg, group, minMM, hiMM)
-    if (!at) continue
-    if (!inBand(at.sizeMM, loMM, hiMM)) continue   // judge: another band owns it
-    rungs.push({ at, revealMM: mm })
-  }
-  return { offers: orderOffers(rungs), bestSeated: bestSeatedCandidate(witnesses) }
-}
+// THE 1MM SWEEP IS DELETED (Dan, 2026-08-29: "the sweep goes ... segmentation > classification >
+// layout is the filter already, wrap applies to that and this is MVP").
+//
+// It stepped a millimetre at a time across the band, seated whatever the material happened to hold
+// at each size, deduped, wrapped each survivor and dropped anything that wrapped into another band
+// — 48 solves to stumble on layouts a lookup names directly. It was the placeholder standing where
+// step 3's library lookup belongs, and pipeline.ts is that step. Discovery may return later as the
+// METHOD for step 5 (next best), which is where searching for something the catalogue does not hold
+// actually belongs.

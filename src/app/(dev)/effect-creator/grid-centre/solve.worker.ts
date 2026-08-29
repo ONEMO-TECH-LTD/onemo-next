@@ -2,12 +2,11 @@
 // bridge/engine calls the page used to make inline, nothing computed here.
 
 import { BANDS, bandOuterMM, computeGrid, MIN_EFFECT_MM, type GridConfig } from '@/lib/effect/grid-magnet'
-import { wrapBandLadder, wrapGrid, type BandSolve, type WrapConfig } from '@/lib/effect/grid-magnet-wrap-compute'
+import { wrapGrid, type WrapConfig } from '@/lib/effect/grid-magnet-wrap-compute'
+import { runPipeline, type PipelineResult } from '@/lib/effect/pipeline'
 import { bbox, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet-compute'
 import { contourCentroidOf } from '@/lib/effect/units/centring'
 import { anchorBakeOf, anchorFromBake, assignSizes, type AnchorBake, type CentreMode, type Governor, type MagnetPlan } from '@/lib/effect/grid-magnet-logic'
-import { classFrameNodes, shapeFamilyOf, type ShapeFamily } from '@/lib/effect/grid-magnet-class'
-import { defaultLanding } from '@/lib/effect/units/judge'
 import { DEFAULT_PITCH_MM, MASS_DEPTH_MM, PADDING_FLOOR_MM } from '@/lib/effect/grid-magnet-spec'
 import { contourCacheKey, makeSizer, sizeRange } from '@/lib/effect/grid-magnet-bridge'
 import type { Contour } from '@/lib/effect/types'
@@ -30,18 +29,18 @@ const ctx = self as unknown as Worker
 // reused across interactions; a new shape clears everything. The per-size walk cache and the idle
 // prefetcher this comment used to describe were deleted with the rigid fallback.
 let shapeSig = ''
-const rungCache = new Map<string, BandSolve>()
+const rungCache = new Map<string, PipelineResult>()
 // ANCHOR BAKE — the centre measured ONCE per shape (at the largest size, all material present)
 // and scaled linearly per size. Positions are shape features; only qualification is size-
 // dependent (evaluated inside anchorFromBake). Core mode (1) is size-dependent by definition
 // and stays live — the bake returns null and the engine measures as before.
-const bakeCache = new Map<string, { bake: AnchorBake; segW: number; segH: number; family: ShapeFamily }>()
+const bakeCache = new Map<string, { bake: AnchorBake; segW: number; segH: number }>()
 
 /** STEP 1 (pipeline doc): one measurement per shape — erosion, legal area, segment box, family.
  *  Classification is a property of the shape, independent of the centring mode. */
 function bakeOf(
   sized: (mm: number) => import('@/lib/effect/types').Contour, cfg: GridConfig, shapeSig2: string,
-): { bake: AnchorBake; segW: number; segH: number; family: ShapeFamily } {
+): { bake: AnchorBake; segW: number; segH: number } {
   const key = shapeSig2 + '|' + JSON.stringify([cfg.paddingMM, cfg.massDepthMM])
   let hit = bakeCache.get(key)
   if (!hit) {
@@ -53,7 +52,7 @@ function bakeOf(
     const bake = anchorBakeOf(segs, [(bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2], contourCentroidOf(sized(refMM)), refMM, (bb.minY + bb.maxY) / 2)
     let sx0 = Infinity, sy0 = Infinity, sx1 = -Infinity, sy1 = -Infinity
     for (const sg of segs) { sx0 = Math.min(sx0, sg.bbox.minX); sy0 = Math.min(sy0, sg.bbox.minY); sx1 = Math.max(sx1, sg.bbox.maxX); sy1 = Math.max(sy1, sg.bbox.maxY) }
-    hit = { bake, segW: Math.max(0, sx1 - sx0), segH: Math.max(0, sy1 - sy0), family: shapeFamilyOf(outer) }
+    hit = { bake, segW: Math.max(0, sx1 - sx0), segH: Math.max(0, sy1 - sy0) }
     bakeCache.set(key, hit)
     if (bakeCache.size > 8) bakeCache.delete(bakeCache.keys().next().value!)
   }
@@ -97,63 +96,66 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       const grid = computeGrid(contour, aFn ? { ...cfg, centreOverrideMM: aFn(sizeMM) } : cfg)
       ctx.postMessage({ id, model: { contour, grid, effSize: sizeMM, ladder: [], idx: 0, segments: grid.segments } })
     } else {
-      // THE REVERSAL — band in, count out. The material reveals each distinct layout across the
-      // band's range (centre-rules seating); each is solved WHOLE by wrapGroup to its exact
-      // contact size. Composition only: the wrap engine is transferred untouched.
+      // THE PIPELINE — class, band, layout, wrap. The worker is transport: it calls the one door
+      // and shapes what comes back for the canvas. It measures nothing, ranks nothing, and hides
+      // nothing; every attempt the pipeline made reaches the screen, in the order it made them.
       const band = BANDS.find((b) => b.id === mode) ?? BANDS[0]
-      // The band is a LEGAL range; the ladder scans OUTLINE sizes, so it converts through this
-      // shape's own rim. A diamond and a square in one band do not share an outline range.
-      const span = bandOuterMM(band, Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM))
       const anchorAt = anchorFnFor(sized, cfg, cfgSig, sig)
       const key = JSON.stringify([cfgSig, band.id])
       let solve = rungCache.get(key)
       if (!solve) {
-        solve = wrapBandLadder(sized, cfg, span.minMM, span.maxMM, MIN_EFFECT_MM, anchorAt)
+        solve = runPipeline({
+          sized, bandId: band.id, pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM,
+          centreMode: cfg.centreMode, governor: cfg.governor, massDepthMM: cfg.massDepthMM,
+          circle: cfg.circle, anchorAtMM: anchorAt,
+        })
         rungCache.set(key, solve)
         if (rungCache.size > FITS_CAP) rungCache.delete(rungCache.keys().next().value!)
       }
-      const rungs = solve.offers
-      if (rungs.length) {
-        // RULE 4 (Dan, 08-24): prefer the tight solution closest to the centroid — never the
-        // smallest at any centring cost. Among offers of the SAME COUNT as the tightest, within
-        // half a pitch of it, the best-centred is the default landing. All offers stay visible.
-        const ruleIdx = defaultLanding(rungs, cfg.pitchMM ?? DEFAULT_PITCH_MM)
-        const idx = Math.min(stepSel ?? ruleIdx, rungs.length - 1)
-        const at = rungs[idx].at
+      // The full ledger, unsorted: an attempt that never fitted keeps its row with sizeMM null, so
+      // a layout the library offered and the material refused is visible rather than absent.
+      const ladder = solve.attempts.map((a) => ({
+        sizeMM: a.wrap ? a.wrap.sizeMM : null,
+        count: a.wrap ? a.wrap.count : a.seatedMM.length,
+        offMM: a.wrap ? a.wrap.centreOffMM : null,
+        label: a.label,
+        classId: a.classId,
+        transposed: a.transposed,
+        omitted: a.omitted.length,
+        attempted: a.attempted,
+        landedBandId: a.landedBandId,
+      }))
+      const frame = solve.frame
+      const recog = frame
+        ? { cols: frame.cols, rows: frame.rows, segWmm: frame.widthMM, segHmm: frame.heightMM }
+        : undefined
+      const drawable = solve.attempts.map((a, i) => ({ a, i })).filter(({ a }) => a.wrap)
+      if (drawable.length) {
+        // Which row is DRAWN is the viewer's choice, not the engine's: with none picked the first
+        // in generation order is shown. There is no default landing and no ranking — Dan scoped
+        // ordering out of the MVP so the raw behaviour can be seen before anything sorts it.
+        const chosen = drawable[Math.min(stepSel ?? 0, drawable.length - 1)]
+        const at = chosen.a.wrap!
         const wcfg: WrapConfig = { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM, magnetDiaMM: undefined, anchorAtMM: () => at.anchorMM }
         const drawn = wrapGrid(sized, wcfg, at)
         const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
         const r = spotRadiusOf(pad)
         const segments = safeSegments(drawn.contour, r, Math.max(r, cfg.massDepthMM ?? MASS_DEPTH_MM), 'full')
         const anchors = assignSizes(at.points, (cfg.plan ?? 'all6') as MagnetPlan)
-        const ladder = rungs.map((rg) => ({ sizeMM: rg.at.sizeMM, count: rg.at.count, offMM: rg.at.centreOffMM }))
-        const bk = bakeOf(sized, cfg, sig)
-        const cf = classFrameNodes(bk.segW, bk.segH, band.id, cfg.pitchMM)
-        const refMM = sizeRange(Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)).maxMM
-        const recog = {
-          family: bk.family, cols: cf.cols, rows: cf.rows,
-          segWmm: bk.segW * at.sizeMM / refMM, segHmm: bk.segH * at.sizeMM / refMM,
-        }
         ctx.postMessage({ id, model: {
           contour: drawn.contour, grid: { ...drawn.grid, anchors, segments },
-          effSize: at.sizeMM, ladder, idx, segments, offMM: at.centreOffMM, recog,
+          effSize: at.sizeMM, ladder, idx: chosen.i, segments, offMM: at.centreOffMM, recog,
         } })
         return
       }
-      // NO LAWFUL OFFER. Judge allowed nothing in this band. The witness comes from LAYOUT's own
-      // generated population — the worker measures nothing and ranks nothing — and it is evidence,
-      // never an offer.
-      const bestSeatedMM = solve.bestSeated?.revealMM ?? span.minMM
-      const contour = sized(bestSeatedMM)
-      // The witness DRAWN is the witness layout SELECTED — one solve, at the same baked centre the
-      // ladder used. Re-solving WITHOUT that centre drew a different population under the same
-      // label: evidence of a solve nobody made.
-      const grid = computeGrid(contour, anchorAt
-        ? { ...cfg, centreOverrideMM: anchorAt(bestSeatedMM) }
-        : cfg)
+      // NOTHING WRAPPED. Either the library holds no layout for this frame, or every layout it
+      // holds was refused by the material. Both are answers, and the ledger above says which.
+      const span = bandOuterMM(band, Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM))
+      const contour = sized(span.minMM)
+      const grid = computeGrid(contour, anchorAt ? { ...cfg, centreOverrideMM: anchorAt(span.minMM) } : cfg)
       ctx.postMessage({ id, model: {
-        contour, grid, effSize: bestSeatedMM, ladder: [], idx: 0, segments: grid.segments,
-        offers: [], diagnostic: { reason: 'no-lawful-offer', bestSeatedMM },
+        contour, grid, effSize: span.minMM, ladder, idx: 0, segments: grid.segments, recog,
+        diagnostic: { reason: solve.attempts.length ? 'no-layout-fitted' : 'no-layout-for-frame' },
       } })
     }
   } catch (err) {
