@@ -4,14 +4,44 @@
 import type { LibraryFrame, LibraryLayout } from './types'
 import { BANDS } from '../grid-magnet-spec'
 
-/** THE BAND OF A LAYOUT — read off its dominant axis. The rule has one home in the engine spec
- *  (every 48mm is a new band), so the band the engine asks for and the band the catalogue groups
- *  by are the same band by construction, not by agreement.
+/** THE BAND OF A LAYOUT — read off the dominant axis of its LEGAL AREA, against the engine's own
+ *  band table. One home for the ranges, so the band the engine asks for and the band the catalogue
+ *  groups by are the same band by construction, not by agreement.
  *
- *  This is where a layout SITS at its canonical outline. What band an ANSWER lands in is decided by
- *  the wrap on the real shape — the catalogue groups, it does not adjudicate. */
-export function bandIdOfMM(sizeMM: number): number | null {
-  return BANDS.find((b) => sizeMM >= b.minMM && sizeMM <= b.maxMM)?.id ?? null
+ *  For a library record the legal area needs no erosion: the outline is generated FROM the disks
+ *  plus their own 12mm rim, so the disk group's extent already is it.
+ *
+ *  This is where a layout SITS. What band an ANSWER lands in is decided by the wrap on the real
+ *  shape — the catalogue groups, it does not adjudicate. */
+export function bandIdOfMM(legalMM: number): number | null {
+  return BANDS.find((b) => legalMM >= b.minMM && legalMM <= b.maxMM)?.id ?? null
+}
+
+/** THE LEGAL BOX of a placed magnet group — the span the seats themselves occupy.
+ *
+ *  Both sides, because both are needed: the longer one gives the band, and the ratio between them
+ *  is what says which layouts a shape can wear at all. The OUTER aspect is locked by proportional
+ *  scaling and therefore tells you nothing; the LEGAL aspect moves with size, because the 12mm rim
+ *  does not scale — a 100×50 shape's legal box is 2.92:1 and the same shape at 400×200 is 2.14:1.
+ *  That drift is what brings different layouts into range as the shape grows. */
+export function legalBoxMM(nodes: readonly Node[]): { widthMM: number; heightMM: number } {
+  if (!nodes.length) return { widthMM: 0, heightMM: 0 }
+  const xs = nodes.map((n) => n[0]), ys = nodes.map((n) => n[1])
+  return { widthMM: Math.max(...xs) - Math.min(...xs), heightMM: Math.max(...ys) - Math.min(...ys) }
+}
+
+/** The longer side of the legal box — what the band is read from. */
+export function legalExtentMM(nodes: readonly Node[]): number {
+  const box = legalBoxMM(nodes)
+  return Math.max(box.widthMM, box.heightMM)
+}
+
+/** Longer side over shorter, 1 for a square box. Infinity where a side is zero — a single line of
+ *  magnets has no width, and that is an answer, not a missing value. */
+export function aspectOf(widthMM: number, heightMM: number): number {
+  const lo = Math.min(widthMM, heightMM), hi = Math.max(widthMM, heightMM)
+  if (hi === 0) return 1
+  return lo === 0 ? Infinity : hi / lo
 }
 
 type Node = readonly [number, number]

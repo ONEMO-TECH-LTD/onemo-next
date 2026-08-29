@@ -59,7 +59,7 @@ const ZONE_FILES: Record<Exclude<Zone, 1 | 3>, readonly string[]> = {
   0: ['types.ts', 'class-contract.ts'],
   2: ['geometry.ts', 'transforms.ts', 'outline.ts', 'rules.ts', 'selection-transition.ts'],
   4: ['class-registry.ts'],
-  5: ['selection.ts', 'options.ts', 'authoring.ts', 'materialize.ts', 'catalogue.ts', 'drafts.ts', 'integrity.ts'],
+  5: ['selection.ts', 'options.ts', 'authoring.ts', 'materialize.ts', 'catalogue.ts', 'band-ranges.ts', 'drafts.ts', 'integrity.ts'],
   6: ['surface.ts'],
   7: ['index.ts'],
 }
@@ -805,14 +805,14 @@ describe('Shape-Layout Library Law — activation schedule', () => {
       classId: string; typeId: string; id: string; label: string; pitchMM: number; corners: 'sharp' | 'bevel' | 'round'
       nodesMM: readonly (readonly [number, number])[]; outlineMM: readonly (readonly [number, number])[]
       widthMM: number; heightMM: number; frameCols: number; frameRows: number
-      bandId: number | null
+      bandId: number | null; legalWidthMM: number; legalHeightMM: number
     }>
     type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false
     const exact: Equal<CatalogueEntry, Exact> = true
     expect(exact).toBe(true)
     expect(CATALOGUE_FORMAT_VERSION).toBe(2)
     const entries = catalogue(48)
-    const keys = ['classId', 'typeId', 'id', 'label', 'pitchMM', 'corners', 'nodesMM', 'outlineMM', 'widthMM', 'heightMM', 'frameCols', 'frameRows', 'bandId'].sort()
+    const keys = ['classId', 'typeId', 'id', 'label', 'pitchMM', 'corners', 'nodesMM', 'outlineMM', 'widthMM', 'heightMM', 'frameCols', 'frameRows', 'bandId', 'legalWidthMM', 'legalHeightMM'].sort()
     for (const pitchMM of [24, 48, 96]) for (const entry of catalogue(pitchMM)) {
       expect(Object.keys(entry).sort()).toEqual(keys)
       assertDataOnly(entry)
@@ -855,8 +855,8 @@ describe('Shape-Layout Library Law — activation schedule', () => {
   }, 20_000)
   it('STEP 5: surface, bridge, barrel, and shell use the contract boundary', () => {
     expect(barrelExports()).toEqual({
-      types: ['CatalogueEntry', 'CornerMode', 'LibraryDraft', 'LibraryEdit', 'LibraryFamily', 'LibrarySelection', 'LibrarySurface', 'MaterializedLibrary', 'PanelOption', 'PanelOptions'],
-      values: ['CATALOGUE_FORMAT_VERSION', 'DEFAULT_LIBRARY_SELECTION', 'DRAFT_STORE_KEY', 'LIBRARY_FAMILIES', 'bandIdOfMM', 'catalogue', 'deleteEdit', 'librarySurface', 'saveEdit', 'selectionForFamily', 'startAdd', 'startEdit', 'toggleNodeAt'],
+      types: ['CatalogueEntry', 'ClassBandRange', 'CornerMode', 'LibraryDraft', 'LibraryEdit', 'LibraryFamily', 'LibrarySelection', 'LibrarySurface', 'MaterializedLibrary', 'PanelOption', 'PanelOptions'],
+      values: ['CATALOGUE_FORMAT_VERSION', 'DEFAULT_LIBRARY_SELECTION', 'DRAFT_STORE_KEY', 'LIBRARY_FAMILIES', 'bandIdOfMM', 'catalogue', 'classBandRanges', 'deleteEdit', 'librarySurface', 'saveEdit', 'selectionForFamily', 'sizeRangeForBand', 'startAdd', 'startEdit', 'toggleNodeAt'],
       wildcards: [],
       aliases: [],
     })

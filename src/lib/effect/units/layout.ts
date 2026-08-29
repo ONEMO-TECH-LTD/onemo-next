@@ -72,10 +72,23 @@ export function latticeOver(region: BBox, pitch: number, phase: Pt): Pt[] {
   return latticeAt(region, pitch, phase[0], phase[1])
 }
 
-/** Which band a size falls in — dominant side against the band ranges. Null above the last. */
-export function bandOf(sizeMM: number): Band | null {
-  for (const b of BANDS) if (sizeMM >= b.minMM && sizeMM <= b.maxMM) return b
+/** Which band a LEGAL extent falls in. Bands are measured on the legal area, never the outline box:
+ *  a pointed or diagonal outline is far bigger than the region inside it that can hold a magnet. */
+export function bandOf(legalMM: number): Band | null {
+  for (const b of BANDS) if (legalMM >= b.minMM && legalMM <= b.maxMM) return b
   return null
+}
+
+/** The legal extent an outline of this size leaves: the rim comes off both sides. */
+export function legalOfOuterMM(outerMM: number, padMM: number): number {
+  return Math.max(0, outerMM - 2 * padMM)
+}
+
+/** The outline sizes a band spans for a shape whose rim is `padMM`. The conversion is the shape's
+ *  own — a diamond and a square in the same band do NOT share an outline range, which is why the
+ *  band is defined on the legal area and this is derived rather than tabulated. */
+export function bandOuterMM(band: Band, padMM: number): { minMM: number; maxMM: number } {
+  return { minMM: band.minMM + 2 * padMM, maxMM: band.maxMM + 2 * padMM }
 }
 
 
@@ -212,7 +225,7 @@ export function registerLayout(
     // only sorts the non-canonical remainder. Centring is exact by construction.
     const bxc = ruleTarget[0] - bb.minX, byc = ruleTarget[1] - bb.minY
     const half = pitch / 2
-    const clsOf = (side: number) => bandOf(side)?.id ?? BANDS[BANDS.length - 1].id
+    const clsOf = (side: number) => bandOf(legalOfOuterMM(side, pad))?.id ?? BANDS[BANDS.length - 1].id
     const canX = clsOf(bb.maxX - bb.minX) % 2 === 1 ? bxc : bxc + half
     const canY = clsOf(bb.maxY - bb.minY) % 2 === 1 ? byc : byc + half
     const otherX = canX === bxc ? bxc + half : bxc

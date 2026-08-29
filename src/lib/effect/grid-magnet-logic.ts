@@ -3,7 +3,7 @@
 import type { Anchor, MagnetPlan, Pt } from './types'
 
 // Moved to foundation/geometry.ts and units/layout.ts (S2 step 4). Re-exported for now.
-export { bandOf } from './units/layout'
+export { bandOf, bandOuterMM, legalOfOuterMM } from './units/layout'
 export { applyCoverage } from './units/layout'
 export type { Anchor, MagnetDia, MagnetPlan } from './types'
 

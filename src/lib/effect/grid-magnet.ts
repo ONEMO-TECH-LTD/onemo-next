@@ -34,7 +34,7 @@ export {
   type SafeMass,
   type SafeSegment,
 } from './grid-magnet-compute'
-export { bandOf, type Anchor, type MagnetDia, type MagnetPlan } from './grid-magnet-logic'
+export { bandOf, bandOuterMM, legalOfOuterMM, type Anchor, type MagnetDia, type MagnetPlan } from './grid-magnet-logic'
 
 /** Sweep the lattice phase at the placement step (ruled 1mm), seat exactly, score, apply coverage, report. */
 

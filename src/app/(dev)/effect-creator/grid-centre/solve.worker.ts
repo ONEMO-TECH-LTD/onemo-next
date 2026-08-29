@@ -1,7 +1,7 @@
 // solve.worker.ts — runs the grid solve off the main thread. Pure dispatch: the same
 // bridge/engine calls the page used to make inline, nothing computed here.
 
-import { BANDS, computeGrid, MIN_EFFECT_MM, type GridConfig } from '@/lib/effect/grid-magnet'
+import { BANDS, bandOuterMM, computeGrid, MIN_EFFECT_MM, type GridConfig } from '@/lib/effect/grid-magnet'
 import { wrapBandLadder, wrapGrid, type BandSolve, type WrapConfig } from '@/lib/effect/grid-magnet-wrap-compute'
 import { bbox, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet-compute'
 import { contourCentroidOf } from '@/lib/effect/units/centring'
@@ -101,11 +101,14 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       // band's range (centre-rules seating); each is solved WHOLE by wrapGroup to its exact
       // contact size. Composition only: the wrap engine is transferred untouched.
       const band = BANDS.find((b) => b.id === mode) ?? BANDS[0]
+      // The band is a LEGAL range; the ladder scans OUTLINE sizes, so it converts through this
+      // shape's own rim. A diamond and a square in one band do not share an outline range.
+      const span = bandOuterMM(band, Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM))
       const anchorAt = anchorFnFor(sized, cfg, cfgSig, sig)
       const key = JSON.stringify([cfgSig, band.id])
       let solve = rungCache.get(key)
       if (!solve) {
-        solve = wrapBandLadder(sized, cfg, band.minMM, band.maxMM, MIN_EFFECT_MM, anchorAt)
+        solve = wrapBandLadder(sized, cfg, span.minMM, span.maxMM, MIN_EFFECT_MM, anchorAt)
         rungCache.set(key, solve)
         if (rungCache.size > FITS_CAP) rungCache.delete(rungCache.keys().next().value!)
       }
@@ -140,7 +143,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       // NO LAWFUL OFFER. Judge allowed nothing in this band. The witness comes from LAYOUT's own
       // generated population — the worker measures nothing and ranks nothing — and it is evidence,
       // never an offer.
-      const bestSeatedMM = solve.bestSeated?.revealMM ?? band.minMM
+      const bestSeatedMM = solve.bestSeated?.revealMM ?? span.minMM
       const contour = sized(bestSeatedMM)
       // The witness DRAWN is the witness layout SELECTED — one solve, at the same baked centre the
       // ladder used. Re-solving WITHOUT that centre drew a different population under the same

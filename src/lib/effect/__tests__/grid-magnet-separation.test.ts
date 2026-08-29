@@ -13,7 +13,7 @@ import { join } from 'node:path'
 import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 import { computeGrid } from '../grid-magnet'
-import { BANDS, BAND_STEP_MM, MIN_EFFECT_MM } from '../grid-magnet-spec'
+import { BANDS, BAND_STEP_MM } from '../grid-magnet-spec'
 import { scaleContour } from '../grid-magnet-compute'
 import { makeContourSeatPredicate } from '../units/layout'
 import { wrapGroup } from '../units/wrap'
@@ -330,10 +330,12 @@ describe('3 — each sub holds only its own kind', () => {
     // Dan, 2026-08-29: "every 48mm is new band if you didnt guess". Spec may not compute, so the
     // table is written out; this is what stops it drifting off the rule. The hand-written five
     // stopped at 264 and made every larger layout homeless.
-    expect(BANDS[0].minMM).toBe(MIN_EFFECT_MM)
+    // Bands are LEGAL-AREA ranges, so the first one starts at zero: a single magnet's legal extent
+    // is a point. The outline size that band corresponds to is the shape's own business.
+    expect(BANDS[0].minMM).toBe(0)
     BANDS.forEach((b, i) => {
       expect(b.id, 'band ids run 1..n in order').toBe(i + 1)
-      expect(b.minMM, `B${b.id} starts one step past B${i}`).toBe(MIN_EFFECT_MM + i * BAND_STEP_MM)
+      expect(b.minMM, `B${b.id} starts one step past B${i}`).toBe(i * BAND_STEP_MM)
       expect(b.maxMM - b.minMM, `B${b.id} spans one step`).toBe(BAND_STEP_MM - 1)
       if (i) expect(b.minMM, `B${b.id} starts where B${i} ended`).toBe(BANDS[i - 1].maxMM + 1)
     })

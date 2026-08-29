@@ -33,26 +33,34 @@ export const MAGNET_DIA_LARGE_MM = 8
 /** Fewest seated magnets the perimeter belt may thin down to. */
 export const MIN_ANCHORS = 2
 
-/** SIZE BANDS — **every 48mm is a new band** (Dan, 2026-08-29). One magnet pitch per band from the
- *  smallest effect up; each end 1mm shy of the next start so no size lives in two bands.
+/** SIZE BANDS — measured on the INNER LEGAL AREA, every 48mm a new band (Dan, 2026-08-29:
+ *  "free shapes are actually less predictable so the range in which the shape is must be measure by
+ *  inner legal area ... B2 is 48-96mm range for legal area and this continues like this").
  *
- *  Written out as values because spec holds values, never arithmetic — the 48mm repeat is asserted
- *  by the separation gate instead, so the table cannot drift off the rule.
+ *  The legal area is what the outline leaves after the magnet's own 12mm rim is taken off every
+ *  boundary — the region a magnet CENTRE may occupy. Banding on it means a band says how many
+ *  magnet positions the shape can carry across its dominant axis: B1 holds one, B2 two, B3 three.
+ *  Band and class then agree by construction rather than by coincidence — measured across the whole
+ *  library, a record's legal band equals its frame's larger axis in all 163 cases.
  *
- *  The five that used to be here stopped at 264 and left everything larger homeless: twelve library
- *  records among them, two of which are slim shapes only 73mm and 75mm across their short axis. */
+ *  Banding on the OUTER box was the bug: a pointed or diagonal outline is far bigger than the area
+ *  inside it that can hold anything. Sixteen triangle records sat one band too high for exactly
+ *  that reason, and a diamond's outline overstates its legal extent by 10mm at 2×2 alone.
+ *
+ *  Ends 1mm shy of the next start so no size lives in two bands. Values only — the 48mm repeat is
+ *  asserted by the separation gate, so the table cannot drift off the rule. */
 export const BAND_STEP_MM = 48
 export interface Band { readonly id: number; readonly minMM: number; readonly maxMM: number }
 export const BANDS: ReadonlyArray<Band> = Object.freeze([
-  Object.freeze({ id: 1, minMM: 24, maxMM: 71 }),
-  Object.freeze({ id: 2, minMM: 72, maxMM: 119 }),
-  Object.freeze({ id: 3, minMM: 120, maxMM: 167 }),
-  Object.freeze({ id: 4, minMM: 168, maxMM: 215 }),
-  Object.freeze({ id: 5, minMM: 216, maxMM: 263 }),
-  Object.freeze({ id: 6, minMM: 264, maxMM: 311 }),
-  Object.freeze({ id: 7, minMM: 312, maxMM: 359 }),
-  Object.freeze({ id: 8, minMM: 360, maxMM: 407 }),
-  Object.freeze({ id: 9, minMM: 408, maxMM: 455 }),
+  Object.freeze({ id: 1, minMM: 0, maxMM: 47 }),
+  Object.freeze({ id: 2, minMM: 48, maxMM: 95 }),
+  Object.freeze({ id: 3, minMM: 96, maxMM: 143 }),
+  Object.freeze({ id: 4, minMM: 144, maxMM: 191 }),
+  Object.freeze({ id: 5, minMM: 192, maxMM: 239 }),
+  Object.freeze({ id: 6, minMM: 240, maxMM: 287 }),
+  Object.freeze({ id: 7, minMM: 288, maxMM: 335 }),
+  Object.freeze({ id: 8, minMM: 336, maxMM: 383 }),
+  Object.freeze({ id: 9, minMM: 384, maxMM: 431 }),
 ])
 
 /** Snap scan size step. */

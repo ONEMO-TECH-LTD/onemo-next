@@ -21,6 +21,7 @@ import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
 import { DEFAULT_PITCH_MM, type BandSnapPoint, type GridResult, type MagnetPlan, type SafeSegment } from '@/lib/effect/grid-magnet'
+import { bandOuterMM } from '@/lib/effect/grid-magnet'
 import { BANDS, CENTRE_MODE, GOVERNOR, MASS_DEPTH_CEIL_MM, MASS_DEPTH_FLOOR_MM, MASS_DEPTH_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-magnet-spec'
 import { fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-magnet-bridge'
 
@@ -311,7 +312,7 @@ export default function GridLab() {
       id, base, offsetMM: 0, cfg,
       mode,
       manualBand,
-      sizeMM: manualBand ? (bandScale ?? effSizeRef.current ?? BANDS[0].minMM) : 0,
+      sizeMM: manualBand ? (bandScale ?? effSizeRef.current ?? bandOuterMM(BANDS[0], pad).minMM) : 0,
       stepSel,
     }
     if (busyRef.current) { queuedRef.current = msg; setSolving(true); return }
@@ -394,7 +395,7 @@ export default function GridLab() {
                     onPan: (dx: number, dy: number) => setManual((m) => { const bx = m ? m.x : model!.grid.phaseMM[0], by = m ? m.y : model!.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } }),
                     onZoom: (f: number) => {
                       // Pinch = manual scaling WITHIN the band's range.
-                      const b = BANDS.find((x) => x.id === mode)!
+                      const b = bandOuterMM(BANDS.find((x) => x.id === mode)!, pad)
                       setBandScale((s) => Math.min(b.maxMM, Math.max(b.minMM, (s ?? effSizeRef.current ?? b.minMM) * f)))
                     },
                     onReset: () => setManual(null) }
@@ -471,7 +472,7 @@ export default function GridLab() {
                   </button>)}
               </div>}
               {(() => {
-                const b = BANDS.find((x) => x.id === mode)!
+                const b = bandOuterMM(BANDS.find((x) => x.id === mode)!, pad)
                 return <Slider label={`Band scale · manual within B${mode}`} unit="mm"
                   v={Math.round(bandScale ?? (effSizeRef.current || b.minMM))}
                   set={(n) => setBandScale(Math.min(b.maxMM, Math.max(b.minMM, n)))}
@@ -958,6 +959,10 @@ const CSS = `
   --accent:#2f6bff;--accent-soft:#2f6bff18;--grid:#9fb0cc;--suede:#454952;--suede-edge:#2c2f36;--magnet:#20242c;
   --magnet-hi:#6b7280;--mag8:#c98a12;--pass:#1a9e4b;--fail:#e5484d;--shadow:0 1px 2px #18202e0d,0 10px 26px #18202e0f;
   --mono:ui-monospace,"SF Mono",Menlo,monospace;--sans:system-ui,-apple-system,"Segoe UI",sans-serif;
+  /* everything above a full-bleed tab — the sticky bar, and nothing else once the page padding is
+     dropped for those tabs. The tabs used to subtract 70, a number matching no real element, so the
+     page overflowed by 80px and the sticky bar covered the zoom card the moment anything scrolled. */
+  --gl-chrome:54px;
   background:var(--bg);color:var(--ink);font-family:var(--sans);min-height:100vh;padding:26px 20px 70px;-webkit-font-smoothing:antialiased}
 @media (prefers-color-scheme:dark){.gl:not([data-theme]){--bg:#0f141b;--panel:#161c25;--panel-2:#12171f;--line:#232c3a;--ink:#e6edf3;--ink-2:#9aa6b6;--ink-3:#66717f;--accent:#4d84ff;--accent-soft:#4d84ff20;--grid:#3d4a60;--suede:#9aa6ba;--suede-edge:#c9d4e2;--magnet:#0b0e12;--magnet-hi:#4a515c;--shadow:0 1px 2px #0005,0 12px 30px #0006}}
 .gl *{box-sizing:border-box}
@@ -1091,7 +1096,11 @@ const CSS = `
 .gl-libedit button:disabled{opacity:.4;cursor:default}
 .gl-libedit button:hover:not(:disabled){color:var(--ink)}
 /* LIBRARY TAB ONLY — full-bleed canvas with the panel floating over it (scoped: .gl-libtab). */
-.gl-libtab{max-width:none;display:block;position:relative;height:calc(100vh - 70px);
+/* A full-bleed tab owns the whole window: the page's own padding above and below it is dead
+   space that only pushed the panel column past the bottom, so the column scrolled and took the
+   zoom control out of sight under the bar. */
+.gl:has(.gl-libtab),.gl:has(.gl-benchtab){padding-top:0;padding-bottom:0}
+.gl-libtab{max-width:none;display:block;position:relative;height:calc(100vh - var(--gl-chrome));
   width:100vw;margin-left:calc(50% - 50vw)}
 .gl-libtab .gl-stage{height:100%;padding:0;border:0;background:none;box-shadow:none}
 .gl-libtab .gl-vp{max-width:none;width:100%;height:100%;aspect-ratio:auto;border:0;border-radius:0;background:var(--panel)}
@@ -1108,7 +1117,7 @@ const CSS = `
 .gl-libbar .gl-seg button{padding:7px 14px}
 /* BENCH TAB — the same full-bleed board with floating panels. Layout only: gestures,
    solver and readouts are untouched (scoped: .gl-benchtab). */
-.gl-benchtab{max-width:none;display:block;position:relative;height:calc(100vh - 70px);
+.gl-benchtab{max-width:none;display:block;position:relative;height:calc(100vh - var(--gl-chrome));
   width:100vw;margin-left:calc(50% - 50vw)}
 .gl-benchtab .gl-stage{height:100%;padding:0;border:0;background:none;box-shadow:none}
 .gl-benchtab .gl-vp{max-width:none;width:100%;height:100%;aspect-ratio:auto;border:0;border-radius:0;background:var(--panel)}
