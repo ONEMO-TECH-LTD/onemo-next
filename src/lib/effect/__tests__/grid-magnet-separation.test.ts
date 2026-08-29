@@ -360,6 +360,26 @@ describe('4 — no surface restates a released value', () => {
       expect(pageText().includes(dead), dead + ' must stay retired').toBe(false)
   })
 
+  it('the rendered pitch choices come from the Spec binding, not a literal beside its import', () => {
+    // QA's counterexample: keep the RELEASED_PITCHES_MM import but render a hardcoded pitch array
+    // — the import-presence check above stays green while the page shows an incomplete released
+    // list. The binding itself is what the law requires, so the binding is what is asserted.
+    const bindsSpec = (text: string) => {
+      let found = false
+      walkAst(text, (node) => {
+        if (!ts.isCallExpression(node) || !ts.isPropertyAccessExpression(node.expression)) return
+        if (node.expression.name.text !== 'map') return
+        if (node.expression.expression.getText() === 'RELEASED_PITCHES_MM') found = true
+      })
+      return found
+    }
+    expect(bindsSpec(pageText()), 'Grid pitch must map RELEASED_PITCHES_MM from Spec').toBe(true)
+    // and the exact mutation dies: the import kept, the rendered list hardcoded
+    const mutated = pageText().replace(/RELEASED_PITCHES_MM\.map\(/, "[{ mm: 24, label: '24 mm' }].map(")
+    expect(mutated).not.toBe(pageText())
+    expect(bindsSpec(mutated), 'the hardcoded-list mutation must be caught').toBe(false)
+  })
+
   it('compute, logic and the bridges import their values instead of restating them', () => {
     // semantic, not numeric: every module that consumes a released law imports it from spec.
     // A module restating a law under its own literal is the drift the old number-scan tried to
