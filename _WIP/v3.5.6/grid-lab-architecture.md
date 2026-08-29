@@ -95,7 +95,10 @@ class. `judge` never mutates a population.
 
 ---
 
-## 3 · What the read found
+## 3 · What the pre-S2 read found
+
+**Historical baseline, not current code truth.** S1/S2 dispositions below record what was deleted,
+moved or repaired; present-tense statements in this section describe the code before those stages.
 
 **The pipeline is assembled in the worker.** `bakeOf`, `anchorFnFor`, `wrapBandLadder`, the rule-4
 landing — all in `solve.worker.ts`. No module in `lib/` composes them; the catalogue-vs-solver
@@ -300,7 +303,7 @@ The pipeline decides none of this: it sequences layout → wrap → judge and pa
 With that landed, `fitSizeInBand`, `bandWalk`, `bandFit`, `maxPressMM` and the idle prefetcher have
 no caller and are deleted in S2.
 *Done when:* the bench still solves and the oracle stays green · a supplied donut keeps its hole
-through the pipeline · an empty band returns `offers: []` with a `no-lawful-offer` diagnostic
+through sizing, layout and wrap · an empty band returns `offers: []` with a `no-lawful-offer` diagnostic
 carrying only a calibration witness, and the shell draws the population layout selected ·
 `fitSizeInBand`, `bandWalk`, `bandFit`, `maxPressMM`, the idle prefetcher, the voting axis and the
 dead placement-step dial are gone · a unit→unit import fails the suite.
