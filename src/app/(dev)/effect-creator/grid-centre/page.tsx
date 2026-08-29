@@ -20,10 +20,10 @@ import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
-import { DEFAULT_PITCH_MM, type BandSnapPoint, type GridResult, type MagnetPlan, type SafeSegment } from '@/lib/effect/grid-magnet'
+import { DEFAULT_PITCH_MM, type GridResult, type MagnetPlan, type SafeSegment } from '@/lib/effect/grid-magnet'
 import { bandOuterMM } from '@/lib/effect/grid-magnet'
 import { BANDS, CENTRE_MODE, GOVERNOR, MASS_DEPTH_CEIL_MM, MASS_DEPTH_FLOOR_MM, MASS_DEPTH_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-magnet-spec'
-import { fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-magnet-bridge'
+import { fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, type FieldSpot } from '@/lib/effect/grid-magnet-bridge'
 
 /** Bench test libraries — static assets, listed by a committed manifest. */
 const LIB_MANIFEST = '/grid-engine/library.json'
@@ -131,7 +131,6 @@ export default function GridLab() {
   const [bandScale, setBandScale] = useState<number | null>(null)
   /** Manual grid calibration — a forced registration (mm), or null for the engine's auto pick. */
   const [manual, setManual] = useState<{ x: number; y: number } | null>(null)
-  const [coverage, setCoverage] = useState<'full' | 'perimeter'>('perimeter')
 
   // On load the bench opens on B1 or the last band you pushed (Dan, 08-25). usePersisted loads
   // in a post-mount effect, so read storage directly for the one decision that must be right on
@@ -263,16 +262,18 @@ export default function GridLab() {
   }, [src, preset, gen, p1, p2, sides, points, magic, cutC])
 
   // The solve runs in a worker so the page never freezes; the last result stays up while solving.
-  /** One row of the pipeline's ledger: a layout the library offered, tried at one registration.
-   *  A row with no size never fitted — it stays visible, because a layout the material refused is
-   *  an answer too and hiding it would be the filter the MVP exists to do without. */
   type LedgerRow = {
-    sizeMM: number | null; count: number; offMM: number | null
-    label: string; classId: string; transposed: boolean
-    omitted: number; attempted: number; landedBandId: number | null; registration: string
-    viewId: string; attemptId: string
+    attemptId: string; classId: string; frameCols: number; frameRows: number
+    label: string; viewId: string; registration: string
+    attempted: number; count: number; omittedMM: Array<[number, number]>
+    sizeMM: number | null; landedBandId: number | null
+    outcome: 'fit' | 'no-fit'; offMM: number | null
   }
-  type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: LedgerRow[]; idx: number; segments: SafeSegment[]; stops?: Array<{ press: number; reveal: number }>; offMM?: number; recog?: { cols: number; rows: number; segWmm: number; segHmm: number }; diagnostic?: { reason: string } }
+  type Model = {
+    contour: Contour; grid: GridResult; effSize: number; ladder: LedgerRow[]
+    selectedAttemptId: string | null; segments: SafeSegment[]
+    offMM: number | null; frame: { cols: number; rows: number } | null; reason?: string
+  }
   const [model, setModel] = useState<Model | null>(null)
   const [solving, setSolving] = useState(false)
   // The overlay earns its place only on a REAL wait: it appears after a grace period, so the
@@ -315,24 +316,36 @@ export default function GridLab() {
     const w = workerRef.current
     if (!w) return
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
-    const cfg = { pitchMM: pitch, paddingMM: pad, massDepthMM: massDepth, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' }
-    // Manual in a band (forced registration OR manual band scale): the walk is meaningless —
-    // solve that size directly, exactly like free mode, band chip stays active.
-    const manualBand = manual !== null || bandScale !== null   // manual scale/pan: solved directly at the requested size
+    // ONE DOOR, TWO ENVELOPES. Manual scale is not a bypass: it states the size and runs the same
+    // classify -> match -> seat -> wrap chain, answering to the same laws (product law: free/manual
+    // and the band run one engine). The old page sent a config object and a manualBand flag, and
+    // the worker chose between two different engines on it.
+    const manualSize = bandScale ?? (manual !== null ? effSizeRef.current : null)
     const id = ++seqRef.current
     const msg = {
-      id, base, offsetMM: 0, cfg,
-      mode,
-      manualBand,
-      sizeMM: manualBand ? (bandScale ?? effSizeRef.current ?? bandOuterMM(BANDS[0], pad).minMM) : 0,
+      id,
+      request: {
+        base,
+        offsetMM: 0,
+        envelope: manualSize != null
+          ? { kind: 'manual' as const, sizeMM: manualSize }
+          : { kind: 'band' as const, bandId: mode },
+        pitchMM: pitch,
+        paddingMM: pad,
+        massDepthMM: massDepth,
+        centreMode,
+        governor,
+        circle: src === 'preset' && preset === 'circle',
+      },
       selectedAttemptId: stepSel,
+      plan,
     }
     if (busyRef.current) { queuedRef.current = msg; setSolving(true); return }
     busyRef.current = true
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, pitch, pad, massDepth, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage])
+  }, [base, src, preset, pitch, pad, massDepth, centreMode, governor, manual, bandScale, plan, mode, stepSel])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -472,24 +485,27 @@ export default function GridLab() {
                   : bandScale !== null
                     ? `manual scale · ${Math.round(bandScale)} mm — tap a step or the band chip to return`
                     : model
-                    ? model.ladder.some((r) => r.sizeMM != null)
-                      ? `${model.recog ? `this shape is ${model.recog.cols}×${model.recog.rows} · ` : ''}${model.ladder.filter((r) => r.sizeMM != null).length} of ${model.ladder.length} attempts fitted · ${new Set(model.ladder.map((r) => r.label + '/' + r.viewId)).size} layouts × 4 grid positions${stepSel ? ` · showing ${Math.round(model.effSize)} mm · ${model.grid.anchors.length}⌾${model.offMM != null ? ` · off-centre ${model.offMM.toFixed(1)}mm` : ''}` : ' · pick a row to draw one'}`
+                    ? model.ladder.some((r) => r.outcome === 'fit')
+                      ? `${model.frame ? `this shape is ${model.frame.cols}×${model.frame.rows} · ` : ''}${model.ladder.filter((r) => r.outcome === 'fit').length} of ${model.ladder.length} attempts fitted · ${new Set(model.ladder.map((r) => r.label + '/' + r.viewId)).size} layouts × 4 grid positions${model.selectedAttemptId ? ` · showing ${Math.round(model.effSize)} mm · ${model.grid.anchors.length}⌾${model.offMM != null ? ` · off-centre ${model.offMM.toFixed(1)}mm` : ''}` : ' · pick a row to draw one'}`
                       : model.ladder.length
-                        ? `${model.recog ? `this shape is ${model.recog.cols}×${model.recog.rows} · ` : ''}the library offered ${new Set(model.ladder.map((r) => r.label)).size} layouts and the material refused every one`
-                        : `${model.recog ? `this shape is ${model.recog.cols}×${model.recog.rows} · ` : ''}the library holds no layout for this grid`
+                        ? `${model.frame ? `this shape is ${model.frame.cols}×${model.frame.rows} · ` : ''}the library offered ${new Set(model.ladder.map((r) => r.label)).size} layouts and the material refused every one`
+                        : `${model.frame ? `this shape is ${model.frame.cols}×${model.frame.rows} · ` : ''}${model.reason ?? 'the library holds no layout for this grid'}`
                     : '—'}
               </div>
               {model && model.ladder.length > 0 && <div className="gl-steps">
                 {/* THE LEDGER — every layout the pipeline tried, in the order it tried them.
                     Unsorted and unranked by design: Dan scoped ordering after the raw MVP, so what
                     you see is what the pipeline found, not what something decided you should see. */}
-                {model.ladder.map((row, i) =>
-                  <button key={row.attemptId} aria-pressed={bandScale === null && stepSel === row.attemptId}
-                    disabled={row.sizeMM == null}
-                    title={`${row.label} · view ${row.viewId} · ${row.registration} · ${row.count} of ${row.attempted} seated${row.omitted ? ` · ${row.omitted} refused by the material` : ''}`}
-                    onClick={() => { if (row.sizeMM != null) { setStepSel(row.attemptId); setBandScale(null) } }}>
-                    <b>{row.sizeMM == null ? 'no fit' : `${row.sizeMM} mm`}</b>
-                    <span>{row.count}⌾{row.omitted ? ` −${row.omitted}` : ''}{row.landedBandId != null && row.landedBandId !== mode ? ` · B${row.landedBandId}` : ''}</span>
+                {model.ladder.map((row) =>
+                  <button key={row.attemptId} aria-pressed={stepSel === row.attemptId}
+                    disabled={row.outcome === 'no-fit'}
+                    title={`${row.classId} ${row.frameCols}×${row.frameRows} · ${row.label} · view ${row.viewId} · ${row.registration}`}
+                    onClick={() => { if (row.outcome === 'fit') { setStepSel(row.attemptId); setBandScale(null) } }}>
+                    <b>{row.classId} · {row.frameCols}×{row.frameRows}</b>
+                    <span>{row.label} · view {row.viewId}</span>
+                    <span>{row.registration}</span>
+                    <span>{row.outcome} · {row.sizeMM == null ? 'no wrap' : `${row.sizeMM} mm`} · {row.count}/{row.attempted}⌾ · {row.landedBandId == null ? 'no band' : `B${row.landedBandId}`}</span>
+                    {row.omittedMM.length > 0 && <span>omitted {row.omittedMM.map(([x, y]) => `${x.toFixed(0)},${y.toFixed(0)}`).join(' · ')}</span>}
                   </button>)}
               </div>}
               {(() => {
@@ -509,17 +525,6 @@ export default function GridLab() {
             <LockNum label="Magnet padding · per spot" unit="mm" v={pad} set={setPad}
               min={PADDING_FLOOR_MM} max={PADDING_CEIL_MM} locked={padLock} setLocked={setPadLock}
               released={RELEASED_PADDING_MM} />
-            {/* The belt does NOT act on the band path any more: the MVP hands wrap the library's
-                layout whole, and thinning it is a refinement Dan deferred until the raw pipeline is
-                proven ("perimeter and 96mm are already in the engine, we just need to refactor and
-                wire them later when the MVP is done"). It still governs manual calibration, so the
-                control stays and says where it applies rather than sitting there doing nothing. */}
-            <div className="gl-field"><span>Coverage · manual calibration only until the belt is rewired</span>
-              <div className="gl-seg">
-                {([['full', 'Full grid'], ['perimeter', 'Perimeter belt']] as ['full' | 'perimeter', string][]).map(([c, l]) =>
-                  <button key={c} aria-pressed={coverage === c} onClick={() => setCoverage(c)}>{l}</button>)}
-              </div>
-            </div>
             <div className="gl-field"><span>Magnet plan</span>
               <div className="gl-seg">
                 {([['all6', 'All 6mm'], ['all8', 'All 8mm'], ['corners8', 'Corners 8']] as [MagnetPlan, string][]).map(([p, l]) =>
@@ -930,20 +935,6 @@ function Slider({ label, v, set, min, max, unit, wide }: { label: string; v: num
 /** Magnet stepper — chevrons either side of a typed count. Forwards the number, decides nothing. */
 /** The wrap engine's stepper, over the snap stops: chevrons step stop-to-stop, typing jumps to
  *  the nearest stop. The value shown IS the pressed size. */
-function Stepper({ label, v, set }: { label: string; v: number; set: (n: number) => void }) {
-  const commit = (raw: string) => { const n = Math.round(+raw); if (Number.isFinite(n)) set(Math.max(1, n)) }
-  return (
-    <div className="gl-field"><span>{label}</span>
-      <div className="gl-stepper">
-        <button aria-label="one fewer magnet" onClick={() => set(v - 1)} disabled={v <= 1}>&#8249;</button>
-        <input key={v} type="number" defaultValue={v} min={1}
-          onBlur={(e) => commit(e.currentTarget.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} />
-        <button aria-label="one more magnet" onClick={() => set(v + 1)}>&#8250;</button>
-      </div>
-    </div>
-  )
-}
 /** Perf value in seconds — green when fast, red past the 2s comfort line. */
 function LockNum({ label, unit, v, set, min, max, locked, setLocked, released }: {
   label: string; unit?: string; v: number; set: (n: number) => void

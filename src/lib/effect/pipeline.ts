@@ -31,13 +31,28 @@ import {
 } from './units/layout'
 import { wrapGroup } from './units/wrap'
 import { layoutsForFrame } from './grid-magnet-library-catalogue'
+import { makeSizer } from './grid-magnet-shape'
 import { viewIdOf } from './units/layout'
 
+/** WHAT SIZE TO MEASURE AT — the only difference between the bench's two controls.
+ *  A band asks the pipeline to solve for the size where the shape fills it; manual states the size
+ *  outright. Manual is NOT a bypass: it classifies, matches, seats, records omission and wraps
+ *  through the same chain and answers to the same laws (product law: "free/manual and the band run
+ *  one engine"). It supplies a measurement, not a verdict. */
+export type PipelineEnvelope =
+  | Readonly<{ kind: 'band'; bandId: number }>
+  | Readonly<{ kind: 'manual'; sizeMM: number }>
+
+/** DATA ONLY. The door used to take `(mm) => Contour` and an anchor function, which meant the
+ *  request could not be serialised, replayed, compared or sent across a worker boundary as a
+ *  value — so there was no single door, only a call convention. The shape arrives as its stored
+ *  contour and the sizer is built inside. */
 export interface PipelineRequest {
-  /** The shape at any size — the one thing the caller owns. */
-  readonly sized: (mm: number) => Contour
-  /** Which band to solve. The band is the measurement anchor and the range, per Dan's step 2. */
-  readonly bandId: number
+  /** The normalized contour, longest side 1mm — the shape as it is stored. */
+  readonly base: Contour
+  /** Outline offset in mm, applied by the sizer. */
+  readonly offsetMM?: number
+  readonly envelope: PipelineEnvelope
   readonly pitchMM?: number
   readonly paddingMM?: number
   readonly centreMode?: number
@@ -45,9 +60,6 @@ export interface PipelineRequest {
   readonly massDepthMM?: number
   /** The outline is a true circle — judge against the analytic curve, not its flattened chords. */
   readonly circle?: boolean
-  /** The governed centre at any size. Supplied by the bench (baked once per shape); derived here
-   *  when absent, so a headless caller needs nothing but a shape. */
-  readonly anchorAtMM?: (mm: number) => Pt
 }
 
 /** A position the layout asked for and the material refused. Recorded, never silent — Dan,
@@ -97,6 +109,10 @@ export interface PipelineResult {
   /** Set when the pipeline could not classify at all, and why. An empty list with no reason would
    *  be indistinguishable from a library that holds nothing. */
   readonly reason?: string
+  /** Echoed so a consumer can rebuild the shape at any size without re-deriving the request. */
+  readonly baseContour: Contour
+  readonly offsetMM: number
+  readonly spotRadiusMM: number
 }
 
 /** Local offsets about a group's own middle — the form wrapGroup takes. */
@@ -171,6 +187,7 @@ function calibrateSizeForBand(
 }
 
 export function runPipeline(request: PipelineRequest): PipelineResult {
+  const sized = makeSizer(request.base, request.offsetMM ?? 0)
   const pitchMM = request.pitchMM ?? DEFAULT_PITCH_MM
   // The released rim is the law and it is locked; a caller that says nothing gets 12, never the
   // admin slider's floor (Dan, 2026-08-29: "point it to the last locked number").
@@ -178,31 +195,36 @@ export function runPipeline(request: PipelineRequest): PipelineResult {
   const radiusMM = spotRadiusOf(padMM)
   // FAIL LOUD. An unknown band silently became B1, so asking for band 999 and band 1 returned
   // byte-identical answers — a wrong question answered confidently is worse than an error.
-  const band = BANDS.find((b) => b.id === request.bandId)
-  if (!band) throw new Error('pipeline: unknown band ' + request.bandId)
+  const envelope = request.envelope
+  const band = envelope.kind === 'band' ? BANDS.find((b) => b.id === envelope.bandId) : undefined
+  if (envelope.kind === 'band' && !band)
+    throw new Error('pipeline: unknown band ' + envelope.bandId)
   // The band is a LEGAL range; sizes are OUTLINE sizes, so it converts through this shape's own
   // rim. A diamond and a square in one band do not share an outline range.
-  const span = bandOuterMM(band, padMM)
+  const ceilingMM = fieldSpanMM(padMM) + SIZE_CEIL_MARGIN_MM
+  const span = band ? bandOuterMM(band, padMM) : { minMM: MIN_EFFECT_MM, maxMM: ceilingMM }
 
   // STEP 1 + 2 — measure where the shape actually FILLS the band, not where its outline happens to
   // be. The size is solved against the same live-span measurement the frame is then read from, so
   // the two cannot disagree.
   const depthMM = Math.max(radiusMM, request.massDepthMM ?? MASS_DEPTH_MM)
-  const calibratedMM = calibrateSizeForBand(request.sized, band.maxMM, radiusMM, depthMM,
-    fieldSpanMM(padMM) + SIZE_CEIL_MARGIN_MM)
+  const calibratedMM = band
+    ? calibrateSizeForBand(sized, band.maxMM, radiusMM, depthMM, ceilingMM)
+    : envelope.kind === 'manual' ? envelope.sizeMM : null
   if (calibratedMM === null)
     return { frame: null, classifiedAtMM: span.maxMM, pitchMM, anchorMM: null, segments: [], attempts: [],
-      reason: 'shape cannot reach band ' + band.id + ' at any size the board allows' }
+      reason: 'shape cannot reach band ' + (band ? band.id : '?') + ' at any size the board allows',
+      baseContour: request.base, offsetMM: request.offsetMM ?? 0, spotRadiusMM: radiusMM }
   const classifiedAtMM = calibratedMM
-  const contour = request.sized(classifiedAtMM)
+  const contour = sized(classifiedAtMM)
   const segments = safeSegments(contour, radiusMM, depthMM, 'full')
   const frame = frameOfMasses(segments, pitchMM)
 
   const bb = bbox(contour.outer.pts)
   const boxC: Pt = [(bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2]
   const mode = (request.centreMode ?? CENTRE_MODE) as CentreMode
-  const anchorFn: (mm: number) => Pt = request.anchorAtMM ?? ((mm: number) => {
-    const c = request.sized(mm)
+  const anchorFn: (mm: number) => Pt = ((mm: number) => {
+    const c = sized(mm)
     const segs = safeSegments(c, radiusMM, depthMM, 'light')
     const cb = bbox(c.outer.pts)
     const centre: Pt = [(cb.minX + cb.maxX) / 2, (cb.minY + cb.maxY) / 2]
@@ -220,7 +242,8 @@ export function runPipeline(request: PipelineRequest): PipelineResult {
 
   if (!frame || !fits)
     return { frame, classifiedAtMM, pitchMM, anchorMM, segments, attempts: [],
-      reason: !frame ? 'no live mass to classify' : 'the outline admits no seat at all' }
+      reason: !frame ? 'no live mass to classify' : 'the outline admits no seat at all',
+      baseContour: request.base, offsetMM: request.offsetMM ?? 0, spotRadiusMM: radiusMM }
 
   const wcfg: WrapConfig = {
     pitchMM, paddingMM: padMM, centreMode: request.centreMode, governor: request.governor,
@@ -250,7 +273,7 @@ export function runPipeline(request: PipelineRequest): PipelineResult {
       // real thing the pipeline tried, and dropping it made the bench claim four grid positions
       // while rendering two (QA F3a).
       const wrap = seatedMM.length
-        ? wrapGroup(request.sized, wcfg, localise(seatedMM).group, MIN_EFFECT_MM, span.maxMM)
+        ? wrapGroup(sized, wcfg, localise(seatedMM).group, MIN_EFFECT_MM, span.maxMM)
         : null
       attempts.push({
         entryId: match.entry.id,
@@ -269,7 +292,8 @@ export function runPipeline(request: PipelineRequest): PipelineResult {
       })
     }
   }
-  return { frame, classifiedAtMM, pitchMM, anchorMM, segments, attempts }
+  return { frame, classifiedAtMM, pitchMM, anchorMM, segments, attempts,
+    baseContour: request.base, offsetMM: request.offsetMM ?? 0, spotRadiusMM: radiusMM }
 }
 
 export { legalOfOuterMM }
