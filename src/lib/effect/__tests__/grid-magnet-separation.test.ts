@@ -13,6 +13,8 @@ import { join } from 'node:path'
 import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 import { computeGrid } from '../grid-magnet'
+import { frameOfMasses, positionsAcross } from '../units/classifier'
+import type { BBox, SafeMass, SafeSegment } from '../types'
 import { BANDS, BAND_STEP_MM } from '../grid-magnet-spec'
 import { scaleContour } from '../grid-magnet-compute'
 import { makeCircleSeatPredicate, makeContourSeatPredicate } from '../units/layout'
@@ -523,6 +525,56 @@ describe('6 — a supplied hole is material boundary, not decoration', () => {
     expect(at).not.toBeNull()
     const off = Math.hypot(at!.points[0][0] - at!.sizeMM / 2, at!.points[0][1] - at!.sizeMM / 2)
     expect(off, 'wrap placed the magnet inside the hole').toBeGreaterThanOrEqual((at!.sizeMM * 60) / 192 - 12)
+  })
+})
+
+describe('1b — the frame comes from the usable material', () => {
+  const mass = (bbox: BBox): SafeMass => ({
+    areaMM2: (bbox.maxX - bbox.minX) * (bbox.maxY - bbox.minY),
+    centreMM: [(bbox.minX + bbox.maxX) / 2, (bbox.minY + bbox.maxY) / 2],
+    peakClearMM: 48, bbox, rings: [],
+  })
+  const segment = (bbox: BBox, masses: SafeMass[]): SafeSegment => ({
+    areaMM2: (bbox.maxX - bbox.minX) * (bbox.maxY - bbox.minY),
+    centreMM: [(bbox.minX + bbox.maxX) / 2, (bbox.minY + bbox.maxY) / 2],
+    meanMM: [(bbox.minX + bbox.maxX) / 2, (bbox.minY + bbox.maxY) / 2],
+    peakClearMM: 3, bbox, rings: [], masses,
+  })
+
+  it('COUNTEREXAMPLE: a dead limb never enlarges the frame', () => {
+    // THE case this measurement exists for. A 96x96 body with a long thin arm: the arm survives
+    // erosion as a sliver of LEGAL area — so it stretches the legal box its whole length — but it
+    // holds no mass and can seat nothing. Measure the legal box and a dead arm reads 3x6; measure
+    // the live masses and it reads 3x3, which is what the material can actually carry.
+    const body = { minX: 0, minY: 0, maxX: 96, maxY: 96 }
+    const deadArm = { minX: 96, minY: 40, maxX: 336, maxY: 56 }
+    const withDeadArm = [segment(body, [mass(body)]), segment(deadArm, [])]
+    expect(frameOfMasses(withDeadArm, 48)).toMatchObject({ cols: 3, rows: 3 })
+    // and the same arm ALIVE must be counted — the rule is "is there mass", never "is it far away"
+    const withLiveArm = [segment(body, [mass(body)]), segment(deadArm, [mass(deadArm)])]
+    expect(frameOfMasses(withLiveArm, 48)).toMatchObject({ cols: 8, rows: 3 })
+  })
+
+  it('COUNTEREXAMPLE: the frame counts past five', () => {
+    // The old axis class is typed 1|2|3|4|5 and clamps, so every larger shape read as five. The
+    // board holds 9 columns and 11 rows at 48mm, and the library publishes frames to match.
+    const wide = { minX: 0, minY: 0, maxX: 384, maxY: 480 }
+    expect(frameOfMasses([segment(wide, [mass(wide)])], 48)).toMatchObject({ cols: 9, rows: 11 })
+  })
+
+  it('positions are (n-1) pitches apart, and a bare span carries one', () => {
+    expect(positionsAcross(0, 48)).toBe(1)
+    expect(positionsAcross(47.9, 48)).toBe(1)
+    expect(positionsAcross(48, 48)).toBe(2)
+    expect(positionsAcross(96, 48)).toBe(3)
+    // exactly on a boundary counts the position it reaches, not the next one
+    expect(positionsAcross(191, 48)).toBe(4)
+    expect(positionsAcross(192, 48)).toBe(5)
+  })
+
+  it('no mass anywhere is null, not a frame of one', () => {
+    expect(frameOfMasses([], 48)).toBeNull()
+    expect(frameOfMasses([segment({ minX: 0, minY: 0, maxX: 10, maxY: 10 }, [])], 48)).toBeNull()
   })
 })
 

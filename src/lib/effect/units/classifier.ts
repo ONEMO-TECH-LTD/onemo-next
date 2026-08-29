@@ -4,9 +4,57 @@
 // shapeFamilyOf did NOT come: the hardcoded three-family enum with its invented numbers has two
 // live callers (the worker and the catalogue matcher) and dies in S4 once the catalogue answers.
 
-import type { AxisClass, FrameKind, Pt, ShapeClass } from '../types'
+import type { AxisClass, BBox, FrameKind, Pt, SafeSegment, ShapeClass } from '../types'
 import { bbox } from '../foundation/geometry'
 import { DEFAULT_PITCH_MM, MIN_EFFECT_MM } from '../grid-magnet-spec'
+
+// ─── THE FRAME: what the shape's USABLE MATERIAL carries ────────────────────────────────────────
+// Dan's step 1. Everything below the divider is the older outline-bbox classification, which
+// measures the wrong region and cannot count past five; it still feeds a display readout and the
+// dormant family matcher, and it leaves when its consumers do.
+
+/** The box enclosing every LIVE MASS — the region deep enough to actually hold a magnet.
+ *
+ *  Not the outline: a 135mm triangle's outline claims three lines across while only 96mm of it can
+ *  hold anything. Not the legal bbox either, and that is the one that surprises — a 30mm arm eroded
+ *  by 12mm each side leaves a 6mm sliver that stretches the box the arm's whole length and seats
+ *  nothing, so a dead arm and a live one measure identically on it. And not the GOVERNING mass:
+ *  that is the centring dial's pick, so classifying off it would tie what the shape IS to a
+ *  control, and would lose a two-mass shape's second body entirely.
+ *
+ *  Masses only — a segment holding no mass contributes nothing. Segmentation itself is untouched;
+ *  this reads what safeSegments already produces. */
+export function massUnionBoxMM(segments: readonly SafeSegment[]): BBox | null {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const segment of segments) for (const mass of segment.masses) {
+    if (mass.bbox.minX < minX) minX = mass.bbox.minX
+    if (mass.bbox.minY < minY) minY = mass.bbox.minY
+    if (mass.bbox.maxX > maxX) maxX = mass.bbox.maxX
+    if (mass.bbox.maxY > maxY) maxY = mass.bbox.maxY
+  }
+  return minX === Infinity ? null : { minX, minY, maxX, maxY }
+}
+
+/** How many magnet positions a span of this length carries: n positions span (n−1) pitches, so the
+ *  span admits floor(span / pitch) + 1. NO CEILING — the 1|2|3|4|5 axis class below encodes the old
+ *  five-band product range in the type system and clamps anything larger down to it. */
+export function positionsAcross(spanMM: number, pitchMM: number): number {
+  return spanMM < 0 ? 0 : Math.floor(spanMM / pitchMM + 1e-9) + 1
+}
+
+/** THE ORDERED FRAME the shape's usable material carries, at the size it was measured.
+ *
+ *  Ordered, not a ratio: 3×6 and 2×4 share a ratio and are different frames, and a 1-wide frame has
+ *  no ratio at all. No aspect anywhere — the pair carries everything a ratio would, without the
+ *  degenerate case. */
+export function frameOfMasses(
+  segments: readonly SafeSegment[], pitchMM: number,
+): { cols: number; rows: number; widthMM: number; heightMM: number } | null {
+  const box = massUnionBoxMM(segments)
+  if (!box) return null
+  const widthMM = box.maxX - box.minX, heightMM = box.maxY - box.minY
+  return { cols: positionsAcross(widthMM, pitchMM), rows: positionsAcross(heightMM, pitchMM), widthMM, heightMM }
+}
 
 /**
  * Which class an axis of this length falls in.
