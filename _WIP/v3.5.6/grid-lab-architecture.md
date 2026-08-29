@@ -177,6 +177,11 @@ already asserts 163 records × 3 pitches *equal* — an existing gate, not new m
 
 ## 4 · Plan
 
+> **SUPERSEDED — authorises nothing.** The S1-S10 plan below was replaced by
+> `v3.5.6-delivery-plan.md` after Dan's 08-29 raw-MVP ruling. It is retained as evidence of the
+> extraction already done; it authorises no task, module, test or deletion.
+
+
 **Only grid-lab internals that will be used.** No characterisation harness, no audit module, no
 gate suite beyond the one import matrix. The engine's own tests are the classifier audit Dan ordered
 and the catalogue oracle that already exists.
