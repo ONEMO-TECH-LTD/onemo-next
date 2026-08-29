@@ -17,10 +17,7 @@ import { BANDS, BAND_STEP_MM } from '../grid-magnet-spec'
 import { scaleContour } from '../grid-magnet-compute'
 import { makeCircleSeatPredicate, makeContourSeatPredicate } from '../units/layout'
 import { wrapGroup } from '../units/wrap'
-import { runPipeline } from '../pipeline'
-import { frameOfMasses } from '../units/classifier'
-import { bandOuterMM } from '../units/layout'
-import type { BBox, SafeMass, SafeSegment } from '../types'
+import { wrapBandLadder } from '../grid-magnet-wrap-compute'
 import { contourCentroidOf } from '../units/centring'
 import { safeSegments } from '../units/segment'
 import { contourCacheKey, makeSizer } from '../grid-magnet-bridge'
@@ -31,14 +28,8 @@ const PAGE = join(process.cwd(), 'src/app/(dev)/effect-creator/grid-centre/page.
 
 // DERIVED, never hand-listed: the previous five-name list omitted wrap-compute, class and the
 // worker — and wrap-compute imports four units and sequences them, invisibly.
-// DERIVED FROM BEHAVIOUR, not from a filename. The old filter was /^grid-magnet.*\.ts$/ — itself a
-// hand-list in disguise: pipeline.ts sequenced five units and no gate could see it, because of its
-// NAME. A file that reaches a unit IS a sequencer seat by definition, so that is the membership
-// test. Widening to every root module instead would drag in neighbours that are not this engine at
-// all (the dormant attachment contract), which is over-reach in the other direction.
 const MODULE_FILES = readdirSync(LIB)
-  .filter((f) => f.endsWith('.ts') && !f.endsWith('.d.ts'))
-  .filter((f) => /^grid-magnet.*\.ts$/.test(f) || /['"]\.\/units\//.test(readFileSync(join(LIB, f), 'utf8')))
+  .filter((f) => /^grid-magnet.*\.ts$/.test(f) && !f.endsWith('.d.ts'))
   .sort()
 
 const readModule = () =>
@@ -130,9 +121,6 @@ describe('2 — traffic is one-way', () => {
     'grid-magnet-library-bridge.ts': [/^\.\/types$/, /^\.\/grid-magnet[a-z-]*$/, /^\.\/library[/a-z-]*$/, /^\.\/foundation\/[a-z-]+$/],
     'grid-magnet-library-catalogue.ts': [/^\.\/types$/, /^\.\/grid-magnet[a-z-]*$/, /^\.\/library[/a-z-]*$/],
     'grid-magnet-bridge.ts': [/^\.\/types$/, /^\.\/geometry-truth$/, /^\.\/contour$/, /^\.\/offset$/, /^\.\/grid-magnet$/, /^\.\/grid-magnet-compute$/, /^@\/lib\/vector-core$/],
-    // THE PIPELINE: shared vocabulary, spec, foundation, the units it sequences, and the matcher.
-    // It may NOT reach the library directly — that boundary is the adapter's whole job.
-    'pipeline.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/foundation\/[a-z-]+$/, /^\.\/units\/[a-z-]+$/, /^\.\/grid-magnet-library-catalogue$/],
   }
 
   it('every module file imports only from its allow-list', () => {
@@ -222,10 +210,7 @@ describe('2b — the units are self-sufficient', () => {
   it('only the two named sequencer seats hold unit edges, and exactly the pinned ones', () => {
     const TEMPORARY_UNIT_EDGES: Record<string, readonly string[]> = {
       'grid-magnet.ts': ['./units/centring', './units/layout', './units/segment'],
-      'grid-magnet-wrap-compute.ts': ['./units/wrap'],
-      // THE PIPELINE — the real sequencer, and the reason this list is not a permanent fixture:
-      // sequencing units is exactly what a pipeline does, and it is the only file that may.
-      'pipeline.ts': ['./units/centring', './units/classifier', './units/layout', './units/segment', './units/wrap'],
+      'grid-magnet-wrap-compute.ts': ['./units/centring', './units/judge', './units/layout', './units/segment', './units/wrap'],
       'grid-magnet-class.ts': ['./units/classifier'],
       'grid-magnet-compute.ts': ['./units/centring', './units/layout', './units/segment'],
       'grid-magnet-logic.ts': ['./units/centring', './units/layout'],
@@ -241,8 +226,7 @@ describe('2b — the units are self-sufficient', () => {
     for (const { file, text } of readModule()) {
       // The two SEQUENCER SEATS may import units, because sequencing them is what a pipeline does.
       // Every other retiring file may only re-export. Both seats hand over at S3.
-      // The SEQUENCER SEATS may import units, because sequencing them is what a pipeline does.
-      if (file === 'grid-magnet.ts' || file === 'grid-magnet-wrap-compute.ts' || file === 'pipeline.ts') continue
+      if (file === 'grid-magnet.ts' || file === 'grid-magnet-wrap-compute.ts') continue
       const bad: string[] = []
       walkAst(text, (n) => {
         if (!ts.isImportDeclaration(n)) return
@@ -303,7 +287,7 @@ describe('2d — the real shells are governed too', () => {
   // expires when the pipeline lands. Pinned exactly, so a stray import fails even where edges exist.
   const SHELL_UNIT_EDGES: Array<[string, readonly string[]]> = [
     [PAGE, []],
-    [WORKER, ['@/lib/effect/units/centring']],
+    [WORKER, ['@/lib/effect/units/judge', '@/lib/effect/units/centring']],
   ]
 
   it('the page and worker hold exactly their pinned unit edges', () => {
@@ -554,11 +538,13 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
 
   const sq = (mm: number): Contour => ({ outer: { pts: [[0, 0], [mm, 0], [mm, mm], [0, mm]] as Pt[] }, holes: [] })
 
-  it('CALLS the pipeline: the band is a LABEL on a result, never a rejection of one', () => {
-    // The old ladder DELETED any layout whose wrapped size fell outside the asked-for band. Dan
-    // ruled that out (2026-08-29): "band membership becomes a label, not a rejection ... deleting
-    // would be a filter; labelling is the classification you already ruled". So an attempt that
-    // wraps into a neighbouring band must still come back, carrying the band it truly landed in.
+  it('CALLS the solver: every returned offer is inside the band it was asked for', () => {
+    // The previous version scanned source text. QA mutated the real post to `offers:
+    // [bestSeatedMM]`, added a decoy `void { offers: [] }`, and every test stayed green. This one
+    // calls the solver on a band that DOES produce offers, so deleting the membership rule fails it.
+    // A SQUARE cannot prove this: its bisection bounds already keep every wrap inside the band, so
+    // deleting the rule changes nothing. A star reveals small layouts that wrap far below the band
+    // floor — 115, 128, 149, 150mm all leak into 168-216 the moment the rule goes.
     const star = (mm: number): Contour => {
       const pts: Pt[] = []
       for (let i = 0; i < 10; i++) {
@@ -568,73 +554,17 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
       }
       return { outer: { pts }, holes: [] }
     }
-    const solve = runPipeline({ sized: star, bandId: 4, paddingMM: 12, pitchMM: 48 })
-    expect(solve.attempts.length, 'this band must produce attempts, or the test proves nothing').toBeGreaterThan(0)
-    for (const a of solve.attempts.filter((x) => x.wrap))
-      expect(a.landedBandId, a.entryId + ' wrapped without a band label').not.toBeNull()
-    // and nothing is removed for landing elsewhere: every wrapped attempt survives to the caller.
-    expect(solve.attempts.every((a) => a.wrap === null || a.wrap.sizeMM > 0)).toBe(true)
-  }, 30_000)
-
-  it('every layout is tried at all four governed registrations — no hidden winner', () => {
-    // The engine built four lawful registrations and returned ONE, by seat count. Measured on a
-    // 168mm square at 12mm padding it kept 16 magnets and destroyed the 12, 12 and 9 before wrap
-    // saw them — the max-count prefilter the brief forbids by name. The pipeline tries all four.
-    const solve = runPipeline({ sized: sq, bandId: 4, paddingMM: 12, pitchMM: 48 })
-    const byEntry = new Map<string, Set<string>>()
-    for (const a of solve.attempts) {
-      const key = a.entryId + '/' + a.viewId
-      byEntry.set(key, (byEntry.get(key) ?? new Set()).add(a.registrationMM.join(',')))
-    }
-    expect(byEntry.size, 'the library must offer this frame something').toBeGreaterThan(0)
-    for (const [entry, phases] of byEntry)
-      expect(phases.size, entry + ' was not tried at all four governed registrations').toBe(4)
-  }, 30_000)
-
-  it('what the material refuses is RECORDED, never silently dropped', () => {
-    // Dan, 2026-08-29: "anything falling off the layout is just omitted as not fitting the shape".
-    // Omission is lawful; SILENT omission is not — every refused position keeps its coordinates.
-    const star = (mm: number): Contour => {
-      const pts: Pt[] = []
-      for (let i = 0; i < 10; i++) {
-        const t = (i / 10) * Math.PI * 2 - Math.PI / 2
-        const r = (i % 2 === 0 ? 0.5 : 0.22) * mm
-        pts.push([mm / 2 + r * Math.cos(t), mm / 2 + r * Math.sin(t)] as Pt)
+    for (const [shape, lo, hi] of [[sq, 24, 72], [star, 120, 168], [star, 168, 216]] as const) {
+      const solve = wrapBandLadder(shape, { paddingMM: 12, pitchMM: 48 }, lo, hi, 24)
+      expect(solve.offers.length, `band ${lo}-${hi} must produce offers`).toBeGreaterThan(0)
+      for (const o of solve.offers) {
+        expect(o.at.sizeMM, `offer ${o.at.sizeMM}mm escaped band ${lo}-${hi}`).toBeGreaterThanOrEqual(lo - 0.005)
+        expect(o.at.sizeMM, `offer ${o.at.sizeMM}mm escaped band ${lo}-${hi}`).toBeLessThanOrEqual(hi + 0.005)
       }
-      return { outer: { pts }, holes: [] }
     }
-    const solve = runPipeline({ sized: star, bandId: 4, paddingMM: 12, pitchMM: 48 })
-    const withOmissions = solve.attempts.filter((a) => a.omitted.length)
-    expect(withOmissions.length, 'a concave star must refuse some positions, or this proves nothing').toBeGreaterThan(0)
-    for (const a of solve.attempts) {
-      expect(a.seatedMM.length + a.omitted.length, a.entryId + ' lost a position between attempt and record')
-        .toBe(a.attempted)
-      for (const o of a.omitted) expect(o.reason).toBe('outside-safe-area')
-    }
-  }, 30_000)
-
-  it('COUNTEREXAMPLE: a dead legal island never becomes classifier mass', () => {
-    // Restore `segment.masses.length ? segment.masses : [segment]` and this dies. Without it the
-    // whole point of the mass union is lost: a dead arm IS a legal segment holding no mass.
-    const live: SafeMass = {
-      areaMM2: 9216, centreMM: [48, 48], peakClearMM: 48,
-      bbox: { minX: 0, minY: 0, maxX: 96, maxY: 96 }, rings: [],
-    }
-    const segment = (bbox: BBox, masses: SafeMass[]): SafeSegment => ({
-      areaMM2: (bbox.maxX - bbox.minX) * (bbox.maxY - bbox.minY),
-      centreMM: [(bbox.minX + bbox.maxX) / 2, (bbox.minY + bbox.maxY) / 2],
-      meanMM: [(bbox.minX + bbox.maxX) / 2, (bbox.minY + bbox.maxY) / 2],
-      peakClearMM: 3, bbox, rings: [], masses,
-    })
-    expect(frameOfMasses([
-      segment(live.bbox, [live]),
-      segment({ minX: 120, minY: 0, maxX: 360, maxY: 30 }, []),
-    ], 48)).toMatchObject({ cols: 3, rows: 3, widthMM: 96, heightMM: 96 })
   })
 
-  it('COUNTEREXAMPLE: a pointed shape is calibrated by measured legal span, not outline arithmetic', () => {
-    // Restore `classifiedAtMM = span.maxMM` and this dies. A star at B4's nominal outline top shows
-    // only ~120mm of legal span — three bands adrift — so it could never be offered a B4 layout.
+  it('band membership actually filters — the star leaks without it', () => {
     const star = (mm: number): Contour => {
       const pts: Pt[] = []
       for (let i = 0; i < 10; i++) {
@@ -644,83 +574,57 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
       }
       return { outer: { pts }, holes: [] }
     }
-    const solve = runPipeline({ sized: star, bandId: 4, paddingMM: 12, pitchMM: 48 })
-    expect(solve.frame, 'the star must classify').not.toBeNull()
-    const segs = safeSegments(star(solve.classifiedAtMM), 12, 16, 'light')
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-    for (const sg of segs) {
-      minX = Math.min(minX, sg.bbox.minX); minY = Math.min(minY, sg.bbox.minY)
-      maxX = Math.max(maxX, sg.bbox.maxX); maxY = Math.max(maxY, sg.bbox.maxY)
-    }
-    const legalSpan = Math.max(maxX - minX, maxY - minY)
-    expect(legalSpan, 'calibration must reach the band ceiling').toBeGreaterThanOrEqual(190)
-    // and it must have had to grow PAST the naive outline conversion to get there
-    expect(solve.classifiedAtMM).toBeGreaterThan(bandOuterMM(BANDS[3], 12).maxMM)
-  }, 60_000)
-
-  it('COUNTEREXAMPLE: a registration that seats nothing is still reported', () => {
-    // Restore `if (!seatedMM.length) continue` and this dies. A hidden registration made the bench
-    // claim four grid positions while rendering two.
-    const tiny = (mm: number): Contour => {
-      const pts: Pt[] = []
-      for (let i = 0; i < 48; i++) {
-        const t = (i / 48) * Math.PI * 2
-        pts.push([mm / 2 + (mm / 2) * Math.cos(t), mm / 2 + (mm / 2) * Math.sin(t)] as Pt)
-      }
-      return { outer: { pts }, holes: [] }
-    }
-    const solve = runPipeline({ sized: tiny, bandId: 1, paddingMM: 12, pitchMM: 48 })
-    expect(solve.attempts.length % 4, 'every match must appear at all four registrations').toBe(0)
-    expect(solve.attempts.some((a) => a.seatedMM.length === 0),
-      'a band-1 circle cannot seat a half-step registration — that row must still exist').toBe(true)
-    for (const a of solve.attempts)
-      expect(a.seatedMM.length + a.omitted.length, a.attemptId).toBe(a.attempted)
-  }, 60_000)
-
-  it('COUNTEREXAMPLE: an unknown band fails loud instead of becoming B1', () => {
-    // Restore `?? BANDS[0]` and this dies. Asking for band 999 and band 1 returned identical
-    // answers — a wrong question answered confidently.
-    expect(() => runPipeline({ sized: sq, bandId: 999, paddingMM: 12, pitchMM: 48 }))
-      .toThrow('pipeline: unknown band 999')
+    const solve = wrapBandLadder(star, { paddingMM: 12, pitchMM: 48 }, 168, 216, 24)
+    expect(solve.offers.length, 'this band must hold offers, or the test proves nothing').toBe(2)
+    expect(solve.offers.every((o) => o.at.sizeMM >= 168), 'a sub-band layout was offered').toBe(true)
   })
 
-  it('COUNTEREXAMPLE: every attempt carries a stable identity, so nothing is chosen by position', () => {
-    // Restore index-based selection and this dies: ids must be unique and stable across runs, which
-    // is what lets the shell select without ranking.
-    const a = runPipeline({ sized: sq, bandId: 3, paddingMM: 12, pitchMM: 48 })
-    const b = runPipeline({ sized: sq, bandId: 3, paddingMM: 12, pitchMM: 48 })
-    const ids = a.attempts.map((x) => x.attemptId)
-    expect(new Set(ids).size, 'attempt ids must be unique').toBe(ids.length)
-    expect(b.attempts.map((x) => x.attemptId), 'and stable between runs').toEqual(ids)
-    for (const x of a.attempts)
-      expect(x.attemptId).toBe(x.entryId + '|' + x.viewId + '|' + x.registrationMM.join(','))
-  }, 60_000)
+  it('the witness comes from layout and is never an offer', () => {
+    const solve = wrapBandLadder(sq, { paddingMM: 12, pitchMM: 48 }, 24, 72, 24)
+    expect(solve.bestSeated, 'layout must supply a witness').not.toBeNull()
+    expect(Object.keys(solve)).toEqual(['offers', 'bestSeated'])
+    // The witness is a REVEAL size, not a wrapped offer: it carries no contact size at all.
+    expect(solve.offers.some((o) => (o as unknown as { points?: unknown }).points !== undefined)).toBe(false)
+  })
 
-  it('the pipeline runs headless and sorts nothing', () => {
-    // This lane's deliverable is an engine that answers from a plain test with no browser. It also
-    // must not order: ordering is judgement, and Dan scoped it after the raw MVP.
-    const solve = runPipeline({ sized: sq, bandId: 3, paddingMM: 12, pitchMM: 48 })
-    expect(solve.frame, 'the pipeline must classify the shape').not.toBeNull()
-    const sizes = solve.attempts.filter((a) => a.wrap).map((a) => a.wrap!.sizeMM)
-    const ascending = [...sizes].sort((a, b) => a - b)
-    const descending = [...ascending].reverse()
-    // Generation order is the contract. If it happens to be sorted, that is the engine sorting.
-    if (sizes.length > 2)
-      expect(sizes.join() === ascending.join() && sizes.join() === descending.join()
-        || (sizes.join() !== ascending.join() || new Set(sizes).size === 1),
-      'the attempt list came back sorted — something ranked it').toBe(true)
-  }, 30_000)
+  it('on an empty band the shell DRAWS the witness layout selected, not a fresh solve', async () => {
+    // The shell used to re-run computeGrid without the baked centre, so the population labelled
+    // "calibration witness" was a solve nobody made. Pre-fix this band drew 2 magnets at a
+    // different phase while layout had selected 4.
+    const star: Contour = (() => {
+      const pts: Pt[] = []
+      for (let i = 0; i < 10; i++) {
+        const t = (i / 10) * Math.PI * 2 - Math.PI / 2
+        const r = (i % 2 === 0 ? 0.5 : 0.22) * (i === 4 ? 0.78 : 1)
+        pts.push([0.5 + r * Math.cos(t), 0.5 + r * Math.sin(t)] as Pt)
+      }
+      return { outer: { pts }, holes: [] }
+    })()
+    const cfg: GridConfig = { paddingMM: 12, pitchMM: 48, centreMode: 2, governor: 0 }
+    const posted: Array<{ model: { grid: { anchors: Array<{ p: Pt }> }; diagnostic?: unknown } | null }> = []
+    const stub = { onmessage: null as ((e: { data: unknown }) => void) | null, postMessage: (m: unknown) => { posted.push(m as never) } }
+    const g = globalThis as { self?: unknown }
+    const prev = g.self
+    g.self = stub
+    try {
+      const worker = await import('@/app/(dev)/effect-creator/grid-centre/solve.worker')
+      stub.onmessage!({ data: { id: 1, base: star, offsetMM: 0, cfg, mode: 4, sizeMM: 0, stepSel: null } })
+      const model = posted[0]?.model
+      expect(model, 'the worker posted no model').toBeTruthy()
+      expect(model!.diagnostic, 'this band must be empty, or the test proves nothing').toBeTruthy()
+      const sized = makeSizer(star, 0)
+      const solve = wrapBandLadder(sized, cfg, 168, 216, 24, worker.anchorFnFor(sized, cfg, JSON.stringify(cfg), 'gate'))
+      expect(solve.offers.length, 'this band must hold no offers').toBe(0)
+      expect(model!.grid.anchors.map((a) => a.p), 'the drawn population is not the selected witness')
+        .toEqual(solve.bestSeated!.points)
+    } finally {
+      g.self = prev
+    }
+  })
 
-  it('the shell never presents a layout that did not fit as one that did', () => {
-    // The witness is gone with the sweep, but the failure it guarded is not: the shell must never
-    // let a row that never fitted read as a fit. A row with no size is labelled "no fit" AND is
-    // unselectable, so the canvas cannot draw one — the two are enforced together.
+  it('the shell never labels the witness a fit', () => {
     const page = readFileSync(join(process.cwd(), 'src/app/(dev)/effect-creator/grid-centre/page.tsx'), 'utf8')
     expect(page).not.toMatch(/nothing fully fits in this band/)
-    expect(page).toMatch(/no fit/)
-    expect(page, 'an unfitted row must be unselectable').toMatch(/disabled=\{row\.sizeMM == null\}/)
-    expect(page, 'and unclickable even so').toMatch(/if \(row\.sizeMM != null\)/)
-    // Omission is lawful; SILENT omission is not — what the material refused reaches the screen.
-    expect(page, 'the shell must show what the material refused').toMatch(/row\.omitted/)
+    expect(page).toMatch(/no lawful offer in this band/)
   })
 })

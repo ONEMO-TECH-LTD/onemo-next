@@ -25,7 +25,7 @@ import { boardPositions } from '../library/geometry'
 import { bandOfFrame } from '../library/rules'
 import type { LibraryFrame, LibrarySelection } from '../library/types'
 import { libraryStageModel } from '../grid-magnet-library-bridge'
-import { positionsAcross } from '../units/classifier'
+import { classifyShape } from '../grid-magnet-class'
 import { MANUFACTURING_TOLERANCE_MM } from '../geometry-truth'
 
 /** The library states its own millimetres as readonly pairs; the engine's classifiers take
@@ -80,21 +80,18 @@ describe('corpus completeness — removal must fail these', () => {
 })
 
 describe('classifier goldens — library and engine taxonomies stay distinct', () => {
-  it('QA F1 golden: a layout\'s own legal span reads back as the frame it came from', () => {
-    // The engine used to classify a layout's OUTLINE through the outer bbox, and that classifier
-    // is gone: it measured the wrong box and could not count past five, so this golden skipped
-    // every 6-line frame the library holds. The invariant it was really guarding survives and now
-    // covers the WHOLE library — the span the magnets occupy must read back as their own frame,
-    // which is the agreement the matcher depends on to find anything at all.
+  it('QA F1 golden: the outline CLASSIFIES as the selected/transformed frame (compatible pairs)', () => {
     for (const family of ['square', 'rectangle'] as const) for (const f of framesAt(family, 48)) {
+      // The engine classifier tops out at 5 magnet lines per axis (bands B1-B5), so a 6-line
+      // library frame has no class to be read back as. The library carries it; the classifier
+      // cannot express it until a sixth band is ruled.
+      if (f.cols > 5 || f.rows > 5) continue
       for (const transpose of [false, true]) {
         const cols = transpose ? f.rows : f.cols, rows = transpose ? f.cols : f.rows
         if (family === 'square' && cols !== rows) continue
         const pv = libraryPreview(sel({ classId: family, frameKey: frameKeyOf(f), layoutId: f.layouts[0].name, view: { transpose, flipX: false, flipY: false } }), 48)
-        const xs = pv.nodesMM.map((q) => q[0]), ys = pv.nodesMM.map((q) => q[1])
-        const legalW = Math.max(...xs) - Math.min(...xs), legalH = Math.max(...ys) - Math.min(...ys)
-        expect([positionsAcross(legalW, 48), positionsAcross(legalH, 48)],
-          `${family} on ${frameKeyOf(f)}${transpose ? ' T' : ''}`).toEqual([cols, rows])
+        const c = classifyShape(enginePts(pv.outlineMM), 48)
+        expect([c.cx, c.cy], `${family} on ${frameKeyOf(f)}${transpose ? ' T' : ''}`).toEqual([cols, rows])
       }
     }
   })

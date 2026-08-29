@@ -11,10 +11,10 @@ import { holds, prepare } from '@/lib/grid-engine/compute/geometry'
 import type { Band } from '../grid-magnet-spec'
 import { MIN_ANCHORS } from '../grid-magnet-spec'
 import {
-  bbox, edgeDistMM, pointInOuter,
+  bbox, edgeDistMM, edgeDistToContourMM, pointInOuter,
 } from '../foundation/geometry'
 import {
-  BANDS, DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS, PADDING_FLOOR_MM,
+  BANDS, DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS, PADDING_FLOOR_MM, SNAP_STEP_MM,
 } from '../grid-magnet-spec'
 
 /** Split seated nodes into perimeter belt and fully-surrounded interior. */
@@ -75,12 +75,7 @@ export function latticeOver(region: BBox, pitch: number, phase: Pt): Pt[] {
 /** Which band a LEGAL extent falls in. Bands are measured on the legal area, never the outline box:
  *  a pointed or diagonal outline is far bigger than the region inside it that can hold a magnet. */
 export function bandOf(legalMM: number): Band | null {
-  // The table states whole-millimetre ends (0-47, 48-95, ...) so that no size lives in two bands,
-  // but a real span is fractional: a 47.5mm legal extent fell BETWEEN B1 and B2 and came back with
-  // no band at all, which is how a lawfully wrapped layout ended up unlabelled (QA F3c). The
-  // interval is half-open on the upper end, so the bands tile the line with no holes and no
-  // overlap — 47.5 is B1, 48.0 is B2.
-  for (const b of BANDS) if (legalMM >= b.minMM && legalMM < b.maxMM + 1) return b
+  for (const b of BANDS) if (legalMM >= b.minMM && legalMM <= b.maxMM) return b
   return null
 }
 
@@ -162,20 +157,6 @@ export function makeContourSeatPredicate(
 
 const mod = (v: number, m: number) => ((v % m) + m) % m
 
-/** THE FOUR GOVERNED REGISTRATIONS, as offsets from the governed centre. Centre rules pins the
- *  grid by parity instead of sweeping it: each axis either carries a NODE on the centre or a GAP
- *  on it, which is these four. Layout owns them because layout owns the lattice — the pipeline
- *  sequences, it does not define geometry. */
-export function registrationOffsets(pitchMM: number): Array<[number, number]> {
-  const half = pitchMM / 2
-  return [[0, 0], [half, 0], [0, half], [half, half]]
-}
-
-/** A view's stable short id: transpose/flipX/flipY as three letters. */
-export function viewIdOf(view: { transpose: boolean; flipX: boolean; flipY: boolean }): string {
-  return (view.transpose ? 't' : 'n') + (view.flipX ? 'x' : 'n') + (view.flipY ? 'y' : 'n')
-}
-
 /** What layout decided — placement only; the caller turns it into the engine's result. */
 interface LayoutPlacement {
   bb: ReturnType<typeof bbox>; pitch: number; reach: number
@@ -185,6 +166,18 @@ interface LayoutPlacement {
   bestSeated: Pt[]; bestOx: number; bestOy: number; bestKx: number; bestKy: number
   mainCentre: Pt
 }
+
+/** THE WRAP LAW (Dan, 2026-08-20: "0 flap means magnets and edges touch"): wrap is each
+ *  disc PRESSED against the outline. The force is the mean of every seated disc's own gap
+ *  past its margined edge (spot + allowance) — zero when every disc that can touch does.
+ *  Enforced through the dominance tiers, not preferred. */
+function pressExcessMM(contour: Contour, seated: ReadonlyArray<Pt>, reach: number): number {
+  if (!seated.length) return 0
+  let sum = 0
+  for (const s of seated) sum += Math.max(0, edgeDistToContourMM(contour, s) - reach)
+  return sum / seated.length
+}
+
 
 /** Registration + population: which lattice nodes the material supports, and which survive
  *  coverage. The caller shapes the result — layout decides placement, nothing else. */
@@ -236,20 +229,24 @@ export function registerLayout(
     const clsOf = (side: number) => bandOf(legalOfOuterMM(side, pad))?.id ?? BANDS[BANDS.length - 1].id
     const canX = clsOf(bb.maxX - bb.minX) % 2 === 1 ? bxc : bxc + half
     const canY = clsOf(bb.maxY - bb.minY) % 2 === 1 ? byc : byc + half
+    const otherX = canX === bxc ? bxc + half : bxc
+    const otherY = canY === byc ? byc + half : byc
     // canon = how many axes carry their class-derived parity (2 = the full canonical frame).
-    // THE MAX-COUNT WINNER IS DELETED (Dan, 2026-08-29: "no max-count prefilter · no hidden
-    // winner · never hide a lawful result because another has a higher count"). It built all four
-    // of these, compared seat counts, then canonical parity, then press excess, and returned ONE —
-    // three lawful registrations destroyed before wrap ever saw them. Measured on a 168mm square at
-    // 12mm padding it kept 16 magnets and silently dropped the 12, 12 and 9.
-    //
-    // Registration is the PIPELINE's to enumerate now, and it tries all four. What remains here is
-    // the door's display seating, and it takes the CANONICAL parity — the one Dan's centre-rules
-    // law names (odd line count puts a node on the centre, even puts the gap on it). That is a
-    // stated rule rather than a hidden contest, and it decides nothing the pipeline offers.
-    const ox = mod(canX, pitch), oy = mod(canY, pitch)
-    bestSeated = latticeAt(bb, pitch, ox, oy).filter(fits)
-    bestOx = ox; bestOy = oy
+    const cands: Array<[number, number, number]> = [
+      [canX, canY, 2], [otherX, canY, 1], [canX, otherY, 1], [otherX, otherY, 0],
+    ]
+    let best: { seats: number; canon: number; excess: number } | null = null
+    for (const [px, py, canon] of cands) {
+      const ox = mod(px, pitch), oy = mod(py, pitch)
+      const seat = latticeAt(bb, pitch, ox, oy).filter(fits)
+      if (!seat.length) continue
+      const excess = pressExcessMM(contourMM, seat, reach)
+      const wins = !best
+        || seat.length > best.seats
+        || (seat.length === best.seats && canon > best.canon)
+        || (seat.length === best.seats && canon === best.canon && excess < best.excess)
+      if (wins) { best = { seats: seat.length, canon, excess }; bestSeated = seat; bestOx = ox; bestOy = oy }
+    }
     mainCentre = ruleTarget
   }
 
@@ -269,6 +266,20 @@ export function applyCoverage(
   return { seated, interior: [] }
 }
 
-// fallbackRevealSizes and bestSeatedCandidate are DELETED with the sweep that called them: one
-// generated a size per millimetre across a band, the other picked the fullest seating as a
-// calibration witness. Both existed only to serve discovery, and the pipeline looks layouts up.
+/** The fallback population is LAYOUT'S, not the sequencer's. It generates candidate sizes across
+ *  the band from the ruled snap step — never a private threshold invented at the call site. */
+export function fallbackRevealSizes(loMM: number, hiMM: number): number[] {
+  const out: number[] = []
+  for (let mm = loMM; mm <= hiMM + 1e-9; mm += SNAP_STEP_MM) out.push(mm)
+  return out
+}
+
+/** Selecting the calibration witness is layout's too: the candidate the material carries most of.
+ *  It is evidence, never an offer — judge alone decides what is lawful. */
+export function bestSeatedCandidate<T extends { points: ReadonlyArray<Pt> }>(
+  candidates: ReadonlyArray<T>,
+): T | null {
+  let best: T | null = null
+  for (const c of candidates) if (!best || c.points.length > best.points.length) best = c
+  return best
+}

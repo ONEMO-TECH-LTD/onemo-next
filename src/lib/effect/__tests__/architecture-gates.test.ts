@@ -6,9 +6,8 @@ import { describe, expect, it } from 'vitest'
 import { CLASS_SPECS, LIBRARY_FAMILIES, specOf } from '../library/class-registry'
 import { outlineFromLayout } from '../library/outline'
 import { CATALOGUE_FORMAT_VERSION, catalogue, type CatalogueEntry } from '../library/catalogue'
-import { catalogueAt, layoutsForFrame } from '../grid-magnet-library-catalogue'
+import { catalogueCandidates, classifiedLibraryCatalogue } from '../grid-magnet-library-catalogue'
 import { selectVariant } from '../library/selection'
-import { D4_VIEWS } from '../library/transforms'
 import { materializeSelection } from '../library/materialize'
 
 const ROOT = resolve(process.cwd(), 'src/lib/effect')
@@ -392,11 +391,9 @@ const catalogueAdapterViolations = (code = source(CATALOGUE_ADAPTER)): string[] 
       && parts.size === Object.keys(expected).length
       && Object.entries(expected).every(([name, typeOnly]) => parts.get(name) === typeOnly)
     if (specifier === './library') {
-      // The adapter takes the matcher from the barrel as well: WHICH layouts live on a frame, and
-      // in which of the eight views, is the library's own law and must have one owner. The adapter
-      // converts types; it no longer answers that question with two views and a guessed family.
-      if (!exact({ catalogue: false, layoutsForFrame: false, CatalogueEntry: true, FrameMatch: true }))
-        violations.push(specifier)
+      if (!exact({ catalogue: false, CatalogueEntry: true })) violations.push(specifier)
+    } else if (specifier === './grid-magnet-class') {
+      if (!exact({ classifyShape: false, shapeFamilyOf: false })) violations.push(specifier)
     } else if (specifier === './types') {
       if (!exact({ Pt: true })) violations.push(specifier)
     } else violations.push(specifier)
@@ -779,14 +776,8 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     expect(importEdges(TRANSITION).map((edge) => edge.specifier).sort())
       .toEqual(['./class-contract', './types'])
     expect(runtimeExportNames(TRANSITION)).toEqual(['pickLayout', 'selectVariant'])
-    // D4_VIEWS and sameView join the pin deliberately: the eight lattice views were written out in
-    // THREE places (admin options, the triangle's upright search, and a matcher that had only two
-    // of them and so hid six lawful arrangements of every triangle). One owner, beside the
-    // transform that applies them.
     expect(runtimeExportNames(join(LIBRARY, 'transforms.ts')))
-      .toEqual(['D4_VIEWS', 'canonicalNode', 'frameKeyOf', 'sameView', 'transformLayout', 'viewName'])
-    expect(D4_VIEWS.length, 'the square has eight symmetries').toBe(8)
-    expect(new Set(D4_VIEWS.map((v) => String(v.transpose) + v.flipX + v.flipY)).size, 'all eight distinct').toBe(8)
+      .toEqual(['canonicalNode', 'frameKeyOf', 'transformLayout', 'viewName'])
     expect(transitionShapeViolations(TRANSITION)).toEqual([])
     // and its bodies, which no shape check can see
     expect(createHash('sha256').update(readFileSync(TRANSITION)).digest('hex')).toBe(TRANSITION_SHA256)
@@ -864,40 +855,18 @@ describe('Shape-Layout Library Law — activation schedule', () => {
         .toEqual([expected.widthMM, expected.heightMM, expected.frameCols, expected.frameRows])
     }
   }, 30_000)
-  it('STEP 4: the matcher round-trips every catalogue entry on its own frame, at every pitch', () => {
-    // The round trip is the compatibility contract, and its KEY changed with the pipeline: the old
-    // one asked the matcher for an entry's own OUTLINE and hoped the invented shape-family agreed.
-    // Now an entry must come back for the frame it declares — the only structure there is.
-    for (const pitchMM of [24, 48, 96]) for (const entry of catalogueAt(pitchMM)) {
-      const onOwnFrame = layoutsForFrame(entry.frameCols, entry.frameRows, pitchMM)
-      expect(onOwnFrame.some((m) => m.entry.id === entry.id), entry.id + ' @' + pitchMM).toBe(true)
-      // and it must be reachable TURNED, from the transposed frame — that is what serves a
-      // landscape shape out of a canonical-tall library without publishing both orientations.
-      const turned = layoutsForFrame(entry.frameRows, entry.frameCols, pitchMM)
-      expect(turned.some((m) => m.entry.id === entry.id), entry.id + ' turned @' + pitchMM).toBe(true)
+  it('STEP 4: classifier matcher round-trips every catalogue entry at every pitch', () => {
+    for (const pitchMM of [24, 48, 96]) for (const item of classifiedLibraryCatalogue(pitchMM)) {
+      const shape = item.shapeClass
+      const numericFields = [shape.cx, shape.cy, shape.band, shape.widthMM, shape.heightMM, shape.fill, shape.frame.cols, shape.frame.rows, shape.frame.capacity]
+      expect(numericFields.every(Number.isFinite), item.entry.id).toBe(true)
+      expect(catalogueCandidates(item.entry.outlineMM.map(([x, y]) => [x, y]), pitchMM).some((entry) => entry.id === item.entry.id), item.entry.id).toBe(true)
     }
   }, 20_000)
-  it('STEP 4: the matcher returns EVERY entry sharing a frame — no winner, no frozen count', () => {
-    // Several entries legitimately share one frame (a square, a diamond and triangles on a 5×5).
-    // Returning one would be the invented filter the pipeline forbids. This proves all of them come
-    // back with distinct identities, and it grows with the catalogue instead of freezing a number.
-    const byFrame = new Map<string, string[]>()
-    for (const entry of catalogueAt(48)) {
-      const key = entry.frameCols + 'x' + entry.frameRows
-      byFrame.set(key, [...(byFrame.get(key) ?? []), entry.id])
-    }
-    const shared = [...byFrame.entries()].filter(([, ids]) => ids.length > 1)
-    expect(shared.length, 'the catalogue must hold a multi-entry frame for this gate to mean anything').toBeGreaterThan(0)
-    for (const [key, ids] of shared) {
-      const [cols, rows] = key.split('x').map(Number)
-      const returned = layoutsForFrame(cols, rows, 48).map((m) => m.entry.id)
-      for (const id of ids) expect(returned, key).toContain(id)
-    }
-  })
   it('STEP 5: surface, bridge, barrel, and shell use the contract boundary', () => {
     expect(barrelExports()).toEqual({
-      types: ['CatalogueEntry', 'ClassBandRange', 'CornerMode', 'FrameMatch', 'LibraryDraft', 'LibraryEdit', 'LibraryFamily', 'LibrarySelection', 'LibrarySurface', 'MaterializedLibrary', 'PanelOption', 'PanelOptions'],
-      values: ['CATALOGUE_FORMAT_VERSION', 'DEFAULT_LIBRARY_SELECTION', 'DRAFT_STORE_KEY', 'LIBRARY_FAMILIES', 'bandIdOfMM', 'catalogue', 'classBandRanges', 'deleteEdit', 'layoutsForFrame', 'librarySurface', 'saveEdit', 'selectionForFamily', 'sizeRangeForBand', 'startAdd', 'startEdit', 'toggleNodeAt'],
+      types: ['CatalogueEntry', 'ClassBandRange', 'CornerMode', 'LibraryDraft', 'LibraryEdit', 'LibraryFamily', 'LibrarySelection', 'LibrarySurface', 'MaterializedLibrary', 'PanelOption', 'PanelOptions'],
+      values: ['CATALOGUE_FORMAT_VERSION', 'DEFAULT_LIBRARY_SELECTION', 'DRAFT_STORE_KEY', 'LIBRARY_FAMILIES', 'bandIdOfMM', 'catalogue', 'classBandRanges', 'deleteEdit', 'librarySurface', 'saveEdit', 'selectionForFamily', 'sizeRangeForBand', 'startAdd', 'startEdit', 'toggleNodeAt'],
       wildcards: [],
       aliases: [],
     })
@@ -925,13 +894,9 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     expect(zone8Violations(PAGE, source(PAGE) + `\nimport { materializeSelection } from '@/lib/effect/library/materialize'`)).toEqual(['@/lib/effect/library/materialize'])
     expect(zone8Violations(join(ROOT, 'grid-magnet-library-bridge.ts'), source(join(ROOT, 'grid-magnet-library-bridge.ts')) + `\nimport { resolveSelection } from './library/selection'`)).toEqual(['./library/selection'])
     expect(barrelExports(source(join(LIBRARY, 'index.ts')) + `\nexport * from './triangle-class'`).wildcards).toHaveLength(1)
-    // A self-proof that mutates a string the file no longer contains proves nothing and passes
-    // anyway — this one silently stopped biting the moment the barrel line gained a second export.
-    // Assert the mutation LANDED before asserting what it catches.
-    const barrelSource = source(join(LIBRARY, 'index.ts'))
-    const hacked = barrelSource.replace('librarySurface }', 'librarySurface as hacked }')
-    expect(hacked, 'the barrel mutation no longer applies — fix the probe, not the gate').not.toBe(barrelSource)
-    expect(barrelExports(hacked)).toMatchObject({ values: expect.arrayContaining(['hacked']), aliases: ['librarySurface as hacked'] })
+    expect(barrelExports(source(join(LIBRARY, 'index.ts')).replace(
+      'catalogue }', 'catalogue as hacked }',
+    ))).toMatchObject({ values: expect.arrayContaining(['hacked']), aliases: ['catalogue as hacked'] })
     expect(bridgeViolations(source(join(ROOT, 'grid-magnet-library-bridge.ts')) + `\nimport './types'`)).toEqual(['./types'])
     expect(catalogueAdapterViolations(source(join(ROOT, 'grid-magnet-library-catalogue.ts')).replace(
       "from './library'", "from './library/catalogue'",

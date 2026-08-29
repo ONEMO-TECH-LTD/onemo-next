@@ -16,26 +16,6 @@ export function transformLayout(
 
 export function frameKeyOf(f: FrameExtent): string { return f.cols + 'x' + f.rows }
 
-/** THE EIGHT LATTICE VIEWS — the square's symmetry group, and the only ways a layout may be
- *  turned. One owner, here beside the transform that applies them: the same eight were written
- *  out three times (the admin options, the triangle's upright search, and — the one that mattered
- *  — the matcher, which had only two of them and so hid six lawful arrangements of every triangle
- *  it offered). A layout and its mirror are different magnet sets, and Dan ruled they stay. */
-export const D4_VIEWS: readonly LibraryTransform[] = Object.freeze([
-  { transpose: false, flipX: false, flipY: false },
-  { transpose: false, flipX: true, flipY: false },
-  { transpose: false, flipX: false, flipY: true },
-  { transpose: false, flipX: true, flipY: true },
-  { transpose: true, flipX: false, flipY: false },
-  { transpose: true, flipX: true, flipY: false },
-  { transpose: true, flipX: false, flipY: true },
-  { transpose: true, flipX: true, flipY: true },
-].map((v) => Object.freeze(v)))
-
-/** Two views are the same view. */
-export const sameView = (a: LibraryTransform, b: LibraryTransform): boolean =>
-  a.transpose === b.transpose && a.flipX === b.flipX && a.flipY === b.flipY
-
 /** The inverse of transformLayout for ONE node: a view-space node back to canonical.
  *  Undo in reverse order — flipY, then flipX (both against the TRANSFORMED dimensions),
  *  then the transpose. Authoring picks land in view space; the corpus and every draft are
