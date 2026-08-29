@@ -133,10 +133,11 @@ export function wrapBandLadder(
     const group = pts.map(([x, y]) => [x - cx, y - cy] as Pt)
     const solved = wrapGroup(sized, wcfg, group, minMM, hiMM)
     if (!solved) continue
-    if (!inBand(solved.sizeMM, loMM, hiMM)) continue   // judge: another band owns it
+    const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
     // The set was revealed at `mm` and the shape then shrank onto it. Ask the material once more,
     // at the size that actually shipped, so no lattice position sits empty inside it.
-    const at = completeAt(sized, solved, pitch, Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM))
+    const at = completeAt(sized, solved, pitch, pad)
+    if (!inBand(at.sizeMM, loMM, hiMM)) continue   // judge: another band owns it
     // Two reveals can complete to the same answer, so what is OFFERED is deduped on what ships.
     const settled = shippedIdentity(at.sizeMM, at.points)
     if (shipped.has(settled)) continue

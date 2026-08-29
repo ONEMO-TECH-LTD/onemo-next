@@ -82,6 +82,12 @@ function pickOrigin(valid: Paths64, towards: Pt): Pt {
   return best
 }
 
+/** How far the group's own middle sits from the governed centre — wrap's deviation measurement,
+ *  in one place. A population offered at a size wrap did not solve for needs it computed there. */
+export function centreOffsetMM(midMM: Pt, anchorMM: Pt): number {
+  return Math.round(Math.hypot(midMM[0] - anchorMM[0], midMM[1] - anchorMM[1]) * 10) / 10
+}
+
 /** Each magnet's gap past its own margined edge — the wrap measurement, in ONE place. The
  *  sequencer needs it again when the population is completed at the shipped size, and a second
  *  copy of this expression is exactly the duplication this module was split to remove. */
@@ -143,7 +149,7 @@ export function wrapGroup(
   return {
     count: pts.length,
     sizeMM: Math.round(hi * 100) / 100,
-    centreOffMM: Math.round(Math.hypot(finalMid[0] - anchor[0], finalMid[1] - anchor[1]) * 10) / 10,
+    centreOffMM: centreOffsetMM(finalMid, anchor),
     points: pts,
     originMM: origin,
     anchorMM: anchor,
