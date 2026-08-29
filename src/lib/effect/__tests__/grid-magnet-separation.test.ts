@@ -18,6 +18,9 @@ import { scaleContour } from '../grid-magnet-compute'
 import { makeCircleSeatPredicate, makeContourSeatPredicate } from '../units/layout'
 import { wrapGroup } from '../units/wrap'
 import { runPipeline } from '../pipeline'
+import { frameOfMasses } from '../units/classifier'
+import { bandOuterMM } from '../units/layout'
+import type { BBox, SafeMass, SafeSegment } from '../types'
 import { contourCentroidOf } from '../units/centring'
 import { safeSegments } from '../units/segment'
 import { contourCacheKey, makeSizer } from '../grid-magnet-bridge'
@@ -609,6 +612,89 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
       for (const o of a.omitted) expect(o.reason).toBe('outside-safe-area')
     }
   }, 30_000)
+
+  it('COUNTEREXAMPLE: a dead legal island never becomes classifier mass', () => {
+    // Restore `segment.masses.length ? segment.masses : [segment]` and this dies. Without it the
+    // whole point of the mass union is lost: a dead arm IS a legal segment holding no mass.
+    const live: SafeMass = {
+      areaMM2: 9216, centreMM: [48, 48], peakClearMM: 48,
+      bbox: { minX: 0, minY: 0, maxX: 96, maxY: 96 }, rings: [],
+    }
+    const segment = (bbox: BBox, masses: SafeMass[]): SafeSegment => ({
+      areaMM2: (bbox.maxX - bbox.minX) * (bbox.maxY - bbox.minY),
+      centreMM: [(bbox.minX + bbox.maxX) / 2, (bbox.minY + bbox.maxY) / 2],
+      meanMM: [(bbox.minX + bbox.maxX) / 2, (bbox.minY + bbox.maxY) / 2],
+      peakClearMM: 3, bbox, rings: [], masses,
+    })
+    expect(frameOfMasses([
+      segment(live.bbox, [live]),
+      segment({ minX: 120, minY: 0, maxX: 360, maxY: 30 }, []),
+    ], 48)).toMatchObject({ cols: 3, rows: 3, widthMM: 96, heightMM: 96 })
+  })
+
+  it('COUNTEREXAMPLE: a pointed shape is calibrated by measured legal span, not outline arithmetic', () => {
+    // Restore `classifiedAtMM = span.maxMM` and this dies. A star at B4's nominal outline top shows
+    // only ~120mm of legal span — three bands adrift — so it could never be offered a B4 layout.
+    const star = (mm: number): Contour => {
+      const pts: Pt[] = []
+      for (let i = 0; i < 10; i++) {
+        const t = (i / 10) * Math.PI * 2 - Math.PI / 2
+        const r = (i % 2 === 0 ? 0.5 : 0.22) * mm
+        pts.push([mm / 2 + r * Math.cos(t), mm / 2 + r * Math.sin(t)] as Pt)
+      }
+      return { outer: { pts }, holes: [] }
+    }
+    const solve = runPipeline({ sized: star, bandId: 4, paddingMM: 12, pitchMM: 48 })
+    expect(solve.frame, 'the star must classify').not.toBeNull()
+    const segs = safeSegments(star(solve.classifiedAtMM), 12, 16, 'light')
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    for (const sg of segs) {
+      minX = Math.min(minX, sg.bbox.minX); minY = Math.min(minY, sg.bbox.minY)
+      maxX = Math.max(maxX, sg.bbox.maxX); maxY = Math.max(maxY, sg.bbox.maxY)
+    }
+    const legalSpan = Math.max(maxX - minX, maxY - minY)
+    expect(legalSpan, 'calibration must reach the band ceiling').toBeGreaterThanOrEqual(190)
+    // and it must have had to grow PAST the naive outline conversion to get there
+    expect(solve.classifiedAtMM).toBeGreaterThan(bandOuterMM(BANDS[3], 12).maxMM)
+  }, 60_000)
+
+  it('COUNTEREXAMPLE: a registration that seats nothing is still reported', () => {
+    // Restore `if (!seatedMM.length) continue` and this dies. A hidden registration made the bench
+    // claim four grid positions while rendering two.
+    const tiny = (mm: number): Contour => {
+      const pts: Pt[] = []
+      for (let i = 0; i < 48; i++) {
+        const t = (i / 48) * Math.PI * 2
+        pts.push([mm / 2 + (mm / 2) * Math.cos(t), mm / 2 + (mm / 2) * Math.sin(t)] as Pt)
+      }
+      return { outer: { pts }, holes: [] }
+    }
+    const solve = runPipeline({ sized: tiny, bandId: 1, paddingMM: 12, pitchMM: 48 })
+    expect(solve.attempts.length % 4, 'every match must appear at all four registrations').toBe(0)
+    expect(solve.attempts.some((a) => a.seatedMM.length === 0),
+      'a band-1 circle cannot seat a half-step registration — that row must still exist').toBe(true)
+    for (const a of solve.attempts)
+      expect(a.seatedMM.length + a.omitted.length, a.attemptId).toBe(a.attempted)
+  }, 60_000)
+
+  it('COUNTEREXAMPLE: an unknown band fails loud instead of becoming B1', () => {
+    // Restore `?? BANDS[0]` and this dies. Asking for band 999 and band 1 returned identical
+    // answers — a wrong question answered confidently.
+    expect(() => runPipeline({ sized: sq, bandId: 999, paddingMM: 12, pitchMM: 48 }))
+      .toThrow('pipeline: unknown band 999')
+  })
+
+  it('COUNTEREXAMPLE: every attempt carries a stable identity, so nothing is chosen by position', () => {
+    // Restore index-based selection and this dies: ids must be unique and stable across runs, which
+    // is what lets the shell select without ranking.
+    const a = runPipeline({ sized: sq, bandId: 3, paddingMM: 12, pitchMM: 48 })
+    const b = runPipeline({ sized: sq, bandId: 3, paddingMM: 12, pitchMM: 48 })
+    const ids = a.attempts.map((x) => x.attemptId)
+    expect(new Set(ids).size, 'attempt ids must be unique').toBe(ids.length)
+    expect(b.attempts.map((x) => x.attemptId), 'and stable between runs').toEqual(ids)
+    for (const x of a.attempts)
+      expect(x.attemptId).toBe(x.entryId + '|' + x.viewId + '|' + x.registrationMM.join(','))
+  }, 60_000)
 
   it('the pipeline runs headless and sorts nothing', () => {
     // This lane's deliverable is an engine that answers from a plain test with no browser. It also
