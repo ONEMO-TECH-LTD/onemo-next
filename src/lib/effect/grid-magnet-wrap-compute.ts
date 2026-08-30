@@ -136,16 +136,7 @@ export function wrapBandLadder(
     return { at, revealMM, roles: [] }
   }
 
-  // THE CANON GOES INTO THE SWEEPER WHOLE. Dan, 2026-08-30: "build canon route into the sweeper
-  // and let sweeper not run full guess work but fine tune it to fit ... the max and min wrap count
-  // are comparables as fall backs."
-  //
-  // wrapGroup IS that fine-tuning: it takes the group whole, bisects the size between the floor
-  // and the band top, and computes every lawful origin the whole group can sit at. Nothing is
-  // dropped before it runs — thinning a GIVEN arrangement is destruction, not processing, and it
-  // is what made "8 refused" mean "8 did not land at the sizes I tried" rather than "8 cannot be
-  // held". If the whole canon cannot be held anywhere in the band there is simply no optimal row;
-  // fewest and most are the fallback comparables.
+  // THE OPTIMAL, FIRST. Same wrap, same laws — it just gets asked before anything is discovered.
   const optimal = optimalNodesMM?.length ? attempt(optimalNodesMM, loMM) : null
 
   // THE WALK, unchanged in range and method. Every lawful registration at each size is collected,

@@ -670,20 +670,16 @@ describe('1b — the frame comes from the usable material', () => {
       return { solve, optimal }
     }
 
-    // B4 — THE CANON GOES IN WHOLE (Dan, 2026-08-30: "build canon route into the sweeper and let
-    // sweeper not run full guess work but fine tune it to fit ... the max and min wrap count are
-    // comparables as fall backs"). The 4x4 is sixteen magnets and it arrives as sixteen: nothing
-    // thins a GIVEN arrangement before the wrap has been asked whether a size and position exist
-    // where all of it holds. Fewest and most are the walk's own answers, the fallback comparables.
+    // B4 — three distinct answers. The counts are pinned because they are the whole point: the
+    // FEWEST is 10, and 10 is only reachable because every registration now survives. Winner-only
+    // cannot produce it — that path keeps the fullest at each size, so its fewest is 12.
     const b4 = solveBand(4)
-    expect(b4.solve.offers.map((o) => o.at.count), 'B4 counts').toEqual([16, 10, 12])
+    expect(b4.solve.offers.map((o) => o.at.count), 'B4 optimal / fewest / most').toEqual([16, 10, 12])
+    // every row states WHY it is on the list — the order alone is not the answer
     expect(b4.solve.offers.map((o) => o.roles.join('+')), 'B4 roles')
       .toEqual(['optimal', 'fewest', 'most'])
-    expect(b4.solve.offers[0].at.count, 'the canon was thinned on its way in').toBe(
-      b4.optimal!.nodesMM.length)
-    // the FEWEST is 10, and 10 is only reachable because every registration now survives.
-    // Winner-only cannot produce it — that path keeps the fullest at each size, so its fewest is 12.
-    expect(b4.solve.offers[1].at.count, 'fewest came from a sparse registration').toBe(10)
+    expect(b4.solve.offers[0].at.count, 'the first row must be the canon layout')
+      .toBe(b4.optimal!.nodesMM.length)
 
     // B2 — the optimal IS the fullest, so those two rows are the same answer and COLLAPSE to one.
     // This is the case that proves the collapse: without it the same answer appears twice.
