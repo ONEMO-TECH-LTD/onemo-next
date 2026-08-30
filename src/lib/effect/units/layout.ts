@@ -174,6 +174,13 @@ interface LayoutPlacement {
    *  So they are RETURNED. The winner is unchanged and still drives the drawn answer; this is the
    *  work the function already did and threw away. */
   seatings: Pt[][]
+  /** THE SUGGESTED LAYOUT, seated from the SAME four positions. Dan, 2026-08-30: "if we provide
+   *  suggested layout as starting point for optimal search but keep the rest as is for the search."
+   *
+   *  So the only difference between this and `seatings` is what the search STARTS from — the whole
+   *  lattice there, the layout's own spots here. Same positions, same fits test, same everything
+   *  after. Empty unless a layout was handed in. */
+  canonSeatings: Pt[][]
 }
 
 /** THE WRAP LAW (Dan, 2026-08-20: "0 flap means magnets and edges touch"): wrap is each
@@ -192,6 +199,8 @@ function pressExcessMM(contour: Contour, seated: ReadonlyArray<Pt>, reach: numbe
  *  coverage. The caller shapes the result — layout decides placement, nothing else. */
 export function registerLayout(
   contourMM: Contour, cfg: GridConfig, given: { segments: SafeSegment[]; centres: Pt[]; ruleTarget: Pt },
+  /** A suggested layout's node offsets about its own middle — the search's starting points. */
+  canonLocalMM?: ReadonlyArray<Pt>,
 ): LayoutPlacement {
   const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
   const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
@@ -218,6 +227,7 @@ export function registerLayout(
 
   let bestSeated: Pt[] = []
   const seatings: Pt[][] = []
+  const canonSeatings: Pt[][] = []
   let bestOx = 0, bestOy = 0, bestKx = 0, bestKy = 0
   let mainCentre: Pt = centres[0]
   if (fits && cfg.forcePhaseMM) {
@@ -249,6 +259,15 @@ export function registerLayout(
     let best: { seats: number; canon: number; excess: number } | null = null
     for (const [px, py, canon] of cands) {
       const ox = mod(px, pitch), oy = mod(py, pitch)
+      // The suggested layout starts from THIS position, displaced exactly as this candidate is
+      // from the canonical parity — so it gets all four, like the lattice does. Nothing else:
+      // no ranking here, no thinning, no coverage. Just which of its spots the material holds.
+      if (canonLocalMM?.length) {
+        const held = canonLocalMM
+          .map(([lx, ly]) => [ruleTarget[0] + (px - bxc) + lx, ruleTarget[1] + (py - byc) + ly] as Pt)
+          .filter(fits)
+        if (held.length) canonSeatings.push(held)
+      }
       const seat = latticeAt(bb, pitch, ox, oy).filter(fits)
       if (!seat.length) continue
       seatings.push(seat)
@@ -263,7 +282,7 @@ export function registerLayout(
   }
 
   return { bb, pitch, reach, plan, perimeterOnly, outer, fits, segments, centres, ruleTarget,
-    bestSeated, bestOx, bestOy, bestKx, bestKy, mainCentre, seatings }
+    bestSeated, bestOx, bestOy, bestKx, bestKy, mainCentre, seatings, canonSeatings }
 }
 
 /** Perimeter belt: with >4 seated, drop fully-surrounded interior nodes, never below the minimum. */

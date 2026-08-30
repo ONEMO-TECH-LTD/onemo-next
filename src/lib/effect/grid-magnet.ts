@@ -90,7 +90,11 @@ export function classifyBands(
 }
 
 
-export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResult {
+export function computeGrid(
+  contourMM: Contour, cfg: GridConfig = {},
+  /** A suggested layout's offsets about its own middle — the search's starting points. */
+  canonLocalMM?: ReadonlyArray<Pt>,
+): GridResult {
   // Placement is layout's; this door only shapes the result the bench and the ladder read.
   // Until the pipeline module exists (S3) this door sequences the units: segment measures, centring
   // names the target, layout places. No unit reaches sideways for any of it.
@@ -107,8 +111,9 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const ruleTarget0: Pt = cfg.centreOverrideMM ?? (mode0 === 2 ? (governMass(masses0, gov0, midY0)?.centreMM ?? centres0[0]) : centres0[0])
 
   const { bb, pitch, reach, plan, perimeterOnly, outer, segments, ruleTarget,
-    bestSeated, bestOx, bestOy, bestKx, bestKy, mainCentre, seatings } =
-    registerLayout(contourMM, cfg, { segments: segments0, centres: centres0, ruleTarget: ruleTarget0 })
+    bestSeated, bestOx, bestOy, bestKx, bestKy, mainCentre, seatings, canonSeatings } =
+    registerLayout(contourMM, cfg, { segments: segments0, centres: centres0, ruleTarget: ruleTarget0 },
+      canonLocalMM)
 
   const lattice = latticeAt(bb, pitch, bestOx, bestOy)
 
@@ -130,6 +135,9 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     centreMainMM: mainCentre,
     // the same coverage rule the drawn answer gets, so the sparse registrations are comparable
     seatings: seatings.map((seat) => applyCoverage(seat, perimeterOnly, pitch).seated),
+    // NO BELT ON THE SUGGESTED LAYOUT: a 3x3 IS nine magnets, and thinning it to a ring means the
+    // answer returned is not the record that was looked up.
+    canonSeatings,
   }
 }
 

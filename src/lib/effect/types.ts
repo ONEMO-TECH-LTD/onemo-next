@@ -170,6 +170,8 @@ export interface GridResult {
    *  always built these and kept only the fullest; the MIN answer cannot exist while the sparse
    *  ones are discarded before anything can look at them. `anchors` is still the winner. */
   seatings: Pt[][]
+  /** The suggested layout seated at the same four positions — empty unless one was handed in. */
+  canonSeatings: Pt[][]
 }
 
 export type CentreMode = 0 | 1 | 2 | 3 | 4 | 5

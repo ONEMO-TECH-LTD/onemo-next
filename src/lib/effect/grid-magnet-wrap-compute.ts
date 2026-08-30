@@ -63,6 +63,7 @@ export function wrapGrid(
       centresMM: [at.anchorMM],
       centreMainMM: at.anchorMM,
       seatings: [],   // display of a settled answer; the registrations were spent upstream
+      canonSeatings: [],
     },
   }
 }
@@ -136,13 +137,28 @@ export function wrapBandLadder(
     return { at, revealMM, roles: [] }
   }
 
-  // THE OPTIMAL, FIRST. Same wrap, same laws — it just gets asked before anything is discovered.
-  const optimal = optimalNodesMM?.length ? attempt(optimalNodesMM, loMM) : null
+  // THE SUGGESTED LAYOUT IS THE SEARCH'S STARTING POINT — not a second search. Dan, 2026-08-30:
+  // "make canon just an anchor that plugs in the free search that fine tunes", and "if we provide
+  // suggested layout as starting point for optimal search but keep the rest as is for the search."
+  //
+  // It is handed to the SAME computeGrid the walk already calls, at the SAME sizes, and comes back
+  // seated at the SAME four positions the centre rule produces. The only difference from the free
+  // search is where it starts: the layout's own spots instead of the whole lattice. Everything
+  // after — the fits test, the wrap, the band rule — is the identical code path.
+  //
+  // Three previous attempts gave the canon its own machinery instead. This gives it none.
+  const canonLocal = optimalNodesMM?.length ? localise(optimalNodesMM) : undefined
+  const canonRungs: BandRung[] = []
+  /** Its OWN dedup set, so it never collides with the free search's pool. The walk drops repeats
+   *  before wrapping and this must too: without it the same landing is wrapped once per size —
+   *  ~192 solves instead of a handful, which does not fail, it hangs. */
+  const canonSeen = new Set<string>()
 
   // THE WALK, unchanged in range and method. Every lawful registration at each size is collected,
   // not only the fullest, or the MIN answer below could never exist.
   for (const mm of fallbackRevealSizes(loMM, hiMM)) {
-    const grid = computeGrid(sized(mm), anchorAtMM ? { ...scanCfg, centreOverrideMM: anchorAtMM(mm) } : scanCfg)
+    const grid = computeGrid(sized(mm),
+      anchorAtMM ? { ...scanCfg, centreOverrideMM: anchorAtMM(mm) } : scanCfg, canonLocal)
     const drawn = grid.anchors.map((a) => a.p)
     if (drawn.length) witnesses.push({ revealMM: mm, points: drawn })
     for (const pts of grid.seatings.length ? grid.seatings : [drawn]) {
@@ -153,7 +169,22 @@ export function wrapBandLadder(
       const rung = attempt(pts, mm)
       if (rung) rungs.push(rung)
     }
+    // The suggested layout's own landings, kept SEPARATE so MIN and MAX are drawn from exactly the
+    // pool they are drawn from today. Same attempt, same wrap, same band rule.
+    for (const pts of grid.canonSeatings) {
+      if (!pts.length) continue
+      const id = identityOf(pts)
+      if (canonSeen.has(id)) continue
+      canonSeen.add(id)
+      const rung = attempt(pts, mm)
+      if (rung) canonRungs.push(rung)
+    }
   }
+
+  // Of the suggested layout's landings, the one holding most of it; tightest breaks a tie. This is
+  // the one judgement in the path and it is Dan's own max-count rule, narrowed to the canon.
+  const optimal: BandRung | null = canonRungs
+    .sort((a, b) => b.at.count - a.at.count || a.at.sizeMM - b.at.sizeMM)[0] ?? null
 
   // MIN and MAX magnets in the range, from what the walk actually found. Dan's own words for
   // them, restored 2026-08-30 — they had been renamed to fewest/most, which he never asked for.

@@ -38,6 +38,7 @@ export function libraryStageModel(materialized: MaterializedLibrary, pitchMM: nu
     centresMM: [],
     centreMainMM: [(materialized.frameCols - 1) * pitchMM / 2, (materialized.frameRows - 1) * pitchMM / 2],
     seatings: [],   // a library record is one authored population; nothing was registered
+    canonSeatings: [],
   }
   return { contour, grid, error: materialized.error }
 }
