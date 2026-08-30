@@ -6,7 +6,7 @@
 
 import type { AxisClass, BBox, FrameKind, Pt, SafeSegment, ShapeClass } from '../types'
 import { bbox } from '../foundation/geometry'
-import { DEFAULT_PITCH_MM, MIN_EFFECT_MM } from '../grid-magnet-spec'
+import { BAND_STEP_MM, DEFAULT_PITCH_MM, MIN_EFFECT_MM, type Band } from '../grid-magnet-spec'
 
 // ─── THE FRAME: what the shape's USABLE MATERIAL carries ────────────────────────────────────────
 // Dan's step 1. Everything below the divider is the older outline-bbox classification, which
@@ -54,6 +54,18 @@ export function frameOfMasses(
   if (!box) return null
   const widthMM = box.maxX - box.minX, heightMM = box.maxY - box.minY
   return { cols: positionsAcross(widthMM, pitchMM), rows: positionsAcross(heightMM, pitchMM), widthMM, heightMM }
+}
+
+/** THE TRIAL SIZE a band is classified at — the middle of the outline range that band spans for a
+ *  shape wearing this rim (Dan, 2026-08-30: "size the shape for each mid range value in each band").
+ *
+ *  The middle rather than the floor or the ceiling: the floor under-reveals a shape's material, and
+ *  the ceiling touches the next band. It is a PROBE, not a band assignment — what band a finished
+ *  answer belongs to is decided after the wrap, on its own measured legal extent.
+ *
+ *  A formula, not a table: BANDS runs to B11 and the rim is a caller's value. */
+export function classificationSeedMM(band: Band, paddingMM: number): number {
+  return band.minMM + BAND_STEP_MM / 2 + 2 * paddingMM
 }
 
 /**

@@ -1,16 +1,17 @@
 // solve.worker.ts — runs the grid solve off the main thread. Pure dispatch: the same
 // bridge/engine calls the page used to make inline, nothing computed here.
 
-import { BANDS, bandOuterMM, computeGrid, MIN_EFFECT_MM, type GridConfig } from '@/lib/effect/grid-magnet'
+import { BANDS, bandOuterMM, classifyBands, computeGrid, MIN_EFFECT_MM, type BandClass, type GridConfig } from '@/lib/effect/grid-magnet'
 import { wrapBandLadder, wrapGrid, type BandSolve, type WrapConfig } from '@/lib/effect/grid-magnet-wrap-compute'
 import { bbox, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet-compute'
 import { contourCentroidOf } from '@/lib/effect/units/centring'
 import { anchorBakeOf, anchorFromBake, assignSizes, type AnchorBake, type CentreMode, type Governor, type MagnetPlan } from '@/lib/effect/grid-magnet-logic'
 import { classFrameNodes, shapeFamilyOf, type ShapeFamily } from '@/lib/effect/grid-magnet-class'
+
 import { defaultLanding } from '@/lib/effect/units/judge'
 import { DEFAULT_PITCH_MM, PADDING_FLOOR_MM } from '@/lib/effect/grid-magnet-spec'
 import { contourCacheKey, makeSizer, sizeRange } from '@/lib/effect/grid-magnet-bridge'
-import type { Contour } from '@/lib/effect/types'
+import type { Contour, Pt } from '@/lib/effect/types'
 
 interface SolveRequest {
   id: number
@@ -105,6 +106,10 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       // shape's own rim. A diamond and a square in one band do not share an outline range.
       const span = bandOuterMM(band, Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM))
       const anchorAt = anchorFnFor(sized, cfg, cfgSig, sig)
+      // STEP 1 + 2 — the classifier's own table: at each band's trial size, what frame the shape
+      // carries and where its centre sits. Measured once per shape; it decides nothing here yet.
+      const bandClasses = classifyBands(sized, cfg, anchorAt)
+      const bandClass = bandClasses.find((row) => row.bandId === band.id) ?? null
       const key = JSON.stringify([cfgSig, band.id])
       let solve = rungCache.get(key)
       if (!solve) {
@@ -137,6 +142,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         ctx.postMessage({ id, model: {
           contour: drawn.contour, grid: { ...drawn.grid, anchors, segments },
           effSize: at.sizeMM, ladder, idx, segments, offMM: at.centreOffMM, recog,
+          bandClass, bandClasses,
         } })
         return
       }
@@ -154,6 +160,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       ctx.postMessage({ id, model: {
         contour, grid, effSize: bestSeatedMM, ladder: [], idx: 0, segments: grid.segments,
         offers: [], diagnostic: { reason: 'no-lawful-offer', bestSeatedMM },
+        bandClass, bandClasses,
       } })
     }
   } catch (err) {

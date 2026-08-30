@@ -258,7 +258,10 @@ export default function GridLab() {
   }, [src, preset, gen, p1, p2, sides, points, magic, cutC])
 
   // The solve runs in a worker so the page never freezes; the last result stays up while solving.
-  type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: BandSnapPoint[]; idx: number; segments: SafeSegment[]; stops?: Array<{ press: number; reveal: number }>; offMM?: number; recog?: { family: string; cols: number; rows: number; segWmm: number; segHmm: number } }
+  type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: BandSnapPoint[]; idx: number; segments: SafeSegment[]; stops?: Array<{ press: number; reveal: number }>; offMM?: number; recog?: { family: string; cols: number; rows: number; segWmm: number; segHmm: number }
+    /** STEP 1+2 — what the classifier read at this band's trial size, and the whole table. */
+    bandClass?: { bandId: number; seedMM: number; cols: number; rows: number; anchorMM: Pt; canonId: string | null; canonCount: number | null } | null
+    bandClasses?: Array<{ bandId: number; seedMM: number; cols: number; rows: number; canonCount: number | null }> }
   const [model, setModel] = useState<Model | null>(null)
   const [solving, setSolving] = useState(false)
   // The overlay earns its place only on a REAL wait: it appears after a grace period, so the
@@ -452,6 +455,15 @@ export default function GridLab() {
               </div>
             </div>
             {true && <>
+              {model?.bandClass && <div className="gl-snap">
+                {`class at B${model.bandClass.bandId} · measured at ${Math.round(model.bandClass.seedMM)} mm · `}
+                <b>{model.bandClass.cols}×{model.bandClass.rows}</b>
+                {model.bandClass.cols === model.bandClass.rows ? ' square'
+                  : model.bandClass.rows > model.bandClass.cols ? ' portrait' : ' landscape'}
+                {model.bandClass.canonCount === null
+                  ? ' · no canon layout for that frame'
+                  : ` · canon ${model.bandClass.canonCount}⌾ to try first`}
+              </div>}
               <div className="gl-snap">
                 {manual
                   ? 'manual calibration · double-click the canvas to return to auto'

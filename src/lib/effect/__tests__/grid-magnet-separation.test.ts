@@ -12,7 +12,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
-import { computeGrid } from '../grid-magnet'
+import { classifyBands, computeGrid } from '../grid-magnet'
 import { frameOfMasses, positionsAcross } from '../units/classifier'
 import type { BBox, SafeMass, SafeSegment } from '../types'
 import { BANDS, BAND_STEP_MM } from '../grid-magnet-spec'
@@ -115,7 +115,12 @@ describe('2 — traffic is one-way', () => {
     // segment -> centring -> layout and shapes the result. Sequencing units is what a pipeline
     // does, so this is the one file that may import them — and the unit zone still forbids any
     // unit from importing back.
-    'grid-magnet.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/grid-magnet-compute$/, /^\.\/grid-magnet-logic$/, /^\.\/foundation\/[a-z-]+$/, /^\.\/units\/[a-z-]+$/],
+    //
+    // ONE EDGE ADDED 2026-08-30: the catalogue adapter. Dan: "we need the channel that we use
+    // between catalogue and classifier". Classifying a band and then asking the library what
+    // belongs on that frame is one sequence, and sequencing is this seat's job. The edge is to the
+    // ADAPTER, never to library/** directly — that boundary is unchanged.
+    'grid-magnet.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/grid-magnet-compute$/, /^\.\/grid-magnet-logic$/, /^\.\/grid-magnet-library-catalogue$/, /^\.\/foundation\/[a-z-]+$/, /^\.\/units\/[a-z-]+$/],
     // The two SEQUENCER SEATS may import units (sequencing them is what a pipeline does); both
     // hand over to pipeline/ at S3. Every other retiring file re-exports only.
     'grid-magnet-wrap-compute.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/grid-magnet$/, /^\.\/offset$/, /^\.\/foundation\/[a-z-]+$/, /^\.\/units\/[a-z-]+$/, /^@countertype\/clipper2-ts$/],
@@ -211,7 +216,7 @@ describe('2b — the units are self-sufficient', () => {
 
   it('only the two named sequencer seats hold unit edges, and exactly the pinned ones', () => {
     const TEMPORARY_UNIT_EDGES: Record<string, readonly string[]> = {
-      'grid-magnet.ts': ['./units/centring', './units/layout', './units/segment'],
+      'grid-magnet.ts': ['./units/centring', './units/classifier', './units/layout', './units/segment'],
       'grid-magnet-wrap-compute.ts': ['./units/centring', './units/judge', './units/layout', './units/segment', './units/wrap'],
       'grid-magnet-class.ts': ['./units/classifier'],
       'grid-magnet-compute.ts': ['./units/centring', './units/layout', './units/segment'],
@@ -532,6 +537,8 @@ describe('6 — a supplied hole is material boundary, not decoration', () => {
 })
 
 describe('1b — the frame comes from the usable material', () => {
+  const bandBy = (id: number) => BANDS.find((b) => b.id === id)!
+
   const mass = (bbox: BBox): SafeMass => ({
     areaMM2: (bbox.maxX - bbox.minX) * (bbox.maxY - bbox.minY),
     centreMM: [(bbox.minX + bbox.maxX) / 2, (bbox.minY + bbox.maxY) / 2],
@@ -556,6 +563,60 @@ describe('1b — the frame comes from the usable material', () => {
     // and the same arm ALIVE must be counted — the rule is "is there mass", never "is it far away"
     const withLiveArm = [segment(body, [mass(body)]), segment(deadArm, [mass(deadArm)])]
     expect(frameOfMasses(withLiveArm, 48)).toMatchObject({ cols: 8, rows: 3 })
+  })
+
+  it('STEP 1+2: every band is classified at its own trial size, through REAL segmentation', () => {
+    // Dan, 2026-08-30: "size the shape for each mid range value in each band and define the class
+    // for each and center it". This drives safeSegments for real — the synthetic-mass tests above
+    // cannot see a measurement error, which is exactly how a depth-inset frame went unnoticed.
+    const unit = (mm: number): Contour =>
+      ({ outer: { pts: [[0, 0], [mm, 0], [mm, mm], [0, mm]] as Pt[] }, holes: [] })
+    const rows = classifyBands(unit, { pitchMM: 48, paddingMM: 12 })
+
+    // a square's frame at each band's own midpoint is that band's count, both ways round
+    const seen = new Map(rows.map((r) => [r.bandId, r]))
+    for (const [bandId, n] of [[1, 1], [2, 2], [3, 3], [4, 4], [5, 5]] as [number, number][]) {
+      const row = seen.get(bandId)
+      expect(row, 'B' + bandId + ' must be classified').toBeTruthy()
+      expect([row!.cols, row!.rows], 'B' + bandId + ' at ' + row!.seedMM + 'mm').toEqual([n, n])
+      // and the trial size is the band's MIDDLE, not its floor or its ceiling
+      expect(row!.seedMM, 'B' + bandId + ' trial size').toBe(bandBy(bandId).minMM + 24 + 24)
+    }
+
+    // the canon for that frame is named, and it is the square — never a preset
+    const b3 = seen.get(3)!
+    expect(b3.canonCount, 'a 3x3 canon is nine magnets').toBe(9)
+    expect(b3.canonId, 'canon must be square or rectangle').toMatch(/^(square|rectangle)\//)
+
+    // the centre is the governed one, not the box middle by accident: it is inside the shape
+    expect(b3.anchorMM[0]).toBeGreaterThan(0)
+    expect(b3.anchorMM[0]).toBeLessThan(b3.seedMM)
+
+    // it decides NOTHING: a band the board cannot reach is absent, never invented
+    expect(rows.every((r) => r.seedMM <= 420 + 12), 'a row past the board').toBe(true)
+  })
+
+  it('STEP 1+2: a shape whose material lags its outline classifies LOWER, not by its box', () => {
+    // The whole point of measuring the legal area. A star at B3's trial size carries far less than
+    // a square does at the same size, and the classifier must say so rather than read the outline.
+    const star = (mm: number): Contour => {
+      const pts: Pt[] = []
+      for (let i = 0; i < 10; i++) {
+        const t = (i / 10) * Math.PI * 2 - Math.PI / 2
+        const r = (i % 2 === 0 ? 0.5 : 0.22) * mm
+        pts.push([mm / 2 + r * Math.cos(t), mm / 2 + r * Math.sin(t)] as Pt)
+      }
+      return { outer: { pts }, holes: [] }
+    }
+    const sq = (mm: number): Contour =>
+      ({ outer: { pts: [[0, 0], [mm, 0], [mm, mm], [0, mm]] as Pt[] }, holes: [] })
+    const at = (rows: ReturnType<typeof classifyBands>, id: number) => rows.find((r) => r.bandId === id)
+    const cfg = { pitchMM: 48, paddingMM: 12 }
+    const starB3 = at(classifyBands(star, cfg), 3)!
+    const squareB3 = at(classifyBands(sq, cfg), 3)!
+    expect(squareB3.seedMM, 'both measured at the same trial size').toBe(starB3.seedMM)
+    expect(starB3.cols, 'the star carries less than the square at the same size')
+      .toBeLessThan(squareB3.cols)
   })
 
   it('COUNTEREXAMPLE: the frame counts past five', () => {

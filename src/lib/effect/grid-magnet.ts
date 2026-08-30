@@ -7,12 +7,17 @@
 import type { Contour, GridConfig, GridResult, Pt } from './types'
 export type { GridConfig, GridResult } from './types'
 import { registerLayout } from './units/layout'
+import { classificationSeedMM, frameOfMasses } from './units/classifier'
+import { canonLayoutForFrame } from './grid-magnet-library-catalogue'
 import { safeSegments } from './units/segment'
 import { centeringAnchors, governMass } from './units/centring'
 import { bbox } from './foundation/geometry'
 import { contourCentroidOf } from './units/centring'
-import { latticeAt, spotRadiusOf } from './units/layout'
+import { fieldSpanMM, latticeAt, spotRadiusOf } from './units/layout'
 import {
+  BANDS,
+  DEFAULT_PITCH_MM,
+  SIZE_CEIL_MARGIN_MM,
   CENTRE_MODE,
   GOVERNOR,
   PADDING_FLOOR_MM,
@@ -36,6 +41,61 @@ export {
 export { bandOf, bandOuterMM, legalOfOuterMM, type Anchor, type MagnetDia, type MagnetPlan } from './grid-magnet-logic'
 
 /** Sweep the lattice phase at the placement step (ruled 1mm), seat exactly, score, apply coverage, report. */
+
+
+/** ONE ROW PER BAND — what the classifier tells the band module before it searches.
+ *
+ *  Dan, 2026-08-30: "the classifier loading the shape and identifying the class in each band mid
+ *  trial size and classing them after that centering", so that the band module "must get
+ *  recommendation from the classifier of optimal layout to try first from the canon".
+ *
+ *  It is a NUDGE, not a stage: it decides no size and rejects nothing. The walk still does the
+ *  scaling and wrap still does the fitting. This only says what to reach for first. */
+export interface BandClass {
+  bandId: number
+  /** The trial size this row was measured at — the middle of the band's outline range. */
+  seedMM: number
+  /** The ordered frame the shape's legal area carries there. Order IS the orientation. */
+  cols: number
+  rows: number
+  legalWidthMM: number
+  legalHeightMM: number
+  /** The governed centre at that size — the anchor the canon layout is placed on. */
+  anchorMM: Pt
+  /** The canon square/rectangle for that frame, or null when the board holds no such frame. */
+  canonId: string | null
+  canonCount: number | null
+}
+
+/** Eleven bands, one segmentation each. The caller supplies the anchor query, exactly as wrap
+ *  does — this sequences units, it does not reach sideways for a centre. */
+export function classifyBands(
+  sized: (mm: number) => Contour, cfg: GridConfig, anchorAt?: (mm: number) => Pt,
+): BandClass[] {
+  const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
+  const r = spotRadiusOf(pad)
+  const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
+  const ceilingMM = fieldSpanMM(pad) + SIZE_CEIL_MARGIN_MM
+  const rows: BandClass[] = []
+  for (const band of BANDS) {
+    const seedMM = classificationSeedMM(band, pad)
+    if (seedMM > ceilingMM) continue          // past the board — that band has no trial size
+    const contour = sized(seedMM)
+    const frame = frameOfMasses(safeSegments(contour, r, 'light'), pitch)
+    if (!frame) continue                      // nothing legal at that size: no class to report
+    const bb = bbox(contour.outer.pts)
+    const canon = canonLayoutForFrame(pitch, frame.cols, frame.rows)
+    rows.push({
+      bandId: band.id, seedMM,
+      cols: frame.cols, rows: frame.rows,
+      legalWidthMM: frame.widthMM, legalHeightMM: frame.heightMM,
+      anchorMM: anchorAt ? anchorAt(seedMM) : [(bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2],
+      canonId: canon?.id ?? null,
+      canonCount: canon ? canon.nodesMM.length : null,
+    })
+  }
+  return rows
+}
 
 
 export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResult {
