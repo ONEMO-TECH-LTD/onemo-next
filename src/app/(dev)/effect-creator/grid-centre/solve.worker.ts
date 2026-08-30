@@ -12,7 +12,7 @@ import { classFrameNodes, shapeFamilyOf, type ShapeFamily } from '@/lib/effect/g
 import { defaultLanding } from '@/lib/effect/units/judge'
 import { DEFAULT_PITCH_MM, PADDING_FLOOR_MM } from '@/lib/effect/grid-magnet-spec'
 import { contourCacheKey, makeSizer, sizeRange } from '@/lib/effect/grid-magnet-bridge'
-import type { Contour } from '@/lib/effect/types'
+import type { Contour, Pt } from '@/lib/effect/types'
 
 interface SolveRequest {
   id: number
@@ -122,7 +122,9 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       const key = JSON.stringify([cfgSig, band.id])
       let solve = rungCache.get(key)
       if (!solve) {
-        solve = wrapBandLadder(sized, cfg, span.minMM, span.maxMM, MIN_EFFECT_MM, anchorAt)
+        // the classifier measured the boxes, the lookup named the layout; the ladder tries it first
+        const optimalNodes = optimal?.nodesMM.map(([x, y]) => [x, y] as Pt)
+        solve = wrapBandLadder(sized, cfg, span.minMM, span.maxMM, MIN_EFFECT_MM, anchorAt, optimalNodes)
         rungCache.set(key, solve)
         if (rungCache.size > FITS_CAP) rungCache.delete(rungCache.keys().next().value!)
       }

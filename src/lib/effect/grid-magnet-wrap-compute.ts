@@ -82,9 +82,16 @@ export function wrapGrid(
  *
  * Composition only: computeGrid and wrapGroup are used as they are, byte-untouched.
  */
+/** THE THREE ANSWERS Dan asked for: the canon layout tried first, then the fewest magnets in the
+ *  range and the most. Anything that coincides collapses, so a shape whose optimal IS its fullest
+ *  shows two rows, and one whose optimal is also its sparsest shows one.
+ *
+ *  `optimalNodesMM` is the layout the lookup named for this band — local offsets about its own
+ *  middle. It is handed to the SAME wrapGroup the discovery walk uses; scaling and shrinking to
+ *  make it hold are that mechanism's job, unchanged. */
 export function wrapBandLadder(
   sized: (mm: number) => Contour, cfg: GridConfig, loMM: number, hiMM: number, minMM: number,
-  anchorAtMM?: (mm: number) => Pt,
+  anchorAtMM?: (mm: number) => Pt, optimalNodesMM?: ReadonlyArray<Pt>,
 ): BandSolve {
   const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
   const scanCfg: GridConfig = { ...cfg, segmentsDetail: 'light', forcePhaseMM: undefined }
@@ -110,24 +117,60 @@ export function wrapBandLadder(
   const seen = new Set<string>()
   const rungs: BandRung[] = []
   const witnesses: Array<{ revealMM: number; points: Pt[] }> = []
-  for (const mm of fallbackRevealSizes(loMM, hiMM)) {
-    const pts = computeGrid(sized(mm), anchorAtMM ? { ...scanCfg, centreOverrideMM: anchorAtMM(mm) } : scanCfg).anchors.map((a) => a.p)
-    if (!pts.length) continue
-    witnesses.push({ revealMM: mm, points: pts })
-    // Layout identity: the seated pattern in lattice units, origin-free.
-    let mx = Infinity, my = Infinity
-    for (const p of pts) { if (p[0] < mx) mx = p[0]; if (p[1] < my) my = p[1] }
-    const id = pts.map((p) => Math.round((p[0] - mx) / pitch) + ',' + Math.round((p[1] - my) / pitch)).sort().join(';')
-    if (seen.has(id)) continue
-    seen.add(id)
-    // Local offsets about the group's own middle — wrapGroup pins that middle on the anchor.
+  /** local offsets about a population's own middle — wrapGroup pins that middle on the anchor */
+  const localise = (pts: ReadonlyArray<Pt>): Pt[] => {
     const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1])
     const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2
-    const group = pts.map(([x, y]) => [x - cx, y - cy] as Pt)
-    const at = wrapGroup(sized, wcfg, group, minMM, hiMM)
-    if (!at) continue
-    if (!inBand(at.sizeMM, loMM, hiMM)) continue   // judge: another band owns it
-    rungs.push({ at, revealMM: mm })
+    return pts.map(([x, y]) => [x - cx, y - cy] as Pt)
   }
-  return { offers: orderOffers(rungs), bestSeated: bestSeatedCandidate(witnesses) }
+  /** the seated pattern in lattice units, origin-free */
+  const identityOf = (pts: ReadonlyArray<Pt>): string => {
+    let mx = Infinity, my = Infinity
+    for (const p of pts) { if (p[0] < mx) mx = p[0]; if (p[1] < my) my = p[1] }
+    return pts.map((p) => Math.round((p[0] - mx) / pitch) + ',' + Math.round((p[1] - my) / pitch)).sort().join(';')
+  }
+  const attempt = (pts: ReadonlyArray<Pt>, revealMM: number): BandRung | null => {
+    const at = wrapGroup(sized, wcfg, localise(pts), minMM, hiMM)
+    if (!at) return null
+    if (!inBand(at.sizeMM, loMM, hiMM)) return null   // judge: another band owns it
+    return { at, revealMM }
+  }
+
+  // THE OPTIMAL, FIRST. Same wrap, same laws — it just gets asked before anything is discovered.
+  const optimal = optimalNodesMM?.length ? attempt(optimalNodesMM, loMM) : null
+
+  // THE WALK, unchanged in range and method. Every lawful registration at each size is collected,
+  // not only the fullest, or the fewest-magnet answer below could never exist.
+  for (const mm of fallbackRevealSizes(loMM, hiMM)) {
+    const grid = computeGrid(sized(mm), anchorAtMM ? { ...scanCfg, centreOverrideMM: anchorAtMM(mm) } : scanCfg)
+    const drawn = grid.anchors.map((a) => a.p)
+    if (drawn.length) witnesses.push({ revealMM: mm, points: drawn })
+    for (const pts of grid.seatings.length ? grid.seatings : [drawn]) {
+      if (!pts.length) continue
+      const id = identityOf(pts)
+      if (seen.has(id)) continue
+      seen.add(id)
+      const rung = attempt(pts, mm)
+      if (rung) rungs.push(rung)
+    }
+  }
+
+  // FEWEST and MOST magnets in the range, from what the walk actually found.
+  const byCount = [...rungs].sort((a, b) => a.at.count - b.at.count || a.at.sizeMM - b.at.sizeMM)
+  const fewest = byCount[0] ?? null
+  const most = byCount[byCount.length - 1] ?? null
+
+  // COINCIDENT RESULTS COLLAPSE — the same answer is one row, whatever reached it first. Identity
+  // is what SHIPS: the wrapped size and the magnet positions, never which probe proposed it.
+  const shipped = (r: BandRung) => r.at.sizeMM.toFixed(2) + '|' + identityOf(r.at.points)
+  const offers: BandRung[] = []
+  const kept = new Set<string>()
+  for (const r of [optimal, fewest, most]) {
+    if (!r) continue
+    const key = shipped(r)
+    if (kept.has(key)) continue
+    kept.add(key)
+    offers.push(r)
+  }
+  return { offers, bestSeated: bestSeatedCandidate(witnesses) }
 }

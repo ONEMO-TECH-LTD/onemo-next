@@ -652,6 +652,52 @@ describe('1b — the frame comes from the usable material', () => {
     }
   })
 
+  it('THE THREE ANSWERS: optimal first, then fewest and most, coincident rows collapsed', () => {
+    // Dan, 2026-08-30: "band module must get recommendation from the classifier of optimal layout
+    // to try first from the canon ... and also try next best min magnet count in the range and max
+    // - if they coincide or anything coincides we show only the single result".
+    const sq = (mm: number): Contour =>
+      ({ outer: { pts: [[0, 0], [mm, 0], [mm, mm], [0, mm]] as Pt[] }, holes: [] })
+    const cfg = { pitchMM: 48, paddingMM: 12 }
+    const anchorAt = (mm: number): Pt => [mm / 2, mm / 2]
+    const rows = classifyBands(sq, cfg, anchorAt)
+    const solveBand = (id: number) => {
+      const band = BANDS.find((b) => b.id === id)!
+      const row = rows.find((r) => r.bandId === id)!
+      const optimal = optimalLayoutForBox(48, id, row.legalWidthMM, row.legalHeightMM)
+      const nodes = optimal?.nodesMM.map(([x, y]) => [x, y] as Pt)
+      const solve = wrapBandLadder(sq, cfg, band.minMM + 24, band.maxMM + 24, 24, anchorAt, nodes)
+      return { solve, optimal }
+    }
+
+    // B4 — three distinct answers. The counts are pinned because they are the whole point: the
+    // FEWEST is 6, and 6 is only reachable because every registration now survives. Winner-only
+    // cannot produce it — that path keeps the fullest at each size, so its fewest is 12.
+    const b4 = solveBand(4)
+    expect(b4.solve.offers.map((o) => o.at.count), 'B4 optimal / fewest / most').toEqual([16, 10, 12])
+    expect(b4.solve.offers[0].at.count, 'the first row must be the canon layout')
+      .toBe(b4.optimal!.nodesMM.length)
+
+    // B2 — the optimal IS the fullest, so those two rows are the same answer and COLLAPSE to one.
+    // This is the case that proves the collapse: without it the same answer appears twice.
+    const b2 = solveBand(2)
+    expect(b2.solve.offers.length, 'B2 must collapse to two rows').toBe(2)
+    const shipped = (o: (typeof b2.solve.offers)[number]) => o.at.sizeMM.toFixed(2) + '|'
+      + [...o.at.points].map((q) => q.map((v) => v.toFixed(1)).join(',')).sort().join(';')
+    expect(new Set(b2.solve.offers.map(shipped)).size, 'the same answer appears twice').toBe(2)
+
+    // never more than the three probes, whatever the walk found
+    for (const id of [2, 3, 4, 5])
+      expect(solveBand(id).solve.offers.length, 'B' + id + ' returned more than three')
+        .toBeLessThanOrEqual(3)
+
+    // with NO optimal handed in, the canon row is simply absent — never invented
+    const band4 = BANDS.find((b) => b.id === 4)!
+    const bare = wrapBandLadder(sq, cfg, band4.minMM + 24, band4.maxMM + 24, 24, anchorAt)
+    expect(bare.offers.length, 'without a canon there are at most two probes').toBeLessThanOrEqual(2)
+    expect(bare.offers.some((o) => o.at.count === 16), 'a canon answer appeared unasked').toBe(false)
+  }, 20_000)
+
   it('COUNTEREXAMPLE: the frame counts past five', () => {
     // The old axis class is typed 1|2|3|4|5 and clamps, so every larger shape read as five. The
     // board holds 9 columns and 11 rows at 48mm, and the library publishes frames to match.
