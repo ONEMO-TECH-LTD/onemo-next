@@ -42,6 +42,21 @@ const table = (s: (mm: number) => Contour) =>
     .map((r) => `B${r.bandId}:${r.legalWidthMM.toFixed(3)}x${r.legalHeightMM.toFixed(3)}`)
 
 describe('the classifier reads a transform-invariant ruler', () => {
+  it('ARITHMETIC GOLDEN: a square measures exactly outline minus the rim, both sides', () => {
+    // The ruler must carry NO safety margin. My first region insetted by radius PLUS the arc
+    // tolerance — copying wrap's seatRegion, where that margin is correct because it decides where
+    // a magnet may be PLACED. As a ruler it read 0.05mm short a side, so 193 measured 168.90 and
+    // rounded to 168 on the canvas. A tenth of a millimetre is the margin that decides a band, so
+    // the odd sizes are pinned too: they are where a mesh or a margin shows up and 144 does not.
+    // QA F2 re-gate, 2026-08-30: restoring +arcTolerance left the invariance tests 3/3 green.
+    const sq = (mm: number): Contour => ring([[0, 0], [mm, 0], [mm, mm], [0, mm]])
+    for (const [outline, legal] of [[144, 120], [193, 169], [195, 171], [197, 173]]) {
+      const b = legalRegionBoxMM(sq(outline), RELEASED_PADDING_MM)!
+      expect(b.maxX - b.minX, `${outline}mm square: legal width`).toBeCloseTo(legal, 6)
+      expect(b.maxY - b.minY, `${outline}mm square: legal height`).toBeCloseTo(legal, 6)
+    }
+  })
+
   it('MIRROR: the per-band table is identical for a shape and its mirror', () => {
     const bad: string[] = []
     for (let k = 0; k < 40; k++) {

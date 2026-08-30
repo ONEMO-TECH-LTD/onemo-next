@@ -35,6 +35,9 @@ export {
   type SafeMass,
   type SafeSegment,
 } from './grid-magnet-compute'
+// the exact ruler, re-exported through the door so the shell draws the SAME box the classifier
+// measures — never the 2mm segmentation islands (QA re-gate, 2026-08-30)
+export { legalRegionBoxMM } from './units/classifier'
 export { bandOf, bandOuterMM, legalOfOuterMM, type Anchor, type MagnetDia, type MagnetPlan } from './grid-magnet-logic'
 
 /** Sweep the lattice phase at the placement step (ruled 1mm), seat exactly, score, apply coverage, report. */
