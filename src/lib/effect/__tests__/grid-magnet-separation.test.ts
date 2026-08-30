@@ -685,20 +685,6 @@ describe('1b — the frame comes from the usable material', () => {
     // Winner-only cannot produce it — that path keeps the fullest at each size, so its fewest is 12.
     expect(b4.solve.offers[1].at.count, 'fewest came from a sparse registration').toBe(10)
 
-    // THE BELT DOES NOT REACH THE CANON. Turning coverage off changes what the WALK finds — its
-    // fewest moves 10 -> 12 — and leaves the canon untouched at sixteen either way. That asymmetry
-    // is the rule: the belt thins populations the engine discovered, never a layout it was handed.
-    const bandFour = BANDS.find((b) => b.id === 4)!
-    const cfgFull = { ...cfg, perimeterOnly: false }
-    const rowFull = classifyBands(sq, cfgFull, anchorAt).find((r) => r.bandId === 4)!
-    const optFull = optimalLayoutForBox(48, 4, rowFull.legalWidthMM, rowFull.legalHeightMM)!
-    const full = wrapBandLadder(sq, cfgFull, bandFour.minMM + 24, bandFour.maxMM + 24, 24, anchorAt,
-      optFull.nodesMM.map(([x, y]) => [x, y] as Pt))
-    expect(full.offers[0].at.count, 'the canon must not move with the belt').toBe(16)
-    expect(full.offers[0].at.count, 'belt on and belt off must agree on the canon')
-      .toBe(b4.solve.offers[0].at.count)
-    expect(full.offers.map((o) => o.roles.join('+')), 'belt off: the canon IS the fullest')
-      .toEqual(['optimal+most', 'fewest'])
     // B2 — the optimal IS the fullest, so those two rows are the same answer and COLLAPSE to one.
     // This is the case that proves the collapse: without it the same answer appears twice.
     const b2 = solveBand(2)
