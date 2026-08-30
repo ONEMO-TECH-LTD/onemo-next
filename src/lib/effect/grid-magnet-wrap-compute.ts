@@ -22,7 +22,7 @@ import { CENTRE_MODE, GOVERNOR } from './grid-magnet-spec'
 import type { CentreMode, Governor } from './types'
 import { wrapGroup } from './units/wrap'
 import { inBand, orderOffers } from './units/judge'
-import { bestSeatedCandidate, fallbackRevealSizes } from './units/layout'
+import { bestSeatedCandidate, fallbackRevealSizes, makeContourSeatPredicate } from './units/layout'
 
 
 /** mm → integer microns; Clipper64 is integer-robust. */
@@ -136,12 +136,42 @@ export function wrapBandLadder(
     return { at, revealMM, roles: [] }
   }
 
-  // THE OPTIMAL, FIRST. Same wrap, same laws — it just gets asked before anything is discovered.
-  const optimal = optimalNodesMM?.length ? attempt(optimalNodesMM, loMM) : null
+  // THE CANON IS THE ANCHOR AND THE GOAL. Dan, 2026-08-30: "canon needs to be used as anchor for
+  // the search and optimal goal, but it must try to fit the canon and not all magnets needs to
+  // fit — we need to fit smart, for example max count applied to the layout of canon and fit on
+  // that basis, same max count logic only narrow focus."
+  //
+  // So the canon is FITTED, not accepted-or-refused. All-or-nothing returned nothing on every real
+  // cutout: the lookup named the BOT a 3x4 and its material cannot hold all twelve, so the
+  // recommendation was absent exactly where it was wanted.
+  //
+  // The rule for WHICH of its magnets hold is the engine's own, narrowed — the walk takes the most
+  // magnets it can find across the band, and this takes the most CANON magnets it can across the
+  // same band. Ties break to the smallest size because the size list ascends, which is the walk's
+  // own tie-break. What comes out goes to wrapGroup WHOLE, like every other candidate.
+  //
+  // Absent because they were not asked for: no coverage pass over the canon (a 3x3 IS nine
+  // magnets), no parity contest, no ranking beyond the count.
+  const radiusMM = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
+  const canonLocal = optimalNodesMM?.length ? localise(optimalNodesMM) : null
+  interface CanonFit { pts: Pt[]; mm: number }
+  /** The better of a running best and what the canon holds at this size. Ties keep the running
+   *  best, and the size list ascends, so the smallest size wins — the walk's own tie-break. */
+  const growCanon = (best: CanonFit | null, mm: number): CanonFit | null => {
+    if (!canonLocal) return best
+    const fits = makeContourSeatPredicate(sized(mm), radiusMM)
+    if (!fits) return best
+    const anchor = anchorFn(mm)
+    const held = canonLocal.map(([x, y]) => [anchor[0] + x, anchor[1] + y] as Pt).filter(fits)
+    if (!held.length) return best
+    return !best || held.length > best.pts.length ? { pts: held, mm } : best
+  }
+  let canonBest: CanonFit | null = null
 
   // THE WALK, unchanged in range and method. Every lawful registration at each size is collected,
   // not only the fullest, or the MIN answer below could never exist.
   for (const mm of fallbackRevealSizes(loMM, hiMM)) {
+    canonBest = growCanon(canonBest, mm)
     const grid = computeGrid(sized(mm), anchorAtMM ? { ...scanCfg, centreOverrideMM: anchorAtMM(mm) } : scanCfg)
     const drawn = grid.anchors.map((a) => a.p)
     if (drawn.length) witnesses.push({ revealMM: mm, points: drawn })
@@ -154,6 +184,10 @@ export function wrapBandLadder(
       if (rung) rungs.push(rung)
     }
   }
+
+  // The canon's max-count fit, wrapped whole like anything else. Null only when not one of its
+  // positions holds anywhere in the band.
+  const optimal: BandRung | null = canonBest ? attempt(canonBest.pts, canonBest.mm) : null
 
   // MIN and MAX magnets in the range, from what the walk actually found. Dan's own words for
   // them, restored 2026-08-30 — they had been renamed to fewest/most, which he never asked for.
