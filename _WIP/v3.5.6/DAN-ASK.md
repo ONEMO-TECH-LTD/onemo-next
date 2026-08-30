@@ -16,7 +16,7 @@ item is unticked. Partial is reported as partial, with the missing item named.
 | # | item | state |
 |---|---|---|
 | 1 | canon wired properly — suggested layout is the search's STARTING POINT, no parallel path | DONE · QA-CLEAR at 2c7e4286, bounded |
-| 2 | outer/inner classifier ruler toggle — "i prefer testing both" | BUILT + COMMITTED · gated headless · LIVE GATE OWED |
+| 2 | outer/inner classifier ruler toggle — "i prefer testing both" | BUILT + COMMITTED · headless gated · LIVE GATED: butterfly B3 legal=no optimal, outer=optimal 123.26/3 |
 | 3 | Clipper2 unprotected-area defender + the four preferences, as toggles | NOT STARTED — step 2, awaiting Dan |
 
 ## Step 2's content, verbatim
