@@ -207,38 +207,27 @@ describe('the toggle REACHES the ladder — not just the pressed state', () => {
     expect(run(undefined)).toEqual(run(NO_HOLDING_RULES))
   })
 
-  it('THE ENFORCER IS CURRENTLY REDUNDANT — recorded, not dressed up as working', () => {
-    // My previous version of this test asserted only `enforced.length <= off.length`, which is
-    // true of any filter including one that does nothing. QA proved it: mutating the pool filter
-    // to `keep = () => true` left it green.
-    //
-    // Measured properly — a sweep over tall, wide, L, U and triangle shapes across B2 to B7 — the
-    // enforcer changes NO ladder answer. The reason is structural and worth keeping: wrapGroup
-    // presses the group against the outline, so a wrapped answer's magnets already sit at the
-    // extremes by construction. Dan's rule 2 is a law the wrap already enforces.
-    //
-    // So the code stays — it is his rule, and it bites the moment a candidate arrives unpressed —
-    // but it is reported as REDUNDANT rather than proven. Do not call rule 2 built on this.
-    const off = run(NO_HOLDING_RULES)
-    const enforced = run({ ...NO_HOLDING_RULES, extremes: true })
-    expect(enforced, 'if this ever differs, the enforcer has started to bite and this note is stale')
-      .toEqual(off)
-    // and the fact it filters on is real, even where it changes nothing
-    expect(off.length, 'the pools were empty — the sweep proves nothing').toBeGreaterThan(0)
+  it('THE ENFORCER IS ACTIVE: 96mm U B3 removes the unheld minimum', () => {
+    // The earlier 48mm B2-B5 sweep happened to produce only offers that already held both ends.
+    // It was then promoted into a universal "wrap guarantees this" claim. At another released
+    // pitch the rule bites: U B3 has min:2 + max:4 with the rule off, and only the held 4 survives.
+    const pts: Pt[] = [[0, 0], [300, 0], [300, 300], [200, 300], [200, 100],
+      [100, 100], [100, 300], [0, 300]]
+    const sized = (mm: number): Contour => ring(pts.map(([x, y]) => [x * mm / 300, y * mm / 300] as Pt))
+    const at = (mm: number): Pt => [mm / 2, mm / 2]
+    const band = BANDS.find((b) => b.id === 3)!
+    const solve = (extremes: boolean) => wrapBandLadder(sized, {
+      pitchMM: 96, paddingMM: RELEASED_PADDING_MM,
+      holdingRules: { ...NO_HOLDING_RULES, extremes },
+    }, band.minMM + 24, band.maxMM + 24, 24, at).offers
+      .map((o) => `${o.roles.join('+')}:${o.at.count}`)
+    expect(solve(false)).toEqual(['min:2', 'max:4'])
+    expect(solve(true)).toEqual(['min+max:4'])
   }, 60_000)
 
-  it("RULE 2 IS ALREADY LAW: every shipped offer holds the extremes, wrap or no toggle", () => {
-    // QA's version of this asserted that switching rule 2 on must change the result somewhere.
-    // It cannot, and making it pass would mean inventing behaviour Dan did not ask for. So this
-    // is QA's own alternative: prove the law is already enforced, over the real corpus rather
-    // than one fixture — which is also the sweep my earlier comment claimed but did not ship.
-    //
-    // The reason is structural: wrapGroup presses the group against the outline, so a wrapped
-    // answer's magnets already sit at the extremes. Dan's rule 2 describes something the wrap
-    // guarantees.
-    //
-    // WHETHER TO DELETE HIS TOGGLE IS DAN'S CALL, not QA's and not mine — it is a control he
-    // asked for. Recorded as PARTIAL in _WIP/v3.5.6/DAN-ASK.md until he rules.
+  it("AT 48MM B2-B5: the sampled corpus already holds the extremes", () => {
+    // This is a bounded 48mm observation, not a universal wrap invariant; the focused 96mm case
+    // above proves the enforcer remains necessary.
     const shapes: Record<string, Pt[]> = {
       tall: [[0, 0], [140, 0], [140, 260], [0, 260]],
       wide: [[0, 0], [260, 0], [260, 140], [0, 140]],

@@ -17,7 +17,7 @@ item is unticked. Partial is reported as partial, with the missing item named.
 |---|---|---|
 | 1 | canon wired properly — suggested layout is the search's STARTING POINT, no parallel path | DONE · QA-CLEAR at 2c7e4286, bounded |
 | 2 | outer/inner classifier ruler toggle — "i prefer testing both" | BUILT + COMMITTED · headless gated · LIVE GATED: butterfly B3 legal=no optimal, outer=optimal 123.26/3 |
-| 3 | Clipper2 unprotected-area defender + the four preferences, as toggles | BUILT · QA-rejected 3x, twelve defects repaired · **PARTIAL**, needs three Dan rulings: (a) rule 2 is REDUNDANT — wrap already holds the extremes, proven over the corpus — delete his toggle or keep it? (b) combined-toggle ordering strict or weighted? (c) is the top as drawn the top as worn? · no live gate since the repairs |
+| 3 | Clipper2 unprotected-area defender + the four preferences, as toggles | BUILT · **PARTIAL**, needs two Dan rulings: (a) combined-toggle ordering strict or weighted? (b) is the top as drawn the top as worn? Rule 2 is active at released 24/96mm pitches and stays. |
 
 ## Step 2's content, verbatim
 
