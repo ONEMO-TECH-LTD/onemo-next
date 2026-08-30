@@ -1,0 +1,153 @@
+# Grid Lab MVP — Plan v1.2
+
+Supersedes v1.1 and the two QA response files. One document; there is no second home.
+
+## What the finished engine does
+
+Any shape, any band, one path:
+
+1. **Seed** — scale the shape to the middle of the requested band's size range.
+2. **Erode 12mm** from every edge and every hole. That is the legal area — where a magnet centre
+   may sit. ONE measurement; everything below reads from it.
+3. **Read it** — its longest span says which band the shape is actually in; the same box divided by
+   the pitch gives the grid, across and down.
+4. **Settle the size** — if the shape is not yet in the band you asked for, grow it until its
+   material is. If it never gets there before the board runs out, say so with the measurement.
+5. **Centre it** — bake the governed centre at that size. Six modes and the governor, unchanged.
+6. **Look up the canon** — the library's square or rectangle for that grid. That is the optimal:
+   the grid dictates it, nothing ranks or chooses.
+7. **Place and seat** — centre the layout on the anchor, test every magnet against the real
+   material, drop what will not hold and record which.
+8. **Wrap** — hand the survivors in WHOLE to the existing solver; get the tightest size at which the
+   shape grips them. That is the manufacturable size.
+9. **Confirm the band** — measure the finished shape's legal area. It belongs to the band it landed
+   in, not the one you asked for.
+10. **Canon stands first.**
+11. **Next best** — the existing millimetre sweep runs alongside; its results sit beneath the canon
+    answer, and are the answer only when canon cannot be placed or cannot hold.
+12. **Draw** — layout, lattice, ladder, manual controls, all as they are.
+
+**No coverage on the canon path.** The belt is not applied between 7 and 8. The canon for a 3x3 IS
+nine magnets; thinning it to a ring before wrapping means the answer returned is not the record that
+was looked up. The belt stays in the engine, stays on its control, and is wired to the canon path
+only when Dan calls for it after the MVP.
+
+**7 goes straight to 8.** The survivors go to the wrap solver directly, never through
+`registerLayout` — that function does not accept a population, it BUILDS one by seating the lattice
+and keeping whichever of four parities holds most. Routing canon through it destroys the canon
+before wrap ever sees it, and re-introduces the max-count prefilter Dan forbids by name.
+
+## Where it stands
+
+- **Built and correct, untouched by this work:** 1, 2, 5, 8, 11, 12.
+- **Measurable, but nothing calls it:** 3.
+- **Missing entirely:** 4, 6, 7, 9, 10.
+
+## Rules
+
+1. Bands are measured on the bounding extent of every 12mm-inset legal magnet-centre segment. Not
+   outer-outline boxes.
+2. Band and frame come from the SAME box and therefore cannot disagree. (This is what deleting the
+   mass-depth dial bought; under the old two-depth model they were two different readings.)
+3. The initial midpoint is a probe, not a band assignment.
+4. At 48mm the midpoint seeds are B1 48, B2 96, B3 144, B4 192, B5 240.
+5. If the requested band never exists before the board limit, return no canon match with the trace.
+6. Ordered frame owns orientation: 3x4 and 4x3 are different canon records.
+7. Square and rectangle are automatic canon. Diamond and triangle are explicit presets only.
+8. The governed centre anchors the canon layout. Wrap may shift it only as far as legality requires.
+9. No candidate magnet disappears without appearing in the recorded omissions.
+10. `wrapGroup` stays whole-population-in, tightest-size-out. Nothing mutates the population after.
+11. The released rim is 12mm. The 10mm floor is an admin bound, not a default.
+12. Delete nothing until canon and the sweep have been seen side by side and agree.
+
+## The build
+
+### Task 0 — clear the debris from the mass-depth removal
+
+- `units/classifier.ts` still says the frame is "not the legal bbox" and that a thin arm's sliver
+  "seats nothing". Both are false at `cb2946e2`.
+- The dead-limb counterexample hands the arm `masses: []` by hand. It never runs `safeSegments`, so
+  it proves only that the reader ignores a segment you told it was empty. It passed before and after
+  a change that inverted the behaviour it claims to guard.
+
+**Done when:** the comment describes what the code does, and the test drives real segmentation. It
+will then assert the OPPOSITE of what it says today — a 30mm arm's positions COUNT, because a magnet
+centre genuinely sits in its 6mm band with full clearance either side.
+
+### Task 1 — the lookup
+
+Export the canon roster through the library door; it is not exported today, so nothing outside the
+library can reach it. Then: pitch and ordered frame in, the one canon record out. No caller yet.
+
+**Done when:** 3x4 returns portrait only, 4x3 landscape only, equal axes the square, never a diamond
+or triangle, and a grid the board cannot hold returns nothing.
+
+### Task 2 — the placer
+
+Layout, shape and governed centre in; attempted, seated and omitted magnets out. No caller yet.
+
+**Done when:** odd grids put a magnet on the centre and even grids put the gap there, outer edges and
+holes reject seats, and every omission is visible in the result.
+
+### Task 3 — the calibrator
+
+Band in; this shape's own size interval and the grid at its midpoint out.
+
+**Done when:** a square seeds at 144mm and stays band 3; a star seeded there grows until its material
+genuinely reaches band 3; a shape that never reaches it returns nothing with the measurement.
+
+### Task 4 — connect, additively
+
+- One call that runs 1 to 12 with no browser.
+- Canon becomes an ADDITIONAL candidate handed to the existing `wrapGroup`, beside the sweep.
+- Band membership by measured legal extent — for canon AND for the sweep. The current test adds
+  twice the rim to get an outer window; that is true only for a box. A star's real band-3 range is
+  179-226mm and it is judged against 120-167, so every star answer is discarded today.
+- The rim resolved once at the entry point, then passed explicitly.
+- **Nothing is deleted in this task.** The worker's duplicate orchestration is removed in a separate
+  step, after both sources have been seen side by side.
+
+**Done when:** a no-browser call returns band calibration, ordered frame, anchor, canon identity,
+omissions and wrapped size; canon is attempted first; the sweep still produces next-best; manual
+controls and lattice are unchanged.
+
+### Task 5 — prove it
+
+Square, portrait rectangle, landscape rectangle, star, limbed shape, holed shape. Every fix defended
+by a test that dies when the fix is reverted. Mutations that must fail: outer bbox replacing legal
+extent; band floor or ceiling replacing the midpoint; a preset entering automatic match; the governed
+anchor ignored; omission evidence deleted; wrap bypassed; coverage applied to the canon population;
+canon routed through `registerLayout`.
+
+Full suite, typecheck, scoped lint. Then the running bench: pick a band, see the canon answer first
+with its size and what it dropped, next-best beneath it, lattice and manual controls untouched.
+
+## Not in this
+
+No scoring beyond canon-first. No garment 96mm lattice. No presets or D4 in automatic matching. No
+new geometry, segmentation, centring or wrap. No new judge. Nothing deleted from manual controls,
+lattice, coverage or the sweep.
+
+## What changed from v1.1, and why
+
+- **The classifier repair is gone.** Dan ruled the 16mm mass-depth an invented addition and it was
+  removed at `cb2946e2`. It had cost the classifier one magnet position at every size and moved with
+  a centring dial. With one depth, the band and the grid come from one reading.
+- **The two-probe split is gone.** `legalUnionBoxMM` and a depth-compensated mass box are now the
+  same box. One function, not two names for one extent.
+- **The matcher is not replacing a live path.** The old family/fill matcher is dormant and has no
+  production caller. Task 1 adds the first matching path that has ever existed.
+- **Task 4 is additive, not a cutover.** v1.1 said make the worker transport, remove duplicate
+  orchestration, leave no parallel automatic paths. That is the shape that unplugged manual pan, the
+  belt and the lattice on 2026-08-29. Prove first, delete second.
+- **Coverage comes off the canon path.** v1.1 applied it between seating and wrap, which would have
+  returned a ring where the record says a full grid.
+- **Task 0 is new** — debris from the mass-depth removal.
+
+## Verdicts
+
+**Necessity:** every existing working unit is reused; additions are limited to the four missing
+connections plus the debris clearance.
+
+**Sufficiency:** calibration, legal measurement, classification, centring, canon matching, anchored
+seating, exact wrap, honest band membership and retained next-best are all delivered and proven.
