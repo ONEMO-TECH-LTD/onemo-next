@@ -107,7 +107,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const ruleTarget0: Pt = cfg.centreOverrideMM ?? (mode0 === 2 ? (governMass(masses0, gov0, midY0)?.centreMM ?? centres0[0]) : centres0[0])
 
   const { bb, pitch, reach, plan, perimeterOnly, outer, segments, ruleTarget,
-    bestSeated, bestOx, bestOy, bestKx, bestKy, mainCentre } =
+    bestSeated, bestOx, bestOy, bestKx, bestKy, mainCentre, seatings } =
     registerLayout(contourMM, cfg, { segments: segments0, centres: centres0, ruleTarget: ruleTarget0 })
 
   const lattice = latticeAt(bb, pitch, bestOx, bestOy)
@@ -128,6 +128,8 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
     segments,
     centresMM: [ruleTarget],
     centreMainMM: mainCentre,
+    // the same coverage rule the drawn answer gets, so the sparse registrations are comparable
+    seatings: seatings.map((seat) => applyCoverage(seat, perimeterOnly, pitch).seated),
   }
 }
 

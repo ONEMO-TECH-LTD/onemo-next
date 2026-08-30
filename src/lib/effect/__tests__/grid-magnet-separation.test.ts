@@ -636,6 +636,22 @@ describe('1b — the frame comes from the usable material', () => {
       .toBeNull()
   })
 
+  it('EVERY lawful registration survives to the caller; the drawn answer is unchanged', () => {
+    // Centre rules pins the grid by parity — node or gap on each axis — which is four positions.
+    // Only the fullest was ever returned, so "find min count -> propose" was impossible: the sparse
+    // ones were destroyed before anything could look at them. Dan's brief forbids a max-count
+    // prefilter by name.
+    const sq = (mm: number): Contour =>
+      ({ outer: { pts: [[0, 0], [mm, 0], [mm, mm], [0, mm]] as Pt[] }, holes: [] })
+    for (const [mm, expected] of [[120, [4, 6, 6, 8]], [168, [8, 10, 10, 12]]] as [number, number[]][]) {
+      const g = computeGrid(sq(mm), { pitchMM: 48, paddingMM: 12 })
+      expect(g.seatings.map((x) => x.length).sort((a, b) => a - b), mm + 'mm registrations')
+        .toEqual(expected)
+      // and the ANSWER is untouched: still the fullest, still what gets drawn
+      expect(g.anchors.length, mm + 'mm drawn answer moved').toBe(Math.max(...expected))
+    }
+  })
+
   it('COUNTEREXAMPLE: the frame counts past five', () => {
     // The old axis class is typed 1|2|3|4|5 and clamps, so every larger shape read as five. The
     // board holds 9 columns and 11 rows at 48mm, and the library publishes frames to match.

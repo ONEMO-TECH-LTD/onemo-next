@@ -161,6 +161,10 @@ export interface GridResult {
   centresMM: Pt[]
   /** THE centre that governed the winning layout — the main point of the centring system. */
   centreMainMM: Pt
+  /** EVERY lawful registration at this size, coverage applied, not just the one drawn. The engine
+   *  always built these and kept only the fullest; "fewest magnets" cannot exist while the sparse
+   *  ones are discarded before anything can look at them. `anchors` is still the winner. */
+  seatings: Pt[][]
 }
 
 export type CentreMode = 0 | 1 | 2 | 3 | 4 | 5

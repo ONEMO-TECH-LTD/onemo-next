@@ -165,6 +165,15 @@ interface LayoutPlacement {
   segments: SafeSegment[]; centres: Pt[]; ruleTarget: Pt
   bestSeated: Pt[]; bestOx: number; bestOy: number; bestKx: number; bestKy: number
   mainCentre: Pt
+  /** EVERY lawful registration, not just the one kept. Centre rules pins the grid by parity —
+   *  node or gap on each axis — which is four positions, and only the fullest survives the winner
+   *  test below. On a 168mm square that is 16 kept and 12, 12, 9 destroyed.
+   *
+   *  Dan's brief forbids a max-count prefilter by name, and "find min count -> propose" is
+   *  impossible while the sparse registrations are discarded before anything can look at them.
+   *  So they are RETURNED. The winner is unchanged and still drives the drawn answer; this is the
+   *  work the function already did and threw away. */
+  seatings: Pt[][]
 }
 
 /** THE WRAP LAW (Dan, 2026-08-20: "0 flap means magnets and edges touch"): wrap is each
@@ -208,6 +217,7 @@ export function registerLayout(
   // path, so this one point rules outright; Masses names it via the governor switch.
 
   let bestSeated: Pt[] = []
+  const seatings: Pt[][] = []
   let bestOx = 0, bestOy = 0, bestKx = 0, bestKy = 0
   let mainCentre: Pt = centres[0]
   if (fits && cfg.forcePhaseMM) {
@@ -217,6 +227,7 @@ export function registerLayout(
     bestKx = mod(bestOx - (bb.maxX - bb.minX) / 2, pitch)
     bestKy = mod(bestOy - (bb.maxY - bb.minY) / 2, pitch)
     bestSeated = latticeAt(bb, pitch, bestOx, bestOy).filter(fits)
+    if (bestSeated.length) seatings.push(bestSeated)
   } else if (fits) {
     // CENTRE RULES — no voting. Parity is DERIVED from the bbox axis classes (canon §4/§6):
     // each axis's class fixes its magnet-line count, odd count puts a NODE on the centre,
@@ -240,6 +251,7 @@ export function registerLayout(
       const ox = mod(px, pitch), oy = mod(py, pitch)
       const seat = latticeAt(bb, pitch, ox, oy).filter(fits)
       if (!seat.length) continue
+      seatings.push(seat)
       const excess = pressExcessMM(contourMM, seat, reach)
       const wins = !best
         || seat.length > best.seats
@@ -251,7 +263,7 @@ export function registerLayout(
   }
 
   return { bb, pitch, reach, plan, perimeterOnly, outer, fits, segments, centres, ruleTarget,
-    bestSeated, bestOx, bestOy, bestKx, bestKy, mainCentre }
+    bestSeated, bestOx, bestOy, bestKx, bestKy, mainCentre, seatings }
 }
 
 /** Perimeter belt: with >4 seated, drop fully-surrounded interior nodes, never below the minimum. */

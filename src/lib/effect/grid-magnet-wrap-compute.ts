@@ -62,6 +62,7 @@ export function wrapGrid(
       segments: [],
       centresMM: [at.anchorMM],
       centreMainMM: at.anchorMM,
+      seatings: [],   // display of a settled answer; the registrations were spent upstream
     },
   }
 }
