@@ -675,6 +675,9 @@ describe('1b — the frame comes from the usable material', () => {
     // cannot produce it — that path keeps the fullest at each size, so its fewest is 12.
     const b4 = solveBand(4)
     expect(b4.solve.offers.map((o) => o.at.count), 'B4 optimal / fewest / most').toEqual([16, 10, 12])
+    // every row states WHY it is on the list — the order alone is not the answer
+    expect(b4.solve.offers.map((o) => o.roles.join('+')), 'B4 roles')
+      .toEqual(['optimal', 'fewest', 'most'])
     expect(b4.solve.offers[0].at.count, 'the first row must be the canon layout')
       .toBe(b4.optimal!.nodesMM.length)
 
@@ -682,6 +685,9 @@ describe('1b — the frame comes from the usable material', () => {
     // This is the case that proves the collapse: without it the same answer appears twice.
     const b2 = solveBand(2)
     expect(b2.solve.offers.length, 'B2 must collapse to two rows').toBe(2)
+    // and the collapsed row SAYS it is two answers, rather than silently being one of them
+    expect(b2.solve.offers.map((o) => o.roles.join('+')), 'B2 roles')
+      .toEqual(['optimal+most', 'fewest'])
     const shipped = (o: (typeof b2.solve.offers)[number]) => o.at.sizeMM.toFixed(2) + '|'
       + [...o.at.points].map((q) => q.map((v) => v.toFixed(1)).join(',')).sort().join(';')
     expect(new Set(b2.solve.offers.map(shipped)).size, 'the same answer appears twice').toBe(2)

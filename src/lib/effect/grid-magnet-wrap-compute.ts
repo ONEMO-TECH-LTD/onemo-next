@@ -10,7 +10,7 @@
  * is what its previous header falsely claimed while it imported the door and four units.
  */
 
-import type { BandRung, BandSolve, Contour, GridConfig, GridResult, Pt, WrapAt, WrapConfig } from './types'
+import type { BandRung, BandSolve, Contour, GridConfig, GridResult, Pt, RungRole, WrapAt, WrapConfig } from './types'
 import { DEFAULT_PITCH_MM, MAGNET_DIA_SMALL_MM, MAGNET_DIA_LARGE_MM, PADDING_FLOOR_MM } from './grid-magnet-spec'
 import { computeGrid } from './grid-magnet'
 import { bbox } from './foundation/geometry'
@@ -133,7 +133,7 @@ export function wrapBandLadder(
     const at = wrapGroup(sized, wcfg, localise(pts), minMM, hiMM)
     if (!at) return null
     if (!inBand(at.sizeMM, loMM, hiMM)) return null   // judge: another band owns it
-    return { at, revealMM }
+    return { at, revealMM, roles: [] }
   }
 
   // THE OPTIMAL, FIRST. Same wrap, same laws — it just gets asked before anything is discovered.
@@ -164,12 +164,14 @@ export function wrapBandLadder(
   // is what SHIPS: the wrapped size and the magnet positions, never which probe proposed it.
   const shipped = (r: BandRung) => r.at.sizeMM.toFixed(2) + '|' + identityOf(r.at.points)
   const offers: BandRung[] = []
-  const kept = new Set<string>()
-  for (const r of [optimal, fewest, most]) {
+  const kept = new Map<string, BandRung>()
+  for (const [role, r] of [['optimal', optimal], ['fewest', fewest], ['most', most]] as Array<[RungRole, BandRung | null]>) {
     if (!r) continue
     const key = shipped(r)
-    if (kept.has(key)) continue
-    kept.add(key)
+    const already = kept.get(key)
+    if (already) { already.roles.push(role); continue }   // the same answer, reached twice: one row
+    r.roles = [role]
+    kept.set(key, r)
     offers.push(r)
   }
   return { offers, bestSeated: bestSeatedCandidate(witnesses) }

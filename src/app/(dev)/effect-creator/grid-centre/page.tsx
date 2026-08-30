@@ -258,7 +258,7 @@ export default function GridLab() {
   }, [src, preset, gen, p1, p2, sides, points, magic, cutC])
 
   // The solve runs in a worker so the page never freezes; the last result stays up while solving.
-  type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: BandSnapPoint[]; idx: number; segments: SafeSegment[]; stops?: Array<{ press: number; reveal: number }>; offMM?: number; recog?: { family: string; cols: number; rows: number; segWmm: number; segHmm: number }
+  type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: Array<BandSnapPoint & { roles?: string[] }>; idx: number; segments: SafeSegment[]; stops?: Array<{ press: number; reveal: number }>; offMM?: number; recog?: { family: string; cols: number; rows: number; segWmm: number; segHmm: number }
     /** STEP 1+2 — what the classifier read at this band's trial size, and the whole table. */
     bandClass?: { bandId: number; seedMM: number; outerWidthMM: number; outerHeightMM: number; legalWidthMM: number; legalHeightMM: number; anchorMM: Pt } | null
     recommendation?: { cols: number; rows: number; count: number; id: string; seedMM: number } | null }
@@ -475,7 +475,8 @@ export default function GridLab() {
               {model && model.ladder.length > 0 && <div className="gl-steps">
                 {model.ladder.map((pt, i) =>
                   <button key={i} aria-pressed={bandScale === null && i === model.idx} onClick={() => { setStepSel(i); setBandScale(null) }}>
-                    <b>B{mode}-{i + 1}</b><span>{pt.sizeMM} mm · {pt.count}⌾</span>
+                    <b>{pt.roles?.length ? pt.roles.join(' + ') : `B${mode}-${i + 1}`}</b>
+                    <span>{pt.sizeMM} mm · {pt.count}⌾</span>
                   </button>)}
               </div>}
               {(() => {

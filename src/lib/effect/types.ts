@@ -110,8 +110,13 @@ export interface WrapAt {
   gapsMM: number[]
 }
 
+/** WHY a row is on the list. The three answers Dan asked for: the canon layout the classifier
+ *  recommended, the fewest magnets in the range, and the most. A row that is two of these at once
+ *  collapsed, and says so. */
+export type RungRole = 'optimal' | 'fewest' | 'most'
+
 /** One rung the band offers: a revealed layout at its exact contact size. */
-export interface BandRung { at: WrapAt; revealMM: number }
+export interface BandRung { at: WrapAt; revealMM: number; roles: RungRole[] }
 
 /** What a band solve returns: the lawful offers judge allowed, and — only when there are none — a
  *  calibration witness layout selected from the SAME generated population. The witness is never an
