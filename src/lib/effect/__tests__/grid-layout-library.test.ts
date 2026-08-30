@@ -27,6 +27,9 @@ import type { LibraryFrame, LibrarySelection } from '../library/types'
 import { libraryStageModel } from '../grid-magnet-library-bridge'
 import { classifyShape } from '../grid-magnet-class'
 import { canonCatalogue } from '../library/catalogue'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import LibraryPanel from '@/app/(dev)/effect-creator/grid-centre/LibraryPanel'
 import { MANUFACTURING_TOLERANCE_MM } from '../geometry-truth'
 
 /** The library states its own millimetres as readonly pairs; the engine's classifiers take
@@ -138,59 +141,39 @@ describe('canon and presets — what the engine may offer by itself', () => {
     expect(subtypeOf('4x3')).toBe('frame')
   })
 
-  it('the Orientation row selects the transposed RECORD, not a view', () => {
-    // Dan asked for the toggle to select separate layouts. It stays; what changed is that it moves
-    // the selection to the other frame and leaves the view at identity, because the target frame
-    // already carries its own orientation.
-    const portrait = { classId: 'rectangle', frameKey: '3x4', layoutId: CANON_LAYOUT, view: { transpose: false, flipX: false, flipY: false } }
-    const row = panelOptionsFor(portrait, [], 48).orientations
-    expect(row.map((o) => o.label)).toEqual(['portrait', 'landscape'])
-    expect(row.find((o) => o.label === 'portrait')!.active, '3x4 is portrait').toBe(true)
-    const toLandscape = row.find((o) => o.label === 'landscape')!.next
-    expect(toLandscape.frameKey, 'landscape resolves the transposed frame').toBe('4x3')
-    expect(toLandscape.view, 'and the view stays identity — the frame owns the orientation')
-      .toEqual({ transpose: false, flipX: false, flipY: false })
-    // and back again
-    const back = panelOptionsFor(toLandscape, [], 48).orientations.find((o) => o.label === 'portrait')!.next
-    expect(back.frameKey).toBe('3x4')
-    // the subtype survives the turn
-    expect(canonCatalogue(48).find((e) => e.frameCols + 'x' + e.frameRows === '4x3')!.typeId)
-      .toBe(canonCatalogue(48).find((e) => e.frameCols + 'x' + e.frameRows === '3x4')!.typeId)
+  it('canon rectangles have NO orientation control — the record is locked', () => {
+    // Dan, 2026-08-30: "lock canon without on page orientation, remove orientation completely,
+    // leave the locked orientation." A 3x4 and a 4x3 are two published products; you choose the
+    // one you want. Restore the control and a 3x10's landscape turn silently became a 4x3 — a
+    // different size, band and population under a button labelled Orientation.
+    for (const key of ['3x4', '4x3', '3x10']) {
+      const selection = { classId: 'rectangle', frameKey: key, layoutId: CANON_LAYOUT, view: { transpose: false, flipX: false, flipY: false } }
+      expect(panelOptionsFor(selection, [], 48).orientations, key + ' offers no orientation').toEqual([])
+    }
+    // and both orientations remain reachable as SEPARATE records in the frame list
+    const keys = new Set(canonCatalogue(48).map((e) => e.frameCols + 'x' + e.frameRows))
+    expect(keys.has('3x4') && keys.has('4x3'), 'both are published').toBe(true)
   })
 
-  it('a turn the board cannot hold is offered but disabled, never an illegal record', () => {
-    // 3x10 fits a 9-wide board; 10x3 does not. The choice must not silently land somewhere else,
-    // and it must not create a record the board cannot carry.
-    const tall = { classId: 'rectangle', frameKey: '3x10', layoutId: CANON_LAYOUT, view: { transpose: false, flipX: false, flipY: false } }
-    const landscape = panelOptionsFor(tall, [], 48).orientations.find((o) => o.label === 'landscape')!
-    expect(canonCatalogue(48).some((e) => e.frameCols === 10), 'no 10-wide record exists').toBe(false)
-    if (landscape.disabled) expect(landscape.next.frameKey).toBe('3x10')
-    else expect(landscape.next.frameKey, 'lands on a real same-subtype landscape frame')
-      .toMatch(/^\d+x\d+$/)
-  })
-
-  it('square, diamond and triangle keep the transform-based orientation row', () => {
-    // Only the rectangle owns its orientation through records. Nothing else changed.
-    for (const family of ['square', 'diamond'] as const) {
+  it('presets keep the transform-based orientation row', () => {
+    // Canon is locked; the presets are unchanged — their orientation genuinely is a view.
+    for (const family of ['diamond'] as const) {
       const s = selectionForFamily(sel(), family, 48)
       const labels = panelOptionsFor(s, [], 48).orientations.map((o) => o.label)
       expect(labels.every((l) => l !== 'portrait' && l !== 'landscape'), family).toBe(true)
     }
   })
 
-  it('the canon table holds BOTH sides of square — recognition is a proportion', () => {
-    // A shape is classified by its proportion against the canon table, before any size exists. With
-    // tall-only records every proportion was 1.00 or greater, so a landscape shape's ratio matched
-    // nothing: half of all shapes were unrecognisable by construction. Delete the turned frame from
-    // rectangleFrames and this dies.
+  it('the canon table carries both ordered rectangle orientations', () => {
+    // With tall-only records the table held no landscape rectangle at all, so no matcher could
+    // distinguish a wide shape's class from a tall one's. Delete the turned frame and this dies.
     for (const pitchMM of [24, 48, 96]) {
       const canon = canonCatalogue(pitchMM)
       const wide = canon.filter((e) => e.frameCols > e.frameRows)
       const tall = canon.filter((e) => e.frameRows > e.frameCols)
       expect(wide.length, 'landscape canon @' + pitchMM).toBeGreaterThan(0)
       expect(tall.length, 'portrait canon @' + pitchMM).toBeGreaterThan(0)
-      // every ratio below 1 is a landscape record, every ratio above is portrait — the table spans
-      // both sides, which is what makes a nearest-proportion match possible at all
+      // the table spans both sides of 1.00: a wide ordered frame exists as its own record
       const ratios = canon.map((e) => e.frameRows / e.frameCols)
       expect(Math.min(...ratios), 'a proportion below 1 exists @' + pitchMM).toBeLessThan(1)
       expect(Math.max(...ratios), 'a proportion above 1 exists @' + pitchMM).toBeGreaterThan(1)
@@ -438,9 +421,8 @@ describe('the canon is the full grid, interiors included', () => {
 describe('rectangle class', () => {
   it('carries BOTH orientations of every frame the board holds at that lattice', () => {
     // Portrait and landscape are separate layouts (Dan, 2026-08-30), not one record and a view
-    // toggle. Recognition compares a shape's proportion against the canon table, so the table must
-    // hold both sides of 1.00 — with tall-only records every entry was 1.00 or taller and a wide
-    // shape's 0.71 matched nothing at all. A turned frame exists only where the board can hold it:
+    // toggle. With tall-only records the catalogue held no landscape rectangle at all. A turned
+    // frame exists only where the board can hold it:
     // the board is 9 wide and 11 tall, so 3x10 is published and 10x3 is not.
     for (const pitch of [24, 48, 96]) {
       const { cols, rows } = boardPositions(pitch)
@@ -895,10 +877,9 @@ describe('triangle — authoring, identity and orientation (QA F1-F6)', () => {
       // of saying a turn already on the row
       expect(new Set(labels).size, type).toBe(labels.length)
     }
-    // The rectangle keeps its own vocabulary, and it is now RECORD-OWNED: portrait and landscape
-    // are two frames, so the row selects between them instead of transforming one.
+    // Canon classes offer no orientation at all — the record is locked.
     const rect = selectionForFamily(sel(), 'rectangle', 48)
-    expect(panelOptionsFor(rect, [], 48).orientations.map((o) => o.label)).toEqual(['portrait', 'landscape'])
+    expect(panelOptionsFor(rect, [], 48).orientations).toEqual([])
   })
 
   it('F4 — a frameKey that does not name the geometry is refused by both resolvers', () => {

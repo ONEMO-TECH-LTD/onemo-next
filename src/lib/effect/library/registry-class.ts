@@ -1,4 +1,4 @@
-import type { CatalogueRole, ClassControls, ClassOrientationChoice, ClassSpec, ClassType, ClassVariant, DraftIdentity, DraftShape, LibraryClass, OutlineRecipe } from './class-contract'
+import type { CatalogueRole, ClassControls, ClassSpec, ClassType, ClassVariant, DraftIdentity, DraftShape, LibraryClass, OutlineRecipe } from './class-contract'
 import { bandOfFrame } from './rules'
 import { frameKeyOf } from './transforms'
 import type { LibraryFamily, LibraryFrame, LibrarySelection, LibraryTransform } from './types'
@@ -6,7 +6,6 @@ import type { LibraryFamily, LibraryFrame, LibrarySelection, LibraryTransform } 
 interface RegistryClassConfig {
   classId: LibraryFamily
   catalogueRole: CatalogueRole
-  orientationChoices?: (sel: LibrarySelection, pitchMM: number) => readonly ClassOrientationChoice[] | null
   types: readonly ClassType[]
   frames(pitchMM: number): readonly LibraryFrame[]
   typeOfFrame(frame: LibraryFrame): string
@@ -76,7 +75,6 @@ export function registryClass(config: RegistryClassConfig): LibraryClass {
       return { ...current, classId: config.classId, geometryId: undefined, frameKey: frameKeyOf(frame), layoutId: frame.layouts[0].name, view: none }
     },
     orientations: config.orientations,
-    orientationChoices: config.orientationChoices,
     baseView: () => none,
     draftMatches: config.draftMatches,
     draftIdParts: config.draftIdParts,

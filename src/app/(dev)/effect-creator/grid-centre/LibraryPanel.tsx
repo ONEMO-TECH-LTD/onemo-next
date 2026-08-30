@@ -57,7 +57,8 @@ export default function LibraryPanel({
         <Fold title="Orientation">
           <div className="gl-seg gl-liborient">
             {opts.orientations.map((o) => (
-              <button key={o.id} aria-pressed={o.active} onClick={() => setSel(o.next)}>{o.label}</button>
+              <button key={o.id} aria-pressed={o.active} disabled={o.disabled}
+                onClick={() => setSel(o.next)}>{o.label}</button>
             ))}
           </div>
         </Fold>
