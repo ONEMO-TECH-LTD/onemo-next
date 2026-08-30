@@ -17,7 +17,7 @@ item is unticked. Partial is reported as partial, with the missing item named.
 |---|---|---|
 | 1 | canon wired properly — suggested layout is the search's STARTING POINT, no parallel path | DONE · QA-CLEAR at 2c7e4286, bounded |
 | 2 | outer/inner classifier ruler toggle — "i prefer testing both" | BUILT + COMMITTED · headless gated · LIVE GATED: butterfly B3 legal=no optimal, outer=optimal 123.26/3 |
-| 3 | Clipper2 unprotected-area defender + the four preferences, as toggles | BUILT · QA-rejected once, six defects repaired · **PARTIAL**: combined-toggle ordering is UNRULED (see below) |
+| 3 | Clipper2 unprotected-area defender + the four preferences, as toggles | BUILT · QA-rejected twice, nine defects repaired · **PARTIAL**: rule 2 is behaviourally REDUNDANT (wrap already holds the extremes); combined-toggle ordering UNRULED; no live gate since the repairs |
 
 ## Step 2's content, verbatim
 

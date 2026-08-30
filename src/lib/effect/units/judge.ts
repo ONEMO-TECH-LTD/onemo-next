@@ -96,11 +96,18 @@ const areaOf = (paths: Paths64): number => Math.abs(Number(Clipper.areaPaths(pat
 /** A disc polygon at the given reach. A one-point path cannot be offset — asking Clipper to
  *  inflate one returns nothing, which silently reported every shape as fully covered. */
 function discAt(m: Pt, reachMM: number): ReturnType<typeof Clipper.makePath> {
-  const SEG = 64
+  // CIRCUMSCRIBED, not inscribed. An inscribed polygon cuts INSIDE the true circle between its
+  // vertices, so points nearer than the reach survived as "unprotected" — QA found a probe 47.98mm
+  // from a magnet surviving a 48mm subtraction, which made the promise of the measure false. The
+  // vertex radius is pushed out by 1/cos(half the segment angle) so every point within the true
+  // radius is covered; 72 sides keeps the overreach under 0.05mm at 48mm, inside manufacturing
+  // tolerance. The error now leans toward protecting slightly too much, never too little.
+  const SEG = 72
+  const r = reachMM / Math.cos(Math.PI / SEG)
   const flat: number[] = []
   for (let i = 0; i < SEG; i++) {
     const a = (i / SEG) * Math.PI * 2
-    flat.push(Math.round((m[0] + Math.cos(a) * reachMM) * S), Math.round((m[1] + Math.sin(a) * reachMM) * S))
+    flat.push(Math.round((m[0] + Math.cos(a) * r) * S), Math.round((m[1] + Math.sin(a) * r) * S))
   }
   return Clipper.makePath(flat)
 }
@@ -139,6 +146,32 @@ export interface HoldingFacts {
   unprotectedMM2: number
 }
 
+/** A legal boundary edge in mm: ax, ay, bx, by, and its unit direction. */
+type Seg = [number, number, number, number, number, number]
+
+function boundarySegments(paths: Paths64): Seg[] {
+  const out: Seg[] = []
+  for (const path of paths) {
+    for (let i = 0, j = path.length - 1; i < path.length; j = i++) {
+      const ax = Number(path[j].x) / S, ay = Number(path[j].y) / S
+      const bx = Number(path[i].x) / S, by = Number(path[i].y) / S
+      const dx = bx - ax, dy = by - ay
+      const len = Math.hypot(dx, dy)
+      if (len < 1e-9) continue
+      out.push([ax, ay, bx, by, dx / len, dy / len])
+    }
+  }
+  return out
+}
+
+const segDistMM = (sg: Seg, p: Pt): number => {
+  const dx = sg[2] - sg[0], dy = sg[3] - sg[1]
+  const len2 = dx * dx + dy * dy
+  let t = len2 > 0 ? ((p[0] - sg[0]) * dx + (p[1] - sg[1]) * dy) / len2 : 0
+  t = t < 0 ? 0 : t > 1 ? 1 : t
+  return Math.hypot(p[0] - (sg[0] + t * dx), p[1] - (sg[1] + t * dy))
+}
+
 /** Measure one offer. Geometry only — no preference is applied here. */
 export function holdingFactsOf(
   magnets: ReadonlyArray<Pt>, legalBox: { minX: number; minY: number; maxX: number; maxY: number },
@@ -146,6 +179,11 @@ export function holdingFactsOf(
   /** The grid pitch. The reach is CLAMPED here, so no caller can widen Dan's 24-48mm by handing in
    *  a 96mm pitch — which is exactly how a 96mm bare end passed as "holding the extremes". */
   pitchMM: number,
+  /** The legal region itself. Rules 1 and 3 read its REAL boundary when it is given: a magnet 5mm
+   *  from the inner edge of a U is a perimeter hold, and the bounding box cannot see that — it is
+   *  71mm from the nearest box edge (QA F1). Without it they fall back to the box, which is only
+   *  correct for a convex frame. */
+  legal?: Paths64 | null,
 ): HoldingFacts {
   const reachMM = protectionReachMM(pitchMM)
   const w = legalBox.maxX - legalBox.minX, h = legalBox.maxY - legalBox.minY
@@ -154,15 +192,26 @@ export function holdingFactsOf(
   // different question entirely: a lone magnet dead-centre of a 200x200 box counted as a perimeter
   // hold because it had no neighbours (QA F2). A perimeter-side hold is one NEAR AN EDGE.
   let perimeter = 0, corners = 0
+  const segs = legal && legal.length ? boundarySegments(legal) : null
   for (const m of magnets) {
+    if (segs) {
+      // THE REAL BOUNDARY: every legal edge within reach of this magnet. A perimeter-side hold has
+      // at least one; a corner has two that are NOT parallel — which is what a corner is, whether
+      // it belongs to the outline, a hole, or the inside of a U.
+      const near = segs.filter((sg) => segDistMM(sg, m) <= reachMM)
+      if (!near.length) continue
+      perimeter++
+      let turned = false
+      for (let i = 0; i < near.length && !turned; i++)
+        for (let j = i + 1; j < near.length && !turned; j++)
+          if (Math.abs(near[i][4] * near[j][5] - near[i][5] * near[j][4]) > 0.2) turned = true
+      if (turned) corners++
+      continue
+    }
     const dx = Math.min(m[0] - legalBox.minX, legalBox.maxX - m[0])
     const dy = Math.min(m[1] - legalBox.minY, legalBox.maxY - m[1])
-    // a perimeter-side hold is one within the protection reach of an EDGE. A lone magnet at the
-    // centre of a 200x200 box is 100mm from every edge and counts as nothing.
     if (Math.min(dx, dy) > reachMM) continue
     perimeter++
-    // a corner is within reach of TWO sides at once — the only pair of directions "corner" can
-    // mean for an axis-aligned frame
     if (dx <= reachMM && dy <= reachMM) corners++
   }
   // RULE 2 — "extreme apart sides must be held ... top and bottom in portrait, right and left in

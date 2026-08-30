@@ -151,8 +151,15 @@ describe("Dan's holding rules: rule 2 enforces, rules 1/3/4 order", () => {
     // therefore misses precisely the concave perimeter Dan asked the Clipper defender to see.
     const u = ring([[0, 0], [300, 0], [300, 300], [200, 300], [200, 100],
       [100, 100], [100, 300], [0, 300]])
+    // QA's own repair says the fact seam must RECEIVE the legal path set; their test omitted it,
+    // and with only a box the answer cannot be 1 by construction. Passing the region, as their
+    // repair specifies.
     const box = legalRegionBoxMM(u, RELEASED_PADDING_MM)!
-    expect(holdingFactsOf([[83, 200]], box, [], 48).perimeter).toBe(1)
+    const legal = legalRegion(u, RELEASED_PADDING_MM)!
+    expect(holdingFactsOf([[83, 200]], box, [], 48, legal).perimeter).toBe(1)
+    // and the box-only fallback is exactly what it was before: blind to the concave edge
+    expect(holdingFactsOf([[83, 200]], box, [], 48).perimeter,
+      'without the region a box is 71mm away and sees nothing — that is the defect').toBe(0)
   })
 
   it("RULE 2: the 48mm limit does not expand with a 96mm pitch", () => {
@@ -189,14 +196,24 @@ describe('the toggle REACHES the ladder — not just the pressed state', () => {
     expect(run(undefined)).toEqual(run(NO_HOLDING_RULES))
   })
 
-  it('THE ENFORCER runs on the pools, so a failing candidate cannot take a role with it', () => {
-    // rule 2 on: every offer the ladder returns must hold the extremes, or there is no offer
+  it('THE ENFORCER IS CURRENTLY REDUNDANT — recorded, not dressed up as working', () => {
+    // My previous version of this test asserted only `enforced.length <= off.length`, which is
+    // true of any filter including one that does nothing. QA proved it: mutating the pool filter
+    // to `keep = () => true` left it green.
+    //
+    // Measured properly — a sweep over tall, wide, L, U and triangle shapes across B2 to B7 — the
+    // enforcer changes NO ladder answer. The reason is structural and worth keeping: wrapGroup
+    // presses the group against the outline, so a wrapped answer's magnets already sit at the
+    // extremes by construction. Dan's rule 2 is a law the wrap already enforces.
+    //
+    // So the code stays — it is his rule, and it bites the moment a candidate arrives unpressed —
+    // but it is reported as REDUNDANT rather than proven. Do not call rule 2 built on this.
     const off = run(NO_HOLDING_RULES)
     const enforced = run({ ...NO_HOLDING_RULES, extremes: true })
-    expect(enforced.length, 'the enforcer must not return more than it started with')
-      .toBeLessThanOrEqual(off.length)
-    // and it is genuinely gating: with it off, the same call returns at least as much
-    expect(off.length, 'the pools were empty to begin with — this proves nothing').toBeGreaterThan(0)
+    expect(enforced, 'if this ever differs, the enforcer has started to bite and this note is stale')
+      .toEqual(off)
+    // and the fact it filters on is real, even where it changes nothing
+    expect(off.length, 'the pools were empty — the sweep proves nothing').toBeGreaterThan(0)
   }, 60_000)
 
   it('a rule ON changes what the ladder returns', () => {
