@@ -162,6 +162,18 @@ describe("Dan's holding rules: rule 2 enforces, rules 1/3/4 order", () => {
       'without the region a box is 71mm away and sees nothing — that is the defect').toBe(0)
   })
 
+  it('RULE 3: a smooth circular boundary is not a corner', () => {
+    const pts: Pt[] = []
+    for (let i = 0; i < 96; i++) {
+      const a = i * Math.PI * 2 / 96
+      pts.push([100 + 100 * Math.cos(a), 100 + 100 * Math.sin(a)])
+    }
+    const circle = ring(pts)
+    const box = legalRegionBoxMM(circle, RELEASED_PADDING_MM)!
+    const legal = legalRegion(circle, RELEASED_PADDING_MM)!
+    expect(holdingFactsOf([[180, 100]], box, [], 48, legal).corners).toBe(0)
+  })
+
   it("RULE 2: the 48mm limit does not expand with a 96mm pitch", () => {
     const box = { minX: 0, minY: 0, maxX: 100, maxY: 300 }
     expect(holdingFactsOf([[50, 95], [50, 205]], box, [], 96).holdsExtremes).toBe(false)
@@ -214,6 +226,10 @@ describe('the toggle REACHES the ladder — not just the pressed state', () => {
       .toEqual(off)
     // and the fact it filters on is real, even where it changes nothing
     expect(off.length, 'the pools were empty — the sweep proves nothing').toBeGreaterThan(0)
+  }, 60_000)
+
+  it('RULE 2 TOGGLE: Dan required a result filter, so on must differ from off somewhere', () => {
+    expect(run({ ...NO_HOLDING_RULES, extremes: true })).not.toEqual(run(NO_HOLDING_RULES))
   }, 60_000)
 
   it('a rule ON changes what the ladder returns', () => {
