@@ -455,23 +455,27 @@ export default function GridLab() {
             }} /> : null}</> : <>
           <Fold title="Grid settings">
             <div className="gl-field"><span>Band · the offer list</span>
-              <div className="gl-seg">
+              <div className="gl-seg gl-bandrow">
                 {BANDS.map((b) =>
                   <button key={b.id} aria-pressed={mode === b.id} onClick={() => { setMode(b.id); setStepSel(null); setManual(null); setBandScale(null); try { localStorage.setItem('grid-centre.band', String(b.id)) } catch { } }}>B{b.id}</button>)}
               </div>
             </div>
             {true && <>
-              <div className="gl-snap">
-                {manual
-                  ? 'manual calibration · double-click the canvas to return to auto'
-                  : bandScale !== null
-                    ? `manual scale · ${Math.round(bandScale)} mm — tap a step or the band chip to return`
-                    : model
-                    ? model.ladder.length
-                      ? `Fit B${mode}-${model.idx + 1} · ${Math.round(model.effSize)} mm · ${model.grid.anchors.length}⌾${model.offMM != null ? ` · off-centre ${model.offMM.toFixed(1)}mm` : ''} · ${model.ladder.length} holding layouts in band`
-                      : 'no lawful offer in this band — calibration witness only, not a fit'
-                    : '—'}
-              </div>
+              {/* The FIT READOUT is gone (Dan, 2026-08-30: "this panel text I said to remove, there
+                  were two plates like that and now 1 — I need it gone"). The offer rows below say
+                  the size and the count and which probe found them, so the plate only repeated
+                  them in a second voice — and its "B3-1" index contradicted the rows' own labels.
+                  What stays is the manual-mode hint, which is not a readout: it is the only place
+                  that says how to get back to auto. */}
+              {(manual || bandScale !== null || (model && !model.ladder.length)) && (
+                <div className="gl-snap">
+                  {manual
+                    ? 'manual calibration · double-click the canvas to return to auto'
+                    : bandScale !== null
+                      ? `manual scale · ${Math.round(bandScale)} mm — tap a step or the band chip to return`
+                      : 'no lawful offer in this band — calibration witness only, not a fit'}
+                </div>
+              )}
               {model && model.ladder.length > 0 && <div className="gl-steps">
                 {model.ladder.map((pt, i) =>
                   <button key={i} aria-pressed={bandScale === null && i === model.idx} onClick={() => { setStepSel(i); setBandScale(null) }}>
@@ -852,6 +856,34 @@ function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, 
           <text {...lbl} x={maxX + fs * 0.6} y={cy} textAnchor="middle" transform={`rotate(90 ${maxX + fs * 0.6} ${cy})`}>{hTxt}</text>
         </g>)
       })()}
+      {/* THE LEGAL AREA'S OWN BOX, dimensioned like the outer one but in the island colour (Dan,
+          2026-08-30: "add the dimensions to the canvas view of the legal eroded area bbox size,
+          same as outer bb only orange to match the island colour and bbox frame"). This is the
+          box the band and the canon lookup are measured on, so it is the number that decides
+          which layout a shape can wear — worth reading off the canvas rather than inferring. */}
+      {box && segments.length > 0 && (() => {
+        const lx = Math.min(...segments.map((sg) => sg.bbox.minX))
+        const lX = Math.max(...segments.map((sg) => sg.bbox.maxX))
+        const ly = Math.min(...segments.map((sg) => sg.bbox.minY))
+        const lY = Math.max(...segments.map((sg) => sg.bbox.maxY))
+        const lw = lX - lx, lh = lY - ly
+        if (!(lw > 0 && lh > 0)) return null
+        // smaller and lighter than the outer box's label — the quieter of the two readings
+        const fs = (viewport ? 5 : 8) * spanMM / VP
+        const hue = SEG_HUES[0]
+        // lighter than the outer box's label: the legal box is the quieter of the two readings
+        const lbl = { fontSize: fs, fill: hue, fillOpacity: 0.85, fontFamily: 'var(--mono)', fontWeight: 400 } as const
+        const wTxt = `${Math.round(lw)} mm`, hTxt = `${Math.round(lh)} mm`
+        const mx = (lx + lX) / 2, my = -(ly + lY) / 2
+        return (<g style={{ pointerEvents: 'none' }}>
+          <rect x={lx} y={-lY} width={lw} height={lh} fill="none" stroke={hue}
+            strokeOpacity={0.55} strokeDasharray="4 4" vectorEffect="non-scaling-stroke" />
+          <text {...lbl} x={mx} y={-lY - fs * 0.6} textAnchor="middle">{wTxt}</text>
+          <text {...lbl} x={mx} y={-ly + fs * 1.5} textAnchor="middle">{wTxt}</text>
+          <text {...lbl} x={lx - fs * 0.6} y={my} textAnchor="middle" transform={`rotate(-90 ${lx - fs * 0.6} ${my})`}>{hTxt}</text>
+          <text {...lbl} x={lX + fs * 0.6} y={my} textAnchor="middle" transform={`rotate(90 ${lX + fs * 0.6} ${my})`}>{hTxt}</text>
+        </g>)
+      })()}
       {/* Every spot the bridge handed over: faint where empty, accent where a magnet seats. */}
       <g transform={pend.x || pend.y ? `translate(${pend.x} ${-pend.y})` : undefined}>
       {spots.map((sp, i) => {
@@ -1013,6 +1045,9 @@ const CSS = `
 .gl-seg{display:flex;gap:4px;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:3px}
 .gl-seg3 button,.gl-seg button{flex:1;min-width:0;font:550 12px var(--sans);color:var(--ink-2);background:none;border:0;border-radius:7px;padding:8px 4px;cursor:pointer;transition:.12s;white-space:nowrap}
 .gl-seg.gl-wrap{flex-wrap:wrap}.gl-seg.gl-wrap button{min-width:64px}
+/* BAND ROW — six per row, so eleven bands read 6 + 5 on two lines instead of eleven squashed
+   into one strip (Dan, 2026-08-30). A grid rather than wrap so the break is the same every time. */
+.gl-seg.gl-bandrow{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px}
 .gl-seg button:hover{color:var(--ink)}
 .gl-seg button[aria-pressed=true]{background:var(--accent);color:#fff;box-shadow:0 1px 2px #0002}
 .gl-field{display:flex;flex-direction:column;gap:8px;font:600 10.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}

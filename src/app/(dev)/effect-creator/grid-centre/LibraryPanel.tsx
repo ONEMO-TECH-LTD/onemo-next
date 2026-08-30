@@ -37,6 +37,9 @@ export default function LibraryPanel({
   const opts = options
   // the only state the view adds is whether the editor is open; everything else is an option
   const go = (o: PanelOption) => { setEdit(null); setSel(o.next) }
+  // a band or orientation chip filters AND lands on the first record it leaves visible, so the
+  // canvas never sits on a record the list no longer shows (Dan, 2026-08-30)
+  const browseTo = (o: BrowseOption) => { setEdit(null); setBrowse(o.next); if (o.select) setSel(o.select) }
   const pressed = (o: PanelOption) => !edit && o.active
   return (
     <>
@@ -66,18 +69,18 @@ export default function LibraryPanel({
       )}
       {opts.bands.length > 0 && (
         <Fold title="Band">
-          <div className="gl-seg gl-libband-row">
+          <div className="gl-seg gl-bandrow">
             {opts.bands.map((o: BrowseOption) => (
-              <button key={o.id} aria-pressed={o.active} onClick={() => setBrowse(o.next)}>{o.label}</button>
+              <button key={o.id} aria-pressed={o.active} onClick={() => browseTo(o)}>{o.label}</button>
             ))}
           </div>
         </Fold>
       )}
       {opts.frameOrientations.length > 0 && (
         <Fold title="Orientation">
-          <div className="gl-seg gl-liborient">
+          <div className="gl-seg gl-wrap">
             {opts.frameOrientations.map((o: BrowseOption) => (
-              <button key={o.id} aria-pressed={o.active} onClick={() => setBrowse(o.next)}>{o.label}</button>
+              <button key={o.id} aria-pressed={o.active} onClick={() => browseTo(o)}>{o.label}</button>
             ))}
           </div>
         </Fold>

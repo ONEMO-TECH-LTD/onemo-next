@@ -122,6 +122,56 @@ export function safeSegments(
         }
       }
     }
+    // THE TRUE EXTENT, not the sampled one. A region's box was accumulated from the MESH SAMPLE
+    // positions that fell inside it, so it could only ever report multiples of the 2mm grain and
+    // sat up to one cell inside the real edge. That is why the drawn box was not edge to edge and
+    // the shape crossed it (Dan, 2026-08-30: "the orange frame is not edge to edge ... we need
+    // precision here") — the outline is traced on the exact iso curve while the box was not.
+    //
+    // The crossings are the exact curve, so the box is taken from them. Computed here for every
+    // detail level: 'light' still skips the ring CHAINING, which is the expensive part, but a
+    // measurement must not depend on whether anyone asked to draw it.
+    const bounds = accs.map(() => ({ minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity }))
+    const growAt = (id: number, p: Pt) => {
+      if (id < 0) return
+      const b = bounds[id]
+      if (p[0] < b.minX) b.minX = p[0]; if (p[0] > b.maxX) b.maxX = p[0]
+      if (p[1] < b.minY) b.minY = p[1]; if (p[1] > b.maxY) b.maxY = p[1]
+    }
+    /** The region a crossing belongs to: the qualifying corner of its own cell. */
+    const ownerOf = (i00: number, i10: number, i01: number, i11: number): number => {
+      for (const i of [i00, i10, i01, i11]) if (S[i] >= thr && comp[i] >= 0) return comp[i]
+      return -1
+    }
+    for (let iy = 0; iy < ny - 1; iy++) {
+      for (let ix = 0; ix < nx - 1; ix++) {
+        const i00 = iy * nx + ix, i10 = i00 + 1, i01 = i00 + nx, i11 = i01 + 1
+        const s00 = S[i00] - thr, s10 = S[i10] - thr, s01 = S[i01] - thr, s11 = S[i11] - thr
+        const m = (s00 >= 0 ? 1 : 0) | (s10 >= 0 ? 2 : 0) | (s11 >= 0 ? 4 : 0) | (s01 >= 0 ? 8 : 0)
+        if (m === 0 || m === MS_CASES.length - 1) continue
+        const ax = x0 + ix * step, ay = y0 + iy * step
+        const P00: Pt = [ax, ay], P10: Pt = [ax + step, ay], P01: Pt = [ax, ay + step], P11: Pt = [ax + step, ay + step]
+        const own = ownerOf(i00, i10, i01, i11)
+        if (own < 0) continue
+        for (const [ea, eb] of MS_CASES[m]) {
+          for (const e of [ea, eb]) {
+            growAt(own, e === 0 ? lerp(P00, s00, P10, s10)
+              : e === 1 ? lerp(P10, s10, P11, s11)
+                : e === 2 ? lerp(P01, s01, P11, s11)
+                  : lerp(P00, s00, P01, s01))
+          }
+        }
+      }
+    }
+    /** The sampled box is the floor: a region whose crossings were all clipped keeps it. */
+    const boxOf = (a: { minX: number; minY: number; maxX: number; maxY: number }, id: number): BBox => {
+      const b = bounds[id]
+      return b.minX === Infinity ? { minX: a.minX, minY: a.minY, maxX: a.maxX, maxY: a.maxY } : {
+        minX: Math.min(a.minX, b.minX), minY: Math.min(a.minY, b.minY),
+        maxX: Math.max(a.maxX, b.maxX), maxY: Math.max(a.maxY, b.maxY),
+      }
+    }
+
     // Level-crossing segments per mesh cell, lerped; chained into closed rings.
     // 'light' skips outlines entirely — scoring needs centres/areas/boxes, only display needs rings.
     const segs: Array<[Pt, Pt]> = []
@@ -129,12 +179,12 @@ export function safeSegments(
       const at0 = (i: number): Pt => [x0 + (i % nx) * step, y0 + ((i / nx) | 0) * step]
       return {
         comp,
-        items: accs.map((a) => ({
+        items: accs.map((a, i) => ({
           areaMM2: a.n * step * step,
           centreMM: at0(a.deepIdx),
           meanMM: [a.sx / a.n, a.sy / a.n] as Pt,
           peakClearMM: a.deepS + r + thr,
-          bbox: { minX: a.minX, minY: a.minY, maxX: a.maxX, maxY: a.maxY },
+          bbox: boxOf(a, i),
           rings: [],
           deepIdx: a.deepIdx,
         })),
@@ -210,7 +260,7 @@ export function safeSegments(
         centreMM: at(a.deepIdx),
         meanMM: [a.sx / a.n, a.sy / a.n] as Pt,
         peakClearMM: a.deepS + r + thr,
-        bbox: { minX: a.minX, minY: a.minY, maxX: a.maxX, maxY: a.maxY },
+        bbox: boxOf(a, id),
         rings: ringsByComp[id],
         deepIdx: a.deepIdx,
       })),

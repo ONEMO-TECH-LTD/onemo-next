@@ -4,7 +4,7 @@
 // shell and poage"). Resolution lives in selection.ts; classes answer through class-registry.ts.
 
 import { specOf } from './class-registry'
-import type { FrameOrientation, LibraryClass } from './class-contract'
+import type { ClassVariant, FrameOrientation, LibraryClass } from './class-contract'
 import { frameKeyOf, transformLayout, viewName } from './transforms'
 import { draftLayoutId, selectVariant, type ResolvedSelection } from './selection'
 import type { LibraryDraft } from './drafts'
@@ -45,6 +45,11 @@ export interface BrowseOption {
   label: string
   active: boolean
   next: LibraryBrowse
+  /** The record to land on when this chip is pressed — the first one the filter leaves visible.
+   *  Dan, 2026-08-30: "when selecting the band the selection is automatic of the content." A
+   *  filter that narrows the list but leaves the canvas on a record you can no longer see is a
+   *  dead control. Absent when the filter leaves nothing. */
+  select?: LibrarySelection
 }
 
 export interface PanelOptions {
@@ -136,22 +141,28 @@ export function selectionForFamily(
  *  in the panel: the view renders options and holds no class logic (Dan, 08-26 "no logic in UI
  *  shell and page"), and deciding which frames a band contains is exactly that logic. */
 function browseRows(
-  variants: readonly { bandId: number | null; orientation: FrameOrientation }[], browse: LibraryBrowse,
+  variants: readonly ClassVariant[], browse: LibraryBrowse, sel: LibrarySelection,
 ): { bands: BrowseOption[]; frameOrientations: BrowseOption[]; applied: LibraryBrowse } {
   const ids = [...new Set(variants.map((v) => v.bandId).filter((b): b is number => b !== null))]
     .sort((a, b) => a - b)
+  /** The record a chip lands on: the first one still visible once that chip's filter is applied. */
+  const landing = (next: LibraryBrowse): LibrarySelection | undefined => {
+    const first = variants.find((v) => (next.bandId === null || v.bandId === next.bandId)
+      && (next.orientation === null || v.orientation === next.orientation))
+    return first ? selectVariant(sel, first) : undefined
+  }
+  const chip = (id: string, label: string, active: boolean, next: LibraryBrowse): BrowseOption =>
+    ({ id, label, active, next, select: landing(next) })
   const bands: BrowseOption[] = ids.length > 1 ? [
-    { id: 'band-all', label: 'all', active: browse.bandId === null, next: { ...browse, bandId: null } },
-    ...ids.map((id) => ({
-      id: 'band' + id, label: 'B' + id, active: browse.bandId === id, next: { ...browse, bandId: id },
-    })),
+    chip('band-all', 'all', browse.bandId === null, { ...browse, bandId: null }),
+    ...ids.map((id) => chip('band' + id, 'B' + id, browse.bandId === id, { ...browse, bandId: id })),
   ] : []
   // only a class publishing BOTH ways round has a choice to offer
   const ways = new Set(variants.map((v) => v.orientation))
   const frameOrientations: BrowseOption[] = ways.has('portrait') && ways.has('landscape') ? [
-    { id: 'o-all', label: 'all', active: browse.orientation === null, next: { ...browse, orientation: null } },
-    { id: 'o-portrait', label: 'portrait', active: browse.orientation === 'portrait', next: { ...browse, orientation: 'portrait' } },
-    { id: 'o-landscape', label: 'landscape', active: browse.orientation === 'landscape', next: { ...browse, orientation: 'landscape' } },
+    chip('o-all', 'all', browse.orientation === null, { ...browse, orientation: null }),
+    chip('o-portrait', 'portrait', browse.orientation === 'portrait', { ...browse, orientation: 'portrait' }),
+    chip('o-landscape', 'landscape', browse.orientation === 'landscape', { ...browse, orientation: 'landscape' }),
   ] : []
   // A FILTER THAT IS NOT OFFERED MUST NOT FILTER. Carrying "portrait" from the rectangle tab into
   // the square tab emptied the list — squares are neither portrait nor landscape, so every chip
@@ -175,7 +186,7 @@ export function panelOptionsResolved(
   const variantId = variant.id
   const layoutSel = (name: string): LibrarySelection => ({ ...sel, layoutId: name })
   const allVariants = spec.variants(type, pitchMM)
-  const rows = browseRows(allVariants, browse)
+  const rows = browseRows(allVariants, browse, sel)
 
   return {
     // a class with one type offers no choice, so its chip is inert. WHICH controls are inert is
