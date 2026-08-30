@@ -35,6 +35,7 @@ export function libraryStageModel(materialized: MaterializedLibrary, pitchMM: nu
     spotRadiusMM: RELEASED_PADDING_MM,
     contactsMM: [],
     segments: [],
+    legalBoxMM: materialized.legalBoxMM,
     centresMM: [],
     centreMainMM: [(materialized.frameCols - 1) * pitchMM / 2, (materialized.frameRows - 1) * pitchMM / 2],
     seatings: [],   // a library record is one authored population; nothing was registered

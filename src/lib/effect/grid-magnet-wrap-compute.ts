@@ -23,6 +23,7 @@ import type { CentreMode, Governor } from './types'
 import { wrapGroup } from './units/wrap'
 import { inBand, orderOffers } from './units/judge'
 import { bestSeatedCandidate, fallbackRevealSizes } from './units/layout'
+import { legalRegionBoxMM } from './units/classifier'
 
 
 /** mm → integer microns; Clipper64 is integer-robust. */
@@ -60,6 +61,7 @@ export function wrapGrid(
       spotRadiusMM: radius,
       contactsMM: at.points.filter((_, i) => (at.gapsMM[i] ?? Infinity) <= 0.6),
       segments: [],
+      legalBoxMM: legalRegionBoxMM(contour, radius),
       centresMM: [at.anchorMM],
       centreMainMM: at.anchorMM,
       seatings: [],   // display of a settled answer; the registrations were spent upstream

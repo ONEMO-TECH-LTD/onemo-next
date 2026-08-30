@@ -218,7 +218,12 @@ describe('2b — the units are self-sufficient', () => {
   it('only the two named sequencer seats hold unit edges, and exactly the pinned ones', () => {
     const TEMPORARY_UNIT_EDGES: Record<string, readonly string[]> = {
       'grid-magnet.ts': ['./units/centring', './units/classifier', './units/layout', './units/segment'],
-      'grid-magnet-wrap-compute.ts': ['./units/centring', './units/judge', './units/layout', './units/segment', './units/wrap'],
+      // + './units/classifier' (2026-08-30): the sequencer shapes the DISPLAY result, and that
+      // result now carries the legal box so the canvas draws the same ruler the classifier
+      // measures instead of deriving one from the 2mm segmentation islands. A measured value
+      // travelling with the result is sequencing, not policy — but it is a new unit edge, so it
+      // is pinned deliberately rather than arriving as a side effect.
+      'grid-magnet-wrap-compute.ts': ['./units/centring', './units/classifier', './units/judge', './units/layout', './units/segment', './units/wrap'],
       'grid-magnet-class.ts': ['./units/classifier'],
       'grid-magnet-compute.ts': ['./units/centring', './units/layout', './units/segment'],
       'grid-magnet-logic.ts': ['./units/centring', './units/layout'],

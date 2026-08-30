@@ -30,6 +30,10 @@ export interface MaterializedLibrary {
   bandId: number
   nodesMM: readonly PointMM[]
   outlineMM: readonly PointMM[]
+  /** Exact legal box of the authored magnet population. The library outline is derived from these
+   *  nodes plus the released rim, so this is the classifier-equivalent ruler without re-eroding
+   *  the outline in the UI shell. */
+  legalBoxMM: { minX: number; minY: number; maxX: number; maxY: number } | null
   widthMM: number
   heightMM: number
   /** Why the population being drawn is not a shape yet — null when it is. */
@@ -52,6 +56,11 @@ export function materializeResolved(
   if (band === null) throw new Error('library: ' + frameKeyOf(frame) + ' at ' + pitchMM + 'mm has no released band')
   const bandId = band
   const outlineOf = (ns: readonly PointMM[]) => outlineFromLayout(ns, variant.outline)
+  const legalBoxOf = (ns: readonly PointMM[]): MaterializedLibrary['legalBoxMM'] => {
+    if (!ns.length) return null
+    const xs = ns.map(([x]) => x), ys = ns.map(([, y]) => y)
+    return { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) }
+  }
   /** The one record. Only the outline it wraps, its layout name, why it is not a shape yet and
    *  where to look when nothing is drawn ever differ between the three cases. */
   const record = (
@@ -60,7 +69,8 @@ export function materializeResolved(
     classId,
     sourceFrameKey: frameKeyOf(frame), frameKey: p.cols + 'x' + p.rows,
     frameCols: p.cols, frameRows: p.rows, layoutId, bandId,
-    nodesMM: p.nodesMM, outlineMM, ...boundsMM(outlineMM), error, seedMM,
+    nodesMM: p.nodesMM, outlineMM, legalBoxMM: legalBoxOf(p.nodesMM),
+    ...boundsMM(outlineMM), error, seedMM,
   })
 
   if (!nodes) return record(outlineOf(p.nodesMM), layout.name, null, p.nodesMM[0] ?? null)

@@ -22,7 +22,7 @@ import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
 import { DEFAULT_PITCH_MM, type BandSnapPoint, type GridResult, type MagnetPlan, type SafeSegment } from '@/lib/effect/grid-magnet'
-import { bandOuterMM, legalRegionBoxMM, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet'
+import { bandOuterMM, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet'
 import { BANDS, CENTRE_MODE, GOVERNOR, PADDING_CEIL_MM, PADDING_FLOOR_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-magnet-spec'
 import { fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-magnet-bridge'
 
@@ -402,7 +402,6 @@ export default function GridLab() {
                 ? { contour: libraryModel.contour, grid: libraryModel.grid, lattice: showLattice, box: showBox,
                     // the record's own legal area, dimensioned like the bench's
                     segments: librarySegments, segFill: false,
-                    legalBoxMM: legalRegionBoxMM(libraryModel.contour, spotRadiusOf(pad)),
                     viewport: { panMM: libView.panMM, zoom: libView.zoom * CAM_BASE, wheelZoom: true },
                     onPan: (dx: number, dy: number) => setLibView((v) => ({ ...v, panMM: [v.panMM[0] - dx, v.panMM[1] - dy] })),
                     onZoom: (f: number) => setLibView((v) => ({ ...v, zoom: camClamp(v.zoom * f) })),
@@ -414,7 +413,6 @@ export default function GridLab() {
                     // 100% = the shape at half the board, so there is room around it (Dan).
                     viewport: { panMM: [0, 0] as Pt, zoom: camZoom * CAM_BASE },
                     segments: showSegs ? model!.segments : [], segFill: segFillN !== 0,
-                    legalBoxMM: legalRegionBoxMM(model!.contour, spotRadiusOf(pad)),
                     onPan: (dx: number, dy: number) => setManual((m) => { const bx = m ? m.x : model!.grid.phaseMM[0], by = m ? m.y : model!.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } }),
                     onZoom: (f: number) => {
                       // Pinch = manual scaling WITHIN the band's range.
@@ -651,12 +649,8 @@ function dim(c: Contour, axis: 0 | 1): number {
 /** Island tints — screen colours only, one hue per segment, smallest first. */
 const SEG_HUES = ['#e0762f', '#7a4ae0', '#2fa864', '#e04a8f', '#2f9fe0']
 
-function Stage({ contour, grid, lattice, box, segments, segFill, legalBoxMM, onPan, onZoom, onReset, onPickNode, viewport }: {
+function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, onReset, onPickNode, viewport }: {
   contour: Contour; grid: GridResult; lattice: boolean; box: boolean; segments: SafeSegment[]; segFill: boolean
-  /** The EXACT legal box from the domain — the same ruler the classifier and the canon lookup use.
-   *  Not derived from `segments`: those are the 2mm marching-squares islands and exist to be drawn.
-   *  Reading the box off them put 168 on the canvas where the ruler says 169 (QA re-gate). */
-  legalBoxMM: { minX: number; minY: number; maxX: number; maxY: number } | null
   onPan: (dxMM: number, dyMM: number) => void; onZoom: (f: number) => void; onReset: () => void
   /** Library authoring: a lattice spot was clicked (mm, engine y-up). Display layer only. */
   onPickNode?: (pMM: Pt) => void
@@ -881,8 +875,8 @@ function Stage({ contour, grid, lattice, box, segments, segFill, legalBoxMM, onP
           same as outer bb only orange to match the island colour and bbox frame"). This is the
           box the band and the canon lookup are measured on, so it is the number that decides
           which layout a shape can wear — worth reading off the canvas rather than inferring. */}
-      {box && legalBoxMM && (() => {
-        const { minX: lx, maxX: lX, minY: ly, maxY: lY } = legalBoxMM
+      {box && grid.legalBoxMM && (() => {
+        const { minX: lx, maxX: lX, minY: ly, maxY: lY } = grid.legalBoxMM
         const lw = lX - lx, lh = lY - ly
         // A SLIM RECORD'S LEGAL AREA IS ZERO WIDE AND THAT IS THE ANSWER, not an absence: a 24mm
         // strip minus the 12mm rim each side leaves one column of centres, which is a real product

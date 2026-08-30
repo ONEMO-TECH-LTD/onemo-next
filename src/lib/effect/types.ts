@@ -162,6 +162,9 @@ export interface GridResult {
   contactsMM: Pt[]
   /** The legal area's islands with depth masses — what centring anchored on. */
   segments: SafeSegment[]
+  /** Exact radius-only legal-region box used by classification and display. Segment boxes remain
+   *  the sampled island measurement and must not be promoted into this product ruler. */
+  legalBoxMM: BBox | null
   /** The active centre-mode's candidate target(s) — drawn so the aim is visible. */
   centresMM: Pt[]
   /** THE centre that governed the winning layout — the main point of the centring system. */
