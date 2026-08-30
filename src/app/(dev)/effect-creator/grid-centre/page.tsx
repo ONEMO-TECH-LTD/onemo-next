@@ -260,8 +260,10 @@ export default function GridLab() {
   // The solve runs in a worker so the page never freezes; the last result stays up while solving.
   type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: Array<BandSnapPoint & { roles?: string[] }>; idx: number; segments: SafeSegment[]; stops?: Array<{ press: number; reveal: number }>; offMM?: number; recog?: { family: string; cols: number; rows: number; segWmm: number; segHmm: number }
     /** STEP 1+2 — what the classifier read at this band's trial size, and the whole table. */
-    bandClass?: { bandId: number; seedMM: number; outerWidthMM: number; outerHeightMM: number; legalWidthMM: number; legalHeightMM: number; anchorMM: Pt } | null
-    recommendation?: { cols: number; rows: number; count: number; id: string; seedMM: number } | null }
+    /** the classifier's own row and the layout it recommended — carried for the readout, not
+     *  rendered as a second panel (Dan: I did not ask for that) */
+    bandClass?: { bandId: number; seedMM: number; legalWidthMM: number; legalHeightMM: number } | null
+    recommendation?: { cols: number; rows: number; count: number } | null }
   const [model, setModel] = useState<Model | null>(null)
   const [solving, setSolving] = useState(false)
   // The overlay earns its place only on a REAL wait: it appears after a grace period, so the
@@ -455,12 +457,6 @@ export default function GridLab() {
               </div>
             </div>
             {true && <>
-              {model?.bandClass && <div className="gl-snap">
-                {`measured at ${Math.round(model.bandClass.seedMM)} mm · outer ${Math.round(model.bandClass.outerWidthMM)}×${Math.round(model.bandClass.outerHeightMM)} · legal ${Math.round(model.bandClass.legalWidthMM)}×${Math.round(model.bandClass.legalHeightMM)} mm`}
-                {model.recommendation
-                  ? <> · optimal <b>{model.recommendation.cols}×{model.recommendation.rows}</b> · {model.recommendation.count}⌾ to try first</>
-                  : ' · nothing in this band fits that box'}
-              </div>}
               <div className="gl-snap">
                 {manual
                   ? 'manual calibration · double-click the canvas to return to auto'
