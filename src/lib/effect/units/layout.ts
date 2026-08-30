@@ -157,6 +157,20 @@ export function makeContourSeatPredicate(
 
 const mod = (v: number, m: number) => ((v % m) + m) % m
 
+/** The shifts that put a finite layout on `targetPhase`, the phase the lattice is built at.
+ *
+ *  Solves `(anchorFromMin + shift + nodeOffset) mod pitch = targetPhase` and returns the solution
+ *  nearest zero — least displacement from the governed centre. At exactly half a pitch both
+ *  directions are equally centred and BOTH are returned: they are the same phase but different
+ *  finite windows, and choosing one is what made the placement mirror-biased (QA, 2026-08-30). */
+function canonShifts(nodeOffset: number, anchorFromMin: number, targetPhase: number, pitch: number): number[] {
+  const need = mod(targetPhase - (anchorFromMin + nodeOffset), pitch)
+  const half = pitch / 2
+  const low = need - pitch                       // the same phase, the other side of zero
+  if (Math.abs(Math.abs(need) - half) < 1e-9) return [low, need]
+  return [Math.abs(need) <= Math.abs(low) ? need : low]
+}
+
 /** What layout decided — placement only; the caller turns it into the engine's result. */
 interface LayoutPlacement {
   bb: ReturnType<typeof bbox>; pitch: number; reach: number
@@ -259,14 +273,26 @@ export function registerLayout(
     let best: { seats: number; canon: number; excess: number } | null = null
     for (const [px, py, canon] of cands) {
       const ox = mod(px, pitch), oy = mod(py, pitch)
-      // The suggested layout starts from THIS position, displaced exactly as this candidate is
-      // from the canonical parity — so it gets all four, like the lattice does. Nothing else:
-      // no ranking here, no thinning, no coverage. Just which of its spots the material holds.
+      // THE SUGGESTED LAYOUT AT THIS CANDIDATE'S PHASE. Derived from `ox`/`oy` — the phase the
+      // lattice is actually built at — not from the candidate's unwrapped coordinate.
+      //
+      // QA F2/F1 (2026-08-30): displacing by `px - bxc` does NOT put a finite frame at the same
+      // phase as `latticeAt`. On a 4x4 square the two sets coincide by luck, which is why it
+      // looked right; on an off-centre rectangle it reverses, and it is MIRROR-BIASED — the same
+      // shape flipped gave canon [1,1] one way and [2,1] the other while the free search returned
+      // [1,2] both times. A shape's answer must not depend on which way round it is drawn.
+      //
+      // A finite frame also has a SIGN choice the infinite lattice does not: at exactly half a
+      // pitch, -half and +half are equally centred and land on different material. Picking one is
+      // the bias. Both are tried.
       if (canonLocalMM?.length) {
-        const held = canonLocalMM
-          .map(([lx, ly]) => [ruleTarget[0] + (px - bxc) + lx, ruleTarget[1] + (py - byc) + ly] as Pt)
-          .filter(fits)
-        if (held.length) canonSeatings.push(held)
+        for (const sx of canonShifts(canonLocalMM[0][0], ruleTarget[0] - bb.minX, ox, pitch))
+          for (const sy of canonShifts(canonLocalMM[0][1], ruleTarget[1] - bb.minY, oy, pitch)) {
+            const held = canonLocalMM
+              .map(([lx, ly]) => [ruleTarget[0] + sx + lx, ruleTarget[1] + sy + ly] as Pt)
+              .filter(fits)
+            if (held.length) canonSeatings.push(held)
+          }
       }
       const seat = latticeAt(bb, pitch, ox, oy).filter(fits)
       if (!seat.length) continue

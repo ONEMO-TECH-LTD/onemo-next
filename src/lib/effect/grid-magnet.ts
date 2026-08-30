@@ -7,7 +7,7 @@
 import type { Contour, GridConfig, GridResult, Pt } from './types'
 export type { GridConfig, GridResult } from './types'
 import { registerLayout } from './units/layout'
-import { classificationSeedMM, legalUnionBoxMM } from './units/classifier'
+import { classificationSeedMM, legalRegionBoxMM } from './units/classifier'
 import { safeSegments } from './units/segment'
 import { centeringAnchors, governMass } from './units/centring'
 import { bbox } from './foundation/geometry'
@@ -76,7 +76,12 @@ export function classifyBands(
     // COLUMN count for both axes and so believes the board is square.
     const seedMM = classificationSeedMM(band, pad)
     const contour = sized(seedMM)
-    const legal = legalUnionBoxMM(safeSegments(contour, r, 'light'))
+    // THE EXACT LEGAL BOX, from the same Clipper2 inward offset that seating and wrap use — not
+    // from the 2mm segmentation mesh. QA proved the mesh box is not transform-invariant: a 7-point
+    // polygon read 239.18mm (no band) and its horizontal mirror 238.81mm (B5), with mirrored
+    // disagreement up to 5.97mm across 1,000 shapes. A shape's band must not change when you flip
+    // it, so the ruler cannot be a sampled display field.
+    const legal = legalRegionBoxMM(contour, r)
     if (!legal) continue                      // nothing can hold a magnet at that size
     const bb = bbox(contour.outer.pts)
     rows.push({
