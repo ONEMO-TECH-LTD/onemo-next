@@ -671,7 +671,7 @@ describe('1b — the frame comes from the usable material', () => {
     }
 
     // B4 — three distinct answers. The counts are pinned because they are the whole point: the
-    // FEWEST is 10, and 10 is only reachable because every registration now survives. Winner-only
+    // FEWEST is 6, and 6 is only reachable because every registration now survives. Winner-only
     // cannot produce it — that path keeps the fullest at each size, so its fewest is 12.
     const b4 = solveBand(4)
     expect(b4.solve.offers.map((o) => o.at.count), 'B4 optimal / fewest / most').toEqual([16, 10, 12])
