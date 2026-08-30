@@ -22,7 +22,7 @@ import { CENTRE_MODE, GOVERNOR } from './grid-magnet-spec'
 import type { CentreMode, Governor } from './types'
 import { wrapGroup } from './units/wrap'
 import { inBand, orderOffers } from './units/judge'
-import { applyCoverage, bestSeatedCandidate, fallbackRevealSizes, makeContourSeatPredicate } from './units/layout'
+import { bestSeatedCandidate, fallbackRevealSizes } from './units/layout'
 
 
 /** mm → integer microns; Clipper64 is integer-robust. */
@@ -136,49 +136,17 @@ export function wrapBandLadder(
     return { at, revealMM, roles: [] }
   }
 
-  // THE OPTIMAL IS A FORCED CANDIDATE — nothing more. Dan, 2026-08-30: "the engine sweep is
-  // correct engine ... optimal must be just forced layout that needs to be processed by sweep
-  // logic and wrap like anything else fed into it from sweeping every 1mm."
+  // THE CANON GOES INTO THE SWEEPER WHOLE. Dan, 2026-08-30: "build canon route into the sweeper
+  // and let sweeper not run full guess work but fine tune it to fit ... the max and min wrap count
+  // are comparables as fall backs."
   //
-  // So it has no path of its own. At each size the walk already visits, the canon's positions are
-  // seated against the real material with the SAME predicate the walk uses, thinned by the SAME
-  // coverage rule, deduped by the SAME identity and wrapped by the SAME wrap between the same
-  // bounds. It is forced in; it is not privileged once inside.
-  //
-  // What was here before was a private path: its own size scan, its own seating, and its own wrap
-  // floor so it could not shrink. That is three ways to make wrap inactive for one candidate, and
-  // it also skipped the belt — so the "optimal" was the only row in the list that had not been
-  // through the engine's own rules.
-  const radiusMM = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
-  const perimeterOnly = cfg.perimeterOnly ?? true
-  // FOUR REGISTRATIONS, like everything else. Centre rules pins the grid by parity — node or gap
-  // on each axis — and the engine tries all four for its own populations. Placing the canon on the
-  // anchor alone tries ONE, which is why the duck's 3x4 landed with its columns straddling the
-  // neck: only the middle column seated and the answer was a spine down the shape with both flanks
-  // unheld. The alignment that puts columns over the flanks was never attempted.
-  const half = pitch / 2
-  const canonAt = (mm: number): Pt[][] => {
-    if (!optimalNodesMM?.length) return []
-    const fits = makeContourSeatPredicate(sized(mm), radiusMM)
-    if (!fits) return []
-    const anchor = anchorFn(mm)
-    const local = localise(optimalNodesMM)
-    const out: Pt[][] = []
-    for (const [dx, dy] of [[0, 0], [half, 0], [0, half], [half, half]] as Array<[number, number]>) {
-      const seated = local
-        .map(([x, y]) => [anchor[0] + dx + x, anchor[1] + dy + y] as Pt)
-        .filter(fits)
-      if (!seated.length) continue
-      const kept = applyCoverage(seated, perimeterOnly, pitch).seated
-      if (kept.length) out.push(kept)
-    }
-    return out
-  }
-  // Identity, not object reference. The canon is deduped against the walk like everything else, so
-  // when the walk has already found the same population the canon has no rung of its own — and
-  // matching by reference lost the optimal role entirely in exactly the case that should read
-  // "optimal + most". Identity is origin-free, so it survives the wrap.
-  const canonIds = new Map<string, number>()   // identity -> magnets the material refused
+  // wrapGroup IS that fine-tuning: it takes the group whole, bisects the size between the floor
+  // and the band top, and computes every lawful origin the whole group can sit at. Nothing is
+  // dropped before it runs — thinning a GIVEN arrangement is destruction, not processing, and it
+  // is what made "8 refused" mean "8 did not land at the sizes I tried" rather than "8 cannot be
+  // held". If the whole canon cannot be held anywhere in the band there is simply no optimal row;
+  // fewest and most are the fallback comparables.
+  const optimal = optimalNodesMM?.length ? attempt(optimalNodesMM, loMM) : null
 
   // THE WALK, unchanged in range and method. Every lawful registration at each size is collected,
   // not only the fullest, or the fewest-magnet answer below could never exist.
@@ -186,9 +154,7 @@ export function wrapBandLadder(
     const grid = computeGrid(sized(mm), anchorAtMM ? { ...scanCfg, centreOverrideMM: anchorAtMM(mm) } : scanCfg)
     const drawn = grid.anchors.map((a) => a.p)
     if (drawn.length) witnesses.push({ revealMM: mm, points: drawn })
-    const forced = canonAt(mm)
-    for (const f of forced) canonIds.set(identityOf(f), (optimalNodesMM?.length ?? 0) - f.length)
-    for (const pts of [...(grid.seatings.length ? grid.seatings : [drawn]), ...forced]) {
+    for (const pts of grid.seatings.length ? grid.seatings : [drawn]) {
       if (!pts.length) continue
       const id = identityOf(pts)
       if (seen.has(id)) continue
@@ -196,20 +162,6 @@ export function wrapBandLadder(
       const rung = attempt(pts, mm)
       if (rung) rungs.push(rung)
     }
-  }
-
-  // The optimal is the FEWEST canon answer that actually wraps (Dan: "it must provide the fewest
-  // option that wraps — so wrapping is not optional, it is a rule in the formula"). A canon that
-  // never wraps has no row, and none is invented.
-  // Of the canon answers that WRAP, the one holding most of the layout wins; the tightest breaks a
-  // tie. Fewest-of-the-canon was giving a three-magnet spine where a four-magnet pair-per-mass
-  // existed at the same size.
-  const canonRungs = rungs.filter((r) => canonIds.has(identityOf(r.at.points)))
-    .sort((x, y) => y.at.count - x.at.count || x.at.sizeMM - y.at.sizeMM)
-  const optimal = canonRungs[0] ?? null
-  if (optimal) {
-    const refused = canonIds.get(identityOf(optimal.at.points)) ?? 0
-    if (refused > 0) optimal.omittedFromOptimal = refused
   }
 
   // FEWEST and MOST magnets in the range, from what the walk actually found.

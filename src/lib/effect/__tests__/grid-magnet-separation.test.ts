@@ -670,27 +670,35 @@ describe('1b — the frame comes from the usable material', () => {
       return { solve, optimal }
     }
 
-    // B4 — the canon is a FORCED CANDIDATE, not a privileged one (Dan, 2026-08-30: "optimal must
-    // be just forced layout that needs to be processed by sweep logic and wrap like anything else
-    // fed into it"). So the belt reaches it like everything else: the 4x4's sixteen magnets arrive
-    // as their ring of twelve, which is also the walk's fullest — the same answer, collapsed.
+    // B4 — THE CANON GOES IN WHOLE (Dan, 2026-08-30: "build canon route into the sweeper and let
+    // sweeper not run full guess work but fine tune it to fit ... the max and min wrap count are
+    // comparables as fall backs"). The 4x4 is sixteen magnets and it arrives as sixteen: nothing
+    // thins a GIVEN arrangement before the wrap has been asked whether a size and position exist
+    // where all of it holds. Fewest and most are the walk's own answers, the fallback comparables.
     const b4 = solveBand(4)
-    expect(b4.solve.offers.map((o) => o.at.count), 'B4 with the belt on').toEqual([12, 10])
+    expect(b4.solve.offers.map((o) => o.at.count), 'B4 counts').toEqual([16, 10, 12])
     expect(b4.solve.offers.map((o) => o.roles.join('+')), 'B4 roles')
-      .toEqual(['optimal+most', 'fewest'])
+      .toEqual(['optimal', 'fewest', 'most'])
+    expect(b4.solve.offers[0].at.count, 'the canon was thinned on its way in').toBe(
+      b4.optimal!.nodesMM.length)
     // the FEWEST is 10, and 10 is only reachable because every registration now survives.
     // Winner-only cannot produce it — that path keeps the fullest at each size, so its fewest is 12.
     expect(b4.solve.offers[1].at.count, 'fewest came from a sparse registration').toBe(10)
 
-    // TURN THE BELT OFF and the same canon arrives whole. This pair is what proves the coverage
-    // rule reaches the optimal at all, rather than the optimal quietly bypassing it.
+    // THE BELT DOES NOT REACH THE CANON. Turning coverage off changes what the WALK finds — its
+    // fewest moves 10 -> 12 — and leaves the canon untouched at sixteen either way. That asymmetry
+    // is the rule: the belt thins populations the engine discovered, never a layout it was handed.
     const bandFour = BANDS.find((b) => b.id === 4)!
     const cfgFull = { ...cfg, perimeterOnly: false }
     const rowFull = classifyBands(sq, cfgFull, anchorAt).find((r) => r.bandId === 4)!
     const optFull = optimalLayoutForBox(48, 4, rowFull.legalWidthMM, rowFull.legalHeightMM)!
     const full = wrapBandLadder(sq, cfgFull, bandFour.minMM + 24, bandFour.maxMM + 24, 24, anchorAt,
       optFull.nodesMM.map(([x, y]) => [x, y] as Pt))
-    expect(full.offers[0].at.count, 'with the belt off the canon arrives whole').toBe(16)
+    expect(full.offers[0].at.count, 'the canon must not move with the belt').toBe(16)
+    expect(full.offers[0].at.count, 'belt on and belt off must agree on the canon')
+      .toBe(b4.solve.offers[0].at.count)
+    expect(full.offers.map((o) => o.roles.join('+')), 'belt off: the canon IS the fullest')
+      .toEqual(['optimal+most', 'fewest'])
     // B2 — the optimal IS the fullest, so those two rows are the same answer and COLLAPSE to one.
     // This is the case that proves the collapse: without it the same answer appears twice.
     const b2 = solveBand(2)
