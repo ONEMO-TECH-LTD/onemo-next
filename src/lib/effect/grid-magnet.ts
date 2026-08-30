@@ -15,7 +15,6 @@ import { latticeAt, spotRadiusOf } from './units/layout'
 import {
   CENTRE_MODE,
   GOVERNOR,
-  MASS_DEPTH_MM,
   PADDING_FLOOR_MM,
   SNAP_STEP_MM,
 } from './grid-magnet-spec'
@@ -47,7 +46,7 @@ export function computeGrid(contourMM: Contour, cfg: GridConfig = {}): GridResul
   const r0 = spotRadiusOf(pad0)
   const outer0 = contourMM.outer.pts
   const bb0 = bbox(outer0)
-  const segments0 = safeSegments(contourMM, r0, Math.max(r0, cfg.massDepthMM ?? MASS_DEPTH_MM), cfg.segmentsDetail ?? 'full')
+  const segments0 = safeSegments(contourMM, r0, cfg.segmentsDetail ?? 'full')
   const mode0 = (cfg.centreMode ?? CENTRE_MODE) as CentreMode
   const gov0 = (cfg.governor ?? GOVERNOR) as Governor
   const centres0 = cfg.centreOverrideMM ? [cfg.centreOverrideMM] : centeringAnchors(mode0, segments0, [(bb0.minX + bb0.maxX) / 2, (bb0.minY + bb0.maxY) / 2], contourCentroidOf(contourMM))

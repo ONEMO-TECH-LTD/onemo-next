@@ -28,7 +28,7 @@ const MS_CASES: ReadonlyArray<ReadonlyArray<readonly [number, number]>> = [
  * A MEASUREMENT for display and scoring — magnet legality stays the exact per-point test.
  */
 export function safeSegments(
-  contour: Contour, spotRadiusMM: number, massDepthMM: number,
+  contour: Contour, spotRadiusMM: number,
   detail: 'full' | 'light' = 'full',
 ): SafeSegment[] {
   if (contour.outer.pts.length < 3) return []
@@ -219,8 +219,11 @@ export function safeSegments(
 
   const iso0 = level(0)
   if (!iso0.items.length) return []
-  const depthOff = Math.max(0, massDepthMM - r)
-  const isoD = depthOff > 0 ? level(depthOff) : iso0
+  // ONE DEPTH. A mass is an island — the region where a magnet centre may sit. The second, deeper
+  // cut went with the mass-depth dial (Dan, 2026-08-30): probing 4mm past the legal area returned a
+  // region 8mm narrower than the one magnets actually seat in, which cost the classifier a whole
+  // position per axis and moved with a centring control.
+  const isoD = iso0
   const massesByIsland: SafeMass[][] = iso0.items.map(() => [])
   for (const m of isoD.items) {
     const islandId = iso0.comp[m.deepIdx]

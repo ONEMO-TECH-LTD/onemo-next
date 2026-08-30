@@ -22,7 +22,7 @@ import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
 import { DEFAULT_PITCH_MM, type BandSnapPoint, type GridResult, type MagnetPlan, type SafeSegment } from '@/lib/effect/grid-magnet'
 import { bandOuterMM } from '@/lib/effect/grid-magnet'
-import { BANDS, CENTRE_MODE, GOVERNOR, MASS_DEPTH_CEIL_MM, MASS_DEPTH_FLOOR_MM, MASS_DEPTH_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-magnet-spec'
+import { BANDS, CENTRE_MODE, GOVERNOR, PADDING_CEIL_MM, PADDING_FLOOR_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-magnet-spec'
 import { fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-magnet-bridge'
 
 /** Bench test libraries — static assets, listed by a committed manifest. */
@@ -78,8 +78,6 @@ export default function GridLab() {
   const [pitch, setPitch] = useState(DEFAULT_PITCH_MM)
   const [pad, setPad] = usePersisted('pad', RELEASED_PADDING_MM)
   const [padLock, setPadLock] = usePersisted('padLock', 1)
-  /** Mass depth dial — clearance a region must survive to count as a mass for centring. */
-  const [massDepth, setMassDepth] = usePersisted('massDepth', MASS_DEPTH_MM)
   /** Centre-mode switch — which centre drives anchoring and balance. */
   /** Engine mode — 1 wrap ladder (band offers) · 2 free + snap (continuous). */
   const [centreMode, setCentreMode] = usePersisted('centreMode', CENTRE_MODE)
@@ -145,14 +143,14 @@ export default function GridLab() {
   /** Baseline handling: "save" stamps the current dials as the working default; "reset" restores
    *  the saved baseline, or spec defaults when none was saved. */
   const saveDefaults = () => {
-    try { localStorage.setItem('grid-centre.defaults', JSON.stringify({ pad, massDepth, centreMode, governor })) } catch { }
+    try { localStorage.setItem('grid-centre.defaults', JSON.stringify({ pad, centreMode, governor })) } catch { }
   }
   const resetDefaults = () => {
     let d = {
-      pad: RELEASED_PADDING_MM, massDepth: MASS_DEPTH_MM, centreMode: CENTRE_MODE, governor: GOVERNOR,
+      pad: RELEASED_PADDING_MM, centreMode: CENTRE_MODE, governor: GOVERNOR,
     }
     try { const raw = localStorage.getItem('grid-centre.defaults'); if (raw) d = { ...d, ...JSON.parse(raw) } } catch { }
-    setPad(d.pad); setPadLock(1); setMassDepth(d.massDepth); setCentreMode(d.centreMode); setGovernor(d.governor)
+    setPad(d.pad); setPadLock(1); setCentreMode(d.centreMode); setGovernor(d.governor)
   }
 
   const [magic, setMagic] = useState<MagicState>(null)
@@ -303,7 +301,7 @@ export default function GridLab() {
     const w = workerRef.current
     if (!w) return
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
-    const cfg = { pitchMM: pitch, paddingMM: pad, massDepthMM: massDepth, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' }
+    const cfg = { pitchMM: pitch, paddingMM: pad, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' }
     // Manual in a band (forced registration OR manual band scale): the walk is meaningless —
     // solve that size directly, exactly like free mode, band chip stays active.
     const manualBand = manual !== null || bandScale !== null   // manual scale/pan: solved directly at the requested size
@@ -320,7 +318,7 @@ export default function GridLab() {
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, pitch, pad, massDepth, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage])
+  }, [base, src, preset, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -607,8 +605,6 @@ export default function GridLab() {
                   <button key={g} aria-pressed={governor === g} onClick={() => setGovernor(g)}>{l}</button>)}
               </div>
             </div>}
-            {(centreMode === 2 || centreMode === 5) &&
-              <Slider label="Mass depth" unit="mm" v={massDepth} set={setMassDepth} min={MASS_DEPTH_FLOOR_MM} max={MASS_DEPTH_CEIL_MM} />}
           </Fold>
         </aside>
       </div>

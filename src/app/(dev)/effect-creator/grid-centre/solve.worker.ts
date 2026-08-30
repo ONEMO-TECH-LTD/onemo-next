@@ -8,7 +8,7 @@ import { contourCentroidOf } from '@/lib/effect/units/centring'
 import { anchorBakeOf, anchorFromBake, assignSizes, type AnchorBake, type CentreMode, type Governor, type MagnetPlan } from '@/lib/effect/grid-magnet-logic'
 import { classFrameNodes, shapeFamilyOf, type ShapeFamily } from '@/lib/effect/grid-magnet-class'
 import { defaultLanding } from '@/lib/effect/units/judge'
-import { DEFAULT_PITCH_MM, MASS_DEPTH_MM, PADDING_FLOOR_MM } from '@/lib/effect/grid-magnet-spec'
+import { DEFAULT_PITCH_MM, PADDING_FLOOR_MM } from '@/lib/effect/grid-magnet-spec'
 import { contourCacheKey, makeSizer, sizeRange } from '@/lib/effect/grid-magnet-bridge'
 import type { Contour } from '@/lib/effect/types'
 
@@ -42,14 +42,14 @@ const bakeCache = new Map<string, { bake: AnchorBake; segW: number; segH: number
 function bakeOf(
   sized: (mm: number) => import('@/lib/effect/types').Contour, cfg: GridConfig, shapeSig2: string,
 ): { bake: AnchorBake; segW: number; segH: number; family: ShapeFamily } {
-  const key = shapeSig2 + '|' + JSON.stringify([cfg.paddingMM, cfg.massDepthMM])
+  const key = shapeSig2 + '|' + JSON.stringify([cfg.paddingMM])
   let hit = bakeCache.get(key)
   if (!hit) {
     const refMM = sizeRange(Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)).maxMM
     const outer = sized(refMM).outer.pts
     const bb = bbox(outer)
     const r = spotRadiusOf(Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM))
-    const segs = safeSegments(sized(refMM), r, Math.max(r, cfg.massDepthMM ?? MASS_DEPTH_MM), 'light')
+    const segs = safeSegments(sized(refMM), r, 'light')
     const bake = anchorBakeOf(segs, [(bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2], contourCentroidOf(sized(refMM)), refMM, (bb.minY + bb.maxY) / 2)
     let sx0 = Infinity, sy0 = Infinity, sx1 = -Infinity, sy1 = -Infinity
     for (const sg of segs) { sx0 = Math.min(sx0, sg.bbox.minX); sy0 = Math.min(sy0, sg.bbox.minY); sx1 = Math.max(sx1, sg.bbox.maxX); sy1 = Math.max(sy1, sg.bbox.maxY) }
@@ -73,8 +73,8 @@ export function anchorFnFor(
   // at every size, scaled linearly. No per-size re-election.
   const bake = hit.bake
   const gov = (cfg.governor ?? 0) as Governor
-  const depth = Math.max(spotRadiusOf(Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)), cfg.massDepthMM ?? MASS_DEPTH_MM)
-  const aRef = anchorFromBake(bake, mode, gov, depth, bake.refMM) ?? bake.boxC
+  const minClear = spotRadiusOf(Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM))
+  const aRef = anchorFromBake(bake, mode, gov, minClear, bake.refMM) ?? bake.boxC
   return (mm: number) => [aRef[0] * mm / bake.refMM, aRef[1] * mm / bake.refMM]
 }
 
@@ -124,7 +124,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         const drawn = wrapGrid(sized, wcfg, at)
         const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
         const r = spotRadiusOf(pad)
-        const segments = safeSegments(drawn.contour, r, Math.max(r, cfg.massDepthMM ?? MASS_DEPTH_MM), 'full')
+        const segments = safeSegments(drawn.contour, r, 'full')
         const anchors = assignSizes(at.points, (cfg.plan ?? 'all6') as MagnetPlan)
         const ladder = rungs.map((rg) => ({ sizeMM: rg.at.sizeMM, count: rg.at.count, offMM: rg.at.centreOffMM }))
         const bk = bakeOf(sized, cfg, sig)

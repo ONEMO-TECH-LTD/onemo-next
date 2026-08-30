@@ -135,10 +135,14 @@ export function anchorBakeOf(
 /**
  * The governed anchor at a size, from the bake. Null for Core (mode 1) — the caller measures
  * that one live, per its own size-dependent definition. Positions scale linearly; the governor
- * chooses among the masses whose scaled depth still clears the dial.
+ * chooses among the masses that can still hold a magnet at this size.
+ *
+ * `minClearMM` was the mass-depth dial and is now the magnet's own clearance — the padding (Dan,
+ * 2026-08-30). Qualification was always the size-dependent half of the bake; what has gone is the
+ * invented number it was measured against.
  */
 export function anchorFromBake(
-  bake: AnchorBake, mode: CentreMode, governor: Governor, massDepthMM: number, sizeMM: number,
+  bake: AnchorBake, mode: CentreMode, governor: Governor, minClearMM: number, sizeMM: number,
 ): Pt | null {
   const sc = sizeMM / bake.refMM
   const at = (p: Pt): Pt => [p[0] * sc, p[1] * sc]
@@ -147,7 +151,7 @@ export function anchorFromBake(
   if (mode === 3) return at(bake.weightC)
   if (mode === 4) return at(bake.deepC)
   const qualifying = bake.masses
-    .filter((m) => m.peakClearMM * sc >= massDepthMM)
+    .filter((m) => m.peakClearMM * sc >= minClearMM)
     .map((m) => ({ centreMM: at(m.centreMM), areaMM2: m.areaMM2 * sc * sc, peakClearMM: m.peakClearMM * sc }))
   const pool = qualifying.length ? qualifying : bake.masses.map((m) => ({ centreMM: at(m.centreMM), areaMM2: m.areaMM2 * sc * sc, peakClearMM: m.peakClearMM * sc }))
   if (mode === 5) {

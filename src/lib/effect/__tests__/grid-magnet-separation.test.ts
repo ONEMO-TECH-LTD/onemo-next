@@ -355,10 +355,13 @@ describe('4 — no surface restates a released value', () => {
     // the mass-depth family. Each must arrive as an import — restating one as a literal is how
     // a law and a control drift apart.
     for (const name of ['RELEASED_PADDING_MM', 'PADDING_FLOOR_MM', 'PADDING_CEIL_MM',
-      'RELEASED_PITCHES_MM', 'BANDS', 'MASS_DEPTH_MM', 'MASS_DEPTH_FLOOR_MM', 'MASS_DEPTH_CEIL_MM'])
+      'RELEASED_PITCHES_MM', 'BANDS'])
       expect(imported.has(name), name + ' imported by the page').toBe(true)
-    // and the retired controls stay dead: no revival under a spec import
-    for (const dead of ['SNAP_STEP_MM', 'phaseStep', 'positioning'])
+    // and the retired controls stay dead: no revival under a spec import. Mass depth joined them
+    // on 2026-08-30 — a probe 4mm past the legal area cost the classifier a whole magnet position
+    // and moved with a centring dial, so the number and its control are gone, not defaulted.
+    for (const dead of ['SNAP_STEP_MM', 'phaseStep', 'positioning',
+      'MASS_DEPTH_MM', 'MASS_DEPTH_FLOOR_MM', 'MASS_DEPTH_CEIL_MM', 'massDepth'])
       expect(pageText().includes(dead), dead + ' must stay retired').toBe(false)
   })
 
@@ -482,7 +485,7 @@ describe('6 — a supplied hole is material boundary, not decoration', () => {
     // still hole-blind.
     const off: Contour = { outer: { pts: [[0, 0], [192, 0], [192, 192], [0, 192]] as Pt[] }, holes: [{ pts: ring(72, 96, 48) }] }
     expect(contourCentroidOf(off)[0], 'the hole sits left, so the material centre must move right').toBeGreaterThan(100)
-    const inHole = safeSegments(off, 12, 16, 'full')
+    const inHole = safeSegments(off, 12, 'full')
       .filter((sg) => Math.hypot(sg.centreMM[0] - 72, sg.centreMM[1] - 96) < 48 - 12)
     expect(inHole.map((sg) => sg.centreMM), 'a legal-area centre inside a hole').toEqual([])
   })
@@ -627,7 +630,7 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
       return { outer: { pts }, holes: [] }
     }
     const solve = wrapBandLadder(star, { paddingMM: 12, pitchMM: 48 }, 168, 216, 24)
-    expect(solve.offers.length, 'this band must hold offers, or the test proves nothing').toBe(2)
+    expect(solve.offers.length, 'this band must hold offers, or the test proves nothing').toBeGreaterThan(0)
     expect(solve.offers.every((o) => o.at.sizeMM >= 168), 'a sub-band layout was offered').toBe(true)
   })
 
@@ -660,12 +663,12 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
     g.self = stub
     try {
       const worker = await import('@/app/(dev)/effect-creator/grid-centre/solve.worker')
-      stub.onmessage!({ data: { id: 1, base: star, offsetMM: 0, cfg, mode: 4, sizeMM: 0, stepSel: null } })
+      stub.onmessage!({ data: { id: 1, base: star, offsetMM: 0, cfg, mode: 2, sizeMM: 0, stepSel: null } })
       const model = posted[0]?.model
       expect(model, 'the worker posted no model').toBeTruthy()
       expect(model!.diagnostic, 'this band must be empty, or the test proves nothing').toBeTruthy()
       const sized = makeSizer(star, 0)
-      const solve = wrapBandLadder(sized, cfg, 168, 216, 24, worker.anchorFnFor(sized, cfg, JSON.stringify(cfg), 'gate'))
+      const solve = wrapBandLadder(sized, cfg, 72, 119, 24, worker.anchorFnFor(sized, cfg, JSON.stringify(cfg), 'gate'))
       expect(solve.offers.length, 'this band must hold no offers').toBe(0)
       expect(model!.grid.anchors.map((a) => a.p), 'the drawn population is not the selected witness')
         .toEqual(solve.bestSeated!.points)

@@ -89,11 +89,15 @@ export const BANDS: ReadonlyArray<Band> = Object.freeze([
 export const SNAP_STEP_MM = 1
 
 
-/** Mass depth — clearance a region must survive to count as a MASS (limbs and slivers die
- *  shallow, true masses survive deep). Admin-dialled; 12 = every legal point counts. */
-export const MASS_DEPTH_MM = 16
-export const MASS_DEPTH_FLOOR_MM = 12
-export const MASS_DEPTH_CEIL_MM = 24
+/** REMOVED 2026-08-30 (Dan): the mass-depth dial and its 16mm default. Nothing ruled the 16 — it was
+ *  4mm past the padding for no reason anyone could trace — and it was measurably harmful: a region
+ *  probed 4mm deeper than the legal area is 8mm narrower, which cost the classifier a whole magnet
+ *  position at every size (a 120mm square read 2 across where it seats 3). A region is now MASS
+ *  exactly where a magnet centre may sit, so there is one depth, not two, and no dial can change
+ *  what a shape is.
+ *
+ *  What it cost: a thin neck can no longer be excluded from governing the centre by depth alone.
+ *  Islands still separate wherever material narrows past a magnet's own clearance. */
 
 /** Governor — which mass rules in Masses mode: 0 smallest · 1 deepest · 2 top (gravity) ·
  *  3 top-small (upper-half smallest, else topmost). */

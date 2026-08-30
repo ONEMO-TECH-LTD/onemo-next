@@ -83,7 +83,6 @@ export interface WrapConfig {
   /** Centre mode + governor — the existing centring system decides where the group sits. */
   centreMode?: number
   governor?: number
-  massDepthMM?: number
   /** Baked anchor query (anchor bake): the governed centre at any size, positions measured once
    *  on the shape and scaled — replaces per-size mesh re-measurement. In-worker only. */
   /** REQUIRED: the governed centre at any size. Wrap never derives a centre — that is centring's,
@@ -128,8 +127,6 @@ export interface GridConfig {
   paddingMM?: number
   /** Manual calibration: force this registration (mm phase) instead of searching. */
   forcePhaseMM?: Pt
-  /** Clearance a region must survive to count as a mass for centring. */
-  massDepthMM?: number
   /** Centre mode — 0 box · 1 core · 2 masses · 3 weight · 4 deep · 5 top. */
   centreMode?: number
   /** Which mass rules in Masses mode — 0 smallest · 1 deepest · 2 top. */

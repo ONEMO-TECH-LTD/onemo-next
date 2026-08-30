@@ -18,7 +18,7 @@ import { contourCentroidOf } from './units/centring'
 import { spotRadiusOf } from './units/layout'
 import { safeSegments } from './units/segment'
 import { centeringAnchors, governMass } from './units/centring'
-import { CENTRE_MODE, GOVERNOR, MASS_DEPTH_MM } from './grid-magnet-spec'
+import { CENTRE_MODE, GOVERNOR } from './grid-magnet-spec'
 import type { CentreMode, Governor } from './types'
 import { wrapGroup } from './units/wrap'
 import { inBand, orderOffers } from './units/judge'
@@ -93,7 +93,7 @@ export function wrapBandLadder(
   const anchorFn: (mm: number) => Pt = anchorAtMM ?? ((mm: number) => {
     const outer = sized(mm).outer.pts
     const r = spotRadiusOf(Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM))
-    const segs = safeSegments(sized(mm), r, Math.max(r, cfg.massDepthMM ?? MASS_DEPTH_MM), 'light')
+    const segs = safeSegments(sized(mm), r, 'light')
     const bb = bbox(outer)
     const boxC: Pt = [(bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2]
     const cands = centeringAnchors((cfg.centreMode ?? CENTRE_MODE) as CentreMode, segs, boxC, contourCentroidOf(sized(mm)))
@@ -103,7 +103,7 @@ export function wrapBandLadder(
   })
   const wcfg: WrapConfig = {
     pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM,
-    centreMode: cfg.centreMode, governor: cfg.governor, massDepthMM: cfg.massDepthMM,
+    centreMode: cfg.centreMode, governor: cfg.governor,
     anchorAtMM: anchorFn,
   }
   const seen = new Set<string>()
