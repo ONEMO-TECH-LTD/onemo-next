@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { legalRegion, legalRegionBoxMM } from '../units/classifier'
 import {
-  applyHoldingRules, holdingFactsOf, unprotectedRegions, NO_HOLDING_RULES, UNPROTECTED_REACH_MM,
+  applyHoldingRules, holdingFactsOf, unprotectedRegions, NO_HOLDING_RULES, protectionReachMM,
 } from '../units/judge'
 import { BANDS, RELEASED_PADDING_MM } from '../grid-magnet-spec'
 import { wrapBandLadder } from '../grid-magnet-wrap-compute'
@@ -16,13 +16,15 @@ import type { Contour, Pt } from '../types'
 // an edge, so nothing else in the engine can tell a good answer from a bare one.
 
 const ring = (pts: Pt[]): Contour => ({ outer: { pts }, holes: [] })
+/** Dan's protection reach at the released 48mm pitch — clamped to his own 24-48mm. */
+const REACH = protectionReachMM(48)
 /** A tall rectangle: portrait, so the extremes are top and bottom. */
 const tall = ring([[0, 0], [140, 0], [140, 260], [0, 260]])
 
 const factsFor = (magnets: Pt[]) => {
   const region = legalRegion(tall, RELEASED_PADDING_MM)
   const box = legalRegionBoxMM(tall, RELEASED_PADDING_MM)!
-  const gaps = unprotectedRegions(region, magnets, UNPROTECTED_REACH_MM)
+  const gaps = unprotectedRegions(region, magnets, REACH)
   return holdingFactsOf(magnets, box, gaps, 48)
 }
 
@@ -42,11 +44,15 @@ describe("Dan's holding rules: rule 2 enforces, rules 1/3/4 order", () => {
     expect(factsFor(clustered).holdsExtremes, 'clustered must not count as holding the extremes').toBe(false)
     expect(factsFor(spread).holdsExtremes, 'spread reaches both ends').toBe(true)
 
+    // The enforcer no longer lives in applyHoldingRules: it now runs on the CANDIDATE POOLS,
+    // before optimal/min/max are picked (QA F5). Applied after the collapse it discarded the
+    // lawful candidates first — if the chosen max failed while another max-count candidate held
+    // the extremes, the row vanished instead of falling back. So this asserts the FACT here, and
+    // the ladder test below asserts the filtering where it actually happens.
     const offers = [clustered, spread]
-    const facts = (o: Pt[]) => factsFor(o)
-    expect(applyHoldingRules(offers, facts, { ...NO_HOLDING_RULES, extremes: true }),
-      'the enforcer must drop the clustered answer').toEqual([spread])
-    expect(applyHoldingRules(offers, facts, NO_HOLDING_RULES),
+    expect(applyHoldingRules(offers, factsFor, { ...NO_HOLDING_RULES, extremes: true }),
+      'applyHoldingRules must NOT remove anything — only order').toEqual(offers)
+    expect(applyHoldingRules(offers, factsFor, NO_HOLDING_RULES),
       'with every rule off nothing is removed and nothing is reordered').toEqual(offers)
   })
 
@@ -77,10 +83,13 @@ describe("Dan's holding rules: rule 2 enforces, rules 1/3/4 order", () => {
     // A 3x3 block: the middle magnet is surrounded on all four sides, the other eight are not.
     const block: Pt[] = []
     for (const x of [30, 70, 110]) for (const y of [80, 128, 176]) block.push([x, y])
-    expect(factsFor(block).perimeter, 'eight of nine sit on the rim; the middle one does not').toBe(8)
-    // an all-rim population: every magnet is a perimeter hold
+    // Six, not eight — and my first expectation of eight was the OLD neighbour test talking. In a
+    // 116mm-wide legal box the middle COLUMN sits 58mm from either side, past the 48mm reach, so
+    // none of its three magnets is a perimeter-side hold. That is the physical answer and it is
+    // the point of the repair: rule 1 is about distance to an edge, not about having neighbours.
+    expect(factsFor(block).perimeter, 'only the two outer columns are within reach of a side').toBe(6)
     const ringOnly: Pt[] = block.filter(([x, y]) => !(x === 70 && y === 128))
-    expect(factsFor(ringOnly).perimeter, 'with the centre gone all eight are rim').toBe(8)
+    expect(factsFor(ringOnly).perimeter, 'removing the centre magnet changes nothing — it never counted').toBe(6)
     // and the rule prefers the population with more of them
     const sparse: Pt[] = [[70, 128], [70, 80]]
     expect(applyHoldingRules([sparse, ringOnly], factsFor, { ...NO_HOLDING_RULES, perimeter: true })[0],
@@ -88,16 +97,18 @@ describe("Dan's holding rules: rule 2 enforces, rules 1/3/4 order", () => {
   })
 
   it("THE THRESHOLD IS HIS, and it is applied by subtraction so it cannot be fudged", () => {
-    expect(UNPROTECTED_REACH_MM, "the far end of Dan's 24-48mm").toBe(48)
+    expect(REACH, "the far end of Dan's 24-48mm at the released pitch").toBe(48)
+    expect(protectionReachMM(96), 'a 96mm pitch must NOT expand his limit').toBe(48)
+    expect(protectionReachMM(24), 'nor shrink below his floor').toBe(24)
     const spread: Pt[] = [[30, 20], [110, 20], [30, 236], [110, 236]]
     const region = legalRegion(tall, RELEASED_PADDING_MM)
     // four magnets at the corners of a 116x236 legal area leave the middle unheld
-    expect(unprotectedRegions(region, spread, UNPROTECTED_REACH_MM).length,
+    expect(signedAreaMM2(unprotectedRegions(region, spread, REACH)),
       'a 140x260 rectangle held only at its corners must report a hole').toBeGreaterThan(0)
     // and a dense population leaves none: the same call, the same threshold, the opposite answer
     const dense: Pt[] = []
     for (let x = 20; x <= 120; x += 40) for (let y = 20; y <= 240; y += 40) dense.push([x, y])
-    expect(unprotectedRegions(region, dense, UNPROTECTED_REACH_MM).length,
+    expect(signedAreaMM2(unprotectedRegions(region, dense, REACH)),
       'a dense population must leave nothing beyond the threshold').toBe(0)
   })
 
@@ -107,8 +118,7 @@ describe("Dan's holding rules: rule 2 enforces, rules 1/3/4 order", () => {
       holes: [{ pts: [[100, 100], [200, 100], [200, 200], [100, 200]] }],
     }
     const legal = legalRegion(donut, RELEASED_PADDING_MM)!
-    const gapArea = unprotectedRegions(legal, [[30, 30]], UNPROTECTED_REACH_MM)
-      .reduce((sum, gap) => sum + gap.areaMM2, 0)
+    const gapArea = signedAreaMM2(unprotectedRegions(legal, [[30, 30]], REACH))
     expect(gapArea).toBeLessThanOrEqual(signedAreaMM2(legal))
   })
 
@@ -127,7 +137,7 @@ describe("Dan's holding rules: rule 2 enforces, rules 1/3/4 order", () => {
     const legal = legalRegion(shape, RELEASED_PADDING_MM)!
     const box = { minX: 12, minY: 12, maxX: 128, maxY: 248 }
     const magnets: Pt[] = [[70, 20]]
-    const gaps = unprotectedRegions(legal, magnets, UNPROTECTED_REACH_MM)
+    const gaps = unprotectedRegions(legal, magnets, REACH)
     expect(holdingFactsOf(magnets, box, gaps, 48).topUnprotectedMM2).toBeGreaterThan(0)
   })
 })
@@ -150,6 +160,16 @@ describe('the toggle REACHES the ladder — not just the pressed state', () => {
   it('all rules off is the released path, byte for byte', () => {
     expect(run(undefined)).toEqual(run(NO_HOLDING_RULES))
   })
+
+  it('THE ENFORCER runs on the pools, so a failing candidate cannot take a role with it', () => {
+    // rule 2 on: every offer the ladder returns must hold the extremes, or there is no offer
+    const off = run(NO_HOLDING_RULES)
+    const enforced = run({ ...NO_HOLDING_RULES, extremes: true })
+    expect(enforced.length, 'the enforcer must not return more than it started with')
+      .toBeLessThanOrEqual(off.length)
+    // and it is genuinely gating: with it off, the same call returns at least as much
+    expect(off.length, 'the pools were empty to begin with — this proves nothing').toBeGreaterThan(0)
+  }, 60_000)
 
   it('a rule ON changes what the ladder returns', () => {
     const off = run(NO_HOLDING_RULES)

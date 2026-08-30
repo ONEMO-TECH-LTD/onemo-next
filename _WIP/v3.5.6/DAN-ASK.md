@@ -17,7 +17,7 @@ item is unticked. Partial is reported as partial, with the missing item named.
 |---|---|---|
 | 1 | canon wired properly — suggested layout is the search's STARTING POINT, no parallel path | DONE · QA-CLEAR at 2c7e4286, bounded |
 | 2 | outer/inner classifier ruler toggle — "i prefer testing both" | BUILT + COMMITTED · headless gated · LIVE GATED: butterfly B3 legal=no optimal, outer=optimal 123.26/3 |
-| 3 | Clipper2 unprotected-area defender + the four preferences, as toggles | BUILT · headless gated + mutation-proven · live: control reaches the ladder, BOT B4 unchanged because both offers pass every rule |
+| 3 | Clipper2 unprotected-area defender + the four preferences, as toggles | BUILT · QA-rejected once, six defects repaired · **PARTIAL**: combined-toggle ordering is UNRULED (see below) |
 
 ## Step 2's content, verbatim
 
@@ -39,5 +39,9 @@ Answered by Dan: it is a FILTER, with on/off toggles, tested by result.
 - may the canon come from a LOWER band than requested? duck/butterfly at B3 carry a clean 2x2,
   which is a B2 record; the lookup refuses to cross the band line, so those return nothing while
   max finds the 2x2 by itself
-- the four preferences: strict order or weighted?
+- **the four preferences: strict order or weighted?** STILL OPEN, and the code must not be read as
+  having answered it. One toggle on is unambiguous. With several on, the code falls back to Dan's
+  listed sequence as a tie-break chain because that is the least-invented reading — it is a
+  fallback, not a ruling. QA F6 flagged that the checklist called this open while the code had
+  quietly chosen; that contradiction is what this line now records.
 - gravity needs an "up": is the shape's top as drawn always the top as worn?

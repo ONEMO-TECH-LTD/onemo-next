@@ -63,16 +63,14 @@ export function defaultLanding(rungs: BandRung[], pitchMM: number): number {
 import { Clipper, FillRule, type Paths64 } from '@countertype/clipper2-ts'
 import type { Pt } from '../types'
 
-/** A gap in the legal area that nothing holds. */
-export interface UnprotectedRegion {
-  areaMM2: number
-  /** Where it sits, for the gravity rule. */
-  centreMM: Pt
-}
+/** THE GAPS as a path set, kept whole. Never split into per-ring areas: a hole ring must SUBTRACT
+ *  from its owner, and taking |area| of each path adds it instead — a 60,924mm2 legal donut
+ *  reported 87,614mm2 unprotected, more gap than it has material (QA F1). */
+export type UnprotectedPaths = Paths64
 
 /** Which of the four rules are switched on. All off is the released behaviour. */
 export interface HoldingRules {
-  /** 1 · perimeter holds preferred to centres */
+  /** 1 · perimeter-side holds preferred to centres */
   perimeter: boolean
   /** 2 · the extremes of the dominant axis MUST be held — the enforcer */
   extremes: boolean
@@ -85,145 +83,138 @@ export interface HoldingRules {
 export const NO_HOLDING_RULES: HoldingRules =
   { perimeter: false, extremes: false, corners: false, gravity: false }
 
-/** Dan's "24-48mm", taken at its far end: one magnet spacing. A gap nearer than this to a held
- *  magnet is the sliver every offset leaves, not a hole worth reporting. */
-export const UNPROTECTED_REACH_MM = 48
+/** DAN'S PROTECTION REACH — "further from the protected area than 24-48mm", clamped to his own
+ *  range. It never expands with the grid: at 96mm pitch it stays 48, because nothing in his rule
+ *  authorises a 96mm gap (QA F3). */
+export function protectionReachMM(pitchMM: number): number {
+  return Math.min(48, Math.max(24, pitchMM))
+}
 
 const S = 1000
+const areaOf = (paths: Paths64): number => Math.abs(Number(Clipper.areaPaths(paths))) / (S * S)
 
-/** THE GAPS: the legal area minus what the magnets reach, at Dan's threshold.
+/** A disc polygon at the given reach. A one-point path cannot be offset — asking Clipper to
+ *  inflate one returns nothing, which silently reported every shape as fully covered. */
+function discAt(m: Pt, reachMM: number): ReturnType<typeof Clipper.makePath> {
+  const SEG = 64
+  const flat: number[] = []
+  for (let i = 0; i < SEG; i++) {
+    const a = (i / SEG) * Math.PI * 2
+    flat.push(Math.round((m[0] + Math.cos(a) * reachMM) * S), Math.round((m[1] + Math.sin(a) * reachMM) * S))
+  }
+  return Clipper.makePath(flat)
+}
+
+/** THE UNPROTECTED AREA: the legal region minus what the magnets reach, at Dan's threshold.
  *
- *  `reachMM` IS the rule — pass his 48 and every region that comes back is, by construction, made
- *  entirely of points more than 48mm from any magnet. That is his "further from the protected area
- *  than 24-48mm" measured directly, with no second test and no tolerance to tune.
+ *  `reachMM` IS the rule — pass his clamped reach and every point in the result is, by
+ *  construction, further than that from any magnet. The threshold is applied AT the subtraction,
+ *  so there is no second test and no tolerance to tune.
  *
- *  An earlier version measured each region's ring vertices instead and reported 21.6mm for a
- *  25,670mm2 hole through the middle of a rectangle — because a ring hugs the boundary and never
- *  visits the deep interior. Subtracting at the threshold cannot make that mistake.
- *
- *  Exact polygon arithmetic — the same Clipper2 the seating and the ruler use, never a sampled
- *  field. */
+ *  With no magnets the answer is the whole legal region, not nothing: an empty population protects
+ *  nothing (QA F1). */
 export function unprotectedRegions(
   /** The legal magnet-centre region, handed in by the sequencer — a unit never reaches for another
    *  unit's work, and the ruler that produced this is the classifier's. */
   legal: Paths64 | null, magnets: ReadonlyArray<Pt>, reachMM: number,
-): UnprotectedRegion[] {
+): UnprotectedPaths {
   if (!legal || !legal.length) return []
-  if (!magnets.length) return []
-  // Each magnet's reach as an explicit disc polygon. A one-point path cannot be offset — asking
-  // Clipper to inflate one returns nothing, which silently reported every shape as fully covered.
-  const SEG = 48
-  const discs = magnets.map((m) => {
-    const flat: number[] = []
-    for (let i = 0; i < SEG; i++) {
-      const a = (i / SEG) * Math.PI * 2
-      flat.push(Math.round((m[0] + Math.cos(a) * reachMM) * S), Math.round((m[1] + Math.sin(a) * reachMM) * S))
-    }
-    return Clipper.makePath(flat)
-  })
-  const held = Clipper.union(discs, FillRule.NonZero)
-  if (!held || !held.length) return []
-  const left = Clipper.difference(legal, held, FillRule.NonZero)
-  if (!left || !left.length) return []
-  const out: UnprotectedRegion[] = []
-  for (const path of left) {
-    if (path.length < 3) continue
-    let a2 = 0, cx = 0, cy = 0
-    const pts: Pt[] = path.map((p) => [Number(p.x) / S, Number(p.y) / S] as Pt)
-    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
-      const cross = pts[j][0] * pts[i][1] - pts[i][0] * pts[j][1]
-      a2 += cross
-      cx += (pts[j][0] + pts[i][0]) * cross
-      cy += (pts[j][1] + pts[i][1]) * cross
-    }
-    const area = Math.abs(a2 / 2)
-    if (area <= 0) continue
-    const centre: Pt = a2 === 0 ? pts[0] : [cx / (3 * a2), cy / (3 * a2)]
-    out.push({ areaMM2: area, centreMM: centre })
-  }
-  return out
+  if (!magnets.length) return legal
+  const held = Clipper.union(magnets.map((m) => discAt(m, reachMM)), FillRule.NonZero)
+  if (!held || !held.length) return legal
+  return Clipper.difference(legal, held, FillRule.NonZero) ?? []
 }
 
 /** What one offer's holding looks like, measured against the shape it sits on. */
 export interface HoldingFacts {
-  /** magnets on the rim rather than surrounded — rule 1 */
+  /** magnets within the protection reach of the legal region's own boundary — rule 1 */
   perimeter: number
-  /** magnets in a corner quadrant of the legal box — rule 3 */
+  /** magnets within reach of TWO boundaries at once, i.e. in a corner — rule 3 */
   corners: number
   /** does the held population reach BOTH ends of the dominant axis — rule 2, the enforcer */
   holdsExtremes: boolean
-  /** unprotected area sitting in the top third, weighted by size — rule 4, gravity */
+  /** unprotected area inside the top zone, by actual intersection — rule 4, gravity */
   topUnprotectedMM2: number
-  /** every gap further than the reach from a magnet */
+  /** every point further than the reach from a magnet */
   unprotectedMM2: number
 }
 
 /** Measure one offer. Geometry only — no preference is applied here. */
 export function holdingFactsOf(
   magnets: ReadonlyArray<Pt>, legalBox: { minX: number; minY: number; maxX: number; maxY: number },
-  gaps: ReadonlyArray<UnprotectedRegion>, pitchMM: number,
+  gaps: UnprotectedPaths,
+  /** The grid pitch. The reach is CLAMPED here, so no caller can widen Dan's 24-48mm by handing in
+   *  a 96mm pitch — which is exactly how a 96mm bare end passed as "holding the extremes". */
+  pitchMM: number,
 ): HoldingFacts {
+  const reachMM = protectionReachMM(pitchMM)
   const w = legalBox.maxX - legalBox.minX, h = legalBox.maxY - legalBox.minY
-  const portrait = h >= w
-  // RULE 1 — a magnet is a perimeter hold when it is NOT surrounded on all four sides by others.
-  // Same shape as the belt's own test, which is Dan's existing rule for what a rim is.
-  const R = pitchMM * 1.45
-  let perimeter = 0
-  for (let i = 0; i < magnets.length; i++) {
-    let l = false, r = false, u = false, d = false
-    for (let j = 0; j < magnets.length; j++) {
-      if (i === j) continue
-      const dx = magnets[j][0] - magnets[i][0], dy = magnets[j][1] - magnets[i][1]
-      if (Math.hypot(dx, dy) > R) continue
-      if (dx > 1) r = true; else if (dx < -1) l = true
-      if (dy > 1) u = true; else if (dy < -1) d = true
-    }
-    if (!(l && r && u && d)) perimeter++
-  }
-  // RULE 3 — a corner hold sits in the outer quarter of BOTH axes of the legal box.
-  const qx = w / 4, qy = h / 4
-  let corners = 0
-  for (const [x, y] of magnets) {
-    const nearX = x <= legalBox.minX + qx || x >= legalBox.maxX - qx
-    const nearY = y <= legalBox.minY + qy || y >= legalBox.maxY - qy
-    if (nearX && nearY) corners++
+  // RULE 1 and RULE 3 — PHYSICAL, measured against the legal region's own boundary. The previous
+  // version reused the belt's "is this magnet surrounded by neighbours" test, which answers a
+  // different question entirely: a lone magnet dead-centre of a 200x200 box counted as a perimeter
+  // hold because it had no neighbours (QA F2). A perimeter-side hold is one NEAR AN EDGE.
+  let perimeter = 0, corners = 0
+  for (const m of magnets) {
+    const dx = Math.min(m[0] - legalBox.minX, legalBox.maxX - m[0])
+    const dy = Math.min(m[1] - legalBox.minY, legalBox.maxY - m[1])
+    // a perimeter-side hold is one within the protection reach of an EDGE. A lone magnet at the
+    // centre of a 200x200 box is 100mm from every edge and counts as nothing.
+    if (Math.min(dx, dy) > reachMM) continue
+    perimeter++
+    // a corner is within reach of TWO sides at once — the only pair of directions "corner" can
+    // mean for an axis-aligned frame
+    if (dx <= reachMM && dy <= reachMM) corners++
   }
   // RULE 2 — "extreme apart sides must be held ... top and bottom in portrait, right and left in
-  // landscape". Held when the population reaches within one pitch of BOTH ends of that axis.
-  const along = magnets.map((p) => (portrait ? p[1] : p[0]))
-  const lo = portrait ? legalBox.minY : legalBox.minX
-  const hi = portrait ? legalBox.maxY : legalBox.maxX
-  const holdsExtremes = magnets.length > 0
-    && Math.min(...along) <= lo + pitchMM && Math.max(...along) >= hi - pitchMM
-  // RULE 4 — gravity. A gap in the top third is the one that peels the effect off.
-  const topFrom = legalBox.maxY - h / 3
-  let unprotectedMM2 = 0, topUnprotectedMM2 = 0
-  for (const g of gaps) {
-    // no sliver test here: the gaps were subtracted AT his threshold, so each one already is a
-    // region every point of which is further than that from any magnet
-    unprotectedMM2 += g.areaMM2
-    if (g.centreMM[1] >= topFrom) topUnprotectedMM2 += g.areaMM2
+  // landscape". Held when the population reaches within Dan's OWN reach of both ends — never the
+  // grid pitch, which at 96mm would accept a 96mm bare end (QA F3). A square has no dominant axis,
+  // so BOTH axes must hold rather than silently calling it portrait.
+  const square = Math.abs(h - w) < 1e-6
+  const endsHeld = (axis: 0 | 1, lo: number, hi: number) => {
+    const along = magnets.map((p) => p[axis])
+    return magnets.length > 0 && Math.min(...along) <= lo + reachMM && Math.max(...along) >= hi - reachMM
   }
-  return { perimeter, corners, holdsExtremes, topUnprotectedMM2, unprotectedMM2 }
+  const holdsExtremes = square
+    ? endsHeld(0, legalBox.minX, legalBox.maxX) && endsHeld(1, legalBox.minY, legalBox.maxY)
+    : h > w ? endsHeld(1, legalBox.minY, legalBox.maxY) : endsHeld(0, legalBox.minX, legalBox.maxX)
+  // RULE 4 — gravity, by ACTUAL INTERSECTION with the top zone. Classifying a whole region by its
+  // centroid reported zero top-gap for a region spanning the middle AND the whole top, because the
+  // centroid sat in the middle (QA F4).
+  const unprotectedMM2 = areaOf(gaps)
+  // THE TOP ZONE is one protection reach down from the top edge — derived from Dan's own 24-48mm
+  // rather than the "top third" I had invented (QA F4/F6). It is the band where a bare patch is
+  // beyond any magnet's hold AND at the top, which is what his gravity law describes.
+  const topFrom = legalBox.maxY - reachMM
+  const strip = Clipper.makePath([
+    Math.round(legalBox.minX * S), Math.round(topFrom * S),
+    Math.round(legalBox.maxX * S), Math.round(topFrom * S),
+    Math.round(legalBox.maxX * S), Math.round(legalBox.maxY * S),
+    Math.round(legalBox.minX * S), Math.round(legalBox.maxY * S),
+  ])
+  const top = gaps.length ? Clipper.intersect(gaps, [strip], FillRule.NonZero) : []
+  return {
+    perimeter, corners, holdsExtremes,
+    topUnprotectedMM2: top && top.length ? areaOf(top) : 0,
+    unprotectedMM2,
+  }
 }
 
-/** APPLY DAN'S RULES to a set of offers.
+/** ORDER THE OFFERS by whichever PREFERENCES are switched on.
  *
- *  Rule 2 is the ENFORCER: with it on, an offer that does not hold both extremes is removed. The
- *  other three are PREFERENCES: they order what survives, in the sequence he gave them — perimeter
- *  first, then corners, then gravity. Every rule is independent, so any of them can be switched
- *  off and the result seen.
+ *  Rule 2 is not here: it rejects, and it does so on the candidate pools before any role is
+ *  picked. This orders only what already ships.
  *
- *  An offer with no facts is left where it is. Nothing is invented: no weighting, no score, no
- *  threshold beyond his own. */
+ *  COMBINED ORDERING IS NOT RULED. Dan listed his rules "in order of the general to more
+ *  specific", which describes how he enumerated them, not that perimeter must always outrank
+ *  corners. Turning ONE preference on is unambiguous and is what the toggles are for. With more
+ *  than one on, this falls back to his listed sequence as a tie-break chain — the least-invented
+ *  reading available — and that fallback is an OPEN RULING recorded in _WIP/v3.5.6/DAN-ASK.md,
+ *  not a decision (QA F6). Nothing here weights or scores. */
 export function applyHoldingRules<T>(
   offers: ReadonlyArray<T>, factsOf: (o: T) => HoldingFacts | null, rules: HoldingRules,
 ): T[] {
-  const kept = rules.extremes
-    ? offers.filter((o) => { const f = factsOf(o); return !f || f.holdsExtremes })
-    : [...offers]
-  if (!rules.perimeter && !rules.corners && !rules.gravity) return kept
-  return [...kept].sort((a, b) => {
+  if (!rules.perimeter && !rules.corners && !rules.gravity) return [...offers]
+  return [...offers].sort((a, b) => {
     const fa = factsOf(a), fb = factsOf(b)
     if (!fa || !fb) return 0
     if (rules.perimeter && fa.perimeter !== fb.perimeter) return fb.perimeter - fa.perimeter

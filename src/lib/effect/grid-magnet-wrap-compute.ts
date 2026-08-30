@@ -21,7 +21,7 @@ import { centeringAnchors, governMass } from './units/centring'
 import { CENTRE_MODE, GOVERNOR } from './grid-magnet-spec'
 import type { CentreMode, Governor } from './types'
 import { wrapGroup } from './units/wrap'
-import { applyHoldingRules, holdingFactsOf, inBand, orderOffers, unprotectedRegions, UNPROTECTED_REACH_MM, type HoldingFacts } from './units/judge'
+import { applyHoldingRules, holdingFactsOf, inBand, orderOffers, protectionReachMM, unprotectedRegions, type HoldingFacts } from './units/judge'
 import { bestSeatedCandidate, fallbackRevealSizes } from './units/layout'
 import { legalRegion, legalRegionBoxMM } from './units/classifier'
 
@@ -183,6 +183,33 @@ export function wrapBandLadder(
     }
   }
 
+  // DAN'S ENFORCER, BEFORE ANY ROLE IS PICKED (QA F5). Applied after the collapse it discarded the
+  // lawful candidates first: if the chosen max failed the extremes while another max-count
+  // candidate held them, the row vanished instead of falling back to the lawful one. A filter must
+  // constrain the POOLS, not the three survivors.
+  const rules = cfg.holdingRules
+  const ruleReach = protectionReachMM(pitch)
+  const holdRadius = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
+  const holdFacts = new Map<BandRung, HoldingFacts | null>()
+  const factsOf = (r: BandRung): HoldingFacts | null => {
+    if (!holdFacts.has(r)) {
+      const c = sized(r.at.sizeMM)
+      const region = legalRegion(c, holdRadius)
+      const box = legalRegionBoxMM(c, holdRadius)
+      holdFacts.set(r, region && box
+        ? holdingFactsOf(r.at.points, box, unprotectedRegions(region, r.at.points, ruleReach), pitch)
+        : null)
+    }
+    return holdFacts.get(r) ?? null
+  }
+  if (rules?.extremes) {
+    // an offer that cannot be measured is NOT waved through: an enforcer that passes the unmeasured
+    // is no enforcer
+    const keep = (r: BandRung) => factsOf(r)?.holdsExtremes === true
+    for (let i = rungs.length - 1; i >= 0; i--) if (!keep(rungs[i])) rungs.splice(i, 1)
+    for (let i = canonRungs.length - 1; i >= 0; i--) if (!keep(canonRungs[i])) canonRungs.splice(i, 1)
+  }
+
   // Of the suggested layout's landings, the one holding most of it; tightest breaks a tie. This is
   // the one judgement in the path and it is Dan's own max-count rule, narrowed to the canon.
   const optimal: BandRung | null = canonRungs
@@ -208,23 +235,9 @@ export function wrapBandLadder(
     kept.set(key, r)
     offers.push(r)
   }
-  // DAN'S UNPROTECTED-AREA RULES, last, on what would otherwise ship. The sequencer measures —
-  // the classifier's ruler gives the legal region, judge turns it into gaps and applies his
-  // preferences. All toggles off is the released behaviour and this whole block is a no-op.
-  const rules = cfg.holdingRules
-  if (rules && (rules.perimeter || rules.extremes || rules.corners || rules.gravity)) {
-    const radiusMM = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
-    const facts = new Map<BandRung, HoldingFacts>()
-    for (const o of offers) {
-      const c = sized(o.at.sizeMM)
-      const region = legalRegion(c, radiusMM)
-      const box = legalRegionBoxMM(c, radiusMM)
-      if (!region || !box) continue
-      const gaps = unprotectedRegions(region, o.at.points, UNPROTECTED_REACH_MM)
-      facts.set(o, holdingFactsOf(o.at.points, box, gaps, pitch))
-    }
-    const ruled = applyHoldingRules(offers, (o) => facts.get(o) ?? null, rules)
-    return { offers: ruled, bestSeated: bestSeatedCandidate(witnesses) }
-  }
-  return { offers, bestSeated: bestSeatedCandidate(witnesses) }
+  // THE PREFERENCES order what ships. They never remove — only rule 2 removes, and it did that
+  // above, on the pools.
+  const ruled = rules && (rules.perimeter || rules.corners || rules.gravity)
+    ? applyHoldingRules(offers, factsOf, rules) : offers
+  return { offers: ruled, bestSeated: bestSeatedCandidate(witnesses) }
 }
