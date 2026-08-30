@@ -142,7 +142,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         const r = spotRadiusOf(pad)
         const segments = safeSegments(drawn.contour, r, 'full')
         const anchors = assignSizes(at.points, (cfg.plan ?? 'all6') as MagnetPlan)
-        const ladder = rungs.map((rg) => ({ sizeMM: rg.at.sizeMM, count: rg.at.count, offMM: rg.at.centreOffMM, roles: rg.roles }))
+        const ladder = rungs.map((rg) => ({ sizeMM: rg.at.sizeMM, count: rg.at.count, offMM: rg.at.centreOffMM, roles: rg.roles, omitted: rg.omittedFromOptimal }))
         const bk = bakeOf(sized, cfg, sig)
         const cf = classFrameNodes(bk.segW, bk.segH, band.id, cfg.pitchMM)
         const refMM = sizeRange(Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)).maxMM

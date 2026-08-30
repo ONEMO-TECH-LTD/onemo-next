@@ -22,7 +22,7 @@ import { CENTRE_MODE, GOVERNOR } from './grid-magnet-spec'
 import type { CentreMode, Governor } from './types'
 import { wrapGroup } from './units/wrap'
 import { inBand, orderOffers } from './units/judge'
-import { bestSeatedCandidate, fallbackRevealSizes } from './units/layout'
+import { bestSeatedCandidate, fallbackRevealSizes, makeContourSeatPredicate } from './units/layout'
 
 
 /** mm → integer microns; Clipper64 is integer-robust. */
@@ -129,15 +129,58 @@ export function wrapBandLadder(
     for (const p of pts) { if (p[0] < mx) mx = p[0]; if (p[1] < my) my = p[1] }
     return pts.map((p) => Math.round((p[0] - mx) / pitch) + ',' + Math.round((p[1] - my) / pitch)).sort().join(';')
   }
-  const attempt = (pts: ReadonlyArray<Pt>, revealMM: number): BandRung | null => {
-    const at = wrapGroup(sized, wcfg, localise(pts), minMM, hiMM)
+  const attempt = (pts: ReadonlyArray<Pt>, revealMM: number, floorMM = minMM): BandRung | null => {
+    const at = wrapGroup(sized, wcfg, localise(pts), floorMM, hiMM)
     if (!at) return null
     if (!inBand(at.sizeMM, loMM, hiMM)) return null   // judge: another band owns it
     return { at, revealMM, roles: [] }
   }
 
   // THE OPTIMAL, FIRST. Same wrap, same laws — it just gets asked before anything is discovered.
-  const optimal = optimalNodesMM?.length ? attempt(optimalNodesMM, loMM) : null
+  //
+  // Whole group first: if the shape can carry every magnet at some size in the range, that is the
+  // answer and nothing is dropped. Only when it cannot does the second half apply — Dan,
+  // 2026-08-30: "if some of the magnets fall off it must either scale or shrink to it". So the
+  // layout is SEATED against the real material at the most generous size in the range, whatever
+  // the material refuses is dropped and recorded, and the survivors go to the same wrap.
+  //
+  // Without this an irregular shape gets no optimal at all: the BOT's B4 box admits a 3x4 of
+  // twelve, and its actual material holds four. All-or-nothing threw the recommendation away on
+  // every real cutout at B4 and B5.
+  const seatOptimal = (nodes: ReadonlyArray<Pt>, mm: number): { seated: Pt[]; omitted: Pt[] } => {
+    const radius = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
+    const fits = makeContourSeatPredicate(sized(mm), radius)
+    const anchor = anchorFn(mm)
+    const placed = localise(nodes).map(([x, y]) => [anchor[0] + x, anchor[1] + y] as Pt)
+    if (!fits) return { seated: [], omitted: [...placed] }
+    const seated: Pt[] = [], omitted: Pt[] = []
+    for (const q of placed) (fits(q) ? seated : omitted).push(q)
+    return { seated, omitted }
+  }
+  let optimal: BandRung | null = null
+  let optimalOmitted = 0
+  if (optimalNodesMM?.length) {
+    optimal = attempt(optimalNodesMM, loMM)
+    if (!optimal) {
+      // SCALE TO IT before shrinking to it. Seating is a predicate test, not a solve, so every
+      // size in the range is cheap to try; the one that holds most of the layout is the one worth
+      // wrapping. Seating at a single size gave the duck no optimal at all at B3 and B4.
+      let bestSeated: Pt[] = [], bestOmitted = 0, bestMM = hiMM
+      for (const mm of fallbackRevealSizes(loMM, hiMM)) {
+        const { seated, omitted } = seatOptimal(optimalNodesMM, mm)
+        if (seated.length > bestSeated.length) { bestSeated = seated; bestOmitted = omitted.length; bestMM = mm }
+        if (!omitted.length) break            // it holds whole here; nothing better exists
+      }
+      if (bestSeated.length) {
+        // Do not shrink BELOW the size the layout was placed at. Dan asked the shape to be scaled
+        // to the optimal layout; wrapping the survivors from the floor instead lets a heavily
+        // refused canon collapse onto its few remaining magnets and fall out of the band — which
+        // is how the duck and the butterfly lost their optimal at B3 and B4 entirely.
+        optimal = attempt(bestSeated, bestMM, bestMM)
+        optimalOmitted = bestOmitted
+      }
+    }
+  }
 
   // THE WALK, unchanged in range and method. Every lawful registration at each size is collected,
   // not only the fullest, or the fewest-magnet answer below could never exist.
@@ -171,6 +214,7 @@ export function wrapBandLadder(
     const already = kept.get(key)
     if (already) { already.roles.push(role); continue }   // the same answer, reached twice: one row
     r.roles = [role]
+    if (role === 'optimal' && optimalOmitted) r.omittedFromOptimal = optimalOmitted
     kept.set(key, r)
     offers.push(r)
   }
