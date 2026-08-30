@@ -81,9 +81,16 @@ export function classifyBands(
     // polygon read 239.18mm (no band) and its horizontal mirror 238.81mm (B5), with mirrored
     // disagreement up to 5.97mm across 1,000 shapes. A shape's band must not change when you flip
     // it, so the ruler cannot be a sampled display field.
-    const legal = legalRegionBoxMM(contour, r)
-    if (!legal) continue                      // nothing can hold a magnet at that size
     const bb = bbox(contour.outer.pts)
+    // WHICH RULER — 'legal' is released; 'outer' is the test instrument Dan asked for so both can
+    // be tried on the same shape. Outer takes the outline's box and removes the rim from each
+    // side: what the shape WOULD carry if its material reached its outline. On a solid shape the
+    // two agree; on a hollow one they disagree completely, and that disagreement is the thing
+    // worth seeing rather than arguing about.
+    const legal = (cfg.classifierRuler ?? 'legal') === 'outer'
+      ? { minX: bb.minX + r, minY: bb.minY + r, maxX: bb.maxX - r, maxY: bb.maxY - r }
+      : legalRegionBoxMM(contour, r)
+    if (!legal || legal.maxX < legal.minX || legal.maxY < legal.minY) continue
     rows.push({
       bandId: band.id, seedMM,
       outerWidthMM: bb.maxX - bb.minX, outerHeightMM: bb.maxY - bb.minY,

@@ -128,6 +128,17 @@ export interface BandSolve {
 
 // The engine's request/response vocabulary.
 export interface GridConfig {
+  /** WHICH RULER THE CLASSIFIER READS — a test instrument, not a preference (Dan, 2026-08-30:
+   *  "i prefer testing both"). 'legal' is the released behaviour: the exact Clipper2 legal region,
+   *  where a magnet centre may sit. 'outer' measures the outline's own box less the rim on each
+   *  side, which is what the shape would carry IF its material reached the outline.
+   *
+   *  They disagree most on hollow shapes. The butterfly at B3 measures 122.1 x 100.2 outer against
+   *  95.9 x 62.8 legal — 1.22 against 1.53, nearly-square versus landscape rectangle — because the
+   *  wings are wide and too thin to hold anything. Outer minus rim gives 98.1, which clears the
+   *  96mm a B3 record needs; legal gives 95.9 and returns nothing. One ruler yields a layout, the
+   *  other yields silence, on the same shape at the same size. */
+  classifierRuler?: 'legal' | 'outer'
   pitchMM?: number
   paddingMM?: number
   /** Manual calibration: force this registration (mm phase) instead of searching. */

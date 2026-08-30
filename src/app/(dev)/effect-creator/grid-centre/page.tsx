@@ -89,6 +89,9 @@ export default function GridLab() {
   const [showLattice, setShowLattice] = useState(true)
   /** Faint bounding box with per-side dimensions. */
   const [showBox, setShowBox] = useState(true)
+  // WHICH RULER the classifier reads. A test instrument so both can be tried on the same shape
+  // (Dan, 2026-08-30: "i prefer testing both"); 'legal' is the released behaviour.
+  const [ruler, setRuler] = useState<'legal' | 'outer'>('legal')
   /** Legal-area islands, coloured + boxed + centre-marked. */
   const [showSegs, setShowSegs] = useState(true)
   /** Coloured fills of the inner (legal) area — off leaves outlines only. */
@@ -323,7 +326,7 @@ export default function GridLab() {
     const w = workerRef.current
     if (!w) return
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
-    const cfg = { pitchMM: pitch, paddingMM: pad, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle' }
+    const cfg = { pitchMM: pitch, paddingMM: pad, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle', classifierRuler: ruler }
     // Manual in a band (forced registration OR manual band scale): the walk is meaningless —
     // solve that size directly, exactly like free mode, band chip stays active.
     const manualBand = manual !== null || bandScale !== null   // manual scale/pan: solved directly at the requested size
@@ -514,6 +517,12 @@ export default function GridLab() {
             <LockNum label="Magnet padding · per spot" unit="mm" v={pad} set={setPad}
               min={PADDING_FLOOR_MM} max={PADDING_CEIL_MM} locked={padLock} setLocked={setPadLock}
               released={RELEASED_PADDING_MM} />
+            <div className="gl-field"><span>Classifier ruler · what the band is measured on</span>
+              <div className="gl-seg">
+                <button aria-pressed={ruler === 'legal'} onClick={() => setRuler('legal')}>legal area</button>
+                <button aria-pressed={ruler === 'outer'} onClick={() => setRuler('outer')}>outer box</button>
+              </div>
+            </div>
             <div className="gl-field"><span>Coverage</span>
               <div className="gl-seg">
                 {([['full', 'Full grid'], ['perimeter', 'Perimeter belt']] as ['full' | 'perimeter', string][]).map(([c, l]) =>
