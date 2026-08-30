@@ -138,6 +138,10 @@ export interface GridConfig {
    *  needs; legal gives 95.9 and returns nothing. One ruler yields a layout, the
    *  other yields silence, on the same shape at the same size. */
   classifierRuler?: 'legal' | 'outer'
+  /** DAN'S UNPROTECTED-AREA RULES, each independently switchable (2026-08-30: "i would make it
+   *  toggles on off and test the results like a filter indeed"). Omitted or all-false is the
+   *  released behaviour — nothing is filtered and nothing is reordered. */
+  holdingRules?: { perimeter: boolean; extremes: boolean; corners: boolean; gravity: boolean }
   pitchMM?: number
   paddingMM?: number
   /** Manual calibration: force this registration (mm phase) instead of searching. */

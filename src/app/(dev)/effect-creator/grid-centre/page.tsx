@@ -92,6 +92,9 @@ export default function GridLab() {
   // WHICH RULER the classifier reads. A test instrument so both can be tried on the same shape
   // (Dan, 2026-08-30: "i prefer testing both"); 'legal' is the released behaviour.
   const [ruler, setRuler] = useState<'legal' | 'outer'>('legal')
+  // DAN'S FOUR UNPROTECTED-AREA RULES, each on its own switch (2026-08-30: "i would make it
+  // toggles on off and test the results like a filter indeed"). All off is the released path.
+  const [hold, setHold] = useState({ perimeter: false, extremes: false, corners: false, gravity: false })
   /** Legal-area islands, coloured + boxed + centre-marked. */
   const [showSegs, setShowSegs] = useState(true)
   /** Coloured fills of the inner (legal) area — off leaves outlines only. */
@@ -326,7 +329,7 @@ export default function GridLab() {
     const w = workerRef.current
     if (!w) return
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
-    const cfg = { pitchMM: pitch, paddingMM: pad, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle', classifierRuler: ruler }
+    const cfg = { pitchMM: pitch, paddingMM: pad, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle', classifierRuler: ruler, holdingRules: hold }
     // Manual in a band (forced registration OR manual band scale): the walk is meaningless —
     // solve that size directly, exactly like free mode, band chip stays active.
     const manualBand = manual !== null || bandScale !== null   // manual scale/pan: solved directly at the requested size
@@ -343,7 +346,7 @@ export default function GridLab() {
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler])
+  }, [base, src, preset, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler, hold])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -517,6 +520,14 @@ export default function GridLab() {
             <LockNum label="Magnet padding · per spot" unit="mm" v={pad} set={setPad}
               min={PADDING_FLOOR_MM} max={PADDING_CEIL_MM} locked={padLock} setLocked={setPadLock}
               released={RELEASED_PADDING_MM} />
+            <div className="gl-field"><span>Unprotected area · Dan&apos;s holding rules</span>
+              <div className="gl-seg gl-wrap">
+                {([['perimeter', 'perimeter over centre'], ['extremes', 'hold the extremes'],
+                   ['corners', 'corners over sides'], ['gravity', 'top gap worst']] as const).map(([k, label]) =>
+                  <button key={k} aria-pressed={hold[k]}
+                    onClick={() => setHold((h) => ({ ...h, [k]: !h[k] }))}>{label}</button>)}
+              </div>
+            </div>
             <div className="gl-field"><span>Classifier ruler · what the band is measured on</span>
               <div className="gl-seg">
                 <button aria-pressed={ruler === 'legal'} onClick={() => setRuler('legal')}>legal area</button>

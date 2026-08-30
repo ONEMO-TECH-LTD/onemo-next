@@ -21,9 +21,9 @@ import { centeringAnchors, governMass } from './units/centring'
 import { CENTRE_MODE, GOVERNOR } from './grid-magnet-spec'
 import type { CentreMode, Governor } from './types'
 import { wrapGroup } from './units/wrap'
-import { inBand, orderOffers } from './units/judge'
+import { applyHoldingRules, holdingFactsOf, inBand, orderOffers, unprotectedRegions, UNPROTECTED_REACH_MM, type HoldingFacts } from './units/judge'
 import { bestSeatedCandidate, fallbackRevealSizes } from './units/layout'
-import { legalRegionBoxMM } from './units/classifier'
+import { legalRegion, legalRegionBoxMM } from './units/classifier'
 
 
 /** mm → integer microns; Clipper64 is integer-robust. */
@@ -207,6 +207,24 @@ export function wrapBandLadder(
     r.roles = [role]
     kept.set(key, r)
     offers.push(r)
+  }
+  // DAN'S UNPROTECTED-AREA RULES, last, on what would otherwise ship. The sequencer measures —
+  // the classifier's ruler gives the legal region, judge turns it into gaps and applies his
+  // preferences. All toggles off is the released behaviour and this whole block is a no-op.
+  const rules = cfg.holdingRules
+  if (rules && (rules.perimeter || rules.extremes || rules.corners || rules.gravity)) {
+    const radiusMM = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
+    const facts = new Map<BandRung, HoldingFacts>()
+    for (const o of offers) {
+      const c = sized(o.at.sizeMM)
+      const region = legalRegion(c, radiusMM)
+      const box = legalRegionBoxMM(c, radiusMM)
+      if (!region || !box) continue
+      const gaps = unprotectedRegions(region, o.at.points, UNPROTECTED_REACH_MM)
+      facts.set(o, holdingFactsOf(o.at.points, box, gaps, pitch))
+    }
+    const ruled = applyHoldingRules(offers, (o) => facts.get(o) ?? null, rules)
+    return { offers: ruled, bestSeated: bestSeatedCandidate(witnesses) }
   }
   return { offers, bestSeated: bestSeatedCandidate(witnesses) }
 }
