@@ -6,15 +6,17 @@
 // Dan, 08-26: "no logic in UI shell and poage".
 
 import type { ReactElement, ReactNode } from 'react'
-import type { LibraryEdit, LibrarySelection, PanelOption, PanelOptions } from '@/lib/effect/library'
+import type { BrowseOption, LibraryBrowse, LibraryEdit, LibrarySelection, PanelOption, PanelOptions } from '@/lib/effect/library'
 
 type FoldComponent = (p: { title: ReactNode; children: ReactNode }) => ReactElement
 
 export default function LibraryPanel({
-  setSel, Fold, options, boxMM, bandId, showBox, setShowBox, editError,
+  setSel, setBrowse, Fold, options, boxMM, bandId, showBox, setShowBox, editError,
   edit, setEdit, saveEdit, deleteEdit, startAdd, startEdit, isDraft,
 }: {
   setSel: (next: LibrarySelection) => void
+  /** How the listing is being browsed — which band, which way round. A filter, not a selection. */
+  setBrowse: (next: LibraryBrowse) => void
   Fold: FoldComponent
   options: PanelOptions
   boxMM: { w: number; h: number }
@@ -58,6 +60,24 @@ export default function LibraryPanel({
           <div className="gl-seg gl-liborient">
             {opts.orientations.map((o) => (
               <button key={o.id} aria-pressed={o.active} onClick={() => setSel(o.next)}>{o.label}</button>
+            ))}
+          </div>
+        </Fold>
+      )}
+      {opts.bands.length > 0 && (
+        <Fold title="Band">
+          <div className="gl-seg gl-libband-row">
+            {opts.bands.map((o: BrowseOption) => (
+              <button key={o.id} aria-pressed={o.active} onClick={() => setBrowse(o.next)}>{o.label}</button>
+            ))}
+          </div>
+        </Fold>
+      )}
+      {opts.frameOrientations.length > 0 && (
+        <Fold title="Orientation">
+          <div className="gl-seg gl-liborient">
+            {opts.frameOrientations.map((o: BrowseOption) => (
+              <button key={o.id} aria-pressed={o.active} onClick={() => setBrowse(o.next)}>{o.label}</button>
             ))}
           </div>
         </Fold>

@@ -4,7 +4,7 @@
 // shell and poage"). Resolution lives in selection.ts; classes answer through class-registry.ts.
 
 import { specOf } from './class-registry'
-import type { LibraryClass } from './class-contract'
+import type { FrameOrientation, LibraryClass } from './class-contract'
 import { frameKeyOf, transformLayout, viewName } from './transforms'
 import { draftLayoutId, selectVariant, type ResolvedSelection } from './selection'
 import type { LibraryDraft } from './drafts'
@@ -28,8 +28,32 @@ export interface PanelOption {
   /** A hand-authored layout rather than a corpus one. */
   custom?: boolean
 }
+/** HOW THE ADMIN IS BROWSING — which band and which way round, independent of what is selected.
+ *  A filter over the listing, never a transform of a record: portrait and landscape are separate
+ *  published layouts, so choosing one narrows the list rather than turning anything (Dan,
+ *  2026-08-30). Null on either axis means "all". */
+export interface LibraryBrowse {
+  bandId: number | null
+  orientation: FrameOrientation | null
+}
+
+export const DEFAULT_LIBRARY_BROWSE: LibraryBrowse = { bandId: null, orientation: null }
+
+/** A browse chip. Same idiom as PanelOption: it carries the state it produces. */
+export interface BrowseOption {
+  id: string
+  label: string
+  active: boolean
+  next: LibraryBrowse
+}
+
 export interface PanelOptions {
   types: PanelOption[]
+  /** The bands this class's frames actually occupy, plus "all". Empty when there is only one. */
+  bands: BrowseOption[]
+  /** portrait / landscape, offered only when the class publishes both. Empty otherwise — a square
+   *  class has no such choice, and a row with one button is not a choice either. */
+  frameOrientations: BrowseOption[]
   /** The offers a class makes. For a class whose shape IS its layout each offer is one
    *  geometry, so there is one block and not two. */
   frames: PanelOption[]
@@ -108,8 +132,40 @@ export function selectionForFamily(
   return specOf(family).open(current, pitchMM)
 }
 
+/** The band and orientation rows, and the frames that survive them. Filtering lives HERE and not
+ *  in the panel: the view renders options and holds no class logic (Dan, 08-26 "no logic in UI
+ *  shell and page"), and deciding which frames a band contains is exactly that logic. */
+function browseRows(
+  variants: readonly { bandId: number | null; orientation: FrameOrientation }[], browse: LibraryBrowse,
+): { bands: BrowseOption[]; frameOrientations: BrowseOption[]; applied: LibraryBrowse } {
+  const ids = [...new Set(variants.map((v) => v.bandId).filter((b): b is number => b !== null))]
+    .sort((a, b) => a - b)
+  const bands: BrowseOption[] = ids.length > 1 ? [
+    { id: 'band-all', label: 'all', active: browse.bandId === null, next: { ...browse, bandId: null } },
+    ...ids.map((id) => ({
+      id: 'band' + id, label: 'B' + id, active: browse.bandId === id, next: { ...browse, bandId: id },
+    })),
+  ] : []
+  // only a class publishing BOTH ways round has a choice to offer
+  const ways = new Set(variants.map((v) => v.orientation))
+  const frameOrientations: BrowseOption[] = ways.has('portrait') && ways.has('landscape') ? [
+    { id: 'o-all', label: 'all', active: browse.orientation === null, next: { ...browse, orientation: null } },
+    { id: 'o-portrait', label: 'portrait', active: browse.orientation === 'portrait', next: { ...browse, orientation: 'portrait' } },
+    { id: 'o-landscape', label: 'landscape', active: browse.orientation === 'landscape', next: { ...browse, orientation: 'landscape' } },
+  ] : []
+  // A FILTER THAT IS NOT OFFERED MUST NOT FILTER. Carrying "portrait" from the rectangle tab into
+  // the square tab emptied the list — squares are neither portrait nor landscape, so every chip
+  // was excluded by a control the class never showed. Same for a band this class does not reach.
+  const applied: LibraryBrowse = {
+    bandId: browse.bandId !== null && ids.includes(browse.bandId) ? browse.bandId : null,
+    orientation: frameOrientations.length ? browse.orientation : null,
+  }
+  return { bands, frameOrientations, applied }
+}
+
 export function panelOptionsResolved(
   sel: LibrarySelection, drafts: readonly LibraryDraft[], pitchMM: number, resolved: ResolvedSelection,
+  browse: LibraryBrowse = DEFAULT_LIBRARY_BROWSE,
 ): PanelOptions {
   const { spec, variant, typeId: type, frame, layout, draft } = resolved
   // a saved custom layout is deduped from ITS OWN population, not from the corpus layout the
@@ -118,6 +174,8 @@ export function panelOptionsResolved(
   const orientations = orientationOptions(sel, frame, visible, spec, spec.baseView(sel, pitchMM))
   const variantId = variant.id
   const layoutSel = (name: string): LibrarySelection => ({ ...sel, layoutId: name })
+  const allVariants = spec.variants(type, pitchMM)
+  const rows = browseRows(allVariants, browse)
 
   return {
     // a class with one type offers no choice, so its chip is inert. WHICH controls are inert is
@@ -129,10 +187,15 @@ export function panelOptionsResolved(
         disabled: spec.types.length === 1, next: selectVariant(sel, first),
       }
     }),
-    frames: spec.variants(type, pitchMM).map((v) => ({
-      id: v.id, label: v.label, accessibleLabel: v.accessibleLabel,
-      active: v.id === variantId, next: selectVariant(sel, v),
-    })),
+    bands: rows.bands,
+    frameOrientations: rows.frameOrientations,
+    frames: allVariants
+      .filter((v) => (rows.applied.bandId === null || v.bandId === rows.applied.bandId)
+        && (rows.applied.orientation === null || v.orientation === rows.applied.orientation))
+      .map((v) => ({
+        id: v.id, label: v.label, accessibleLabel: v.accessibleLabel,
+        active: v.id === variantId, next: selectVariant(sel, v),
+      })),
     // a class with no named views of its own, and no turn that changes the picture, offers none
     // CANON IS LOCKED: a square or rectangle record's orientation is part of what it is, so the
     // page offers no turn (Dan, 2026-08-30). Presets keep the transform row — for them a turn

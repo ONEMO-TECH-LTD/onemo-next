@@ -33,7 +33,9 @@ const asVariant = (triangle: TriangleLayout, pitchMM: number, index?: number, fr
   return {
     typeId: triangleTypeOf(triangle),
     id: triangle.id,
-    label: (band === null ? '' : 'B' + band + ' · ') + size,
+    label: size,
+    bandId: band,
+    orientation: frame.cols === frame.rows ? 'square' : frame.rows > frame.cols ? 'portrait' : 'landscape',
     ...(index === undefined ? {} : { accessibleLabel: label[triangleTypeOf(triangle)] + ' ' + (index + 1) + ' · ' + size + 'mm' + (restsFlat(triangle) ? '' : ' · diagonal') }),
     frame,
     view: uprightView(triangle),

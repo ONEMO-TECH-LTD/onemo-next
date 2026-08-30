@@ -13,7 +13,8 @@ import {
   DEFAULT_LIBRARY_SELECTION, LIBRARY_FAMILIES, selectionForFamily, librarySurface, DRAFT_STORE_KEY,
   startAdd as libStartAdd, startEdit as libStartEdit, saveEdit as libSaveEdit,
   deleteEdit as libDeleteEdit, toggleNodeAt,
-  type LibraryDraft, type LibraryEdit, type LibrarySelection,
+  DEFAULT_LIBRARY_BROWSE,
+  type LibraryBrowse, type LibraryDraft, type LibraryEdit, type LibrarySelection,
 } from '@/lib/effect/library'
 import { getShape, hasVectorDef, type VectorShapeKind } from '@/lib/shape-library'
 import { type VShape } from '@/lib/vector-core'
@@ -114,9 +115,12 @@ export default function GridLab() {
     setDrafts(next)
     try { localStorage.setItem(DRAFT_STORE_KEY, JSON.stringify(next)) } catch { }
   }
+  // how the library LISTING is browsed — band and orientation. A filter over what is shown, not
+  // part of the selection: turning the filter never changes which record is selected.
+  const [libBrowse, setLibBrowse] = useState<LibraryBrowse>(DEFAULT_LIBRARY_BROWSE)
   const libraryState = useMemo(() => tab === 'library'
-    ? librarySurface(librarySel, drafts, edit, pitch) : null,
-  [tab, librarySel, pitch, edit, drafts])
+    ? librarySurface(librarySel, drafts, edit, pitch, libBrowse) : null,
+  [tab, librarySel, pitch, edit, drafts, libBrowse])
   const libraryModel = useMemo(() => libraryState
     ? libraryStageModel(libraryState.materialized, pitch) : null,
   [libraryState, pitch])
@@ -427,7 +431,7 @@ export default function GridLab() {
               <button aria-label="zoom in" onClick={() => setLibView((v) => ({ ...v, zoom: camStep(v.zoom, +1) }))}>+</button>
             </div>
           </div>
-          {libraryState ? <LibraryPanel setSel={setLibrarySel} Fold={Fold} options={libraryState.options}
+          {libraryState ? <LibraryPanel setSel={setLibrarySel} setBrowse={setLibBrowse} Fold={Fold} options={libraryState.options}
             boxMM={{ w: libraryState.materialized.widthMM, h: libraryState.materialized.heightMM }}
             bandId={libraryState.materialized.bandId}
             showBox={showBox} setShowBox={setShowBox} edit={edit} setEdit={setEdit}

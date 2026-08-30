@@ -997,13 +997,15 @@ describe('triangle — a corner is a corner, and it opens the right way up', () 
       const selection = { ...variant.selection, layoutId: variant.frame.layouts[0].name, view: variant.view }
       const outline = materializeSelection(selection, 48).outlineMM
       const xs = outline.map(([x]) => x), ys = outline.map(([, y]) => y)
-      // the chip reads "B<band> · <width>×<height>" — the band is per pitch, so it is computed, never
-      // written into a frame's name: the same 5x5 is B3 at 24mm, B5 at 48 and B9 at 96
+      // the chip reads "<width>×<height>". The band moved OFF the title and onto the panel's own
+      // band row (Dan, 2026-08-30: the flat list carrying the band in every title is confusing),
+      // so it is asserted where it now lives — still computed per pitch, never written into a
+      // frame's name: the same 5x5 is B3 at 24mm, B5 at 48 and B9 at 96.
       expect(variant.label, variant.id).toBe(
-        'B' + bandOfFrame(variant.frame, 48) + ' · '
-        + Math.round(Math.max(...xs) - Math.min(...xs)) + '×'
+        Math.round(Math.max(...xs) - Math.min(...xs)) + '×'
         + Math.round(Math.max(...ys) - Math.min(...ys)),
       )
+      expect(variant.bandId, variant.id + ' band').toBe(bandOfFrame(variant.frame, 48))
     }
   })
 

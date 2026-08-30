@@ -40,7 +40,11 @@ export function registryClass(config: RegistryClassConfig): LibraryClass {
     const band = bandOfFrame(frame, pitchMM)
     return {
       typeId, id: frameKeyOf(frame),
-      label: (band === null ? '' : 'B' + band + ' · ') + config.label(frame),
+      // The band is no longer spelled into the title: the panel carries a band row and groups by
+      // it, so a chip reads "3x4" and not "B4 · 3x4" (Dan, 2026-08-30).
+      label: config.label(frame),
+      bandId: band,
+      orientation: frame.cols === frame.rows ? 'square' : frame.rows > frame.cols ? 'portrait' : 'landscape',
       frame, view: none,
       outline: config.outline,
       selection: { classId: config.classId, frameKey: frameKeyOf(frame) },

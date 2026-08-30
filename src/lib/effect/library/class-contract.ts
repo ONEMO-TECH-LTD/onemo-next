@@ -7,10 +7,18 @@ export interface OutlineRecipe {
   pointRotationDeg?: number
 }
 
+/** Which way round a frame sits. A fact of the record, not a transform of it: a 3x4 and a 4x3
+ *  are two published products (Dan, 2026-08-30 "those toggles must be separate layouts"). */
+export type FrameOrientation = 'portrait' | 'landscape' | 'square'
+
 export interface ClassVariant {
   typeId: string
   id: string
   label: string
+  /** The band this frame sits in, so the panel can group by it instead of spelling it into
+   *  every title. Null past the last band. */
+  bandId: number | null
+  orientation: FrameOrientation
   accessibleLabel?: string
   frame: LibraryFrame
   view: LibraryTransform
