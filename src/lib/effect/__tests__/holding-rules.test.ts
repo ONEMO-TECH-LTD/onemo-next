@@ -53,13 +53,31 @@ describe("Dan's holding rules: rule 2 enforces, rules 1/3/4 order", () => {
     expect(ruled[0], 'the answer holding the top must stand first').toEqual(bottomBare)
   })
 
-  it('RULE 1 and RULE 3 — perimeter and corner holds are counted, and order the survivors', () => {
+  it('RULE 3 — corners are counted, and preferred to sides', () => {
     const corners: Pt[] = [[30, 20], [110, 20], [30, 236], [110, 236]]
     const middle: Pt[] = [[70, 128], [70, 80], [70, 176], [70, 32]]
     expect(factsFor(corners).corners, 'four corner holds').toBe(4)
     expect(factsFor(middle).corners, 'a centre column holds no corners').toBe(0)
     expect(applyHoldingRules([middle, corners], factsFor, { ...NO_HOLDING_RULES, corners: true })[0],
       'corners are preferred to sides').toEqual(corners)
+  })
+
+  it('RULE 1 — perimeter holds are counted, and preferred to centres', () => {
+    // This test existed in name only: it was titled "RULE 1 and RULE 3" and asserted nothing about
+    // the perimeter count at all. Found by reading my own diff, not by a failing run — which is
+    // exactly the vacuous-test pattern I have shipped twice today.
+    //
+    // A 3x3 block: the middle magnet is surrounded on all four sides, the other eight are not.
+    const block: Pt[] = []
+    for (const x of [30, 70, 110]) for (const y of [80, 128, 176]) block.push([x, y])
+    expect(factsFor(block).perimeter, 'eight of nine sit on the rim; the middle one does not').toBe(8)
+    // an all-rim population: every magnet is a perimeter hold
+    const ringOnly: Pt[] = block.filter(([x, y]) => !(x === 70 && y === 128))
+    expect(factsFor(ringOnly).perimeter, 'with the centre gone all eight are rim').toBe(8)
+    // and the rule prefers the population with more of them
+    const sparse: Pt[] = [[70, 128], [70, 80]]
+    expect(applyHoldingRules([sparse, ringOnly], factsFor, { ...NO_HOLDING_RULES, perimeter: true })[0],
+      'more perimeter holds must stand first').toEqual(ringOnly)
   })
 
   it("THE THRESHOLD IS HIS, and it is applied by subtraction so it cannot be fudged", () => {
