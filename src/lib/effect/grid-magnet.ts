@@ -58,6 +58,9 @@ export interface BandClass {
   /** Where a magnet CENTRE may sit, once the 12mm rim comes off every edge and hole. */
   legalWidthMM: number
   legalHeightMM: number
+  /** The selected ruler's dimensions, supplied to the catalogue matcher. */
+  rulerWidthMM: number
+  rulerHeightMM: number
   /** The governed centre at that size — what a layout gets placed on. */
   anchorMM: Pt
 }
@@ -83,18 +86,17 @@ export function classifyBands(
     // it, so the ruler cannot be a sampled display field.
     const bb = bbox(contour.outer.pts)
     // WHICH RULER — 'legal' is released; 'outer' is the test instrument Dan asked for so both can
-    // be tried on the same shape. Outer takes the outline's box and removes the rim from each
-    // side: what the shape WOULD carry if its material reached its outline. On a solid shape the
-    // two agree; on a hollow one they disagree completely, and that disagreement is the thing
-    // worth seeing rather than arguing about.
-    const legal = (cfg.classifierRuler ?? 'legal') === 'outer'
-      ? { minX: bb.minX + r, minY: bb.minY + r, maxX: bb.maxX - r, maxY: bb.maxY - r }
-      : legalRegionBoxMM(contour, r)
-    if (!legal || legal.maxX < legal.minX || legal.maxY < legal.minY) continue
+    // be tried on the same shape. The legal box remains a separate measured fact in either mode;
+    // selecting outer changes only what the matcher reads.
+    const legal = legalRegionBoxMM(contour, r)
+    const ruler = (cfg.classifierRuler ?? 'legal') === 'outer' ? bb : legal
+    if (!ruler || ruler.maxX < ruler.minX || ruler.maxY < ruler.minY) continue
     rows.push({
       bandId: band.id, seedMM,
       outerWidthMM: bb.maxX - bb.minX, outerHeightMM: bb.maxY - bb.minY,
-      legalWidthMM: legal.maxX - legal.minX, legalHeightMM: legal.maxY - legal.minY,
+      legalWidthMM: legal ? legal.maxX - legal.minX : 0,
+      legalHeightMM: legal ? legal.maxY - legal.minY : 0,
+      rulerWidthMM: ruler.maxX - ruler.minX, rulerHeightMM: ruler.maxY - ruler.minY,
       anchorMM: anchorAt ? anchorAt(seedMM) : [(bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2],
     })
   }

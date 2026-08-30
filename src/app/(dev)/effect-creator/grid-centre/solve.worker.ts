@@ -113,7 +113,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       const bandClass = bandClasses.find((row) => row.bandId === band.id) ?? null
       // the lookup digests the classifier's boxes; the classifier itself counts nothing
       const optimal = bandClass
-        ? optimalLayoutForBox(cfg.pitchMM ?? DEFAULT_PITCH_MM, band.id, bandClass.legalWidthMM, bandClass.legalHeightMM)
+        ? optimalLayoutForBox(cfg.pitchMM ?? DEFAULT_PITCH_MM, band.id, bandClass.rulerWidthMM, bandClass.rulerHeightMM)
         : null
       const recommendation = optimal && bandClass
         ? { cols: optimal.frameCols, rows: optimal.frameRows, count: optimal.nodesMM.length,

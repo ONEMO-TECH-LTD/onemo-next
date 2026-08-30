@@ -26,22 +26,24 @@ const box = (c: (mm: number) => Contour, ruler: 'legal' | 'outer', band: number)
     .find((r) => r.bandId === band)
 
 describe('the classifier ruler is switchable, and the switch changes the answer', () => {
-  it('SOLID: on a square the two rulers agree exactly — outline minus the rim, both ways', () => {
+  it('SOLID: outer reads the actual outline box; legal reads the exact inset', () => {
     for (const band of [3, 4, 5]) {
       const l = box(sq, 'legal', band)!, o = box(sq, 'outer', band)!
-      expect(o.legalWidthMM, `B${band} width`).toBeCloseTo(l.legalWidthMM, 6)
-      expect(o.legalHeightMM, `B${band} height`).toBeCloseTo(l.legalHeightMM, 6)
-      expect(l.legalWidthMM, `B${band} is outline minus the rim`)
-        .toBeCloseTo(l.seedMM - 2 * RELEASED_PADDING_MM, 6)
+      expect(o.rulerWidthMM, `B${band} outer width`).toBeCloseTo(o.outerWidthMM, 6)
+      expect(o.rulerHeightMM, `B${band} outer height`).toBeCloseTo(o.outerHeightMM, 6)
+      expect(l.rulerWidthMM, `B${band} legal width`).toBeCloseTo(l.legalWidthMM, 6)
+      expect(l.rulerHeightMM, `B${band} legal height`).toBeCloseTo(l.legalHeightMM, 6)
+      expect(o.rulerWidthMM - l.rulerWidthMM, `B${band} removes both rims`)
+        .toBeCloseTo(2 * RELEASED_PADDING_MM, 6)
     }
   })
 
   it('HOLLOW: the rulers disagree, and the disagreement reaches the canon', () => {
     const l = box(winged, 'legal', 3)!, o = box(winged, 'outer', 3)!
     // the outer ruler cannot see that the arms hold nothing, so it reads a larger box
-    expect(o.legalWidthMM, 'outer must read at least as wide as legal').toBeGreaterThan(l.legalWidthMM)
-    const lo = optimalLayoutForBox(48, 3, l.legalWidthMM, l.legalHeightMM)
-    const oo = optimalLayoutForBox(48, 3, o.legalWidthMM, o.legalHeightMM)
+    expect(o.rulerWidthMM, 'outer must read wider than legal').toBeGreaterThan(l.rulerWidthMM)
+    const lo = optimalLayoutForBox(48, 3, l.rulerWidthMM, l.rulerHeightMM)
+    const oo = optimalLayoutForBox(48, 3, o.rulerWidthMM, o.rulerHeightMM)
     // the whole reason the switch exists: one ruler names a record where the other names none,
     // or names a bigger one. If this ever stops being true the instrument is measuring nothing.
     expect(`${lo?.frameCols}x${lo?.frameRows}` === `${oo?.frameCols}x${oo?.frameRows}`,
@@ -51,7 +53,6 @@ describe('the classifier ruler is switchable, and the switch changes the answer'
   it("DEFAULT IS THE RELEASED RULER: omitting the flag equals 'legal', never 'outer'", () => {
     const dflt = classifyBands(winged, { pitchMM: 48, paddingMM: RELEASED_PADDING_MM })
     const legal = classifyBands(winged, { pitchMM: 48, paddingMM: RELEASED_PADDING_MM, classifierRuler: 'legal' })
-    expect(dflt.map((r) => r.legalWidthMM.toFixed(6)))
-      .toEqual(legal.map((r) => r.legalWidthMM.toFixed(6)))
+    expect(dflt).toEqual(legal)
   })
 })
