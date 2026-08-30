@@ -26,6 +26,13 @@ const factsFor = (magnets: Pt[]) => {
   return holdingFactsOf(magnets, box, gaps, 48)
 }
 
+const signedAreaMM2 = (paths: NonNullable<ReturnType<typeof legalRegion>>) => {
+  let a2 = 0
+  for (const path of paths) for (let i = 0, j = path.length - 1; i < path.length; j = i++)
+    a2 += Number(path[j].x) * Number(path[i].y) - Number(path[i].x) * Number(path[j].y)
+  return Math.abs(a2 / 2) / 1_000_000
+}
+
 describe("Dan's holding rules: rule 2 enforces, rules 1/3/4 order", () => {
   it('RULE 2 — a population that does not reach both ends is REJECTED, and only when it is on', () => {
     // clustered near the bottom: lawful wrap, does not hold the extremes
@@ -92,6 +99,36 @@ describe("Dan's holding rules: rule 2 enforces, rules 1/3/4 order", () => {
     for (let x = 20; x <= 120; x += 40) for (let y = 20; y <= 240; y += 40) dense.push([x, y])
     expect(unprotectedRegions(region, dense, UNPROTECTED_REACH_MM).length,
       'a dense population must leave nothing beyond the threshold').toBe(0)
+  })
+
+  it('HOLES: unprotected area never exceeds the legal material', () => {
+    const donut: Contour = {
+      outer: { pts: [[0, 0], [300, 0], [300, 300], [0, 300]] },
+      holes: [{ pts: [[100, 100], [200, 100], [200, 200], [100, 200]] }],
+    }
+    const legal = legalRegion(donut, RELEASED_PADDING_MM)!
+    const gapArea = unprotectedRegions(legal, [[30, 30]], UNPROTECTED_REACH_MM)
+      .reduce((sum, gap) => sum + gap.areaMM2, 0)
+    expect(gapArea).toBeLessThanOrEqual(signedAreaMM2(legal))
+  })
+
+  it('RULE 1: a lone centre magnet is not a perimeter-side hold', () => {
+    const box = { minX: 0, minY: 0, maxX: 200, maxY: 200 }
+    expect(holdingFactsOf([[100, 100]], box, [], 48).perimeter).toBe(0)
+  })
+
+  it("RULE 2: the 48mm limit does not expand with a 96mm pitch", () => {
+    const box = { minX: 0, minY: 0, maxX: 100, maxY: 300 }
+    expect(holdingFactsOf([[50, 95], [50, 205]], box, [], 96).holdsExtremes).toBe(false)
+  })
+
+  it('RULE 4: measures top area even when it shares one region with the middle', () => {
+    const shape = ring([[0, 0], [140, 0], [140, 260], [0, 260]])
+    const legal = legalRegion(shape, RELEASED_PADDING_MM)!
+    const box = { minX: 12, minY: 12, maxX: 128, maxY: 248 }
+    const magnets: Pt[] = [[70, 20]]
+    const gaps = unprotectedRegions(legal, magnets, UNPROTECTED_REACH_MM)
+    expect(holdingFactsOf(magnets, box, gaps, 48).topUnprotectedMM2).toBeGreaterThan(0)
   })
 })
 
