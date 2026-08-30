@@ -22,7 +22,7 @@ import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
 import { DEFAULT_PITCH_MM, type BandSnapPoint, type GridResult, type MagnetPlan, type SafeSegment } from '@/lib/effect/grid-magnet'
-import { bandOuterMM } from '@/lib/effect/grid-magnet'
+import { bandOuterMM, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet'
 import { BANDS, CENTRE_MODE, GOVERNOR, PADDING_CEIL_MM, PADDING_FLOOR_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-magnet-spec'
 import { fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-magnet-bridge'
 
@@ -124,6 +124,19 @@ export default function GridLab() {
   const libraryModel = useMemo(() => libraryState
     ? libraryStageModel(libraryState.materialized, pitch) : null,
   [libraryState, pitch])
+  // THE RECORD'S OWN LEGAL AREA, measured exactly as the bench measures a shape's (Dan,
+  // 2026-08-30: "can we add the same to the library canon clone legal area measurements").
+  // Worth seeing here more than anywhere: a canon outline is GENERATED from its disks plus their
+  // 12mm rim, so its legal box should come back as the disk group's own extent — (cols-1) x
+  // (rows-1) pitches. Drawing it makes that identity checkable by eye instead of taken on trust,
+  // and it is the same box the classifier compares a real shape against.
+  //
+  // Measured HERE and not in the bridge: the bridge is a pure type adapter with a pinned
+  // allow-list and may not compute (architecture gate, STEP 5). The bench's own segments come
+  // from the worker for the same reason — the shell is where the two meet.
+  const librarySegments = useMemo(() => libraryModel
+    ? safeSegments(libraryModel.contour, spotRadiusOf(RELEASED_PADDING_MM), 'full') : [],
+  [libraryModel])
   /** Selected step on the band's ladder; null = the band's own pick (smallest size at max count). */
   const [stepSel, setStepSel] = useState<number | null>(null)
   /** Manual scale inside the band's range; null = the ladder rules. */
@@ -387,7 +400,8 @@ export default function GridLab() {
               if (!src2) return null
               const stageProps = libraryModel
                 ? { contour: libraryModel.contour, grid: libraryModel.grid, lattice: showLattice, box: showBox,
-                    segments: [], segFill: false,
+                    // the record's own legal area, dimensioned like the bench's
+                    segments: librarySegments, segFill: false,
                     viewport: { panMM: libView.panMM, zoom: libView.zoom * CAM_BASE, wheelZoom: true },
                     onPan: (dx: number, dy: number) => setLibView((v) => ({ ...v, panMM: [v.panMM[0] - dx, v.panMM[1] - dy] })),
                     onZoom: (f: number) => setLibView((v) => ({ ...v, zoom: camClamp(v.zoom * f) })),
@@ -867,7 +881,11 @@ function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, 
         const ly = Math.min(...segments.map((sg) => sg.bbox.minY))
         const lY = Math.max(...segments.map((sg) => sg.bbox.maxY))
         const lw = lX - lx, lh = lY - ly
-        if (!(lw > 0 && lh > 0)) return null
+        // A SLIM RECORD'S LEGAL AREA IS ZERO WIDE AND THAT IS THE ANSWER, not an absence: a 24mm
+        // strip minus the 12mm rim each side leaves one column of centres, which is a real product
+        // (Dan: "zero width means exactly one column"). Requiring both sides positive hid all
+        // twenty 1-wide rectangles; the box simply draws as the centre line.
+        if (lw < 0 || lh < 0 || (lw === 0 && lh === 0)) return null
         // smaller and lighter than the outer box's label — the quieter of the two readings
         const fs = (viewport ? 5 : 8) * spanMM / VP
         const hue = SEG_HUES[0]

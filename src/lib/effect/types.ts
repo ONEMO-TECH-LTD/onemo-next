@@ -111,9 +111,9 @@ export interface WrapAt {
 }
 
 /** WHY a row is on the list. The three answers Dan asked for: the canon layout the classifier
- *  recommended, the fewest magnets in the range, and the most. A row that is two of these at once
+ *  recommended, the MIN magnets in the range, and the MAX. A row that is two of these at once
  *  collapsed, and says so. */
-export type RungRole = 'optimal' | 'fewest' | 'most'
+export type RungRole = 'optimal' | 'min' | 'max'
 
 /** One rung the band offers: a revealed layout at its exact contact size. */
 export interface BandRung { at: WrapAt; revealMM: number; roles: RungRole[] }
@@ -167,7 +167,7 @@ export interface GridResult {
   /** THE centre that governed the winning layout — the main point of the centring system. */
   centreMainMM: Pt
   /** EVERY lawful registration at this size, coverage applied, not just the one drawn. The engine
-   *  always built these and kept only the fullest; "fewest magnets" cannot exist while the sparse
+   *  always built these and kept only the fullest; the MIN answer cannot exist while the sparse
    *  ones are discarded before anything can look at them. `anchors` is still the winner. */
   seatings: Pt[][]
 }

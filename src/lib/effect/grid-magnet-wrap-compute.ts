@@ -82,8 +82,8 @@ export function wrapGrid(
  *
  * Composition only: computeGrid and wrapGroup are used as they are, byte-untouched.
  */
-/** THE THREE ANSWERS Dan asked for: the canon layout tried first, then the fewest magnets in the
- *  range and the most. Anything that coincides collapses, so a shape whose optimal IS its fullest
+/** THE THREE ANSWERS Dan asked for: the canon layout tried first, then the MIN magnet count in
+ *  the range and the MAX. Anything that coincides collapses, so a shape whose optimal IS its fullest
  *  shows two rows, and one whose optimal is also its sparsest shows one.
  *
  *  `optimalNodesMM` is the layout the lookup named for this band — local offsets about its own
@@ -140,7 +140,7 @@ export function wrapBandLadder(
   const optimal = optimalNodesMM?.length ? attempt(optimalNodesMM, loMM) : null
 
   // THE WALK, unchanged in range and method. Every lawful registration at each size is collected,
-  // not only the fullest, or the fewest-magnet answer below could never exist.
+  // not only the fullest, or the MIN answer below could never exist.
   for (const mm of fallbackRevealSizes(loMM, hiMM)) {
     const grid = computeGrid(sized(mm), anchorAtMM ? { ...scanCfg, centreOverrideMM: anchorAtMM(mm) } : scanCfg)
     const drawn = grid.anchors.map((a) => a.p)
@@ -155,17 +155,18 @@ export function wrapBandLadder(
     }
   }
 
-  // FEWEST and MOST magnets in the range, from what the walk actually found.
+  // MIN and MAX magnets in the range, from what the walk actually found. Dan's own words for
+  // them, restored 2026-08-30 — they had been renamed to fewest/most, which he never asked for.
   const byCount = [...rungs].sort((a, b) => a.at.count - b.at.count || a.at.sizeMM - b.at.sizeMM)
-  const fewest = byCount[0] ?? null
-  const most = byCount[byCount.length - 1] ?? null
+  const min = byCount[0] ?? null
+  const max = byCount[byCount.length - 1] ?? null
 
   // COINCIDENT RESULTS COLLAPSE — the same answer is one row, whatever reached it first. Identity
   // is what SHIPS: the wrapped size and the magnet positions, never which probe proposed it.
   const shipped = (r: BandRung) => r.at.sizeMM.toFixed(2) + '|' + identityOf(r.at.points)
   const offers: BandRung[] = []
   const kept = new Map<string, BandRung>()
-  for (const [role, r] of [['optimal', optimal], ['fewest', fewest], ['most', most]] as Array<[RungRole, BandRung | null]>) {
+  for (const [role, r] of [['optimal', optimal], ['min', min], ['max', max]] as Array<[RungRole, BandRung | null]>) {
     if (!r) continue
     const key = shipped(r)
     const already = kept.get(key)

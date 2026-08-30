@@ -652,7 +652,7 @@ describe('1b — the frame comes from the usable material', () => {
     }
   })
 
-  it('THE THREE ANSWERS: optimal first, then fewest and most, coincident rows collapsed', () => {
+  it('THE THREE ANSWERS: optimal first, then min and max, coincident rows collapsed', () => {
     // Dan, 2026-08-30: "band module must get recommendation from the classifier of optimal layout
     // to try first from the canon ... and also try next best min magnet count in the range and max
     // - if they coincide or anything coincides we show only the single result".
@@ -671,13 +671,13 @@ describe('1b — the frame comes from the usable material', () => {
     }
 
     // B4 — three distinct answers. The counts are pinned because they are the whole point: the
-    // FEWEST is 6, and 6 is only reachable because every registration now survives. Winner-only
-    // cannot produce it — that path keeps the fullest at each size, so its fewest is 12.
+    // MIN is 10, and 10 is only reachable because every registration now survives. Winner-only
+    // cannot produce it — that path keeps the fullest at each size, so its MIN is 12.
     const b4 = solveBand(4)
-    expect(b4.solve.offers.map((o) => o.at.count), 'B4 optimal / fewest / most').toEqual([16, 10, 12])
+    expect(b4.solve.offers.map((o) => o.at.count), 'B4 optimal / min / max').toEqual([16, 10, 12])
     // every row states WHY it is on the list — the order alone is not the answer
     expect(b4.solve.offers.map((o) => o.roles.join('+')), 'B4 roles')
-      .toEqual(['optimal', 'fewest', 'most'])
+      .toEqual(['optimal', 'min', 'max'])
     expect(b4.solve.offers[0].at.count, 'the first row must be the canon layout')
       .toBe(b4.optimal!.nodesMM.length)
 
@@ -687,7 +687,7 @@ describe('1b — the frame comes from the usable material', () => {
     expect(b2.solve.offers.length, 'B2 must collapse to two rows').toBe(2)
     // and the collapsed row SAYS it is two answers, rather than silently being one of them
     expect(b2.solve.offers.map((o) => o.roles.join('+')), 'B2 roles')
-      .toEqual(['optimal+most', 'fewest'])
+      .toEqual(['optimal+max', 'min'])
     const shipped = (o: (typeof b2.solve.offers)[number]) => o.at.sizeMM.toFixed(2) + '|'
       + [...o.at.points].map((q) => q.map((v) => v.toFixed(1)).join(',')).sort().join(';')
     expect(new Set(b2.solve.offers.map(shipped)).size, 'the same answer appears twice').toBe(2)
