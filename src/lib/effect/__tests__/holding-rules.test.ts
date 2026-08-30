@@ -6,6 +6,7 @@ import {
 import { BANDS, RELEASED_PADDING_MM } from '../grid-magnet-spec'
 import { wrapBandLadder } from '../grid-magnet-wrap-compute'
 import type { Contour, Pt } from '../types'
+import { Clipper, FillRule } from '@countertype/clipper2-ts'
 
 // DAN'S UNPROTECTED-AREA RULES (2026-08-30). Rule 2 says "must be held" — it REJECTS. Rules 1, 3
 // and 4 say "preferred" — they ORDER. That split is his wording, not a design choice, and it is
@@ -112,6 +113,23 @@ describe("Dan's holding rules: rule 2 enforces, rules 1/3/4 order", () => {
       'a dense population must leave nothing beyond the threshold').toBe(0)
   })
 
+  it('THE THRESHOLD: no point inside the true reach survives between disc vertices', () => {
+    const shape = ring([[0, 0], [200, 0], [200, 200], [0, 200]])
+    const legal = legalRegion(shape, RELEASED_PADDING_MM)!
+    const gaps = unprotectedRegions(legal, [[100, 100]], REACH)
+    // Halfway between two vertices of the current 64-gon, 0.02mm inside the true 48mm radius.
+    const a = Math.PI / 64, d = REACH - 0.02
+    const x = 100 + Math.cos(a) * d, y = 100 + Math.sin(a) * d
+    const q = 2 // two microns either side
+    const probe = Clipper.makePath([
+      Math.round(x * 1000) - q, Math.round(y * 1000) - q,
+      Math.round(x * 1000) + q, Math.round(y * 1000) - q,
+      Math.round(x * 1000) + q, Math.round(y * 1000) + q,
+      Math.round(x * 1000) - q, Math.round(y * 1000) + q,
+    ])
+    expect(signedAreaMM2(Clipper.intersect(gaps, [probe], FillRule.NonZero))).toBe(0)
+  })
+
   it('HOLES: unprotected area never exceeds the legal material', () => {
     const donut: Contour = {
       outer: { pts: [[0, 0], [300, 0], [300, 300], [0, 300]] },
@@ -125,6 +143,16 @@ describe("Dan's holding rules: rule 2 enforces, rules 1/3/4 order", () => {
   it('RULE 1: a lone centre magnet is not a perimeter-side hold', () => {
     const box = { minX: 0, minY: 0, maxX: 200, maxY: 200 }
     expect(holdingFactsOf([[100, 100]], box, [], 48).perimeter).toBe(0)
+  })
+
+  it('RULE 1: a hold beside a concave legal-region edge is a perimeter hold', () => {
+    // U-shape: after the 12mm inset, the left arm's inner legal edge is x=88. The magnet is 5mm
+    // from that real edge but 71mm from the legal bounding box's nearest edge. A box-only rule
+    // therefore misses precisely the concave perimeter Dan asked the Clipper defender to see.
+    const u = ring([[0, 0], [300, 0], [300, 300], [200, 300], [200, 100],
+      [100, 100], [100, 300], [0, 300]])
+    const box = legalRegionBoxMM(u, RELEASED_PADDING_MM)!
+    expect(holdingFactsOf([[83, 200]], box, [], 48).perimeter).toBe(1)
   })
 
   it("RULE 2: the 48mm limit does not expand with a 96mm pitch", () => {
