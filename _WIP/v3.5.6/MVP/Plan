@@ -65,3 +65,194 @@
   Done means: a requested band classifies the usable frame, retrieves the correct square/
   rectangle canon, attempts it first through the existing engine, preserves every existing
   working behavior, and uses the sweep only when canon cannot solve.
+
+
+
+
+  CURRENT STATE
+
+
+  1 · Catalogue — canon vs preset: MISSING entirely. A record carries
+  class, frame, band, magnets, sizes — fifteen fields, none saying
+  whether it's canon or a preset. classId is a name, not a role, so
+  nothing downstream can tell a square from a triangle in terms of
+  eligibility. This is the gap that let twelve triangles into an
+  automatic answer.
+
+  2 · Segment and classify — segment works, classify is broken and
+  unused.
+  - Segmentation, legal area, masses, holes: all correct, feeding
+    everything.
+  - The classifier measures the shape's outer box, so a pointed shape
+    claims lines it can't hold and a dead limb counts as usable. It
+    also can't count past 5 — the old five-band range is baked into
+    its type.
+  - Its only consumer is a text readout on the bench. It decides
+    nothing.
+  - "Matching to the canon" doesn't exist at all — nothing connects a
+    classified frame to a library record.
+
+  3 · Centring and baking — complete, working, untouched. Six modes,
+  the governor, the once-per-shape bake scaled per size. Nothing to
+  add.
+
+  4 · Matching and offering optimals — exists, wrong key, dormant.
+  The matcher filters on the invented shape family with the fill <
+  0.68 cut-off, and has no production caller. And there's no notion
+  of "optimal" anywhere: nothing says this is the layout for this
+  band.
+
+  5 · The rest — all present and correct. Seating, wrap, band
+  membership, the default landing, manual controls, the lattice, and
+  the sweep that produces next-best options.
+
+  ---
+
+  One step missing from your list, and it's the one that bit me twice
+  today:
+
+  Between 1 and 3 — which size the shape is measured at. A shape's
+  frame changes as it scales: the same squircle is a 3×3 at one size
+  and a 5×5 at another. So "classify, then match" needs a size to
+  classify at, and the band has to supply it. Get that wrong by one
+  measurement step and B4 returns B5's layouts — exactly what
+  happened.
+
+  Today the sweep sidesteps it by measuring at every size. Once we
+  look up instead of sweeping, something must decide: for band N, at
+  what size do we read the frame? That's a real piece of logic that
+  doesn't exist and isn't in the four steps.
+
+  Everything else in your list is either already built and working,
+  or a small connection between things that already exist.
+
+
+
+
+⏺ Read every one of your turns end to end. Here are the answers —
+  including two I've been building against rather than from.
+
+  1. The sweep was never meant to go. You said so.
+
+  ▎ 16:29 — "if the sweep is the method for wrap and layout or
+  ▎ anything from the pipeline it is fine to stay"
+
+  And at 11:55 you described it: start at one magnet in B1, wrap it
+  as the measuring point, scale the shape proportionally, points fall
+  in or out at each size, wrap contains the survivors. That's the
+  sweep. It's your mechanism. What's wrong isn't that it scales —
+  it's that it has no idea what it's aiming for.
+
+  2. What's actually left is four judgement points, not a pipeline.
+
+  ▎ 13:12 — "the engine is fine 90% we need to guide it to recognise
+  ▎ only sizes and layouts that are optimal"
+  ▎ 13:30 — orientation and aspect preference · perimeter law
+  ▎ (perimeter only, no mid fill — not 96mm) · measure unpinned arc ·
+  ▎ coverage dominance
+  ▎ 13:38 — "add 2-3 judgement logic points and scoring and we are
+  ▎ done"
+
+  I never built one of these. I rebuilt the surrounding machinery
+  instead.
+
+  3. The classifier's job, stated twice:
+
+  ▎ 13:41 — "see what class of the shape it is and optimal perfect
+  ▎ layout count and apply it first within each band if it is not
+  ▎ possible next best one"
+  ▎ 11:25 — "when we class shape and segment we have 2 valuable
+  ▎ inputs — shape class and... the ranges we need to search"
+
+  Class and band give the search range. The canon gives the target.
+  The sweep does the scaling. Those three were never alternatives.
+
+  4. Settled and already built: bands belong to the catalogue, every
+  48mm, measured on the inner legal area · triangle and diamond are
+  layouts not shapes · canon is square and rectangle, the rest
+  presets · no aspect, the ordered frame carries it · the pipeline is
+  the filter, nothing invented on top.
+
+  5. The one I inverted: at 16:15 you said segmentation →
+  classification → layout is the filter and wrap applies to it. I
+  read "no other filters" as "step 3 must return everything
+  unranked". It means the opposite — those three steps are the
+  narrowing, so step 3 hands over one target.
+
+  The correction to my own plan: step 3 doesn't replace the sweep. It
+  gives the sweep something to aim at — the canon layout for the
+  band — and the sweep keeps scaling to find where it lands. Then the
+  four judgement points decide between what comes back.
+
+
+---------------------------------------------------------------------------
+
+
+   are those points the only thing you comprehended nothing else no
+  pipeline sequence no agreed metods ?
+  ⎿  Interrupted · What should Claude do instead?
+
+❯ from transcript?
+
+⏺ No — that was the delta, not the model. Here's what the transcript
+  actually agrees, sequence and method.
+
+  THE PIPELINE — your five steps, 16:29, controlling. MVP is 1–4.
+
+  1 · Class. Segment, erode 12mm, get the legal area. Recognise by
+  the inner box — but limbs mean the precise region is the mass, not
+  the legal bbox, because a 6mm sliver stretches the box and holds
+  nothing. The class is the ordered frame, cols × rows. No aspect —
+  the pair carries it without degenerating on a 1-wide frame.
+  Adaptive: the ceiling derives from the live band table, never a
+  typed 1–5. Orientation is portrait or landscape read off the pair,
+  and the engine should prefer the shape's own.
+
+  2 · Bands. Every 48mm a new band, measured on the inner legal area
+  (B2 = 48–96mm of legal span). The band is the skeleton — the layout
+  — and the shape is the body, so one band holds different real
+  sizes per class: a 3×3 is 120mm as a square, 135 as a pyramid.
+  Bands live on the catalogue record. Class + band together give the
+  range to search.
+
+  3 · Layout. Canon is square and rectangle, generated from rows ×
+  columns. Diamond and triangle are presets. The band's optimal
+  layout is applied first; if it can't be made to fit, next-best. And
+  your method for reaching it: start at one magnet in B1 (24–72),
+  wrap it as the measuring point, then scale — proportionally locked,
+  the shape scales, axes never grow one at a time. At each size,
+  positions fall in or out.
+
+  4 · Wrap. Never relieved — magnets touch edges, no flap, no
+  near-duplicate options. Whole group in, tightest size out.
+  "Anything falling off the layout is just omitted as not fitting the
+  shape." It may shift the centre slightly to dip discs into coves.
+  An exact fit is the optimal; everything else is next-best and
+  scored.
+
+  5 · Next best (after the MVP). Tune the centre, shift the grid,
+  pan, rescale. Your method: min count → propose, max count →
+  propose, canon optimal count → propose. And explicitly — "if the
+  sweep is the method... it is fine to stay."
+
+  CENTRING is the cornerstone and untouched: centre first, six modes,
+  governor, mass depth kept, baked once per shape and scaled.
+
+  FILTERS: the pipeline is the filter. Segmentation → classification
+  → layout is the narrowing; wrap applies to it; nothing else. Every
+  existing filter identified and ratified or removed — never silently
+  invented.
+
+  THE FOUR JUDGEMENT POINTS (13:30) — what "2–3 points and scoring
+  and we are done" means: prefer the shape's orientation · perimeter
+  only, no mid fill (not the 96mm rule) · measure unpinned arc ·
+  coverage dominance, so "same band, more held" beats "smallest that
+  fits". Plus: scale further within the allowed range to find the
+  better selection.
+
+  BOARD: 9 × 11, the only cap. The garment canvas (7×9 regular, 9×11
+  max) is an attachment ceiling, not an effect size. The 96mm dice is
+  parked until the foundation is solid.
+
+  PROTOCOL: propose to you and QA, agree, build, self-gate,
+  adversarial gate.
