@@ -13,6 +13,7 @@ import { join } from 'node:path'
 import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 import { classifyBands, computeGrid } from '../grid-magnet'
+import { optimalLayoutForBox } from '../grid-magnet-library-catalogue'
 import { frameOfMasses, positionsAcross } from '../units/classifier'
 import type { BBox, SafeMass, SafeSegment } from '../types'
 import { BANDS, BAND_STEP_MM } from '../grid-magnet-spec'
@@ -565,40 +566,52 @@ describe('1b — the frame comes from the usable material', () => {
     expect(frameOfMasses(withLiveArm, 48)).toMatchObject({ cols: 8, rows: 3 })
   })
 
-  it('STEP 1+2: every band is classified at its own trial size, through REAL segmentation', () => {
-    // Dan, 2026-08-30: "size the shape for each mid range value in each band and define the class
-    // for each and center it". This drives safeSegments for real — the synthetic-mass tests above
-    // cannot see a measurement error, which is exactly how a depth-inset frame went unnoticed.
+  it('STEP 1+2: the classifier measures BOXES at each band trial size — never a count', () => {
+    // Dan, 2026-08-30: "classifier must know no count at this step, it must just send the sweeper
+    // the outer/inner box dimensions in each band". Counting positions, fitting a layout and
+    // dropping what will not hold belong to the lookup, the sweep and wrap.
     const unit = (mm: number): Contour =>
       ({ outer: { pts: [[0, 0], [mm, 0], [mm, mm], [0, mm]] as Pt[] }, holes: [] })
     const rows = classifyBands(unit, { pitchMM: 48, paddingMM: 12 })
-
-    // a square's frame at each band's own midpoint is that band's count, both ways round
     const seen = new Map(rows.map((r) => [r.bandId, r]))
-    for (const [bandId, n] of [[1, 1], [2, 2], [3, 3], [4, 4], [5, 5]] as [number, number][]) {
-      const row = seen.get(bandId)
-      expect(row, 'B' + bandId + ' must be classified').toBeTruthy()
-      expect([row!.cols, row!.rows], 'B' + bandId + ' at ' + row!.seedMM + 'mm').toEqual([n, n])
-      // and the trial size is the band's MIDDLE, not its floor or its ceiling
-      expect(row!.seedMM, 'B' + bandId + ' trial size').toBe(bandBy(bandId).minMM + 24 + 24)
-    }
 
-    // the canon for that frame is named, and it is the square — never a preset
+    // the trial size is the band's MIDDLE, not its floor or its ceiling
+    for (const id of [1, 2, 3, 4, 5])
+      expect(seen.get(id)!.seedMM, 'B' + id + ' trial size').toBe(bandBy(id).minMM + 24 + 24)
+
+    // what comes back is two boxes: the outline, and the legal area 12mm inside every edge
     const b3 = seen.get(3)!
-    expect(b3.canonCount, 'a 3x3 canon is nine magnets').toBe(9)
-    expect(b3.canonId, 'canon must be square or rectangle').toMatch(/^(square|rectangle)\//)
+    expect([b3.outerWidthMM, b3.outerHeightMM], 'the outer box IS the trial size').toEqual([144, 144])
+    expect([b3.legalWidthMM, b3.legalHeightMM], 'the rim comes off both sides').toEqual([120, 120])
 
-    // the centre is the governed one, not the box middle by accident: it is inside the shape
-    expect(b3.anchorMM[0]).toBeGreaterThan(0)
-    expect(b3.anchorMM[0]).toBeLessThan(b3.seedMM)
+    // NO COUNT anywhere in the row — that is the whole point of this step
+    for (const key of ['cols', 'rows', 'count', 'frame', 'canonId', 'canonCount'])
+      expect(key in b3, 'the classifier leaked ' + key).toBe(false)
 
-    // it decides NOTHING: a band the board cannot reach is absent, never invented
-    expect(rows.every((r) => r.seedMM <= 420 + 12), 'a row past the board').toBe(true)
+    // every band is measured: the invented board skip that silently deleted B9-B11 is gone
+    expect(rows.map((r) => r.bandId), 'a band was dropped').toEqual(BANDS.map((b) => b.id))
   })
 
-  it('STEP 1+2: a shape whose material lags its outline classifies LOWER, not by its box', () => {
-    // The whole point of measuring the legal area. A star at B3's trial size carries far less than
-    // a square does at the same size, and the classifier must say so rather than read the outline.
+  it('STEP 1+2: the LOOKUP digests those boxes and names the optimal layout in that band', () => {
+    const at = (w: number, h: number, band: number) => optimalLayoutForBox(48, band, w, h)
+    // a square legal box takes the square; a band above it takes nothing, and says so rather
+    // than substituting something from another band
+    expect([at(120, 120, 3)?.frameCols, at(120, 120, 3)?.frameRows]).toEqual([3, 3])
+    expect(at(120, 120, 4), 'a bigger band squeezed into a smaller box').toBeNull()
+
+    // ORIENTATION IS THE BOX, never a choice: the same numbers the other way round transpose
+    expect([at(62, 120, 3)?.frameCols, at(62, 120, 3)?.frameRows], 'tall').toEqual([2, 3])
+    expect([at(120, 62, 3)?.frameCols, at(120, 62, 3)?.frameRows], 'wide').toEqual([3, 2])
+
+    // it uses as much of the box as fits, rather than the first thing that does
+    expect(at(120, 120, 3)!.nodesMM.length, 'the 3x3, not the 1x3').toBe(9)
+
+    // canon only — a preset never answers an automatic lookup
+    for (const [w, h, band] of [[120, 120, 3], [62, 120, 3], [168, 168, 4]] as [number, number, number][])
+      expect(at(w, h, band)!.catalogueRole, 'a preset answered').toBe('canon')
+  })
+
+  it('STEP 1+2: a shape whose material lags its outline measures a SMALLER legal box', () => {
     const star = (mm: number): Contour => {
       const pts: Pt[] = []
       for (let i = 0; i < 10; i++) {
@@ -610,13 +623,17 @@ describe('1b — the frame comes from the usable material', () => {
     }
     const sq = (mm: number): Contour =>
       ({ outer: { pts: [[0, 0], [mm, 0], [mm, mm], [0, mm]] as Pt[] }, holes: [] })
-    const at = (rows: ReturnType<typeof classifyBands>, id: number) => rows.find((r) => r.bandId === id)
     const cfg = { pitchMM: 48, paddingMM: 12 }
-    const starB3 = at(classifyBands(star, cfg), 3)!
-    const squareB3 = at(classifyBands(sq, cfg), 3)!
-    expect(squareB3.seedMM, 'both measured at the same trial size').toBe(starB3.seedMM)
-    expect(starB3.cols, 'the star carries less than the square at the same size')
-      .toBeLessThan(squareB3.cols)
+    const row = (rows: ReturnType<typeof classifyBands>, id: number) => rows.find((r) => r.bandId === id)!
+    const s3 = row(classifyBands(star, cfg), 3), q3 = row(classifyBands(sq, cfg), 3)
+    expect(s3.seedMM, 'both measured at the same trial size').toBe(q3.seedMM)
+    // the star's points do not reach its corners, so even its OUTLINE box is smaller — but the
+    // gap that matters is the legal one, which is far bigger than the outline gap
+    expect(s3.legalWidthMM, 'the star holds less').toBeLessThan(q3.legalWidthMM)
+    expect(q3.legalWidthMM - s3.legalWidthMM, 'the legal gap dwarfs the outline gap')
+      .toBeGreaterThan(q3.outerWidthMM - s3.outerWidthMM)
+    expect(optimalLayoutForBox(48, 3, s3.legalWidthMM, s3.legalHeightMM), 'the star is not B3 there')
+      .toBeNull()
   })
 
   it('COUNTEREXAMPLE: the frame counts past five', () => {

@@ -7,17 +7,14 @@
 import type { Contour, GridConfig, GridResult, Pt } from './types'
 export type { GridConfig, GridResult } from './types'
 import { registerLayout } from './units/layout'
-import { classificationSeedMM, frameOfMasses } from './units/classifier'
-import { canonLayoutForFrame } from './grid-magnet-library-catalogue'
+import { classificationSeedMM, legalUnionBoxMM } from './units/classifier'
 import { safeSegments } from './units/segment'
 import { centeringAnchors, governMass } from './units/centring'
 import { bbox } from './foundation/geometry'
 import { contourCentroidOf } from './units/centring'
-import { fieldSpanMM, latticeAt, spotRadiusOf } from './units/layout'
+import { latticeAt, spotRadiusOf } from './units/layout'
 import {
   BANDS,
-  DEFAULT_PITCH_MM,
-  SIZE_CEIL_MARGIN_MM,
   CENTRE_MODE,
   GOVERNOR,
   PADDING_FLOOR_MM,
@@ -43,55 +40,50 @@ export { bandOf, bandOuterMM, legalOfOuterMM, type Anchor, type MagnetDia, type 
 /** Sweep the lattice phase at the placement step (ruled 1mm), seat exactly, score, apply coverage, report. */
 
 
-/** ONE ROW PER BAND — what the classifier tells the band module before it searches.
+/** ONE ROW PER BAND — what the classifier MEASURES. Dan, 2026-08-30: "classifier must know no
+ *  count at this step, it must just send the sweeper the outer/inner box dimensions in each band".
  *
- *  Dan, 2026-08-30: "the classifier loading the shape and identifying the class in each band mid
- *  trial size and classing them after that centering", so that the band module "must get
- *  recommendation from the classifier of optimal layout to try first from the canon".
+ *  So there is no grid here, no magnet count, no position arithmetic and no knowledge of the
+ *  lattice. Two boxes and a centre. Counting positions, fitting a layout and dropping what will not
+ *  hold belong to the lookup, the sweep and wrap.
  *
- *  It is a NUDGE, not a stage: it decides no size and rejects nothing. The walk still does the
- *  scaling and wrap still does the fitting. This only says what to reach for first. */
+ *  It is a NUDGE, not a stage: it decides no size and rejects nothing. */
 export interface BandClass {
   bandId: number
   /** The trial size this row was measured at — the middle of the band's outline range. */
   seedMM: number
-  /** The ordered frame the shape's legal area carries there. Order IS the orientation. */
-  cols: number
-  rows: number
+  /** The shape's own bounding box at that size. */
+  outerWidthMM: number
+  outerHeightMM: number
+  /** Where a magnet CENTRE may sit, once the 12mm rim comes off every edge and hole. */
   legalWidthMM: number
   legalHeightMM: number
-  /** The governed centre at that size — the anchor the canon layout is placed on. */
+  /** The governed centre at that size — what a layout gets placed on. */
   anchorMM: Pt
-  /** The canon square/rectangle for that frame, or null when the board holds no such frame. */
-  canonId: string | null
-  canonCount: number | null
 }
 
-/** Eleven bands, one segmentation each. The caller supplies the anchor query, exactly as wrap
- *  does — this sequences units, it does not reach sideways for a centre. */
+/** Measure the shape at every band's trial size. The caller supplies the anchor query, exactly as
+ *  wrap does — this sequences units, it does not reach sideways for a centre. */
 export function classifyBands(
   sized: (mm: number) => Contour, cfg: GridConfig, anchorAt?: (mm: number) => Pt,
 ): BandClass[] {
   const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
   const r = spotRadiusOf(pad)
-  const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
-  const ceilingMM = fieldSpanMM(pad) + SIZE_CEIL_MARGIN_MM
   const rows: BandClass[] = []
   for (const band of BANDS) {
+    // No board skip. A trial size past the board is not an error and guards nothing — the previous
+    // skip was invented, and it silently deleted B9-B11 because the size ceiling still reads the
+    // COLUMN count for both axes and so believes the board is square.
     const seedMM = classificationSeedMM(band, pad)
-    if (seedMM > ceilingMM) continue          // past the board — that band has no trial size
     const contour = sized(seedMM)
-    const frame = frameOfMasses(safeSegments(contour, r, 'light'), pitch)
-    if (!frame) continue                      // nothing legal at that size: no class to report
+    const legal = legalUnionBoxMM(safeSegments(contour, r, 'light'))
+    if (!legal) continue                      // nothing can hold a magnet at that size
     const bb = bbox(contour.outer.pts)
-    const canon = canonLayoutForFrame(pitch, frame.cols, frame.rows)
     rows.push({
       bandId: band.id, seedMM,
-      cols: frame.cols, rows: frame.rows,
-      legalWidthMM: frame.widthMM, legalHeightMM: frame.heightMM,
+      outerWidthMM: bb.maxX - bb.minX, outerHeightMM: bb.maxY - bb.minY,
+      legalWidthMM: legal.maxX - legal.minX, legalHeightMM: legal.maxY - legal.minY,
       anchorMM: anchorAt ? anchorAt(seedMM) : [(bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2],
-      canonId: canon?.id ?? null,
-      canonCount: canon ? canon.nodesMM.length : null,
     })
   }
   return rows

@@ -2,6 +2,7 @@
 // bridge/engine calls the page used to make inline, nothing computed here.
 
 import { BANDS, bandOuterMM, classifyBands, computeGrid, MIN_EFFECT_MM, type GridConfig } from '@/lib/effect/grid-magnet'
+import { optimalLayoutForBox } from '@/lib/effect/grid-magnet-library-catalogue'
 import { wrapBandLadder, wrapGrid, type BandSolve, type WrapConfig } from '@/lib/effect/grid-magnet-wrap-compute'
 import { bbox, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet-compute'
 import { contourCentroidOf } from '@/lib/effect/units/centring'
@@ -110,6 +111,14 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       // carries and where its centre sits. Measured once per shape; it decides nothing here yet.
       const bandClasses = classifyBands(sized, cfg, anchorAt)
       const bandClass = bandClasses.find((row) => row.bandId === band.id) ?? null
+      // the lookup digests the classifier's boxes; the classifier itself counts nothing
+      const optimal = bandClass
+        ? optimalLayoutForBox(cfg.pitchMM ?? DEFAULT_PITCH_MM, band.id, bandClass.legalWidthMM, bandClass.legalHeightMM)
+        : null
+      const recommendation = optimal && bandClass
+        ? { cols: optimal.frameCols, rows: optimal.frameRows, count: optimal.nodesMM.length,
+            id: optimal.id, seedMM: bandClass.seedMM, anchorMM: bandClass.anchorMM }
+        : null
       const key = JSON.stringify([cfgSig, band.id])
       let solve = rungCache.get(key)
       if (!solve) {
@@ -142,7 +151,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         ctx.postMessage({ id, model: {
           contour: drawn.contour, grid: { ...drawn.grid, anchors, segments },
           effSize: at.sizeMM, ladder, idx, segments, offMM: at.centreOffMM, recog,
-          bandClass, bandClasses,
+          bandClass, bandClasses, recommendation,
         } })
         return
       }
@@ -160,7 +169,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       ctx.postMessage({ id, model: {
         contour, grid, effSize: bestSeatedMM, ladder: [], idx: 0, segments: grid.segments,
         offers: [], diagnostic: { reason: 'no-lawful-offer', bestSeatedMM },
-        bandClass, bandClasses,
+        bandClass, bandClasses, recommendation,
       } })
     }
   } catch (err) {

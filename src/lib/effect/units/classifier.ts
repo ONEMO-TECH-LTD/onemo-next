@@ -24,6 +24,20 @@ import { BAND_STEP_MM, DEFAULT_PITCH_MM, MIN_EFFECT_MM, type Band } from '../gri
  *
  *  Masses only — a segment holding no mass contributes nothing. Segmentation itself is untouched;
  *  this reads what safeSegments already produces. */
+/** THE LEGAL BOX — the bounding extent of every region where a magnet centre may sit. Bands and
+ *  classification are both measured on it (QA pin, 2026-08-30). No lattice, no count: how many
+ *  positions this box carries is the lookup's question, not this one's. */
+export function legalUnionBoxMM(segments: readonly SafeSegment[]): BBox | null {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const segment of segments) {
+    if (segment.bbox.minX < minX) minX = segment.bbox.minX
+    if (segment.bbox.minY < minY) minY = segment.bbox.minY
+    if (segment.bbox.maxX > maxX) maxX = segment.bbox.maxX
+    if (segment.bbox.maxY > maxY) maxY = segment.bbox.maxY
+  }
+  return minX === Infinity ? null : { minX, minY, maxX, maxY }
+}
+
 export function massUnionBoxMM(segments: readonly SafeSegment[]): BBox | null {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   for (const segment of segments) for (const mass of segment.masses) {

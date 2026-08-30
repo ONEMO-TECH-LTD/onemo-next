@@ -36,3 +36,39 @@ export function canonLayoutForFrame(
 ): CatalogueEntry | null {
   return canonIndex(pitchMM).get(frameKey(cols, rows)) ?? null
 }
+
+/** THE OPTIMAL LAYOUT IN A BAND, for a shape whose legal box is this big.
+ *
+ *  Dan, 2026-08-30: the classifier "must just send the sweeper the outer/inner box dimensions in
+ *  each band — and the look up must digest it and return the optimal layout in that band".
+ *
+ *  So the digesting happens HERE, not in the classifier. Every canon record already carries the
+ *  legal box its own magnets occupy, so this is box against box: of the canon layouts sitting in
+ *  this band, which ones fit inside the shape's legal box on BOTH axes, and of those, which uses
+ *  the most of it. No position arithmetic, no lattice knowledge on the caller's side.
+ *
+ *  Orientation is carried by the record, not chosen: a tall legal box admits the 2x3 and refuses
+ *  the 3x2, because 3x2 is 96mm wide and the box is not.
+ *
+ *  Null when nothing in that band fits — the shape is not that band's size yet, and saying so is
+ *  the answer. It never substitutes a layout from another band. */
+export function optimalLayoutForBox(
+  pitchMM: number, bandId: number, legalWidthMM: number, legalHeightMM: number,
+): CatalogueEntry | null {
+  const EPS = 0.005
+  let best: CatalogueEntry | null = null
+  for (const entry of canonCatalogue(pitchMM)) {
+    if (entry.bandId !== bandId) continue
+    if (entry.legalWidthMM > legalWidthMM + EPS) continue
+    if (entry.legalHeightMM > legalHeightMM + EPS) continue
+    if (!best) { best = entry; continue }
+    // most of the box used; ties break on the larger magnet count, then on the stable id so the
+    // answer never depends on catalogue order
+    const a = entry.legalWidthMM * entry.legalHeightMM, b = best.legalWidthMM * best.legalHeightMM
+    if (a > b + EPS
+      || (Math.abs(a - b) <= EPS && entry.nodesMM.length > best.nodesMM.length)
+      || (Math.abs(a - b) <= EPS && entry.nodesMM.length === best.nodesMM.length && entry.id < best.id))
+      best = entry
+  }
+  return best
+}
