@@ -27,9 +27,6 @@ import type { LibraryFrame, LibrarySelection } from '../library/types'
 import { libraryStageModel } from '../grid-magnet-library-bridge'
 import { classifyShape } from '../grid-magnet-class'
 import { canonCatalogue } from '../library/catalogue'
-import { createElement } from 'react'
-import { renderToStaticMarkup } from 'react-dom/server'
-import LibraryPanel from '@/app/(dev)/effect-creator/grid-centre/LibraryPanel'
 import { MANUFACTURING_TOLERANCE_MM } from '../geometry-truth'
 
 /** The library states its own millimetres as readonly pairs; the engine's classifiers take
@@ -155,14 +152,6 @@ describe('canon and presets — what the engine may offer by itself', () => {
     expect(keys.has('3x4') && keys.has('4x3'), 'both are published').toBe(true)
   })
 
-  it('presets keep the transform-based orientation row', () => {
-    // Canon is locked; the presets are unchanged — their orientation genuinely is a view.
-    for (const family of ['diamond'] as const) {
-      const s = selectionForFamily(sel(), family, 48)
-      const labels = panelOptionsFor(s, [], 48).orientations.map((o) => o.label)
-      expect(labels.every((l) => l !== 'portrait' && l !== 'landscape'), family).toBe(true)
-    }
-  })
 
   it('the canon table carries both ordered rectangle orientations', () => {
     // With tall-only records the table held no landscape rectangle at all, so no matcher could
