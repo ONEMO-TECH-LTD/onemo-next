@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 import { CLASS_SPECS, LIBRARY_FAMILIES, specOf } from '../library/class-registry'
 import { outlineFromLayout } from '../library/outline'
 import { CATALOGUE_FORMAT_VERSION, catalogue, type CatalogueEntry } from '../library/catalogue'
-import { catalogueCandidates, classifiedLibraryCatalogue } from '../grid-magnet-library-catalogue'
+import { canonLayoutForFrame } from '../grid-magnet-library-catalogue'
 import { selectVariant } from '../library/selection'
 import { materializeSelection } from '../library/materialize'
 
@@ -390,12 +390,13 @@ const catalogueAdapterViolations = (code = source(CATALOGUE_ADAPTER)): string[] 
     const exact = (expected: Readonly<Record<string, boolean>>) => !clause?.name
       && parts.size === Object.keys(expected).length
       && Object.entries(expected).every(([name, typeOnly]) => parts.get(name) === typeOnly)
+    // RE-PINNED 2026-08-30: the adapter stopped classifying. It took the outline, ran the invented
+    // shape family and the capped axis class over it, and filtered the whole catalogue by that key.
+    // It now takes a pitch and an ordered frame and returns the one canon record. So './library'
+    // yields the CANON roster rather than the full one, and the edge to the family classifier is
+    // gone — reaching for it again is a violation, not a pinned edge.
     if (specifier === './library') {
-      if (!exact({ catalogue: false, CatalogueEntry: true })) violations.push(specifier)
-    } else if (specifier === './grid-magnet-class') {
-      if (!exact({ classifyShape: false, shapeFamilyOf: false })) violations.push(specifier)
-    } else if (specifier === './types') {
-      if (!exact({ Pt: true })) violations.push(specifier)
+      if (!exact({ canonCatalogue: false, CatalogueEntry: true })) violations.push(specifier)
     } else violations.push(specifier)
   }
   return violations
@@ -856,34 +857,37 @@ describe('Shape-Layout Library Law — activation schedule', () => {
         .toEqual([expected.widthMM, expected.heightMM, expected.frameCols, expected.frameRows])
     }
   }, 30_000)
-  it('STEP 4: classifier matcher round-trips every catalogue entry at every pitch', () => {
-    // Grouped, not looped. The matcher's key is (shapeFamily, cx, cy), so every record sharing a
-    // key must come back from ONE query — asserting the whole group's id set is stronger coverage
-    // than asking each record for itself, and it turns an O(n^2) walk (the gate reclassified the
-    // entire catalogue once per entry) into one query per distinct key. The quadratic was the
-    // gate's, never the caller's: one production lookup is O(n).
+  it('STEP 4: the canon matcher answers every canon record by its own frame, and only canon', () => {
+    // The old gate round-tripped a (family, cx, cy) matcher that classified outlines and returned
+    // GROUPS. That matcher was dormant — it never had a production caller — and its key was the
+    // invented shape family. The canon matcher is keyed on what the classifier actually measures:
+    // the pitch and the ordered frame. One frame, one record, orientation carried by the order.
     for (const pitchMM of [24, 48, 96]) {
-      const groups = new Map<string, { ids: Set<string>; outline: readonly (readonly [number, number])[] }>()
-      for (const item of classifiedLibraryCatalogue(pitchMM)) {
-        const shape = item.shapeClass
-        const numericFields = [shape.cx, shape.cy, shape.band, shape.widthMM, shape.heightMM, shape.fill, shape.frame.cols, shape.frame.rows, shape.frame.capacity]
-        expect(numericFields.every(Number.isFinite), item.entry.id).toBe(true)
-        const key = item.shapeFamily + '|' + shape.cx + '|' + shape.cy
-        const group = groups.get(key)
-        if (group) group.ids.add(item.entry.id)
-        else groups.set(key, { ids: new Set([item.entry.id]), outline: item.entry.outlineMM })
+      const canon = catalogue(pitchMM).filter((entry) => entry.catalogueRole === 'canon')
+      expect(canon.length, 'canon must exist @' + pitchMM).toBeGreaterThan(0)
+      for (const entry of canon) {
+        const hit = canonLayoutForFrame(pitchMM, entry.frameCols, entry.frameRows)
+        expect(hit?.id, entry.frameCols + 'x' + entry.frameRows + ' @' + pitchMM).toBe(entry.id)
       }
-      expect(groups.size, 'the catalogue must hold groups @' + pitchMM).toBeGreaterThan(0)
-      for (const [key, group] of groups) {
-        const returned = catalogueCandidates(group.outline.map(([x, y]) => [x, y]), pitchMM).map((entry) => entry.id)
-        expect(new Set(returned), key + ' @' + pitchMM).toEqual(group.ids)
+      // a preset's frame never answers with the preset: either the canon on that frame, or nothing
+      for (const preset of catalogue(pitchMM).filter((e) => e.catalogueRole === 'preset')) {
+        const hit = canonLayoutForFrame(pitchMM, preset.frameCols, preset.frameRows)
+        expect(hit === null || hit.catalogueRole === 'canon', preset.id + ' leaked a preset').toBe(true)
       }
+      // orientation is the ORDER, not a transform: a frame and its transpose are different answers
+      const tall = canon.find((e) => e.frameRows > e.frameCols)
+      if (tall) {
+        const wide = canonLayoutForFrame(pitchMM, tall.frameRows, tall.frameCols)
+        if (wide) expect(wide.id, 'transpose returned the same record').not.toBe(tall.id)
+      }
+      // a frame the board cannot hold at this lattice has no answer
+      expect(canonLayoutForFrame(pitchMM, 99, 99)).toBeNull()
     }
   }, 20_000)
   it('STEP 5: surface, bridge, barrel, and shell use the contract boundary', () => {
     expect(barrelExports()).toEqual({
       types: ['CatalogueEntry', 'ClassBandRange', 'CornerMode', 'LibraryDraft', 'LibraryEdit', 'LibraryFamily', 'LibrarySelection', 'LibrarySurface', 'MaterializedLibrary', 'PanelOption', 'PanelOptions'],
-      values: ['CATALOGUE_FORMAT_VERSION', 'DEFAULT_LIBRARY_SELECTION', 'DRAFT_STORE_KEY', 'LIBRARY_FAMILIES', 'bandIdOfMM', 'catalogue', 'classBandRanges', 'deleteEdit', 'librarySurface', 'saveEdit', 'selectionForFamily', 'sizeRangeForBand', 'startAdd', 'startEdit', 'toggleNodeAt'],
+      values: ['CATALOGUE_FORMAT_VERSION', 'DEFAULT_LIBRARY_SELECTION', 'DRAFT_STORE_KEY', 'LIBRARY_FAMILIES', 'bandIdOfMM', 'canonCatalogue', 'catalogue', 'classBandRanges', 'deleteEdit', 'librarySurface', 'saveEdit', 'selectionForFamily', 'sizeRangeForBand', 'startAdd', 'startEdit', 'toggleNodeAt'],
       wildcards: [],
       aliases: [],
     })

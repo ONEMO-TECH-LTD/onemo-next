@@ -9,7 +9,7 @@ export type { MaterializedLibrary } from './materialize'
 
 export { DEFAULT_LIBRARY_SELECTION } from './selection'
 export { LIBRARY_FAMILIES } from './class-registry'
-export { CATALOGUE_FORMAT_VERSION, bandIdOfMM, catalogue } from './catalogue'
+export { CATALOGUE_FORMAT_VERSION, bandIdOfMM, canonCatalogue, catalogue } from './catalogue'
 export type { ClassBandRange } from './band-ranges'
 export { classBandRanges, sizeRangeForBand } from './band-ranges'
 export { librarySurface } from './surface'
