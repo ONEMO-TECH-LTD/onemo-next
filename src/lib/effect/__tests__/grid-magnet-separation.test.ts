@@ -670,17 +670,27 @@ describe('1b — the frame comes from the usable material', () => {
       return { solve, optimal }
     }
 
-    // B4 — three distinct answers. The counts are pinned because they are the whole point: the
-    // FEWEST is 6, and 6 is only reachable because every registration now survives. Winner-only
-    // cannot produce it — that path keeps the fullest at each size, so its fewest is 12.
+    // B4 — the canon is a FORCED CANDIDATE, not a privileged one (Dan, 2026-08-30: "optimal must
+    // be just forced layout that needs to be processed by sweep logic and wrap like anything else
+    // fed into it"). So the belt reaches it like everything else: the 4x4's sixteen magnets arrive
+    // as their ring of twelve, which is also the walk's fullest — the same answer, collapsed.
     const b4 = solveBand(4)
-    expect(b4.solve.offers.map((o) => o.at.count), 'B4 optimal / fewest / most').toEqual([16, 10, 12])
-    // every row states WHY it is on the list — the order alone is not the answer
+    expect(b4.solve.offers.map((o) => o.at.count), 'B4 with the belt on').toEqual([12, 10])
     expect(b4.solve.offers.map((o) => o.roles.join('+')), 'B4 roles')
-      .toEqual(['optimal', 'fewest', 'most'])
-    expect(b4.solve.offers[0].at.count, 'the first row must be the canon layout')
-      .toBe(b4.optimal!.nodesMM.length)
+      .toEqual(['optimal+most', 'fewest'])
+    // the FEWEST is 10, and 10 is only reachable because every registration now survives.
+    // Winner-only cannot produce it — that path keeps the fullest at each size, so its fewest is 12.
+    expect(b4.solve.offers[1].at.count, 'fewest came from a sparse registration').toBe(10)
 
+    // TURN THE BELT OFF and the same canon arrives whole. This pair is what proves the coverage
+    // rule reaches the optimal at all, rather than the optimal quietly bypassing it.
+    const bandFour = BANDS.find((b) => b.id === 4)!
+    const cfgFull = { ...cfg, perimeterOnly: false }
+    const rowFull = classifyBands(sq, cfgFull, anchorAt).find((r) => r.bandId === 4)!
+    const optFull = optimalLayoutForBox(48, 4, rowFull.legalWidthMM, rowFull.legalHeightMM)!
+    const full = wrapBandLadder(sq, cfgFull, bandFour.minMM + 24, bandFour.maxMM + 24, 24, anchorAt,
+      optFull.nodesMM.map(([x, y]) => [x, y] as Pt))
+    expect(full.offers[0].at.count, 'with the belt off the canon arrives whole').toBe(16)
     // B2 — the optimal IS the fullest, so those two rows are the same answer and COLLAPSE to one.
     // This is the case that proves the collapse: without it the same answer appears twice.
     const b2 = solveBand(2)

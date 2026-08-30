@@ -22,7 +22,7 @@ import { CENTRE_MODE, GOVERNOR } from './grid-magnet-spec'
 import type { CentreMode, Governor } from './types'
 import { wrapGroup } from './units/wrap'
 import { inBand, orderOffers } from './units/judge'
-import { bestSeatedCandidate, fallbackRevealSizes, makeContourSeatPredicate } from './units/layout'
+import { applyCoverage, bestSeatedCandidate, fallbackRevealSizes, makeContourSeatPredicate } from './units/layout'
 
 
 /** mm → integer microns; Clipper64 is integer-robust. */
@@ -129,58 +129,56 @@ export function wrapBandLadder(
     for (const p of pts) { if (p[0] < mx) mx = p[0]; if (p[1] < my) my = p[1] }
     return pts.map((p) => Math.round((p[0] - mx) / pitch) + ',' + Math.round((p[1] - my) / pitch)).sort().join(';')
   }
-  const attempt = (pts: ReadonlyArray<Pt>, revealMM: number, floorMM = minMM): BandRung | null => {
-    const at = wrapGroup(sized, wcfg, localise(pts), floorMM, hiMM)
+  const attempt = (pts: ReadonlyArray<Pt>, revealMM: number): BandRung | null => {
+    const at = wrapGroup(sized, wcfg, localise(pts), minMM, hiMM)
     if (!at) return null
     if (!inBand(at.sizeMM, loMM, hiMM)) return null   // judge: another band owns it
     return { at, revealMM, roles: [] }
   }
 
-  // THE OPTIMAL, FIRST. Same wrap, same laws — it just gets asked before anything is discovered.
+  // THE OPTIMAL IS A FORCED CANDIDATE — nothing more. Dan, 2026-08-30: "the engine sweep is
+  // correct engine ... optimal must be just forced layout that needs to be processed by sweep
+  // logic and wrap like anything else fed into it from sweeping every 1mm."
   //
-  // Whole group first: if the shape can carry every magnet at some size in the range, that is the
-  // answer and nothing is dropped. Only when it cannot does the second half apply — Dan,
-  // 2026-08-30: "if some of the magnets fall off it must either scale or shrink to it". So the
-  // layout is SEATED against the real material at the most generous size in the range, whatever
-  // the material refuses is dropped and recorded, and the survivors go to the same wrap.
+  // So it has no path of its own. At each size the walk already visits, the canon's positions are
+  // seated against the real material with the SAME predicate the walk uses, thinned by the SAME
+  // coverage rule, deduped by the SAME identity and wrapped by the SAME wrap between the same
+  // bounds. It is forced in; it is not privileged once inside.
   //
-  // Without this an irregular shape gets no optimal at all: the BOT's B4 box admits a 3x4 of
-  // twelve, and its actual material holds four. All-or-nothing threw the recommendation away on
-  // every real cutout at B4 and B5.
-  const seatOptimal = (nodes: ReadonlyArray<Pt>, mm: number): { seated: Pt[]; omitted: Pt[] } => {
-    const radius = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
-    const fits = makeContourSeatPredicate(sized(mm), radius)
+  // What was here before was a private path: its own size scan, its own seating, and its own wrap
+  // floor so it could not shrink. That is three ways to make wrap inactive for one candidate, and
+  // it also skipped the belt — so the "optimal" was the only row in the list that had not been
+  // through the engine's own rules.
+  const radiusMM = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
+  const perimeterOnly = cfg.perimeterOnly ?? true
+  // FOUR REGISTRATIONS, like everything else. Centre rules pins the grid by parity — node or gap
+  // on each axis — and the engine tries all four for its own populations. Placing the canon on the
+  // anchor alone tries ONE, which is why the duck's 3x4 landed with its columns straddling the
+  // neck: only the middle column seated and the answer was a spine down the shape with both flanks
+  // unheld. The alignment that puts columns over the flanks was never attempted.
+  const half = pitch / 2
+  const canonAt = (mm: number): Pt[][] => {
+    if (!optimalNodesMM?.length) return []
+    const fits = makeContourSeatPredicate(sized(mm), radiusMM)
+    if (!fits) return []
     const anchor = anchorFn(mm)
-    const placed = localise(nodes).map(([x, y]) => [anchor[0] + x, anchor[1] + y] as Pt)
-    if (!fits) return { seated: [], omitted: [...placed] }
-    const seated: Pt[] = [], omitted: Pt[] = []
-    for (const q of placed) (fits(q) ? seated : omitted).push(q)
-    return { seated, omitted }
-  }
-  let optimal: BandRung | null = null
-  let optimalOmitted = 0
-  if (optimalNodesMM?.length) {
-    optimal = attempt(optimalNodesMM, loMM)
-    if (!optimal) {
-      // SCALE TO IT before shrinking to it. Seating is a predicate test, not a solve, so every
-      // size in the range is cheap to try; the one that holds most of the layout is the one worth
-      // wrapping. Seating at a single size gave the duck no optimal at all at B3 and B4.
-      let bestSeated: Pt[] = [], bestOmitted = 0, bestMM = hiMM
-      for (const mm of fallbackRevealSizes(loMM, hiMM)) {
-        const { seated, omitted } = seatOptimal(optimalNodesMM, mm)
-        if (seated.length > bestSeated.length) { bestSeated = seated; bestOmitted = omitted.length; bestMM = mm }
-        if (!omitted.length) break            // it holds whole here; nothing better exists
-      }
-      if (bestSeated.length) {
-        // Do not shrink BELOW the size the layout was placed at. Dan asked the shape to be scaled
-        // to the optimal layout; wrapping the survivors from the floor instead lets a heavily
-        // refused canon collapse onto its few remaining magnets and fall out of the band — which
-        // is how the duck and the butterfly lost their optimal at B3 and B4 entirely.
-        optimal = attempt(bestSeated, bestMM, bestMM)
-        optimalOmitted = bestOmitted
-      }
+    const local = localise(optimalNodesMM)
+    const out: Pt[][] = []
+    for (const [dx, dy] of [[0, 0], [half, 0], [0, half], [half, half]] as Array<[number, number]>) {
+      const seated = local
+        .map(([x, y]) => [anchor[0] + dx + x, anchor[1] + dy + y] as Pt)
+        .filter(fits)
+      if (!seated.length) continue
+      const kept = applyCoverage(seated, perimeterOnly, pitch).seated
+      if (kept.length) out.push(kept)
     }
+    return out
   }
+  // Identity, not object reference. The canon is deduped against the walk like everything else, so
+  // when the walk has already found the same population the canon has no rung of its own — and
+  // matching by reference lost the optimal role entirely in exactly the case that should read
+  // "optimal + most". Identity is origin-free, so it survives the wrap.
+  const canonIds = new Map<string, number>()   // identity -> magnets the material refused
 
   // THE WALK, unchanged in range and method. Every lawful registration at each size is collected,
   // not only the fullest, or the fewest-magnet answer below could never exist.
@@ -188,7 +186,9 @@ export function wrapBandLadder(
     const grid = computeGrid(sized(mm), anchorAtMM ? { ...scanCfg, centreOverrideMM: anchorAtMM(mm) } : scanCfg)
     const drawn = grid.anchors.map((a) => a.p)
     if (drawn.length) witnesses.push({ revealMM: mm, points: drawn })
-    for (const pts of grid.seatings.length ? grid.seatings : [drawn]) {
+    const forced = canonAt(mm)
+    for (const f of forced) canonIds.set(identityOf(f), (optimalNodesMM?.length ?? 0) - f.length)
+    for (const pts of [...(grid.seatings.length ? grid.seatings : [drawn]), ...forced]) {
       if (!pts.length) continue
       const id = identityOf(pts)
       if (seen.has(id)) continue
@@ -196,6 +196,20 @@ export function wrapBandLadder(
       const rung = attempt(pts, mm)
       if (rung) rungs.push(rung)
     }
+  }
+
+  // The optimal is the FEWEST canon answer that actually wraps (Dan: "it must provide the fewest
+  // option that wraps — so wrapping is not optional, it is a rule in the formula"). A canon that
+  // never wraps has no row, and none is invented.
+  // Of the canon answers that WRAP, the one holding most of the layout wins; the tightest breaks a
+  // tie. Fewest-of-the-canon was giving a three-magnet spine where a four-magnet pair-per-mass
+  // existed at the same size.
+  const canonRungs = rungs.filter((r) => canonIds.has(identityOf(r.at.points)))
+    .sort((x, y) => y.at.count - x.at.count || x.at.sizeMM - y.at.sizeMM)
+  const optimal = canonRungs[0] ?? null
+  if (optimal) {
+    const refused = canonIds.get(identityOf(optimal.at.points)) ?? 0
+    if (refused > 0) optimal.omittedFromOptimal = refused
   }
 
   // FEWEST and MOST magnets in the range, from what the walk actually found.
@@ -214,7 +228,6 @@ export function wrapBandLadder(
     const already = kept.get(key)
     if (already) { already.roles.push(role); continue }   // the same answer, reached twice: one row
     r.roles = [role]
-    if (role === 'optimal' && optimalOmitted) r.omittedFromOptimal = optimalOmitted
     kept.set(key, r)
     offers.push(r)
   }
