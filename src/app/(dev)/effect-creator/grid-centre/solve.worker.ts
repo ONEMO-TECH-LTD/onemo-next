@@ -1,7 +1,7 @@
 // solve.worker.ts — runs the grid solve off the main thread. Pure dispatch: the same
 // bridge/engine calls the page used to make inline, nothing computed here.
 
-import { BANDS, bandOuterMM, classifyBands, computeGrid, MIN_EFFECT_MM, type BandClass, type GridConfig } from '@/lib/effect/grid-magnet'
+import { BANDS, bandOuterMM, classifyBands, computeGrid, MIN_EFFECT_MM, type GridConfig } from '@/lib/effect/grid-magnet'
 import { wrapBandLadder, wrapGrid, type BandSolve, type WrapConfig } from '@/lib/effect/grid-magnet-wrap-compute'
 import { bbox, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet-compute'
 import { contourCentroidOf } from '@/lib/effect/units/centring'
@@ -11,7 +11,7 @@ import { classFrameNodes, shapeFamilyOf, type ShapeFamily } from '@/lib/effect/g
 import { defaultLanding } from '@/lib/effect/units/judge'
 import { DEFAULT_PITCH_MM, PADDING_FLOOR_MM } from '@/lib/effect/grid-magnet-spec'
 import { contourCacheKey, makeSizer, sizeRange } from '@/lib/effect/grid-magnet-bridge'
-import type { Contour, Pt } from '@/lib/effect/types'
+import type { Contour } from '@/lib/effect/types'
 
 interface SolveRequest {
   id: number
