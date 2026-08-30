@@ -164,6 +164,43 @@ function boundarySegments(paths: Paths64): Seg[] {
   return out
 }
 
+/** THE SHAPE'S ACTUAL CORNERS: vertices where the outline turns sharply.
+ *
+ *  Read from the SOURCE rings, never from the legal region — the inward offset uses round joins,
+ *  so every convex corner of a square arrives as an arc and a square becomes indistinguishable
+ *  from a circle. And never inferred from "two non-parallel segments within reach", which was the
+ *  previous version: a smooth circle has many differently-oriented segments inside any radius, so
+ *  every hold beside a circle counted as a corner (QA F1).
+ *
+ *  CORNER_TURN_DEG is the one authored number left in this file. A 96-point circle turns 3.75
+ *  degrees a vertex and a right angle turns 90, so anything in between separates them; 40 is
+ *  chosen to sit clear of both, and the three frozen counterexamples — circle 0, rectangle corner
+ *  1, U concave corner 1 — are what hold it honest. */
+const CORNER_TURN_DEG = 40
+
+function cornerFeatures(rings: ReadonlyArray<ReadonlyArray<Pt>>): Pt[] {
+  const out: Pt[] = []
+  // The angle BETWEEN the incoming and outgoing directions: a straight run gives cos 1, a right
+  // angle gives 0, a reversal gives -1. So a turn of at least CORNER_TURN_DEG is cos below
+  // cos(CORNER_TURN_DEG). My first version compared against cos(180 - turn), which asked for a
+  // near-reversal and found no corner on a square at all.
+  const limit = Math.cos(CORNER_TURN_DEG * Math.PI / 180)
+  for (const ring of rings) {
+    const n = ring.length
+    if (n < 3) continue
+    for (let i = 0; i < n; i++) {
+      const a = ring[(i - 1 + n) % n], b = ring[i], c = ring[(i + 1) % n]
+      const ux = b[0] - a[0], uy = b[1] - a[1], vx = c[0] - b[0], vy = c[1] - b[1]
+      const lu = Math.hypot(ux, uy), lv = Math.hypot(vx, vy)
+      if (lu < 1e-9 || lv < 1e-9) continue
+      // cos of the angle between the incoming and outgoing directions; a straight run is 1
+      const cos = (ux * vx + uy * vy) / (lu * lv)
+      if (cos < limit) out.push(b)
+    }
+  }
+  return out
+}
+
 const segDistMM = (sg: Seg, p: Pt): number => {
   const dx = sg[2] - sg[0], dy = sg[3] - sg[1]
   const len2 = dx * dx + dy * dy
@@ -179,11 +216,15 @@ export function holdingFactsOf(
   /** The grid pitch. The reach is CLAMPED here, so no caller can widen Dan's 24-48mm by handing in
    *  a 96mm pitch — which is exactly how a 96mm bare end passed as "holding the extremes". */
   pitchMM: number,
-  /** The legal region itself. Rules 1 and 3 read its REAL boundary when it is given: a magnet 5mm
-   *  from the inner edge of a U is a perimeter hold, and the bounding box cannot see that — it is
-   *  71mm from the nearest box edge (QA F1). Without it they fall back to the box, which is only
-   *  correct for a convex frame. */
-  legal?: Paths64 | null,
+  /** The legal region itself — REQUIRED. Rule 1 reads its real boundary: a magnet 5mm from the
+   *  inner edge of a U is a perimeter hold, and a bounding box cannot see that, being 71mm away.
+   *  The optional box fallback is gone: an API that still permits the implementation a
+   *  counterexample disproved is an API that will be used that way (QA F2). */
+  legal: Paths64,
+  /** The SOURCE contour's rings — outer and holes — for rule 3. A corner is a TURN in the shape,
+   *  and it must be read here rather than off the legal region, because the inward offset rounds
+   *  every convex corner into an arc and would make a square indistinguishable from a circle. */
+  cornersOf: ReadonlyArray<ReadonlyArray<Pt>>,
 ): HoldingFacts {
   const reachMM = protectionReachMM(pitchMM)
   const w = legalBox.maxX - legalBox.minX, h = legalBox.maxY - legalBox.minY
@@ -191,28 +232,14 @@ export function holdingFactsOf(
   // version reused the belt's "is this magnet surrounded by neighbours" test, which answers a
   // different question entirely: a lone magnet dead-centre of a 200x200 box counted as a perimeter
   // hold because it had no neighbours (QA F2). A perimeter-side hold is one NEAR AN EDGE.
+  // RULE 1 — the real legal boundary. RULE 3 — actual corner FEATURES of the shape.
+  const segs = boundarySegments(legal)
+  const features = cornerFeatures(cornersOf)
   let perimeter = 0, corners = 0
-  const segs = legal && legal.length ? boundarySegments(legal) : null
   for (const m of magnets) {
-    if (segs) {
-      // THE REAL BOUNDARY: every legal edge within reach of this magnet. A perimeter-side hold has
-      // at least one; a corner has two that are NOT parallel — which is what a corner is, whether
-      // it belongs to the outline, a hole, or the inside of a U.
-      const near = segs.filter((sg) => segDistMM(sg, m) <= reachMM)
-      if (!near.length) continue
-      perimeter++
-      let turned = false
-      for (let i = 0; i < near.length && !turned; i++)
-        for (let j = i + 1; j < near.length && !turned; j++)
-          if (Math.abs(near[i][4] * near[j][5] - near[i][5] * near[j][4]) > 0.2) turned = true
-      if (turned) corners++
-      continue
-    }
-    const dx = Math.min(m[0] - legalBox.minX, legalBox.maxX - m[0])
-    const dy = Math.min(m[1] - legalBox.minY, legalBox.maxY - m[1])
-    if (Math.min(dx, dy) > reachMM) continue
+    if (!segs.some((sg) => segDistMM(sg, m) <= reachMM)) continue
     perimeter++
-    if (dx <= reachMM && dy <= reachMM) corners++
+    if (features.some((f) => Math.hypot(m[0] - f[0], m[1] - f[1]) <= reachMM)) corners++
   }
   // RULE 2 — "extreme apart sides must be held ... top and bottom in portrait, right and left in
   // landscape". Held when the population reaches within Dan's OWN reach of both ends — never the

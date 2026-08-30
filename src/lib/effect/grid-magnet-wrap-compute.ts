@@ -197,7 +197,8 @@ export function wrapBandLadder(
       const region = legalRegion(c, holdRadius)
       const box = legalRegionBoxMM(c, holdRadius)
       holdFacts.set(r, region && box
-        ? holdingFactsOf(r.at.points, box, unprotectedRegions(region, r.at.points, ruleReach), pitch, region)
+        ? holdingFactsOf(r.at.points, box, unprotectedRegions(region, r.at.points, ruleReach), pitch,
+          region, [c.outer.pts, ...c.holes.map((h) => h.pts)])
         : null)
     }
     return holdFacts.get(r) ?? null

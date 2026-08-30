@@ -22,11 +22,11 @@ const REACH = protectionReachMM(48)
 /** A tall rectangle: portrait, so the extremes are top and bottom. */
 const tall = ring([[0, 0], [140, 0], [140, 260], [0, 260]])
 
-const factsFor = (magnets: Pt[]) => {
-  const region = legalRegion(tall, RELEASED_PADDING_MM)
-  const box = legalRegionBoxMM(tall, RELEASED_PADDING_MM)!
+const factsFor = (magnets: Pt[], shape: Contour = tall) => {
+  const region = legalRegion(shape, RELEASED_PADDING_MM)!
+  const box = legalRegionBoxMM(shape, RELEASED_PADDING_MM)!
   const gaps = unprotectedRegions(region, magnets, REACH)
-  return holdingFactsOf(magnets, box, gaps, 48)
+  return holdingFactsOf(magnets, box, gaps, 48, region, [shape.outer.pts, ...shape.holes.map((h) => h.pts)])
 }
 
 const signedAreaMM2 = (paths: NonNullable<ReturnType<typeof legalRegion>>) => {
@@ -141,8 +141,9 @@ describe("Dan's holding rules: rule 2 enforces, rules 1/3/4 order", () => {
   })
 
   it('RULE 1: a lone centre magnet is not a perimeter-side hold', () => {
-    const box = { minX: 0, minY: 0, maxX: 200, maxY: 200 }
-    expect(holdingFactsOf([[100, 100]], box, [], 48).perimeter).toBe(0)
+    const sq = ring([[0, 0], [224, 0], [224, 224], [0, 224]])   // legal box is 12..212
+    expect(factsFor([[112, 112]], sq).perimeter,
+      'a lone magnet 100mm from every edge is not a perimeter-side hold').toBe(0)
   })
 
   it('RULE 1: a hold beside a concave legal-region edge is a perimeter hold', () => {
@@ -154,12 +155,10 @@ describe("Dan's holding rules: rule 2 enforces, rules 1/3/4 order", () => {
     // QA's own repair says the fact seam must RECEIVE the legal path set; their test omitted it,
     // and with only a box the answer cannot be 1 by construction. Passing the region, as their
     // repair specifies.
-    const box = legalRegionBoxMM(u, RELEASED_PADDING_MM)!
-    const legal = legalRegion(u, RELEASED_PADDING_MM)!
-    expect(holdingFactsOf([[83, 200]], box, [], 48, legal).perimeter).toBe(1)
-    // and the box-only fallback is exactly what it was before: blind to the concave edge
-    expect(holdingFactsOf([[83, 200]], box, [], 48).perimeter,
-      'without the region a box is 71mm away and sees nothing — that is the defect').toBe(0)
+    // The box-only fallback is GONE (QA F2): an API that still permits an implementation a
+    // counterexample disproved is an API that will be used that way. `legal` is now required.
+    expect(factsFor([[83, 200]], u).perimeter,
+      '5mm from the concave legal edge is a perimeter hold; a bbox is 71mm away and blind').toBe(1)
   })
 
   it('RULE 3: a smooth circular boundary is not a corner', () => {
@@ -169,14 +168,14 @@ describe("Dan's holding rules: rule 2 enforces, rules 1/3/4 order", () => {
       pts.push([100 + 100 * Math.cos(a), 100 + 100 * Math.sin(a)])
     }
     const circle = ring(pts)
-    const box = legalRegionBoxMM(circle, RELEASED_PADDING_MM)!
-    const legal = legalRegion(circle, RELEASED_PADDING_MM)!
-    expect(holdingFactsOf([[180, 100]], box, [], 48, legal).corners).toBe(0)
+    expect(factsFor([[180, 100]], circle).corners,
+      'a smooth boundary has no corner feature, however many segments lie within reach').toBe(0)
   })
 
   it("RULE 2: the 48mm limit does not expand with a 96mm pitch", () => {
-    const box = { minX: 0, minY: 0, maxX: 100, maxY: 300 }
-    expect(holdingFactsOf([[50, 95], [50, 205]], box, [], 96).holdsExtremes).toBe(false)
+    const strip = ring([[0, 0], [100, 0], [100, 300], [0, 300]])
+    expect(factsFor([[50, 95], [50, 205]], strip).holdsExtremes,
+      'a 96mm pitch must not stretch the 48mm limit').toBe(false)
   })
 
   it('RULE 4: measures top area even when it shares one region with the middle', () => {
@@ -184,8 +183,8 @@ describe("Dan's holding rules: rule 2 enforces, rules 1/3/4 order", () => {
     const legal = legalRegion(shape, RELEASED_PADDING_MM)!
     const box = { minX: 12, minY: 12, maxX: 128, maxY: 248 }
     const magnets: Pt[] = [[70, 20]]
-    const gaps = unprotectedRegions(legal, magnets, REACH)
-    expect(holdingFactsOf(magnets, box, gaps, 48).topUnprotectedMM2).toBeGreaterThan(0)
+    void legal; void box
+    expect(factsFor(magnets, shape).topUnprotectedMM2).toBeGreaterThan(0)
   })
 })
 
@@ -228,9 +227,50 @@ describe('the toggle REACHES the ladder — not just the pressed state', () => {
     expect(off.length, 'the pools were empty — the sweep proves nothing').toBeGreaterThan(0)
   }, 60_000)
 
-  it('RULE 2 TOGGLE: Dan required a result filter, so on must differ from off somewhere', () => {
-    expect(run({ ...NO_HOLDING_RULES, extremes: true })).not.toEqual(run(NO_HOLDING_RULES))
-  }, 60_000)
+  it("RULE 2 IS ALREADY LAW: every shipped offer holds the extremes, wrap or no toggle", () => {
+    // QA's version of this asserted that switching rule 2 on must change the result somewhere.
+    // It cannot, and making it pass would mean inventing behaviour Dan did not ask for. So this
+    // is QA's own alternative: prove the law is already enforced, over the real corpus rather
+    // than one fixture — which is also the sweep my earlier comment claimed but did not ship.
+    //
+    // The reason is structural: wrapGroup presses the group against the outline, so a wrapped
+    // answer's magnets already sit at the extremes. Dan's rule 2 describes something the wrap
+    // guarantees.
+    //
+    // WHETHER TO DELETE HIS TOGGLE IS DAN'S CALL, not QA's and not mine — it is a control he
+    // asked for. Recorded as PARTIAL in _WIP/v3.5.6/DAN-ASK.md until he rules.
+    const shapes: Record<string, Pt[]> = {
+      tall: [[0, 0], [140, 0], [140, 260], [0, 260]],
+      wide: [[0, 0], [260, 0], [260, 140], [0, 140]],
+      L: [[0, 0], [260, 0], [260, 90], [90, 90], [90, 260], [0, 260]],
+      U: [[0, 0], [300, 0], [300, 300], [200, 300], [200, 100], [100, 100], [100, 300], [0, 300]],
+      tri: [[0, 0], [260, 0], [130, 240]],
+    }
+    let checked = 0
+    for (const [name, pts] of Object.entries(shapes)) {
+      const spanX = Math.max(...pts.map((p) => p[0])), spanY = Math.max(...pts.map((p) => p[1]))
+      const longest = Math.max(spanX, spanY)
+      const sized = (mm: number): Contour => ring(pts.map(([x, y]) => [x * mm / longest, y * mm / longest] as Pt))
+      const at = (mm: number): Pt => [spanX * mm / longest / 2, spanY * mm / longest / 2]
+      for (const id of [2, 3, 4, 5]) {
+        const b = BANDS.find((x) => x.id === id)!
+        const solve = wrapBandLadder(sized, { pitchMM: 48, paddingMM: RELEASED_PADDING_MM },
+          b.minMM + 24, b.maxMM + 24, 24, at)
+        for (const o of solve.offers) {
+          const c = sized(o.at.sizeMM)
+          const region = legalRegion(c, RELEASED_PADDING_MM)
+          const box = legalRegionBoxMM(c, RELEASED_PADDING_MM)
+          if (!region || !box) continue
+          const f = holdingFactsOf(o.at.points, box,
+            unprotectedRegions(region, o.at.points, REACH), 48, region,
+            [c.outer.pts, ...c.holes.map((h) => h.pts)])
+          expect(f.holdsExtremes, `${name} B${id} ${o.roles.join('+')} does NOT hold the extremes`).toBe(true)
+          checked++
+        }
+      }
+    }
+    expect(checked, 'the corpus produced no offers — this proves nothing').toBeGreaterThan(10)
+  }, 300_000)
 
   it('a rule ON changes what the ladder returns', () => {
     const off = run(NO_HOLDING_RULES)
