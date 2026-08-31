@@ -10,8 +10,9 @@ import { anchorBakeOf, anchorFromBake, assignSizes, type AnchorBake, type Centre
 import { classFrameNodes, shapeFamilyOf, type ShapeFamily } from '@/lib/effect/grid-magnet-class'
 
 import { defaultLanding } from '@/lib/effect/units/judge'
-import { DEFAULT_PITCH_MM, PADDING_FLOOR_MM } from '@/lib/effect/grid-magnet-spec'
+import { DEFAULT_PITCH_MM, PADDING_FLOOR_MM, PROTECTION_REACH_MM } from '@/lib/effect/grid-magnet-spec'
 import { contourCacheKey, makeSizer, sizeRange } from '@/lib/effect/grid-magnet-bridge'
+import { exactPerimeterCoverage } from '@/lib/effect/grid-core'
 import type { Contour, Pt } from '@/lib/effect/types'
 
 interface SolveRequest {
@@ -24,6 +25,29 @@ interface SolveRequest {
   manualBand?: boolean
   sizeMM: number
   stepSel: number | null
+  /** THE PROTECTION REACH, in millimetres. Dan, 2026-08-31: "unprotected area default protection
+   *  reach is 24mm". It rides OUTSIDE GridConfig deliberately: the engine must never see it, so it
+   *  cannot reach the search, the cache key or any selection. It feeds the measurement and nothing
+   *  else. */
+  reachMM?: number
+}
+
+/** THE FLAP DETECTOR, returned rather than rebuilt.
+ *
+ *  `exactPerimeterCoverage` is the v1 engine's own measure (grid-core.ts:326) -- it walks each
+ *  manufactured ring, subtracts every magnet's disc and the bounded fabric span between rim-adjacent
+ *  magnets, and hands back the uncovered midpoints plus the unheld length. v1 drew those midpoints
+ *  red on the canvas and printed "unheld Nmm"; that is the code being restored, not a new one.
+ *
+ *  It lives HERE, on the shell, on purpose. The worker is the one seat that may reach a legacy
+ *  aggregate, and measuring here means no engine file changes at all -- so the number cannot reach
+ *  the ladder, the pools, the roles or the cache. Pure measurement, structurally. */
+function flapsOf(contour: Contour, points: ReadonlyArray<Pt>, reachMM: number, pitchMM: number) {
+  if (!points.length) return { flaps: [] as Pt[], uncoveredMM: 0 }
+  // 'standard' is the square lattice this engine seats on; the pattern only selects the
+  // construction basis used to find which magnets are rim-adjacent.
+  const { gaps, uncoveredMM } = exactPerimeterCoverage(contour, points, reachMM, 'standard', pitchMM)
+  return { flaps: gaps, uncoveredMM }
 }
 
 const ctx = self as unknown as Worker
@@ -83,7 +107,9 @@ export function anchorFnFor(
 const FITS_CAP = 12
 
 ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
-  const { id, base, offsetMM, cfg, mode, manualBand, sizeMM, stepSel } = e.data
+  const { id, base, offsetMM, cfg, mode, manualBand, sizeMM, stepSel, reachMM } = e.data
+  const reach = reachMM && reachMM > 0 ? reachMM : PROTECTION_REACH_MM
+  const measurePitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
   try {
     const sized = makeSizer(base, offsetMM)
     // Cache identity is the shape itself — every ring, exactly. A rolling hash of ring counts
@@ -97,7 +123,10 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       const aFn = anchorFnFor(sized, cfg, cfgSig, sig)
       const contour = sized(sizeMM)
       const grid = computeGrid(contour, aFn ? { ...cfg, centreOverrideMM: aFn(sizeMM) } : cfg)
-      ctx.postMessage({ id, model: { contour, grid, effSize: sizeMM, ladder: [], idx: 0, segments: grid.segments } })
+      ctx.postMessage({ id, model: { contour, grid, effSize: sizeMM, ladder: [], idx: 0, segments: grid.segments,
+        // Dan, 2026-08-31: "free slider shows no real time unprotected area." Same detector, same
+        // reach, same answer the canvas is drawing.
+        unprotected: flapsOf(contour, grid.anchors.map((a) => a.p), reach, measurePitch) } })
     } else {
       // THE REVERSAL — band in, count out. The material reveals each distinct layout across the
       // band's range (centre-rules seating); each is solved WHOLE by wrapGroup to its exact
@@ -154,6 +183,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
           contour: drawn.contour, grid: { ...drawn.grid, anchors, segments },
           effSize: at.sizeMM, ladder, idx, segments, offMM: at.centreOffMM, recog,
           bandClass, bandClasses, recommendation,
+          unprotected: flapsOf(drawn.contour, at.points, reach, measurePitch),
         } })
         return
       }
@@ -172,6 +202,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         contour, grid, effSize: bestSeatedMM, ladder: [], idx: 0, segments: grid.segments,
         offers: [], diagnostic: { reason: 'no-lawful-offer', bestSeatedMM },
         bandClass, bandClasses, recommendation,
+        unprotected: flapsOf(contour, grid.anchors.map((a) => a.p), reach, measurePitch),
       } })
     }
   } catch (err) {

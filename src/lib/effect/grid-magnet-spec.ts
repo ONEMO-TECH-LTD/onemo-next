@@ -71,6 +71,17 @@ export const MIN_ANCHORS = 2
  *  asserted by the separation gate, so the table cannot drift off the rule. */
 export const BAND_STEP_MM = 48
 export interface Band { readonly id: number; readonly minMM: number; readonly maxMM: number }
+/** THE PROTECTION REACH — how far one magnet holds, measured out from its own centre.
+ *
+ *  Dan, 2026-08-31: "unprotected area default protection reach is 24mm". It is the DEFAULT for the
+ *  dashboard control, not a law the engine consults: nothing in this module reads it. The detector
+ *  on the shell does, and the detector measures only -- it never reaches the search or a selection.
+ *
+ *  24mm reaching each way is the same rule as his "the top when it is around 24-48mm thick is fine
+ *  and can be held by one magnet disk": one disc covers a 48mm SPAN. Reach is the radius reading of
+ *  that sentence, span is the diameter reading. */
+export const PROTECTION_REACH_MM = 24
+
 export const BANDS: ReadonlyArray<Band> = Object.freeze([
   Object.freeze({ id: 1, minMM: 0, maxMM: 47 }),
   Object.freeze({ id: 2, minMM: 48, maxMM: 95 }),
