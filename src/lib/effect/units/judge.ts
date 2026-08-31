@@ -275,28 +275,47 @@ export function holdingFactsOf(
   }
 }
 
-/** ORDER THE OFFERS by whichever PREFERENCES are switched on.
+/** ORDER THE OFFERS by whichever PREFERENCES are switched on, WEIGHING THEM EVENLY.
  *
- *  Rule 2 is not here: it rejects, and it does so on the candidate pools before any role is
- *  picked. This orders only what already ships.
+ *  Dan, 2026-08-31, ruling the question that was open: "I don't know what is the best way to. Just
+ *  make them apply evenly when on."
  *
- *  COMBINED ORDERING IS NOT RULED. Dan listed his rules "in order of the general to more
- *  specific", which describes how he enumerated them, not that perimeter must always outrank
- *  corners. Turning ONE preference on is unambiguous and is what the toggles are for. With more
- *  than one on, this falls back to his listed sequence as a tie-break chain — the least-invented
- *  reading available — and that fallback is an OPEN RULING recorded in _WIP/v3.5.6/DAN-ASK.md,
- *  not a decision (QA F6). Nothing here weights or scores. */
+ *  So there is no priority. Each enabled rule ranks the offers on its own measure, best first, and
+ *  the ranks are added with equal weight — lowest total stands first. Ranks rather than raw values
+ *  because the measures have no common unit: a perimeter COUNT and a top-gap AREA in mm2 cannot be
+ *  added, and scaling them into each other would be inventing weights he did not give.
+ *
+ *  What this replaces: a lexicographic chain — perimeter, then corners, then gravity — which meant
+ *  perimeter alone decided almost every comparison and gravity was never reached. That chain was
+ *  my reading of "in order of the general to more specific"; it is now ruled out.
+ *
+ *  Ties keep their existing order, so a rule that cannot separate two offers does not disturb
+ *  them. */
 export function applyHoldingRules<T>(
   offers: ReadonlyArray<T>, factsOf: (o: T) => HoldingFacts | null, rules: HoldingRules,
 ): T[] {
-  if (!rules.perimeter && !rules.corners && !rules.gravity) return [...offers]
-  return [...offers].sort((a, b) => {
-    const fa = factsOf(a), fb = factsOf(b)
-    if (!fa || !fb) return 0
-    if (rules.perimeter && fa.perimeter !== fb.perimeter) return fb.perimeter - fa.perimeter
-    if (rules.corners && fa.corners !== fb.corners) return fb.corners - fa.corners
-    if (rules.gravity && fa.topUnprotectedMM2 !== fb.topUnprotectedMM2)
-      return fa.topUnprotectedMM2 - fb.topUnprotectedMM2
-    return 0
-  })
+  const enabled: Array<(f: HoldingFacts) => number> = []
+  // each returns "lower is better", so one comparator serves every rule
+  if (rules.perimeter) enabled.push((f) => -f.perimeter)
+  if (rules.corners) enabled.push((f) => -f.corners)
+  if (rules.gravity) enabled.push((f) => f.topUnprotectedMM2)
+  if (!enabled.length) return [...offers]
+
+  const facts = new Map<T, HoldingFacts | null>()
+  for (const o of offers) facts.set(o, factsOf(o))
+  const rankSum = new Map<T, number>(offers.map((o) => [o, 0]))
+  for (const measure of enabled) {
+    // rank on this measure alone: equal values share a rank, so a rule that cannot tell two
+    // offers apart contributes nothing to the difference between them
+    const scored = offers.map((o) => {
+      const f = facts.get(o) ?? null
+      return { o, v: f ? measure(f) : Number.POSITIVE_INFINITY }
+    }).sort((a, b) => a.v - b.v)
+    let rank = 0
+    for (let i = 0; i < scored.length; i++) {
+      if (i > 0 && scored[i].v !== scored[i - 1].v) rank = i
+      rankSum.set(scored[i].o, (rankSum.get(scored[i].o) ?? 0) + rank)
+    }
+  }
+  return [...offers].sort((a, b) => (rankSum.get(a) ?? 0) - (rankSum.get(b) ?? 0))
 }

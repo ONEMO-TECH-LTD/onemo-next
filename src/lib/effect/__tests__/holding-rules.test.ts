@@ -270,3 +270,39 @@ describe('the toggle REACHES the ladder — not just the pressed state', () => {
     expect([...perimeter].sort(), 'a preference must not remove an offer').toEqual([...off].sort())
   }, 60_000)
 })
+
+describe('the preferences weigh EVENLY — no rule outranks another', () => {
+  // Dan, 2026-08-31: "I don't know what is the best way to. Just make them apply evenly when on."
+  // That rules out the lexicographic chain I had — perimeter, then corners, then gravity — under
+  // which perimeter decided almost every comparison and gravity was never reached.
+  const facts = (perimeter: number, corners: number, topUnprotectedMM2: number) =>
+    ({ perimeter, corners, holdsExtremes: true, topUnprotectedMM2, unprotectedMM2: 0 })
+
+  it('a rule that LOSES on one measure can still win on the others', () => {
+    // A is best on perimeter. B is best on corners AND gravity. Under the old chain A won on
+    // perimeter alone and the other two rules never spoke. Weighed evenly, B wins two to one.
+    const A = 'A', B = 'B'
+    const of = (o: string) => o === A ? facts(9, 0, 900) : facts(1, 9, 10)
+    const all = { ...NO_HOLDING_RULES, perimeter: true, corners: true, gravity: true }
+    expect(applyHoldingRules([A, B], of, all)[0],
+      'perimeter alone must not decide when the other two disagree with it').toBe(B)
+    // and each rule alone still decides alone
+    expect(applyHoldingRules([A, B], of, { ...NO_HOLDING_RULES, perimeter: true })[0]).toBe(A)
+    expect(applyHoldingRules([A, B], of, { ...NO_HOLDING_RULES, corners: true })[0]).toBe(B)
+    expect(applyHoldingRules([A, B], of, { ...NO_HOLDING_RULES, gravity: true })[0]).toBe(B)
+  })
+
+  it('no rule is worth more than any other: swapping which rule favours whom flips the winner', () => {
+    const of1 = (o: string) => o === 'A' ? facts(9, 0, 900) : facts(0, 9, 10)   // B wins 2 of 3
+    const of2 = (o: string) => o === 'A' ? facts(9, 9, 900) : facts(0, 0, 10)   // A wins 2 of 3
+    const all = { ...NO_HOLDING_RULES, perimeter: true, corners: true, gravity: true }
+    expect(applyHoldingRules(['A', 'B'], of1, all)[0]).toBe('B')
+    expect(applyHoldingRules(['A', 'B'], of2, all)[0]).toBe('A')
+  })
+
+  it('a rule that cannot separate two offers does not disturb them', () => {
+    const of = () => facts(3, 3, 100)
+    expect(applyHoldingRules(['A', 'B'], of, { ...NO_HOLDING_RULES, perimeter: true, corners: true }))
+      .toEqual(['A', 'B'])
+  })
+})

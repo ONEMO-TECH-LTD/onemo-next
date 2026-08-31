@@ -39,9 +39,9 @@ Answered by Dan: it is a FILTER, with on/off toggles, tested by result.
 - may the canon come from a LOWER band than requested? duck/butterfly at B3 carry a clean 2x2,
   which is a B2 record; the lookup refuses to cross the band line, so those return nothing while
   max finds the 2x2 by itself
-- **the four preferences: strict order or weighted?** STILL OPEN, and the code must not be read as
-  having answered it. One toggle on is unambiguous. With several on, the code falls back to Dan's
-  listed sequence as a tie-break chain because that is the least-invented reading — it is a
-  fallback, not a ruling. QA F6 flagged that the checklist called this open while the code had
-  quietly chosen; that contradiction is what this line now records.
+- ~~the four preferences: strict order or weighted?~~ **RULED 2026-08-31**: "just make them apply
+  evenly when on". No priority. Each enabled rule ranks the offers on its own measure and the ranks
+  are added with equal weight. Ranks, not raw values, because a perimeter COUNT and a top-gap AREA
+  have no common unit and scaling one into the other would invent a weight he did not give.
+- ~~gravity needs an up: is the shape's top as drawn the top as worn?~~ **RULED 2026-08-31**: yes.
 - gravity needs an "up": is the shape's top as drawn always the top as worn?
