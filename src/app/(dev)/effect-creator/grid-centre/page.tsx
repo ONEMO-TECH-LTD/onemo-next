@@ -520,16 +520,6 @@ export default function GridLab() {
             <LockNum label="Magnet padding · per spot" unit="mm" v={pad} set={setPad}
               min={PADDING_FLOOR_MM} max={PADDING_CEIL_MM} locked={padLock} setLocked={setPadLock}
               released={RELEASED_PADDING_MM} />
-            <div className="gl-field"><span>Unprotected area · Dan&apos;s holding rules</span>
-              <div className="gl-seg gl-wrap">
-                {([['universal', 'THE ONE LAW · hold every span at its ends'],
-                   ['balance', 'balanced, not lopsided'],
-                   ['perimeter', 'perimeter over centre'], ['extremes', 'hold the extremes'],
-                   ['corners', 'span ends over mid-span'], ['gravity', 'top gap worst']] as const).map(([k, label]) =>
-                  <button key={k} aria-pressed={hold[k]}
-                    onClick={() => setHold((h) => ({ ...h, [k]: !h[k] }))}>{label}</button>)}
-              </div>
-            </div>
             <div className="gl-field"><span>Classifier ruler · what the band is measured on</span>
               <div className="gl-seg">
                 <button aria-pressed={ruler === 'legal'} onClick={() => setRuler('legal')}>legal area</button>
@@ -655,6 +645,28 @@ export default function GridLab() {
                   <button key={g} aria-pressed={governor === g} onClick={() => setGovernor(g)}>{l}</button>)}
               </div>
             </div>}
+          </Fold>
+
+          {/* HOLDING RULES — built like Centering and on the same side, because they are the same
+              kind of control: a set of independent switches over how the answer is chosen. One
+              word each; the settings panel's rows are nowrap, which is why sentence-long labels
+              collided there. */}
+          <Fold title="Holding rules">
+            <div className="gl-field"><span>Enforcers · these remove answers</span>
+              <div className="gl-seg gl-wrap">
+                {([['extremes', 'Extremes'], ['balance', 'Balance']] as const).map(([k, l]) =>
+                  <button key={k} aria-pressed={hold[k]}
+                    onClick={() => setHold((h) => ({ ...h, [k]: !h[k] }))}>{l}</button>)}
+              </div>
+            </div>
+            <div className="gl-field"><span>Preferences · these order, weighed evenly</span>
+              <div className="gl-seg gl-wrap">
+                {([['universal', 'One law'], ['perimeter', 'Perimeter'],
+                   ['corners', 'Ends'], ['gravity', 'Top']] as const).map(([k, l]) =>
+                  <button key={k} aria-pressed={hold[k]}
+                    onClick={() => setHold((h) => ({ ...h, [k]: !h[k] }))}>{l}</button>)}
+              </div>
+            </div>
           </Fold>
         </aside>
       </div>
