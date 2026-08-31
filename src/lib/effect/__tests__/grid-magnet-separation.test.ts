@@ -830,6 +830,7 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
     expect(result.trace).toMatchObject({ source: 'canon-full', canonSeats: 16, populations: 1, wraps: 1, retained: 16 })
     expect(result.offers).toHaveLength(1)
     expect(result.offers[0].at.count).toBe(16)
+    expect(result.offers[0].at.sizeMM).toBe(168)
   })
   it('the old rigid walk is gone from every production path', () => {
     for (const f of ['grid-magnet.ts', 'grid-magnet-compute.ts']) {
