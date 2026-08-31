@@ -1,9 +1,10 @@
 # Step 1 and Step 2 — Dan's directives, verbatim
 
-Collated 2026-08-31 at Dan's instruction. Source: the s62/lead transcript vault, 2026-08-30 and
-2026-08-31 day-files. **Every block between quotation rules is Dan's own text, unedited** —
-spelling and all — because paraphrasing his words into mine is the failure this sheet exists to
-prevent. My gloss, where any, is marked `→` and is not his.
+Collated 2026-08-31 at Dan's instruction. Required sources: the s62/lead transcript-vault day-files
+for 2026-08-30 and 2026-08-31. Blocks not marked **source gap** match those files after whitespace-
+only wrapping. Blocks marked **source gap** were supplied as Dan quotes in the first version of this
+sheet but do not occur in either required day-file; they remain visible and cannot govern a CLEAR
+until their source is recovered or Dan confirms them. My gloss is marked `→` and is not Dan's.
 
 **This sheet is the scope. A QA gate is scoped to this file, never to a diff.**
 
@@ -54,9 +55,10 @@ Also (2026-08-30 16:11): counting positions is not the classifier's job —
 ### 1.5 · Wrap is untouchable; wrapping is a RULE not an option (2026-08-30 17:44)
 
 > "ok the wrap can be untouched but the wiring and new scoring may appear that makes it inactive
-> also what is the optimal logic here and how is it calculated? ... i can see segmented 2 zones and
-> centering but it must provide the fewest option that wraps - so wrapping is not optional it is
-> rule in the formula
+>
+> also what is the optimal logic here and how is it calculated? '/Users/daniilsolopov/Downloads/Screenshot 2026-08-30 at 17.39.47.png'i can see segmented 2 zones and centering but it must provide the fewest option that wraps - so wrapping is not optional it is rule in the formula
+>
+>
 > another thing , so optimal is not managed by the perimeter at all?"
 
 ### 1.6 · The rollback, and the scope law (2026-08-30 18:19, via the s63 handoff, verbatim)
@@ -68,7 +70,7 @@ Also (2026-08-30 16:11): counting positions is not the classifier's job —
 > "i actually by logic was forbidding you to build whatever is not mentioned it is not in scope and
 > forbidden by default you only build the behavior i do ask not infer each attempt and build extras"
 
-### 1.7 · Plug the canon in — do not give it its own path (2026-08-31, after three rollbacks)
+### 1.7 · Plug the canon in — do not give it its own path (2026-08-30, after three rollbacks)
 
 > "i told you to wire directly and make canon just an anchor that plugs in the free search that
 > fine tunes"
@@ -89,6 +91,8 @@ Also (2026-08-30 16:11): counting positions is not the classifier's job —
 > rows layout if the inner area and outter area fit the canon already ---- so max means keeping all
 > rows and columns selective,ly ommiting areas where shape does not support"
 
+→ **Source gap:** this second block is absent from both required s62/lead day-files.
+
 ### 1.9 · Naming
 
 > "by the way you did again what i never asked and named against my will - i asked min and max -
@@ -104,19 +108,27 @@ Also (2026-08-30 16:11): counting positions is not the classifier's job —
 > "Canon may come from lower band if none fit in proposed the current and prior band did not use it
 > as well means the band la shifted due to mismatch of the shape bbox and actual internal structure"
 
+→ **Source gap:** this block is absent from both required s62/lead day-files. The 2026-08-31 file
+records Kai saying the ruling was given and later code/tests implementing it, but does not retain
+Dan's own turn.
+
 ### 1.12 · Butterfly, as the worked example (2026-08-31)
 
 > "Butterfly is the example here it is either 2x2 at B3 or 3 point upside down triangle or diamond
 > wit no top - diagonal s with top 2 points and 1 at the bottom centered"
 
-→ *Not yet actioned: canon is square + rectangle only, so a 3-point triangle/diamond is a preset
-and the automatic lookup cannot currently offer one. Flagged, not built.*
+→ **Source gap:** this block is absent from both required s62/lead day-files.
 
-### 1.13 · Earlier, still binding
+→ **NARROWED in code if confirmed:** lower-band 2×2 is implemented; the 3-point triangle/diamond
+alternative is not. The earlier canon-only rule and this later worked example conflict; presets
+cannot be used as a silent reason to discard the more specific example.
 
-- (08-30 00:05) "Repair classification — Derive the ordered grid frame from the union of live
+### 1.13 · Earlier directives, with supersession stated
+
+- **Superseded by 1.3 and the 16mm removal:** (08-30 00:05) "Repair classification — Derive the ordered grid frame from the union of live
   usable masses. Do not use outer shape bounds, governing mass, aspect ratio, or a 1–5 cap. Keep
-  segmentation unchanged."
+  segmentation unchanged." The final classifier knows no count and sends boxes; the deeper mass
+  probe was removed.
 - (08-30 01:14) "turning what - lock canon without on page orientation remove orientation
   completely leave the locked orientation"
 - (08-30 00:40) "check library paghe we have switch that turns lanscape and portrait and i said
@@ -124,6 +136,20 @@ and the automatic lookup cannot currently offer one. Flagged, not built.*
 - (08-30 14:17) on the 16mm mass depth: "16mm is unnecessary addition invented by you week ago" /
   "remove it"
 - (08-30 11:48) "it is mandatory protocol" — QA clearance is not optional on any fix.
+
+### 1.14 · Library surface required by Step 1 — omitted from the first sheet
+
+At 2026-08-30 19:20:
+
+> "can i ask you something first the library ui now shows me flat no band selection only titles
+> carrying the band and this is confusing for me also no separation to portrait and landscape it
+> was simply removed - what i need is the same exactly ui separation between portrait and landscape
+> returned to ui only no other code canges in the catalogue etc and duplicate same band panel that
+> separates and filters results per band"
+
+At 2026-08-30 19:35:
+
+> "can we add the same to the library cannon clone legal area measurements"
 
 ---
 
@@ -149,6 +175,8 @@ And the tool named:
 > "there is also no indication that it need to force fit tha areasa that are kept unprotected and
 > clipper 2 area substraction is out answer that provides answers or we need to build somenthing
 > that understands that legal internal area has more than 24mm of grid space unprotected"
+
+→ **Source gap:** this block is absent from both required s62/lead day-files.
 
 ### 2.2 · Toggles, and the sequencing
 
@@ -192,6 +220,9 @@ And later, on being asked once too often whether one could be removed:
 > that depends on me? Toggles all stay I need them. We are building them now why I need to remove
 > or delete them?"
 
+→ **Source gap:** this later block is absent from both required s62/lead day-files. The verified
+direct instruction immediately above still requires a toggle for each filter.
+
 ### 2.6 · The one law as toggle 5, and BALANCE as an enforcer (2026-08-31 09:53)
 
 > "Your proposal to create one rule is upheld do it. But keep the rest for comparison it will be
@@ -208,11 +239,15 @@ And later, on being asked once too often whether one could be removed:
 ### 2.7 · The UI (2026-08-31 10:14)
 
 > "i do not see the toggles anywhere i see squashed new panel and it is embarrassement that this
-> even exist who do you think you are?
+> even exist who do you think you are? '/Users/daniilsolopov/Downloads/Screenshot 2026-08-31 at 10.12.22.png'
 >
 > i need same as centering well build ui on the left side of the panels not text squashed"
 
 > "i need toggled short lables that are blue when on and grey when off"
+
+→ **Source gap:** the short-label/colour block is absent from both required s62/lead day-files.
+The verified UI block requires the left-side Centering structure; Kai's later live report records
+grey-off/blue-on as built evidence, not as a retained Dan turn.
 
 ---
 

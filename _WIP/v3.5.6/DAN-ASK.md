@@ -1,47 +1,43 @@
-# Dan's ask — verbatim, and what is actually done
+# Dan's Step 1 and Step 2 checklist
 
-Written down because holding it in my head lost an item: I scoped a QA gate from my own
-diff instead of from this, so the gate could not catch what I had left out.
+Authority: `_WIP/v3.5.6/DIRECTIVES-VERBATIM.md`, corrected against the full s62/lead day-files
+for 2026-08-30 and 2026-08-31. The QA scope is this checklist plus that source sheet, never the
+builder's diff. A row is not complete while any required behavior or live proof is missing.
 
-RULE: the QA dispatch scope is THIS FILE, never the diff. Nothing is reported done while an
-item is unticked. Partial is reported as partial, with the missing item named.
+## Step 1 — classifier, canon and sweep
 
-## The ordering (Dan, 2026-08-30)
+| Directive | Current state before full-scope QA |
+|---|---|
+| Post-load table: every band midpoint, outer/legal boxes, governed centre; classifier knows no count | **NARROWED** — rows exist, but source shows they are recomputed inside each band solve rather than once post-load |
+| Lookup digests the selected ruler box and returns the best square/rectangle canon, orientation locked in the record | Built; full-scope QA owed |
+| Canon is a suggested starting population inside the existing 1mm free search, using the same four registrations, seating, wrap and band rule | Built; full-scope QA owed |
+| Canon fit keeps its rows/columns and maximises supported positions; free-search `min` and `max` remain separate comparables | Built; full-scope QA owed |
+| Coincident optimal/min/max results collapse to one row; product labels are `optimal`, `min`, `max` | Built; full-scope QA owed |
+| Wrap remains mandatory and byte-untouched | Built; full-scope QA owed |
+| Outer/legal classifier ruler toggle; default legal | Built and previously live-gated; full-scope QA owed |
+| Canon may step down, never up, when the requested band has no fitting canon | Built; direct Dan quote has a source gap in the required vault files |
+| Butterfly worked example: 2×2 or 3-point triangle/diamond | **NARROWED if the supplied quote is confirmed** — 2×2 step-down exists; automatic 3-point preset path does not |
+| Library UI: band filter; portrait/landscape record filter; locked canon orientation; canon legal-area dimensions | Built; full-scope QA owed |
 
-> "i would make it toggles on off and test the results like a filter indeed but first we need to
-> actually make the canon wired properly - in this case we need to decide if we add toggle as well
-> measurting by outter box or inner - i prefer testing both / and we need to decide if we wire in
-> the clipper 2 unprotected area defender that will enforce the filters above as step 2"
+## Step 2 — unprotected area and holding filters
 
-| # | item | state |
-|---|---|---|
-| 1 | canon wired properly — suggested layout is the search's STARTING POINT, no parallel path | DONE · QA-CLEAR at 2c7e4286, bounded |
-| 2 | outer/inner classifier ruler toggle — "i prefer testing both" | BUILT + COMMITTED · headless gated · LIVE GATED: butterfly B3 legal=no optimal, outer=optimal 123.26/3 |
-| 3 | Clipper2 unprotected-area defender + the four preferences, as toggles | BUILT · **PARTIAL**, needs two Dan rulings: (a) combined-toggle ordering strict or weighted? (b) is the top as drawn the top as worn? Rule 2 is active at released 24/96mm pitches and stays. |
+| Directive | Current state before full-scope QA |
+|---|---|
+| Clipper2 legal-area subtraction with 24–48mm protection reach | Built; full-scope QA owed |
+| Toggle 1 — perimeter over centre | Built |
+| Toggle 2 — hold extremes, hard enforcer before roles | Built |
+| Toggle 3 — span ends, not geometric vertices | Built |
+| Toggle 4 — top gap, with top as drawn | Built |
+| Enabled preferences apply evenly | Built as equal rank-sum |
+| Toggle 5 — universal span-end/unprotected-area law; original four retained for comparison | Built |
+| Toggle 6 — balance/centring enforcer; one lopsided flap loses to two smaller balanced gaps | Built |
+| All six controls independently switchable | Built |
+| UI is a separate left-side card matching Centering; short labels; grey off / blue on | Built at `c211c571`; independent full-scope live gate owed |
 
-## Step 2's content, verbatim
+## Source gaps requiring explicit treatment
 
-> "one rule we need to implement as filter as well and enforcer is the unprotected area and also
-> unprotected area holding preferences - means that in order of the general to more specific :
-> 1. the perimeter side holds are prefered to centers
-> 2. extreme apart sides must be held in preference to closest sides top and bottom of the
->    rectangle for instance in portrait and right left in landscape
-> 3. corners are prefered to sides
-> 4. top unprotected area is prefered to side - gravity law
-> basically even distruibution with less unprotected areas further from the the protected area than
-> 24-48mm is better to be protected and aligned to it especially top side cause the top will by
-> gravity will unstick the effect with no magnets."
-
-Answered by Dan: it is a FILTER, with on/off toggles, tested by result.
-
-## Open — waiting on Dan, not on me
-
-- may the canon come from a LOWER band than requested? duck/butterfly at B3 carry a clean 2x2,
-  which is a B2 record; the lookup refuses to cross the band line, so those return nothing while
-  max finds the 2x2 by itself
-- ~~the four preferences: strict order or weighted?~~ **RULED 2026-08-31**: "just make them apply
-  evenly when on". No priority. Each enabled rule ranks the offers on its own measure and the ranks
-  are added with equal weight. Ranks, not raw values, because a perimeter COUNT and a top-gap AREA
-  have no common unit and scaling one into the other would invent a weight he did not give.
-- ~~gravity needs an up: is the shape's top as drawn the top as worn?~~ **RULED 2026-08-31**: yes.
-- gravity needs an "up": is the shape's top as drawn always the top as worn?
+The corrected directive sheet preserves supplied direct-text claims that do not occur in the two
+required day-files: Step 1 max-count clarification, lower-band wording, Butterfly worked example;
+Step 2 extra Clipper wording, later all-toggles wording, and short-label colour wording. They cannot
+be represented as independently verified vault quotes. Recover their source or obtain Dan's direct
+confirmation before using them to close a disputed requirement.
