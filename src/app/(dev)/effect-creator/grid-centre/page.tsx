@@ -94,7 +94,7 @@ export default function GridLab() {
   const [ruler, setRuler] = useState<'legal' | 'outer'>('legal')
   // DAN'S FOUR UNPROTECTED-AREA RULES, each on its own switch (2026-08-30: "i would make it
   // toggles on off and test the results like a filter indeed"). All off is the released path.
-  const [hold, setHold] = useState({ perimeter: false, extremes: false, corners: false, gravity: false })
+  const [hold, setHold] = useState({ perimeter: false, extremes: false, corners: false, gravity: false, universal: false, balance: false })
   /** Legal-area islands, coloured + boxed + centre-marked. */
   const [showSegs, setShowSegs] = useState(true)
   /** Coloured fills of the inner (legal) area — off leaves outlines only. */
@@ -522,8 +522,10 @@ export default function GridLab() {
               released={RELEASED_PADDING_MM} />
             <div className="gl-field"><span>Unprotected area · Dan&apos;s holding rules</span>
               <div className="gl-seg gl-wrap">
-                {([['perimeter', 'perimeter over centre'], ['extremes', 'hold the extremes'],
-                   ['corners', 'corners over sides'], ['gravity', 'top gap worst']] as const).map(([k, label]) =>
+                {([['universal', 'THE ONE LAW · hold every span at its ends'],
+                   ['balance', 'balanced, not lopsided'],
+                   ['perimeter', 'perimeter over centre'], ['extremes', 'hold the extremes'],
+                   ['corners', 'span ends over mid-span'], ['gravity', 'top gap worst']] as const).map(([k, label]) =>
                   <button key={k} aria-pressed={hold[k]}
                     onClick={() => setHold((h) => ({ ...h, [k]: !h[k] }))}>{label}</button>)}
               </div>

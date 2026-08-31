@@ -78,10 +78,19 @@ export interface HoldingRules {
   corners: boolean
   /** 4 · unprotected at the TOP is worse than at a side — the gravity law */
   gravity: boolean
+  /** 5 · THE ONE LAW, universal. Dan, 2026-08-31: rules 1-4 "are weaker products of it" — extremes
+   *  is a fallback, perimeter is a consequence, the top gap is the same thing where gravity makes
+   *  it hurt first. Hold every span at its ends; what is left unheld beyond one disc's reach is
+   *  the measure. Kept alongside the other four so they can be compared, not instead of them. */
+  universal: boolean
+  /** 6 · BALANCE, an enforcer. Dan, 2026-08-31: "one large flap remaining lopsided is worse [than]
+   *  2 small on each side, so centering must be also enforcer." When unprotected area remains
+   *  whichever answer you take, the balanced one wins. */
+  balance: boolean
 }
 
 export const NO_HOLDING_RULES: HoldingRules =
-  { perimeter: false, extremes: false, corners: false, gravity: false }
+  { perimeter: false, extremes: false, corners: false, gravity: false, universal: false, balance: false }
 
 /** DAN'S PROTECTION REACH — "further from the protected area than 24-48mm", clamped to his own
  *  range. It never expands with the grid: at 96mm pitch it stays 48, because nothing in his rule
@@ -144,6 +153,10 @@ export interface HoldingFacts {
   topUnprotectedMM2: number
   /** every point further than the reach from a magnet */
   unprotectedMM2: number
+  /** HOW LOPSIDED that unprotected area is about the shape's own middle, 0 (even) to 1 (all on one
+   *  side). Dan's balance law: one large flap on one side is worse than two small ones either
+   *  side, even though both leave the same total bare. */
+  imbalance: number
 }
 
 /** A legal boundary edge in mm: ax, ay, bx, by, and its unit direction. */
@@ -211,47 +224,6 @@ function spanEndHolds(
   return held
 }
 
-/** UNUSED by the rules since 2026-08-31 — kept only because the outline's turn is still the honest
- *  answer to "where does this shape have a vertex", and deleting a measurement nobody asked me to
- *  delete is not mine to do. Rule 3 no longer consults it.
- *
- *  THE SHAPE'S ACTUAL CORNERS: vertices where the outline turns sharply.
- *
- *  Read from the SOURCE rings, never from the legal region — the inward offset uses round joins,
- *  so every convex corner of a square arrives as an arc and a square becomes indistinguishable
- *  from a circle. And never inferred from "two non-parallel segments within reach", which was the
- *  previous version: a smooth circle has many differently-oriented segments inside any radius, so
- *  every hold beside a circle counted as a corner (QA F1).
- *
- *  CORNER_TURN_DEG is the one authored number left in this file. A 96-point circle turns 3.75
- *  degrees a vertex and a right angle turns 90, so anything in between separates them; 40 is
- *  chosen to sit clear of both, and the three frozen counterexamples — circle 0, rectangle corner
- *  1, U concave corner 1 — are what hold it honest. */
-const CORNER_TURN_DEG = 40
-
-function cornerFeatures(rings: ReadonlyArray<ReadonlyArray<Pt>>): Pt[] {
-  const out: Pt[] = []
-  // The angle BETWEEN the incoming and outgoing directions: a straight run gives cos 1, a right
-  // angle gives 0, a reversal gives -1. So a turn of at least CORNER_TURN_DEG is cos below
-  // cos(CORNER_TURN_DEG). My first version compared against cos(180 - turn), which asked for a
-  // near-reversal and found no corner on a square at all.
-  const limit = Math.cos(CORNER_TURN_DEG * Math.PI / 180)
-  for (const ring of rings) {
-    const n = ring.length
-    if (n < 3) continue
-    for (let i = 0; i < n; i++) {
-      const a = ring[(i - 1 + n) % n], b = ring[i], c = ring[(i + 1) % n]
-      const ux = b[0] - a[0], uy = b[1] - a[1], vx = c[0] - b[0], vy = c[1] - b[1]
-      const lu = Math.hypot(ux, uy), lv = Math.hypot(vx, vy)
-      if (lu < 1e-9 || lv < 1e-9) continue
-      // cos of the angle between the incoming and outgoing directions; a straight run is 1
-      const cos = (ux * vx + uy * vy) / (lu * lv)
-      if (cos < limit) out.push(b)
-    }
-  }
-  return out
-}
-
 const segDistMM = (sg: Seg, p: Pt): number => {
   const dx = sg[2] - sg[0], dy = sg[3] - sg[1]
   const len2 = dx * dx + dy * dy
@@ -272,10 +244,6 @@ export function holdingFactsOf(
    *  The optional box fallback is gone: an API that still permits the implementation a
    *  counterexample disproved is an API that will be used that way (QA F2). */
   legal: Paths64,
-  /** The SOURCE contour's rings — outer and holes — for rule 3. A corner is a TURN in the shape,
-   *  and it must be read here rather than off the legal region, because the inward offset rounds
-   *  every convex corner into an arc and would make a square indistinguishable from a circle. */
-  cornersOf: ReadonlyArray<ReadonlyArray<Pt>>,
 ): HoldingFacts {
   const reachMM = protectionReachMM(pitchMM)
   const w = legalBox.maxX - legalBox.minX, h = legalBox.maxY - legalBox.minY
@@ -289,7 +257,6 @@ export function holdingFactsOf(
   for (const m of magnets) if (segs.some((sg) => segDistMM(sg, m) <= reachMM)) perimeter++
   // RULE 3 — the ends of a span, not the vertices of an outline (Dan, 2026-08-31)
   const corners = spanEndHolds(magnets, legalBox, reachMM)
-  void cornersOf
   // RULE 2 — "extreme apart sides must be held ... top and bottom in portrait, right and left in
   // landscape". Held when the population reaches within Dan's OWN reach of both ends — never the
   // grid pitch, which at 96mm would accept a 96mm bare end (QA F3). A square has no dominant axis,
@@ -317,10 +284,30 @@ export function holdingFactsOf(
     Math.round(legalBox.minX * S), Math.round(legalBox.maxY * S),
   ])
   const top = gaps.length ? Clipper.intersect(gaps, [strip], FillRule.NonZero) : []
+  // BALANCE — the unprotected area either side of the shape's own middle, on the axis ACROSS the
+  // dominant one. Dan's BOT B2: two magnets to the left leave the whole right bare, which is one
+  // large lopsided flap; holding the extremes centred leaves a little bare on each side instead.
+  // Same law as everything else — what differs is that it compares the two halves rather than the
+  // total.
+  const midX = (legalBox.minX + legalBox.maxX) / 2, midY = (legalBox.minY + legalBox.maxY) / 2
+  const half = (a: number, b: number, c: number, d: number) => {
+    if (!gaps.length) return 0
+    const cut = Clipper.makePath([Math.round(a * S), Math.round(b * S), Math.round(c * S), Math.round(b * S),
+      Math.round(c * S), Math.round(d * S), Math.round(a * S), Math.round(d * S)])
+    const part = Clipper.intersect(gaps, [cut], FillRule.NonZero)
+    return part && part.length ? areaOf(part) : 0
+  }
+  const portrait = h >= w
+  const one = portrait ? half(legalBox.minX, legalBox.minY, midX, legalBox.maxY)
+    : half(legalBox.minX, legalBox.minY, legalBox.maxX, midY)
+  const two = portrait ? half(midX, legalBox.minY, legalBox.maxX, legalBox.maxY)
+    : half(legalBox.minX, midY, legalBox.maxX, legalBox.maxY)
+  const both = one + two
   return {
     perimeter, corners, holdsExtremes,
     topUnprotectedMM2: top && top.length ? areaOf(top) : 0,
     unprotectedMM2,
+    imbalance: both > 0 ? Math.abs(one - two) / both : 0,
   }
 }
 
@@ -343,11 +330,31 @@ export function holdingFactsOf(
 export function applyHoldingRules<T>(
   offers: ReadonlyArray<T>, factsOf: (o: T) => HoldingFacts | null, rules: HoldingRules,
 ): T[] {
+  // 6 · BALANCE, an ENFORCER — it removes, it does not merely order. Dan, 2026-08-31: "if either
+  // option provides unprotected result we must choose centered... one large flap remaining
+  // lopsided is worse [than] 2 small on each side, so centering must be also enforcer."
+  //
+  // Comparative, with no invented threshold: of the answers on the table, the least lopsided
+  // stand and the rest go. Ties survive together, so it only ever removes a genuinely worse
+  // balance. An answer that cannot be measured is not waved through.
+  let pool = [...offers]
+  if (rules.balance && pool.length > 1) {
+    const scored = pool.map((o) => ({ o, f: factsOf(o) }))
+    const measurable = scored.filter((x) => x.f !== null)
+    if (measurable.length) {
+      const best = Math.min(...measurable.map((x) => x.f!.imbalance))
+      pool = measurable.filter((x) => x.f!.imbalance <= best + 1e-9).map((x) => x.o)
+    }
+  }
+  offers = pool
   const enabled: Array<(f: HoldingFacts) => number> = []
   // each returns "lower is better", so one comparator serves every rule
   if (rules.perimeter) enabled.push((f) => -f.perimeter)
   if (rules.corners) enabled.push((f) => -f.corners)
   if (rules.gravity) enabled.push((f) => f.topUnprotectedMM2)
+  // 5 · THE ONE LAW: what is left unheld beyond a disc's reach. Weighed evenly with the rest, so
+  // it can be run beside them and compared rather than replacing them.
+  if (rules.universal) enabled.push((f) => f.unprotectedMM2)
   if (!enabled.length) return [...offers]
 
   const facts = new Map<T, HoldingFacts | null>()

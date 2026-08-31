@@ -599,10 +599,20 @@ describe('1b — the frame comes from the usable material', () => {
 
   it('STEP 1+2: the LOOKUP digests those boxes and names the optimal layout in that band', () => {
     const at = (w: number, h: number, band: number) => optimalLayoutForBox(48, band, w, h)
-    // a square legal box takes the square; a band above it takes nothing, and says so rather
-    // than substituting something from another band
+    // a square legal box takes the square
     expect([at(120, 120, 3)?.frameCols, at(120, 120, 3)?.frameRows]).toEqual([3, 3])
-    expect(at(120, 120, 4), 'a bigger band squeezed into a smaller box').toBeNull()
+    // AND IT STEPS DOWN when nothing in the band asked for fits. Dan, 2026-08-31: "Canon may come
+    // from lower band if none fit in proposed... means the band [was] shifted due to mismatch of
+    // the shape bbox and actual internal structure." A 120mm box cannot carry any B4 record — they
+    // need 144 — so it is offered the largest thing it CAN wear rather than nothing at all.
+    const down = at(120, 120, 4)
+    expect([down?.frameCols, down?.frameRows], 'B4 asked, B3 delivered — the shape can wear it')
+      .toEqual([3, 3])
+    expect(down!.bandId, 'and it is honest about which band that record belongs to').toBe(3)
+    // NEVER UP: a shape is not offered something larger than the band it asked for
+    for (const band of [1, 2, 3, 4, 5])
+      expect(at(216, 216, band)!.bandId, 'a record from ABOVE the requested band')
+        .toBeLessThanOrEqual(band)
 
     // ORIENTATION IS THE BOX, never a choice: the same numbers the other way round transpose
     expect([at(62, 120, 3)?.frameCols, at(62, 120, 3)?.frameRows], 'tall').toEqual([2, 3])
@@ -637,8 +647,15 @@ describe('1b — the frame comes from the usable material', () => {
     expect(s3.legalWidthMM, 'the star holds less').toBeLessThan(q3.legalWidthMM)
     expect(q3.legalWidthMM - s3.legalWidthMM, 'the legal gap dwarfs the outline gap')
       .toBeGreaterThan(q3.outerWidthMM - s3.outerWidthMM)
-    expect(optimalLayoutForBox(48, 3, s3.legalWidthMM, s3.legalHeightMM), 'the star is not B3 there')
-      .toBeNull()
+    // the star cannot wear a B3 record at that size, so it steps down rather than returning
+    // nothing — and the record it gets is honest about being from a lower band
+    const starPick = optimalLayoutForBox(48, 3, s3.legalWidthMM, s3.legalHeightMM)
+    expect(starPick?.bandId ?? 0, 'the star is not B3 there, so it must be offered less')
+      .toBeLessThan(3)
+    // and the floor is the 1x1: a legal box of zero still holds one magnet, which is a real
+    // product (Dan, 01:12 — 'zero width means exactly one column')
+    expect(optimalLayoutForBox(48, 3, 0, 0)?.nodesMM.length, 'the floor is one magnet, not none')
+      .toBe(1)
   })
 
   it('EVERY lawful registration survives to the caller; the drawn answer is unchanged', () => {

@@ -197,8 +197,7 @@ export function wrapBandLadder(
       const region = legalRegion(c, holdRadius)
       const box = legalRegionBoxMM(c, holdRadius)
       holdFacts.set(r, region && box
-        ? holdingFactsOf(r.at.points, box, unprotectedRegions(region, r.at.points, ruleReach), pitch,
-          region, [c.outer.pts, ...c.holes.map((h) => h.pts)])
+        ? holdingFactsOf(r.at.points, box, unprotectedRegions(region, r.at.points, ruleReach), pitch, region)
         : null)
     }
     return holdFacts.get(r) ?? null
@@ -238,7 +237,7 @@ export function wrapBandLadder(
   }
   // THE PREFERENCES order what ships. They never remove — only rule 2 removes, and it did that
   // above, on the pools.
-  const ruled = rules && (rules.perimeter || rules.corners || rules.gravity)
+  const ruled = rules && (rules.perimeter || rules.corners || rules.gravity || rules.universal || rules.balance)
     ? applyHoldingRules(offers, factsOf, rules) : offers
   return { offers: ruled, bestSeated: bestSeatedCandidate(witnesses) }
 }

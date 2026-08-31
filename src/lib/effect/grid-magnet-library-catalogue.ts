@@ -55,6 +55,27 @@ export function canonLayoutForFrame(
 export function optimalLayoutForBox(
   pitchMM: number, bandId: number, legalWidthMM: number, legalHeightMM: number,
 ): CatalogueEntry | null {
+  // THE REQUESTED BAND FIRST, THEN DOWN. Dan, 2026-08-31: "Canon may come from lower band if none
+  // fit in proposed, the current and prior band did not use it as well — means the band [was]
+  // shifted due to mismatch of the shape bbox and actual internal structure."
+  //
+  // That mismatch is the whole reason: a band is asked for on one reading of the shape's size,
+  // while what the material can actually carry is another. The duck and the butterfly at B3 hold a
+  // clean 2x2 — a B2 record — and used to come back with NOTHING while the free search found that
+  // very layout on its own. Stepping down names what the shape can wear instead of staying silent.
+  //
+  // Never UP: a shape is not offered a layout larger than the band asked for.
+  for (let id = bandId; id >= 1; id--) {
+    const found = bestInBand(pitchMM, id, legalWidthMM, legalHeightMM)
+    if (found) return found
+  }
+  return null
+}
+
+/** The largest canon record of one band that fits inside this legal box. */
+function bestInBand(
+  pitchMM: number, bandId: number, legalWidthMM: number, legalHeightMM: number,
+): CatalogueEntry | null {
   const EPS = 0.005
   let best: CatalogueEntry | null = null
   for (const entry of canonCatalogue(pitchMM)) {

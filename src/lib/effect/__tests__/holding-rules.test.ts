@@ -26,7 +26,7 @@ const factsFor = (magnets: Pt[], shape: Contour = tall) => {
   const region = legalRegion(shape, RELEASED_PADDING_MM)!
   const box = legalRegionBoxMM(shape, RELEASED_PADDING_MM)!
   const gaps = unprotectedRegions(region, magnets, REACH)
-  return holdingFactsOf(magnets, box, gaps, 48, region, [shape.outer.pts, ...shape.holes.map((h) => h.pts)])
+  return holdingFactsOf(magnets, box, gaps, 48, region)
 }
 
 const signedAreaMM2 = (paths: NonNullable<ReturnType<typeof legalRegion>>) => {
@@ -198,7 +198,7 @@ describe('the toggle REACHES the ladder — not just the pressed state', () => {
   }
   const band = BANDS.find((b) => b.id === 4)!
   const anchor = (mm: number): Pt => [mm * 140 / 260 / 2, mm / 2]
-  const run = (rules?: { perimeter: boolean; extremes: boolean; corners: boolean; gravity: boolean }) =>
+  const run = (rules?: typeof NO_HOLDING_RULES) =>
     wrapBandLadder(bar, { pitchMM: 48, paddingMM: RELEASED_PADDING_MM, holdingRules: rules },
       band.minMM + 24, band.maxMM + 24, 24, anchor)
       .offers.map((o) => `${o.roles.join('+')}:${o.at.count}`)
@@ -251,8 +251,7 @@ describe('the toggle REACHES the ladder — not just the pressed state', () => {
           const box = legalRegionBoxMM(c, RELEASED_PADDING_MM)
           if (!region || !box) continue
           const f = holdingFactsOf(o.at.points, box,
-            unprotectedRegions(region, o.at.points, REACH), 48, region,
-            [c.outer.pts, ...c.holes.map((h) => h.pts)])
+            unprotectedRegions(region, o.at.points, REACH), 48, region)
           expect(f.holdsExtremes, `${name} B${id} ${o.roles.join('+')} does NOT hold the extremes`).toBe(true)
           checked++
         }
@@ -275,8 +274,9 @@ describe('the preferences weigh EVENLY — no rule outranks another', () => {
   // Dan, 2026-08-31: "I don't know what is the best way to. Just make them apply evenly when on."
   // That rules out the lexicographic chain I had — perimeter, then corners, then gravity — under
   // which perimeter decided almost every comparison and gravity was never reached.
-  const facts = (perimeter: number, corners: number, topUnprotectedMM2: number) =>
-    ({ perimeter, corners, holdsExtremes: true, topUnprotectedMM2, unprotectedMM2: 0 })
+  const facts = (perimeter: number, corners: number, topUnprotectedMM2: number,
+    unprotectedMM2 = 0, imbalance = 0) =>
+    ({ perimeter, corners, holdsExtremes: true, topUnprotectedMM2, unprotectedMM2, imbalance })
 
   it('a rule that LOSES on one measure can still win on the others', () => {
     // A is best on perimeter. B is best on corners AND gravity. Under the old chain A won on
@@ -320,8 +320,7 @@ describe("RULE 3 is about SPANS, not vertices — Dan's batwoman head", () => {
   const factsIn = (shape: Contour, magnets: Pt[]) => {
     const region = legalRegion(shape, RELEASED_PADDING_MM)!
     const box = legalRegionBoxMM(shape, RELEASED_PADDING_MM)!
-    return holdingFactsOf(magnets, box, unprotectedRegions(region, magnets, REACH), 48, region,
-      [shape.outer.pts, ...shape.holes.map((h) => h.pts)])
+    return holdingFactsOf(magnets, box, unprotectedRegions(region, magnets, REACH), 48, region)
   }
 
   it('a WIDE span held at its two ends beats the same count held in the middle', () => {
@@ -349,5 +348,40 @@ describe("RULE 3 is about SPANS, not vertices — Dan's batwoman head", () => {
     }
     // a hold on the equator of a circle is at neither end of the dominant span
     expect(factsIn(ring(pts), [[180, 100]]).corners).toBe(0)
+  })
+})
+
+describe('toggle 5 · THE ONE LAW, and toggle 6 · BALANCE', () => {
+  const facts = (unprotectedMM2: number, imbalance: number) =>
+    ({ perimeter: 0, corners: 0, holdsExtremes: true, topUnprotectedMM2: 0, unprotectedMM2, imbalance })
+
+  it('5 · orders by what is left unheld, and weighs evenly beside the others', () => {
+    const of = (o: string) => o === 'bare' ? facts(900, 0) : facts(10, 0)
+    expect(applyHoldingRules(['bare', 'held'], of, { ...NO_HOLDING_RULES, universal: true })[0],
+      'the answer leaving less unheld stands first').toBe('held')
+  })
+
+  it('6 · BALANCE REMOVES: one large lopsided flap loses to two small ones', () => {
+    // Dan, 2026-08-31, the BOT B2 case: two magnets to the left leave the whole right bare. Holding
+    // the extremes centred leaves a little bare on each side instead — same total, better answer.
+    const of = (o: string) => o === 'lopsided' ? facts(400, 1) : facts(400, 0)
+    const out = applyHoldingRules(['lopsided', 'centred'], of, { ...NO_HOLDING_RULES, balance: true })
+    expect(out, 'balance is an ENFORCER — the lopsided answer is removed, not merely demoted')
+      .toEqual(['centred'])
+  })
+
+  it('6 · equally balanced answers all survive — it only ever removes a worse balance', () => {
+    const of = () => facts(400, 0.25)
+    expect(applyHoldingRules(['a', 'b'], of, { ...NO_HOLDING_RULES, balance: true }))
+      .toEqual(['a', 'b'])
+  })
+
+  it('6 · balance and the total are different questions: same total, different answer', () => {
+    const of = (o: string) => o === 'lopsided' ? facts(400, 0.9) : facts(400, 0.1)
+    expect(applyHoldingRules(['lopsided', 'centred'], of, { ...NO_HOLDING_RULES, universal: true }),
+      'the one law alone cannot separate them — the totals are equal')
+      .toEqual(['lopsided', 'centred'])
+    expect(applyHoldingRules(['lopsided', 'centred'], of, { ...NO_HOLDING_RULES, balance: true }),
+      'balance is what tells them apart').toEqual(['centred'])
   })
 })
