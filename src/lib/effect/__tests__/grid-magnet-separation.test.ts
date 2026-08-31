@@ -13,7 +13,8 @@ import { join } from 'node:path'
 import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 import { classifyBands, computeGrid } from '../grid-magnet'
-import { optimalLayoutForBox } from '../grid-magnet-library-catalogue'
+import { canonLayoutForFrame, optimalLayoutForBox } from '../grid-magnet-library-catalogue'
+import { solveCanonExperiment } from '../grid-magnet-canon-experiment'
 import { frameOfMasses, positionsAcross } from '../units/classifier'
 import type { BBox, SafeMass, SafeSegment } from '../types'
 import { BANDS, BAND_STEP_MM } from '../grid-magnet-spec'
@@ -127,6 +128,7 @@ describe('2 — traffic is one-way', () => {
     // The two SEQUENCER SEATS may import units (sequencing them is what a pipeline does); both
     // hand over to pipeline/ at S3. Every other retiring file re-exports only.
     'grid-magnet-wrap-compute.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/grid-magnet$/, /^\.\/offset$/, /^\.\/foundation\/[a-z-]+$/, /^\.\/units\/[a-z-]+$/, /^@countertype\/clipper2-ts$/],
+    'grid-magnet-canon-experiment.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/grid-magnet$/, /^\.\/grid-magnet-wrap-compute$/, /^\.\/units\/[a-z-]+$/],
     'grid-magnet-class.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/foundation\/[a-z-]+$/, /^\.\/units\/[a-z-]+$/],
     'grid-magnet-library-bridge.ts': [/^\.\/types$/, /^\.\/grid-magnet[a-z-]*$/, /^\.\/library[/a-z-]*$/, /^\.\/foundation\/[a-z-]+$/],
     'grid-magnet-library-catalogue.ts': [/^\.\/types$/, /^\.\/grid-magnet[a-z-]*$/, /^\.\/library[/a-z-]*$/],
@@ -226,6 +228,7 @@ describe('2b — the units are self-sufficient', () => {
       // travelling with the result is sequencing, not policy — but it is a new unit edge, so it
       // is pinned deliberately rather than arriving as a side effect.
       'grid-magnet-wrap-compute.ts': ['./units/centring', './units/classifier', './units/judge', './units/layout', './units/segment', './units/wrap'],
+      'grid-magnet-canon-experiment.ts': ['./units/judge', './units/layout', './units/wrap'],
       'grid-magnet-class.ts': ['./units/classifier'],
       'grid-magnet-compute.ts': ['./units/centring', './units/layout', './units/segment'],
       'grid-magnet-logic.ts': ['./units/centring', './units/layout'],
@@ -241,7 +244,8 @@ describe('2b — the units are self-sufficient', () => {
     for (const { file, text } of readModule()) {
       // The two SEQUENCER SEATS may import units, because sequencing them is what a pipeline does.
       // Every other retiring file may only re-export. Both seats hand over at S3.
-      if (file === 'grid-magnet.ts' || file === 'grid-magnet-wrap-compute.ts') continue
+      if (file === 'grid-magnet.ts' || file === 'grid-magnet-wrap-compute.ts'
+        || file === 'grid-magnet-canon-experiment.ts') continue
       const bad: string[] = []
       walkAst(text, (n) => {
         if (!ts.isImportDeclaration(n)) return
@@ -302,7 +306,7 @@ describe('2d — the real shells are governed too', () => {
   // expires when the pipeline lands. Pinned exactly, so a stray import fails even where edges exist.
   const SHELL_UNIT_EDGES: Array<[string, readonly string[]]> = [
     [PAGE, []],
-    [WORKER, ['@/lib/effect/units/judge', '@/lib/effect/units/centring']],
+    [WORKER, ['@/lib/effect/units/classifier', '@/lib/effect/units/judge', '@/lib/effect/units/centring']],
   ]
 
   it('the page and worker hold exactly their pinned unit edges', () => {
@@ -818,6 +822,15 @@ describe('deepest safe points', () => {
 })
 
 describe('7 — an empty band returns no lawful offer, never a fit', () => {
+  it('canon experiment wraps the complete known answer before any partial or fallback work', () => {
+    const sq = (mm: number): Contour => ({ outer: { pts: [[0, 0], [mm, 0], [mm, mm], [0, mm]] as Pt[] }, holes: [] })
+    const canon = canonLayoutForFrame(48, 4, 4)!.nodesMM.map(([x, y]) => [x, y] as Pt)
+    const result = solveCanonExperiment(sq, { pitchMM: 48, paddingMM: 12 }, 168, 215, 24,
+      (mm) => [mm / 2, mm / 2], canon)
+    expect(result.trace).toMatchObject({ source: 'canon-full', canonSeats: 16, populations: 1, wraps: 1, retained: 16 })
+    expect(result.offers).toHaveLength(1)
+    expect(result.offers[0].at.count).toBe(16)
+  })
   it('the old rigid walk is gone from every production path', () => {
     for (const f of ['grid-magnet.ts', 'grid-magnet-compute.ts']) {
       const text = readFileSync(join(LIB, f), 'utf8')

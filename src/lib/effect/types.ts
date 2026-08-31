@@ -124,6 +124,11 @@ export interface BandSolve {
   bestSeated: { revealMM: number; points: Pt[] } | null
 }
 
+export interface CanonExperimentTrace {
+  source: 'canon-full' | 'canon-partial' | 'free-fallback' | 'none'
+  canonSeats: number; populations: number; wraps: number; retained: number; removed: number[]
+}
+
 // The engine's request/response vocabulary.
 export interface GridConfig {
   /** WHICH RULER THE CLASSIFIER READS — a test instrument, not a preference (Dan, 2026-08-30:

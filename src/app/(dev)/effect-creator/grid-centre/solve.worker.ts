@@ -2,14 +2,16 @@
 // bridge/engine calls the page used to make inline, nothing computed here.
 
 import { BANDS, bandOuterMM, classifyBands, computeGrid, MIN_EFFECT_MM, type GridConfig } from '@/lib/effect/grid-magnet'
-import { optimalLayoutForBox } from '@/lib/effect/grid-magnet-library-catalogue'
+import { canonLayoutForFrame, optimalLayoutForBox } from '@/lib/effect/grid-magnet-library-catalogue'
 import { wrapBandLadder, wrapGrid, type BandSolve, type WrapConfig } from '@/lib/effect/grid-magnet-wrap-compute'
+import { solveCanonExperiment } from '@/lib/effect/grid-magnet-canon-experiment'
 import { bbox, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet-compute'
 import { contourCentroidOf } from '@/lib/effect/units/centring'
 import { anchorBakeOf, anchorFromBake, applyCoverage, assignSizes, type AnchorBake, type CentreMode, type Governor, type MagnetPlan } from '@/lib/effect/grid-magnet-logic'
 import { classFrameNodes, shapeFamilyOf, type ShapeFamily } from '@/lib/effect/grid-magnet-class'
 
 import { defaultLanding } from '@/lib/effect/units/judge'
+import { positionsAcross } from '@/lib/effect/units/classifier'
 import { DEFAULT_PITCH_MM, PADDING_FLOOR_MM } from '@/lib/effect/grid-magnet-spec'
 import { contourCacheKey, makeSizer, sizeRange } from '@/lib/effect/grid-magnet-bridge'
 import type { Contour, Pt } from '@/lib/effect/types'
@@ -24,6 +26,7 @@ interface SolveRequest {
   manualBand?: boolean
   sizeMM: number
   stepSel: number | null
+  canonExperiment?: boolean
 }
 
 const ctx = self as unknown as Worker
@@ -83,7 +86,7 @@ export function anchorFnFor(
 const FITS_CAP = 12
 
 ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
-  const { id, base, offsetMM, cfg, mode, manualBand, sizeMM, stepSel } = e.data
+  const { id, base, offsetMM, cfg, mode, manualBand, sizeMM, stepSel, canonExperiment } = e.data
   try {
     const sized = makeSizer(base, offsetMM)
     // Cache identity is the shape itself — every ring, exactly. A rolling hash of ring counts
@@ -116,19 +119,22 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       const bandClasses = classifyBands(sized, rawCfg, anchorAt)
       const bandClass = bandClasses.find((row) => row.bandId === band.id) ?? null
       // the lookup digests the classifier's boxes; the classifier itself counts nothing
-      const optimal = bandClass
-        ? optimalLayoutForBox(cfg.pitchMM ?? DEFAULT_PITCH_MM, band.id, bandClass.rulerWidthMM, bandClass.rulerHeightMM)
-        : null
+      const pitch0 = cfg.pitchMM ?? DEFAULT_PITCH_MM
+      const optimal = bandClass ? (canonExperiment
+        ? canonLayoutForFrame(pitch0, positionsAcross(bandClass.rulerWidthMM, pitch0), positionsAcross(bandClass.rulerHeightMM, pitch0))
+        : optimalLayoutForBox(pitch0, band.id, bandClass.rulerWidthMM, bandClass.rulerHeightMM)) : null
       const recommendation = optimal && bandClass
         ? { cols: optimal.frameCols, rows: optimal.frameRows, count: optimal.nodesMM.length,
             id: optimal.id, seedMM: bandClass.seedMM, anchorMM: bandClass.anchorMM }
         : null
-      const key = JSON.stringify([rawCfgSig, band.id])
+      const key = JSON.stringify([rawCfgSig, band.id, !!canonExperiment])
       let solve = rungCache.get(key)
       if (!solve) {
         // the classifier measured the boxes, the lookup named the layout; the ladder tries it first
         const optimalNodes = optimal?.nodesMM.map(([x, y]) => [x, y] as Pt)
-        solve = wrapBandLadder(sized, rawCfg, span.minMM, span.maxMM, MIN_EFFECT_MM, anchorAt, optimalNodes)
+        solve = canonExperiment && optimalNodes?.length && anchorAt
+          ? solveCanonExperiment(sized, rawCfg, span.minMM, span.maxMM, MIN_EFFECT_MM, anchorAt, optimalNodes)
+          : wrapBandLadder(sized, rawCfg, span.minMM, span.maxMM, MIN_EFFECT_MM, anchorAt, optimalNodes)
         rungCache.set(key, solve)
         if (rungCache.size > FITS_CAP) rungCache.delete(rungCache.keys().next().value!)
       }
@@ -167,6 +173,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
           contour: drawn.contour, grid: { ...drawn.grid, anchors, segments },
           effSize: at.sizeMM, ladder, idx, segments, offMM: at.centreOffMM, recog,
           bandClass, bandClasses, recommendation,
+          canonExperimentTrace: 'trace' in solve ? solve.trace : undefined,
         } })
         return
       }
