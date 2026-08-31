@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { legalRegion, legalRegionBoxMM } from '../units/classifier'
 import {
-  applyHoldingRules, holdingFactsOf, unprotectedRegions, NO_HOLDING_RULES, protectionReachMM,
+  applyHoldingRules, defaultLanding, holdingFactsOf, unprotectedRegions, NO_HOLDING_RULES, protectionReachMM,
 } from '../units/judge'
 import { BANDS, RELEASED_PADDING_MM } from '../grid-magnet-spec'
 import { wrapBandLadder } from '../grid-magnet-wrap-compute'
@@ -340,6 +340,14 @@ describe("RULE 3 is about SPANS, not vertices — Dan's batwoman head", () => {
       .toBe(2)
   })
 
+  it('a narrow head on a wide body uses the head span, not the global bounding box', () => {
+    const batwoman: Contour = ring([[0, 0], [200, 0], [200, 200], [130, 200],
+      [130, 300], [70, 300], [70, 200], [0, 200]])
+    // The head's legal span is 36mm wide: one centred hold covers it. The whole-shape legal box
+    // is 176mm wide, so a global-bbox implementation incorrectly demands two far-side holds.
+    expect(factsIn(batwoman, [[100, 280]]).corners).toBe(1)
+  })
+
   it('a smooth curve is still not a corner — the vertex test is gone, not replaced by another', () => {
     const pts: Pt[] = []
     for (let i = 0; i < 96; i++) {
@@ -383,5 +391,16 @@ describe('toggle 5 · THE ONE LAW, and toggle 6 · BALANCE', () => {
       .toEqual(['lopsided', 'centred'])
     expect(applyHoldingRules(['lopsided', 'centred'], of, { ...NO_HOLDING_RULES, balance: true }),
       'balance is what tells them apart').toEqual(['centred'])
+  })
+
+  it('preference winner remains the selected default instead of being overridden by legacy centring', () => {
+    const at = (sizeMM: number, centreOffMM: number) => ({
+      at: { sizeMM, count: 4, centreOffMM, points: [[0, 0] as Pt], originMM: [0, 0] as Pt,
+        anchorMM: [0, 0] as Pt, gapsMM: [0] },
+      revealMM: sizeMM, roles: [],
+    })
+    const preferred = at(100, 10), legacyCentred = at(101, 0)
+    expect(defaultLanding([preferred, legacyCentred], 48),
+      'the preference-ranked first row must remain selected').toBe(0)
   })
 })
