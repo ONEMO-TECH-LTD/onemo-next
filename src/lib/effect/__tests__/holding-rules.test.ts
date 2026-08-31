@@ -306,3 +306,48 @@ describe('the preferences weigh EVENLY — no rule outranks another', () => {
       .toEqual(['A', 'B'])
   })
 })
+
+describe("RULE 3 is about SPANS, not vertices — Dan's batwoman head", () => {
+  // Dan, 2026-08-31: "imagine head of the batwoman: it is narrow, the top when it is around
+  // 24-48mm thick is fine and can be held by one magnet disk; when it is larger it becomes more
+  // than that and we need to hold it with min 2 magnets, ideally side extremes closer to the top
+  // — corners." And: "the best hold is in the corners not in middle of each side, cause this
+  // keeps corners unprotected flap. If two top corners hold, mid section will not flap."
+  //
+  // So a corner is a POSITION IN A SPAN — the ends — and the 24-48mm reach is the detector of
+  // whether a span needs one hold or two.
+
+  const factsIn = (shape: Contour, magnets: Pt[]) => {
+    const region = legalRegion(shape, RELEASED_PADDING_MM)!
+    const box = legalRegionBoxMM(shape, RELEASED_PADDING_MM)!
+    return holdingFactsOf(magnets, box, unprotectedRegions(region, magnets, REACH), 48, region,
+      [shape.outer.pts, ...shape.holes.map((h) => h.pts)])
+  }
+
+  it('a WIDE span held at its two ends beats the same count held in the middle', () => {
+    const sq = ring([[0, 0], [200, 0], [200, 200], [0, 200]])       // legal 12..188, 176 across
+    const atEnds: Pt[] = [[30, 170], [170, 170], [30, 30], [170, 30]]
+    const atMiddles: Pt[] = [[100, 170], [100, 30], [30, 100], [170, 100]]
+    expect(factsIn(sq, atEnds).corners, 'four holds at the four ends of the two spans').toBe(4)
+    expect(factsIn(sq, atMiddles).corners, 'the same four holds put mid-span hold nothing at the ends')
+      .toBeLessThan(factsIn(sq, atEnds).corners)
+  })
+
+  it('a NARROW span needs only one hold — one disc already covers it', () => {
+    // 60mm wide: legal span across is 36mm, inside one disc's reach, so a single hold is complete
+    const neck = ring([[0, 0], [60, 0], [60, 300], [0, 300]])
+    const one: Pt[] = [[30, 280], [30, 20]]
+    expect(factsIn(neck, one).corners, 'one hold at each end of a narrow shape is the whole answer')
+      .toBe(2)
+  })
+
+  it('a smooth curve is still not a corner — the vertex test is gone, not replaced by another', () => {
+    const pts: Pt[] = []
+    for (let i = 0; i < 96; i++) {
+      const a = (i / 96) * Math.PI * 2
+      pts.push([100 + 100 * Math.cos(a), 100 + 100 * Math.sin(a)])
+    }
+    // a hold on the equator of a circle is at neither end of the dominant span
+    expect(factsIn(ring(pts), [[180, 100]]).corners).toBe(0)
+  })
+})

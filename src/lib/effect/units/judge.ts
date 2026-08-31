@@ -164,7 +164,58 @@ function boundarySegments(paths: Paths64): Seg[] {
   return out
 }
 
-/** THE SHAPE'S ACTUAL CORNERS: vertices where the outline turns sharply.
+/** CORNER HOLDS — the ends of a span, not the vertices of an outline.
+ *
+ *  Dan, 2026-08-31: "Corners rule is not about the vertex, it is about even and balanced
+ *  distribution similar to extremes. Imagine holding shape like square: the best hold is in the
+ *  corners not in middle of each side, cause this keeps corners unprotected flap. If two top
+ *  corners hold, mid section will not flap. On free form shape same thing — right and left sides
+ *  of the top and bottom make it semantic corner analogue. If the unprotected disk of its material
+ *  is 24-48mm... imagine head of the batwoman: it is narrow, the top when it is around 24-48mm
+ *  thick is fine and can be held by one magnet disk; when it is larger it becomes more than that
+ *  and we need to hold it with min 2 magnets, ideally side extremes closer to the top — corners."
+ *
+ *  So a corner is a POSITION IN A SPAN: the left and right extremes of the material at the top,
+ *  and at the bottom (or the top and bottom extremes of the left and right ends, on a landscape
+ *  shape). A span no wider than one disc's reach needs one hold and has no ends to speak of; a
+ *  wider one needs a hold at each end, or the far side flaps.
+ *
+ *  This replaces a vertex-turn test, which measured the outline's geometry rather than how the
+ *  material is held — and which called every hold beside a smooth curve a corner. */
+function spanEndHolds(
+  magnets: ReadonlyArray<Pt>, legalBox: { minX: number; minY: number; maxX: number; maxY: number },
+  reachMM: number,
+): number {
+  const w = legalBox.maxX - legalBox.minX, h = legalBox.maxY - legalBox.minY
+  const portrait = h >= w
+  let held = 0
+  // the two extreme strips of the dominant axis — the "top and bottom" of Dan's description
+  for (const far of [true, false]) {
+    const inStrip = magnets.filter((m) => portrait
+      ? (far ? m[1] >= legalBox.maxY - reachMM : m[1] <= legalBox.minY + reachMM)
+      : (far ? m[0] >= legalBox.maxX - reachMM : m[0] <= legalBox.minX + reachMM))
+    if (!inStrip.length) continue
+    // how wide the material is ACROSS that strip
+    const across = inStrip.map((m) => (portrait ? m[0] : m[1]))
+    const lo = portrait ? legalBox.minX : legalBox.minY
+    const hi = portrait ? legalBox.maxX : legalBox.maxY
+    if (hi - lo <= reachMM) {
+      // narrow enough that one disc covers it: any hold in the strip is the whole answer
+      held += inStrip.length ? 1 : 0
+      continue
+    }
+    // wider than a disc: it needs a hold at EACH end, and only the ends count
+    if (Math.min(...across) <= lo + reachMM) held++
+    if (Math.max(...across) >= hi - reachMM) held++
+  }
+  return held
+}
+
+/** UNUSED by the rules since 2026-08-31 — kept only because the outline's turn is still the honest
+ *  answer to "where does this shape have a vertex", and deleting a measurement nobody asked me to
+ *  delete is not mine to do. Rule 3 no longer consults it.
+ *
+ *  THE SHAPE'S ACTUAL CORNERS: vertices where the outline turns sharply.
  *
  *  Read from the SOURCE rings, never from the legal region — the inward offset uses round joins,
  *  so every convex corner of a square arrives as an arc and a square becomes indistinguishable
@@ -234,13 +285,11 @@ export function holdingFactsOf(
   // hold because it had no neighbours (QA F2). A perimeter-side hold is one NEAR AN EDGE.
   // RULE 1 — the real legal boundary. RULE 3 — actual corner FEATURES of the shape.
   const segs = boundarySegments(legal)
-  const features = cornerFeatures(cornersOf)
-  let perimeter = 0, corners = 0
-  for (const m of magnets) {
-    if (!segs.some((sg) => segDistMM(sg, m) <= reachMM)) continue
-    perimeter++
-    if (features.some((f) => Math.hypot(m[0] - f[0], m[1] - f[1]) <= reachMM)) corners++
-  }
+  let perimeter = 0
+  for (const m of magnets) if (segs.some((sg) => segDistMM(sg, m) <= reachMM)) perimeter++
+  // RULE 3 — the ends of a span, not the vertices of an outline (Dan, 2026-08-31)
+  const corners = spanEndHolds(magnets, legalBox, reachMM)
+  void cornersOf
   // RULE 2 — "extreme apart sides must be held ... top and bottom in portrait, right and left in
   // landscape". Held when the population reaches within Dan's OWN reach of both ends — never the
   // grid pitch, which at 96mm would accept a 96mm bare end (QA F3). A square has no dominant axis,
