@@ -88,6 +88,8 @@ export interface WrapConfig {
   /** REQUIRED: the governed centre at any size. Wrap never derives a centre — that is centring's,
    *  and a unit may not call another unit. The sequencer supplies it. */
   anchorAtMM: (mm: number) => Pt
+  /** Optional fixed frame centre for partial-canon experiments; released callers use group middle. */
+  frameMidMM?: Pt
   /** Delivery-only perimeter flag. `wrapGroup` ignores it: search, wrap and selection stay raw. */
   perimeterOnly?: boolean
   // NO flap dial. In this engine it would be `radius = padding + flap` — one number behind two
@@ -126,7 +128,7 @@ export interface BandSolve {
 
 export interface CanonExperimentTrace {
   source: 'canon-full' | 'canon-partial' | 'free-fallback' | 'none'
-  canonSeats: number; populations: number; wraps: number; retained: number; removed: number[]
+  canonSeats: number; populations: number; wraps: number; retained: number
 }
 
 // The engine's request/response vocabulary.

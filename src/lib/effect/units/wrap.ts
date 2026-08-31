@@ -99,7 +99,8 @@ export function wrapGroup(
   const radius = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
   const g = group.map((p) => [p[0], p[1]] as Pt)
   const xs = g.map((p) => p[0]), ys = g.map((p) => p[1])
-  const mid: Pt = [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2]
+  const mid: Pt = cfg.frameMidMM
+    ?? [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2]
 
   const anchorAt = (mm: number): Pt => cfg.anchorAtMM(mm)
   const heldAt = (mm: number): Pt | null => {

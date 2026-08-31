@@ -15,8 +15,7 @@ const localise = (pts: ReadonlyArray<Pt>): Pt[] => {
 }
 
 const identity = (pts: ReadonlyArray<Pt>, pitch: number): string => {
-  const local = localise(pts)
-  return local.map(([x, y]) => `${Math.round(x / pitch)},${Math.round(y / pitch)}`).sort().join(';')
+  return pts.map(([x, y]) => `${Math.round(x / pitch)},${Math.round(y / pitch)}`).sort().join(';')
 }
 
 export function solveCanonExperiment(
@@ -26,14 +25,14 @@ export function solveCanonExperiment(
   const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
   const canonLocal = localise(canonNodesMM)
   const wcfg: WrapConfig = { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM,
-    anchorAtMM }
+    anchorAtMM, frameMidMM: [0, 0] }
   const trace: CanonExperimentTrace = { source: 'none', canonSeats: canonNodesMM.length,
-    populations: 0, wraps: 0, retained: 0, removed: [] }
+    populations: 0, wraps: 0, retained: 0 }
   const attempt = (pts: ReadonlyArray<Pt>): BandRung | null => {
     trace.wraps++
     // This route answers the requested band. A canon that fits at the band floor is lawful here
     // even when its unconstrained tight wrap belongs to a smaller band.
-    const at = wrapGroup(sized, wcfg, localise(pts), loMM, hiMM)
+    const at = wrapGroup(sized, wcfg, pts, loMM, hiMM)
     return at && inBand(at.sizeMM, loMM, hiMM) ? { at, revealMM: hiMM, roles: ['optimal'] } : null
   }
 
@@ -44,10 +43,23 @@ export function solveCanonExperiment(
   }
 
   const candidates = new Map<string, Pt[]>()
+  const subsetLocal = (seated: ReadonlyArray<Pt>): Pt[] | null => {
+    if (!seated.length) return null
+    for (const originNode of canonLocal) {
+      const dx = seated[0][0] - originNode[0], dy = seated[0][1] - originNode[1]
+      const subset = canonLocal.filter(([x, y]) => seated.some(([px, py]) =>
+        Math.abs(px - (x + dx)) < 0.01 && Math.abs(py - (y + dy)) < 0.01))
+      if (subset.length === seated.length) return subset
+    }
+    return null
+  }
   const scanCfg: GridConfig = { ...cfg, perimeterOnly: false, segmentsDetail: 'light', forcePhaseMM: undefined }
   for (const mm of fallbackRevealSizes(loMM, hiMM)) {
     const grid = computeGrid(sized(mm), { ...scanCfg, centreOverrideMM: anchorAtMM(mm) }, canonLocal)
-    for (const pts of grid.canonSeatings) if (pts.length) candidates.set(identity(pts, pitch), pts)
+    for (const pts of grid.canonSeatings) if (pts.length) {
+      const subset = subsetLocal(pts)
+      if (subset) candidates.set(identity(subset, pitch), subset)
+    }
   }
   const ordered = [...candidates.values()].sort((a, b) => b.length - a.length
     || identity(a, pitch).localeCompare(identity(b, pitch)))
@@ -63,7 +75,6 @@ export function solveCanonExperiment(
       lawful.sort((a, b) => a.at.centreOffMM - b.at.centreOffMM || a.at.sizeMM - b.at.sizeMM)
       const winner = lawful[0]
       trace.source = 'canon-partial'; trace.retained = winner.at.count
-      trace.removed = Array.from({ length: canonNodesMM.length - winner.at.count }, (_, n) => n)
       return { offers: [winner], bestSeated: null, trace }
     }
   }
