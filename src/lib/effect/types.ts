@@ -88,9 +88,7 @@ export interface WrapConfig {
   /** REQUIRED: the governed centre at any size. Wrap never derives a centre — that is centring's,
    *  and a unit may not call another unit. The sequencer supplies it. */
   anchorAtMM: (mm: number) => Pt
-  /** Perimeter belt — drop fully-surrounded interior seats, keeping the rim. Reused from the
-   *  voting bench. Applied to the ARRANGEMENT before the wrap is solved, so the shape still
-   *  wraps tight around exactly the magnets that remain. */
+  /** Delivery-only perimeter flag. `wrapGroup` ignores it: search, wrap and selection stay raw. */
   perimeterOnly?: boolean
   // NO flap dial. In this engine it would be `radius = padding + flap` — one number behind two
   // controls — and it would also shrink the legal seating area, which is exactly the job T1 says

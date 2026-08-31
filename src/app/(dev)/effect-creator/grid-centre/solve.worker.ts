@@ -6,7 +6,7 @@ import { optimalLayoutForBox } from '@/lib/effect/grid-magnet-library-catalogue'
 import { wrapBandLadder, wrapGrid, type BandSolve, type WrapConfig } from '@/lib/effect/grid-magnet-wrap-compute'
 import { bbox, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet-compute'
 import { contourCentroidOf } from '@/lib/effect/units/centring'
-import { anchorBakeOf, anchorFromBake, assignSizes, type AnchorBake, type CentreMode, type Governor, type MagnetPlan } from '@/lib/effect/grid-magnet-logic'
+import { anchorBakeOf, anchorFromBake, applyCoverage, assignSizes, type AnchorBake, type CentreMode, type Governor, type MagnetPlan } from '@/lib/effect/grid-magnet-logic'
 import { classFrameNodes, shapeFamilyOf, type ShapeFamily } from '@/lib/effect/grid-magnet-class'
 
 import { defaultLanding } from '@/lib/effect/units/judge'
@@ -99,6 +99,10 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       const grid = computeGrid(contour, aFn ? { ...cfg, centreOverrideMM: aFn(sizeMM) } : cfg)
       ctx.postMessage({ id, model: { contour, grid, effSize: sizeMM, ladder: [], idx: 0, segments: grid.segments } })
     } else {
+      // Coverage is delivery-only. The entire solve and its cache identity stay raw so toggling
+      // Belt cannot change search, wrap, qualification, roles, placement or default selection.
+      const rawCfg: GridConfig = { ...cfg, perimeterOnly: false }
+      const rawCfgSig = JSON.stringify(rawCfg)
       // THE REVERSAL — band in, count out. The material reveals each distinct layout across the
       // band's range (centre-rules seating); each is solved WHOLE by wrapGroup to its exact
       // contact size. Composition only: the wrap engine is transferred untouched.
@@ -106,10 +110,10 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       // The band is a LEGAL range; the ladder scans OUTLINE sizes, so it converts through this
       // shape's own rim. A diamond and a square in one band do not share an outline range.
       const span = bandOuterMM(band, Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM))
-      const anchorAt = anchorFnFor(sized, cfg, cfgSig, sig)
+      const anchorAt = anchorFnFor(sized, rawCfg, rawCfgSig, sig)
       // STEP 1 + 2 — the classifier's own table: at each band's trial size, what frame the shape
       // carries and where its centre sits. Measured once per shape; it decides nothing here yet.
-      const bandClasses = classifyBands(sized, cfg, anchorAt)
+      const bandClasses = classifyBands(sized, rawCfg, anchorAt)
       const bandClass = bandClasses.find((row) => row.bandId === band.id) ?? null
       // the lookup digests the classifier's boxes; the classifier itself counts nothing
       const optimal = bandClass
@@ -119,22 +123,31 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         ? { cols: optimal.frameCols, rows: optimal.frameRows, count: optimal.nodesMM.length,
             id: optimal.id, seedMM: bandClass.seedMM, anchorMM: bandClass.anchorMM }
         : null
-      const key = JSON.stringify([cfgSig, band.id])
+      const key = JSON.stringify([rawCfgSig, band.id])
       let solve = rungCache.get(key)
       if (!solve) {
         // the classifier measured the boxes, the lookup named the layout; the ladder tries it first
         const optimalNodes = optimal?.nodesMM.map(([x, y]) => [x, y] as Pt)
-        solve = wrapBandLadder(sized, cfg, span.minMM, span.maxMM, MIN_EFFECT_MM, anchorAt, optimalNodes)
+        solve = wrapBandLadder(sized, rawCfg, span.minMM, span.maxMM, MIN_EFFECT_MM, anchorAt, optimalNodes)
         rungCache.set(key, solve)
         if (rungCache.size > FITS_CAP) rungCache.delete(rungCache.keys().next().value!)
       }
-      const rungs = solve.offers
-      if (rungs.length) {
+      const rawRungs = solve.offers
+      if (rawRungs.length) {
         // RULE 4 (Dan, 08-24): prefer the tight solution closest to the centroid — never the
         // smallest at any centring cost. Among offers of the SAME COUNT as the tightest, within
         // half a pitch of it, the best-centred is the default landing. All offers stay visible.
-        const ruleIdx = defaultLanding(rungs, cfg.pitchMM ?? DEFAULT_PITCH_MM)
-        const idx = Math.min(stepSel ?? ruleIdx, rungs.length - 1)
+        const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
+        const ruleIdx = defaultLanding(rawRungs, pitch)
+        const idx = Math.min(stepSel ?? ruleIdx, rawRungs.length - 1)
+        const perimeterOnly = cfg.perimeterOnly ?? true
+        const rungs = rawRungs.map((rg) => {
+          const points = applyCoverage([...rg.at.points], perimeterOnly, pitch).seated
+          if (points.length === rg.at.points.length) return rg
+          const kept = new Set(points)
+          return { ...rg, at: { ...rg.at, count: points.length, points,
+            gapsMM: rg.at.gapsMM.filter((_, i) => kept.has(rg.at.points[i])) } }
+        })
         const at = rungs[idx].at
         const wcfg: WrapConfig = { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM, magnetDiaMM: undefined, anchorAtMM: () => at.anchorMM }
         const drawn = wrapGrid(sized, wcfg, at)

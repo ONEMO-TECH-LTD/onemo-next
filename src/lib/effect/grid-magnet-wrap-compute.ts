@@ -97,7 +97,9 @@ export function wrapBandLadder(
   anchorAtMM?: (mm: number) => Pt, optimalNodesMM?: ReadonlyArray<Pt>,
 ): BandSolve {
   const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
-  const scanCfg: GridConfig = { ...cfg, segmentsDetail: 'light', forcePhaseMM: undefined }
+  const scanCfg: GridConfig = {
+    ...cfg, perimeterOnly: false, segmentsDetail: 'light', forcePhaseMM: undefined,
+  }
   // Sequencer's job: derive the governed centre ONCE and hand it to wrap, which never computes
   // one for itself. Falls back to the same governed centre the old wrap derived internally, so the
   // answer is unchanged — the derivation simply moved to the caller.

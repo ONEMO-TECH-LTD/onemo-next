@@ -24,7 +24,8 @@ import { wrapBandLadder } from '../grid-magnet-wrap-compute'
 import { contourCentroidOf } from '../units/centring'
 import { safeSegments } from '../units/segment'
 import { edgeDistToContourMM, pointInContour } from '../foundation/geometry'
-import { contourCacheKey, makeSizer } from '../grid-magnet-bridge'
+import { contourCacheKey, makeSizer, normBaseContour } from '../grid-magnet-bridge'
+import { getShape } from '@/lib/shape-library'
 import type { Contour, GridConfig, Pt } from '../types'
 
 const LIB = join(process.cwd(), 'src/lib/effect')
@@ -658,7 +659,7 @@ describe('1b — the frame comes from the usable material', () => {
     }
   })
 
-  it('coverage changes only the drawn output, never search registrations or B4 offers', () => {
+  it('coverage never enters search, wrapping, qualification, roles or placement', () => {
     const sq = (mm: number): Contour =>
       ({ outer: { pts: [[0, 0], [mm, 0], [mm, mm], [0, mm]] as Pt[] }, holes: [] })
     const full = computeGrid(sq(168), { pitchMM: 48, paddingMM: 12, perimeterOnly: false })
@@ -666,17 +667,34 @@ describe('1b — the frame comes from the usable material', () => {
     expect(belt.seatings, 'coverage changed the search registrations').toEqual(full.seatings)
     expect(belt.anchors, 'the belt must remain output processing').not.toEqual(full.anchors)
 
-    const band = BANDS.find((b) => b.id === 4)!
-    const anchorAt = (mm: number): Pt => [mm / 2, mm / 2]
-    const row = classifyBands(sq, { pitchMM: 48, paddingMM: 12 }, anchorAt).find((r) => r.bandId === 4)!
-    const canon = optimalLayoutForBox(48, 4, row.legalWidthMM, row.legalHeightMM)!.nodesMM
-      .map(([x, y]) => [x, y] as Pt)
-    const solve = (perimeterOnly: boolean) => wrapBandLadder(
-      sq, { pitchMM: 48, paddingMM: 12, perimeterOnly }, band.minMM + 24, band.maxMM + 24,
-      24, anchorAt, canon,
-    ).offers.map((o) => ({ roles: o.roles, count: o.at.count, sizeMM: o.at.sizeMM, points: o.at.points }))
-    expect(solve(true), 'coverage changed B4 search output').toEqual(solve(false))
-  }, 20_000)
+    const star = (mm: number): Contour => ({ outer: { pts: Array.from({ length: 10 }, (_, i) => {
+      const t = i * Math.PI * 2 / 10 - Math.PI / 2
+      const r = (i % 2 === 0 ? 0.5 : 0.24) * mm
+      return [mm / 2 + r * Math.cos(t), mm / 2 + r * Math.sin(t)] as Pt
+    }) }, holes: [] })
+    const portrait = (mm: number): Contour =>
+      ({ outer: { pts: [[0, 0], [mm * 0.58, 0], [mm * 0.58, mm], [0, mm]] as Pt[] }, holes: [] })
+    const donut = (mm: number): Contour => ({
+      outer: sq(mm).outer,
+      holes: [{ pts: Array.from({ length: 48 }, (_, i) => {
+        const t = i * Math.PI * 2 / 48
+        return [mm / 2 + mm * 0.16 * Math.cos(t), mm / 2 + mm * 0.16 * Math.sin(t)] as Pt
+      }) }],
+    })
+    const squircleBase = normBaseContour(getShape('squircle', 1024, 1024), 1024)!
+    const cases: Array<[string, (mm: number) => Contour, number]> = [
+      ['square', sq, 4], ['portrait', portrait, 3], ['star', star, 3], ['donut', donut, 4],
+      ['squircle', makeSizer(squircleBase, 0), 4],
+    ]
+    for (const [name, sized, id] of cases) {
+      const band = BANDS.find((b) => b.id === id)!
+      const fullSolve = wrapBandLadder(sized, { pitchMM: 48, paddingMM: 12, perimeterOnly: false },
+        band.minMM + 24, band.maxMM + 24, 24)
+      const beltSolve = wrapBandLadder(sized, { pitchMM: 48, paddingMM: 12, perimeterOnly: true },
+        band.minMM + 24, band.maxMM + 24, 24)
+      expect(beltSolve, `${name}: coverage changed the raw band solve`).toEqual(fullSolve)
+    }
+  }, 120_000)
 
   it('THE THREE ANSWERS: optimal first, then min and max, coincident rows collapsed', () => {
     // Dan, 2026-08-30: "band module must get recommendation from the classifier of optimal layout
@@ -860,7 +878,7 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
     expect(solve.offers.some((o) => (o as unknown as { points?: unknown }).points !== undefined)).toBe(false)
   })
 
-  it('on an empty band the shell DRAWS the witness layout selected, not a fresh solve', async () => {
+  it('the shell belts only final delivery and preserves the raw default and empty witness', async () => {
     // The shell used to re-run computeGrid without the baked centre, so the population labelled
     // "calibration witness" was a solve nobody made. Pre-fix this band drew 2 magnets at a
     // different phase while layout had selected 4.
@@ -874,15 +892,40 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
       return { outer: { pts }, holes: [] }
     })()
     const cfg: GridConfig = { paddingMM: 12, pitchMM: 48, centreMode: 2, governor: 0 }
-    const posted: Array<{ model: { grid: { anchors: Array<{ p: Pt }> }; diagnostic?: unknown } | null }> = []
+    type Posted = { model: {
+      contour: Contour; effSize: number; idx: number
+      ladder: Array<{ sizeMM: number; count: number; roles: string[] }>
+      grid: { anchors: Array<{ p: Pt }>; phaseMM: Pt; centreMainMM: Pt }
+      diagnostic?: unknown
+    } | null }
+    const posted: Posted[] = []
     const stub = { onmessage: null as ((e: { data: unknown }) => void) | null, postMessage: (m: unknown) => { posted.push(m as never) } }
     const g = globalThis as { self?: unknown }
     const prev = g.self
     g.self = stub
     try {
       const worker = await import('@/app/(dev)/effect-creator/grid-centre/solve.worker')
-      stub.onmessage!({ data: { id: 1, base: star, offsetMM: 0, cfg, mode: 2, sizeMM: 0, stepSel: null } })
-      const model = posted[0]?.model
+      const squircle = normBaseContour(getShape('squircle', 1024, 1024), 1024)!
+      stub.onmessage!({ data: { id: 1, base: squircle, offsetMM: 0,
+        cfg: { ...cfg, perimeterOnly: false }, mode: 4, sizeMM: 0, stepSel: null } })
+      stub.onmessage!({ data: { id: 2, base: squircle, offsetMM: 0,
+        cfg: { ...cfg, perimeterOnly: true }, mode: 4, sizeMM: 0, stepSel: null } })
+      const full = posted[0].model!, belt = posted[1].model!
+      expect(belt.idx, 'coverage changed the raw default row').toBe(full.idx)
+      expect(belt.effSize, 'coverage changed the selected wrapped size').toBe(full.effSize)
+      expect(belt.contour, 'coverage changed the selected outline').toEqual(full.contour)
+      expect(belt.grid.phaseMM, 'coverage changed placement').toEqual(full.grid.phaseMM)
+      expect(belt.grid.centreMainMM, 'coverage changed the governed centre').toEqual(full.grid.centreMainMM)
+      expect(belt.ladder.map((r) => [r.roles, r.sizeMM]), 'coverage changed roles or rung sizes')
+        .toEqual(full.ladder.map((r) => [r.roles, r.sizeMM]))
+      expect(full.ladder.map((r) => r.count)).toEqual([16, 12])
+      expect(belt.ladder.map((r) => r.count)).toEqual([12, 8])
+      for (const a of belt.grid.anchors)
+        expect(full.grid.anchors.some((b) => Math.hypot(a.p[0] - b.p[0], a.p[1] - b.p[1]) < 1e-6),
+          'Belt introduced a point instead of removing an interior point').toBe(true)
+
+      stub.onmessage!({ data: { id: 3, base: star, offsetMM: 0, cfg, mode: 2, sizeMM: 0, stepSel: null } })
+      const model = posted[2]?.model
       expect(model, 'the worker posted no model').toBeTruthy()
       expect(model!.diagnostic, 'this band must be empty, or the test proves nothing').toBeTruthy()
       const sized = makeSizer(star, 0)
