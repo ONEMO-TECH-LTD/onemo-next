@@ -24,6 +24,7 @@ export function solveCanonExperiment(
   anchorAtMM: (mm: number) => Pt, canonNodesMM: ReadonlyArray<Pt>,
 ): BandSolve & { trace: CanonExperimentTrace } {
   const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
+  const canonLocal = localise(canonNodesMM)
   const wcfg: WrapConfig = { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM,
     anchorAtMM }
   const trace: CanonExperimentTrace = { source: 'none', canonSeats: canonNodesMM.length,
@@ -36,7 +37,7 @@ export function solveCanonExperiment(
     return at && inBand(at.sizeMM, loMM, hiMM) ? { at, revealMM: hiMM, roles: ['optimal'] } : null
   }
 
-  const whole = attempt(canonNodesMM)
+  const whole = attempt(canonLocal)
   if (whole) {
     trace.source = 'canon-full'; trace.populations = 1; trace.retained = whole.at.count
     return { offers: [whole], bestSeated: null, trace }
@@ -45,7 +46,7 @@ export function solveCanonExperiment(
   const candidates = new Map<string, Pt[]>()
   const scanCfg: GridConfig = { ...cfg, perimeterOnly: false, segmentsDetail: 'light', forcePhaseMM: undefined }
   for (const mm of fallbackRevealSizes(loMM, hiMM)) {
-    const grid = computeGrid(sized(mm), { ...scanCfg, centreOverrideMM: anchorAtMM(mm) }, canonNodesMM)
+    const grid = computeGrid(sized(mm), { ...scanCfg, centreOverrideMM: anchorAtMM(mm) }, canonLocal)
     for (const pts of grid.canonSeatings) if (pts.length) candidates.set(identity(pts, pitch), pts)
   }
   const ordered = [...candidates.values()].sort((a, b) => b.length - a.length
