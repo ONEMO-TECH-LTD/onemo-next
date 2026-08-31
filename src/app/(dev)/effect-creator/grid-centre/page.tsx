@@ -23,7 +23,7 @@ import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
 import { DEFAULT_PITCH_MM, type BandSnapPoint, type GridResult, type MagnetPlan, type SafeSegment } from '@/lib/effect/grid-magnet'
 import { bandOuterMM, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet'
-import { BANDS, CENTRE_MODE, GOVERNOR, PADDING_CEIL_MM, PADDING_FLOOR_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM, PROTECTION_REACH_MM } from '@/lib/effect/grid-magnet-spec'
+import { BANDS, CENTRE_MODE, GOVERNOR, PADDING_CEIL_MM, PADDING_FLOOR_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-magnet-spec'
 import { fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-magnet-bridge'
 
 /** Bench test libraries — static assets, listed by a committed manifest. */
@@ -84,10 +84,6 @@ export default function GridLab() {
   const [centreMode, setCentreMode] = usePersisted('centreMode', CENTRE_MODE)
   /** Governor — which mass rules in Masses mode. */
   const [governor, setGovernor] = usePersisted('governor', GOVERNOR)
-  /** THE PROTECTION REACH the detector measures with — a dashboard value, not a baked constant
-   *  (Dan, 2026-08-31). It reaches the worker OUTSIDE GridConfig, so no solve, cache key or
-   *  selection can see it: turning this dial changes the measurement and nothing else. */
-  const [reach, setReach] = useState(PROTECTION_REACH_MM)
   const [plan, setPlan] = useState<MagnetPlan>('all6')
   /** Off: seated spots only. On: every position the shape was judged against. */
   const [showLattice, setShowLattice] = useState(true)
@@ -283,9 +279,6 @@ export default function GridLab() {
 
   // The solve runs in a worker so the page never freezes; the last result stays up while solving.
   type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: Array<BandSnapPoint & { roles?: string[] }>; idx: number; segments: SafeSegment[]; stops?: Array<{ press: number; reveal: number }>; offMM?: number; recog?: { family: string; cols: number; rows: number; segWmm: number; segHmm: number }
-    /** THE FLAP DETECTOR's own output for the answer being drawn: the uncovered boundary midpoints
-     *  v1 drew red, and the unheld length it printed. Measurement only — nothing selects on it. */
-    unprotected?: { flaps: Pt[]; uncoveredMM: number }
     /** STEP 1+2 — what the classifier read at this band's trial size, and the whole table. */
     /** the classifier's own row and the layout it recommended — carried for the readout, not
      *  rendered as a second panel (Dan: I did not ask for that) */
@@ -344,14 +337,13 @@ export default function GridLab() {
       manualBand,
       sizeMM: manualBand ? (bandScale ?? effSizeRef.current ?? bandOuterMM(BANDS[0], pad).minMM) : 0,
       stepSel,
-      reachMM: reach,
     }
     if (busyRef.current) { queuedRef.current = msg; setSolving(true); return }
     busyRef.current = true
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler, reach])
+  }, [base, src, preset, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -424,7 +416,6 @@ export default function GridLab() {
                     // 100% = the shape at half the board, so there is room around it (Dan).
                     viewport: { panMM: [0, 0] as Pt, zoom: camZoom * CAM_BASE },
                     segments: showSegs ? model!.segments : [], segFill: segFillN !== 0,
-                    flaps: model!.unprotected?.flaps ?? [],
                     onPan: (dx: number, dy: number) => setManual((m) => { const bx = m ? m.x : model!.grid.phaseMM[0], by = m ? m.y : model!.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } }),
                     onZoom: (f: number) => {
                       // Pinch = manual scaling WITHIN the band's range.
@@ -652,19 +643,6 @@ export default function GridLab() {
               </div>
             </div>}
           </Fold>
-          {/* THE DETECTOR — a measurement panel, built like Centering and on the same side, per
-              Dan's 10:14 correction. It reports; it decides nothing. */}
-          <Fold title="Unprotected">
-            <Slider label="Protection reach · one magnet holds this far" unit="mm"
-              v={reach} set={(n) => setReach(Math.min(96, Math.max(6, n)))} min={6} max={96} wide />
-            <div className="gl-field"><span>Unheld edge · measured on the drawn answer</span>
-              <div className="gl-snap">
-                {model?.unprotected
-                  ? `${Math.round(model.unprotected.uncoveredMM)} mm unheld · ${model.unprotected.flaps.length} flap${model.unprotected.flaps.length === 1 ? '' : 's'}`
-                  : '—'}
-              </div>
-            </div>
-          </Fold>
         </aside>
       </div>
     </div>
@@ -680,11 +658,8 @@ function dim(c: Contour, axis: 0 | 1): number {
 /** Island tints — screen colours only, one hue per segment, smallest first. */
 const SEG_HUES = ['#e0762f', '#7a4ae0', '#2fa864', '#e04a8f', '#2f9fe0']
 
-function Stage({ contour, grid, lattice, box, segments, segFill, flaps, onPan, onZoom, onReset, onPickNode, viewport }: {
+function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, onReset, onPickNode, viewport }: {
   contour: Contour; grid: GridResult; lattice: boolean; box: boolean; segments: SafeSegment[]; segFill: boolean
-  /** THE DETECTOR'S OWN uncovered boundary midpoints for the answer on screen. Drawn exactly as v1
-   *  drew them (grid-engine/page.tsx:641) -- r=2, #e5484d. Evidence, never an input. */
-  flaps?: Pt[]
   onPan: (dxMM: number, dyMM: number) => void; onZoom: (f: number) => void; onReset: () => void
   /** Library authoring: a lattice spot was clicked (mm, engine y-up). Display layer only. */
   onPickNode?: (pMM: Pt) => void
@@ -933,16 +908,6 @@ function Stage({ contour, grid, lattice, box, segments, segFill, flaps, onPan, o
           <text {...lbl} x={lX + fs * 0.6} y={my} textAnchor="middle" transform={`rotate(90 ${lX + fs * 0.6} ${my})`}>{hTxt}</text>
         </g>)
       })()}
-      {/* THE FLAPS — restored from v1, which drew exactly this: {picked.flaps.map(([x, y], i) => (
-          <circle key={`f${i}`} cx={x} cy={y} r={2} fill="#e5484d" />))}. Same radius, same colour;
-          only the y flips, because this canvas draws y-down and the engine measures y-up. */}
-      {flaps && flaps.length > 0 && (
-        <g style={{ pointerEvents: 'none' }}>
-          {flaps.map(([x, y], i) => (
-            <circle key={`flap${i}`} cx={x} cy={-y} r={2} fill="#e5484d" />
-          ))}
-        </g>
-      )}
       {/* Every spot the bridge handed over: faint where empty, accent where a magnet seats. */}
       <g transform={pend.x || pend.y ? `translate(${pend.x} ${-pend.y})` : undefined}>
       {spots.map((sp, i) => {
