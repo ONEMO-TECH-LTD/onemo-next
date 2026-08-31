@@ -2,8 +2,9 @@
 import type { BandRung, BandSolve, CanonExperimentTrace, Contour, GridConfig, Pt, WrapConfig } from './types'
 import { computeGrid } from './grid-magnet'
 import { wrapBandLadder } from './grid-magnet-wrap-compute'
-import { DEFAULT_PITCH_MM } from './grid-magnet-spec'
-import { fallbackRevealSizes } from './units/layout'
+import { DEFAULT_PITCH_MM, PADDING_FLOOR_MM } from './grid-magnet-spec'
+import { fallbackRevealSizes, makeCircleSeatPredicate, makeContourSeatPredicate } from './units/layout'
+import { bbox } from './foundation/geometry'
 import { wrapGroup } from './units/wrap'
 import { inBand } from './units/judge'
 
@@ -27,7 +28,7 @@ export function solveCanonExperiment(
   const wcfg: WrapConfig = { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM,
     anchorAtMM, frameMidMM: [0, 0] }
   const trace: CanonExperimentTrace = { source: 'none', canonSeats: canonNodesMM.length,
-    populations: 0, wraps: 0, retained: 0 }
+    populations: 0, wraps: 0, retained: 0, readded: 0 }
   const attempt = (pts: ReadonlyArray<Pt>): BandRung | null => {
     trace.wraps++
     // This route answers the requested band. A canon that fits at the band floor is lawful here
@@ -43,6 +44,26 @@ export function solveCanonExperiment(
   }
 
   const candidates = new Map<string, Pt[]>()
+  const settle = (seed: ReadonlyArray<Pt>, first: BandRung): BandRung => {
+    let group = [...seed], rung = first
+    for (;;) {
+      const contour = sized(rung.at.sizeMM)
+      const bb = bbox(contour.outer.pts)
+      const radius = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
+      const fits = cfg.circle
+        ? makeCircleSeatPredicate((bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2,
+          Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY) / 2, radius)
+        : makeContourSeatPredicate(contour, radius)
+      if (!fits) return rung
+      const expanded = canonLocal.filter(([x, y]) => fits([rung.at.originMM[0] + x, rung.at.originMM[1] + y]))
+      if (expanded.length <= group.length || identity(expanded, pitch) === identity(group, pitch)) return rung
+      const next = attempt(expanded)
+      if (!next) return rung
+      trace.readded += expanded.length - group.length
+      group = expanded
+      rung = next
+    }
+  }
   const subsetLocal = (seated: ReadonlyArray<Pt>): Pt[] | null => {
     if (!seated.length) return null
     for (const originNode of canonLocal) {
@@ -68,8 +89,8 @@ export function solveCanonExperiment(
     const count = ordered[i].length
     const lawful: BandRung[] = []
     while (i < ordered.length && ordered[i].length === count) {
-      const rung = attempt(ordered[i++])
-      if (rung) lawful.push(rung)
+      const group = ordered[i++], rung = attempt(group)
+      if (rung) lawful.push(settle(group, rung))
     }
     if (lawful.length) {
       lawful.sort((a, b) => a.at.centreOffMM - b.at.centreOffMM || a.at.sizeMM - b.at.sizeMM)

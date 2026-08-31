@@ -128,7 +128,7 @@ export interface BandSolve {
 
 export interface CanonExperimentTrace {
   source: 'canon-full' | 'canon-partial' | 'free-fallback' | 'none'
-  canonSeats: number; populations: number; wraps: number; retained: number
+  canonSeats: number; populations: number; wraps: number; retained: number; readded: number
 }
 
 // The engine's request/response vocabulary.

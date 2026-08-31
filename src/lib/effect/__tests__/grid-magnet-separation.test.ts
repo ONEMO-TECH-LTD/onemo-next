@@ -827,7 +827,7 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
     const canon = canonLayoutForFrame(48, 4, 4)!.nodesMM.map(([x, y]) => [x, y] as Pt)
     const result = solveCanonExperiment(sq, { pitchMM: 48, paddingMM: 12 }, 168, 215, 24,
       (mm) => [mm / 2, mm / 2], canon)
-    expect(result.trace).toMatchObject({ source: 'canon-full', canonSeats: 16, populations: 1, wraps: 1, retained: 16 })
+    expect(result.trace).toMatchObject({ source: 'canon-full', canonSeats: 16, populations: 1, wraps: 1, retained: 16, readded: 0 })
     expect(result.offers).toHaveLength(1)
     expect(result.offers[0].at.count).toBe(16)
     expect(result.offers[0].at.sizeMM).toBe(168)

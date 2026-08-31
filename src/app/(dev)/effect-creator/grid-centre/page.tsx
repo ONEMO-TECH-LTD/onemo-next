@@ -656,6 +656,7 @@ export default function GridLab() {
               {' · '}populations {model.canonExperimentTrace.populations}
               {' · '}wraps {model.canonExperimentTrace.wraps}
               {' · '}retained {model.canonExperimentTrace.retained}
+              {' · '}readded {model.canonExperimentTrace.readded}
             </div>}
           </Fold>
         </aside>
