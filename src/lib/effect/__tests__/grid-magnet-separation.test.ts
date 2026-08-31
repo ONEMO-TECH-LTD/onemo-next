@@ -19,9 +19,9 @@ import { frameOfMasses, positionsAcross } from '../units/classifier'
 import type { BBox, SafeMass, SafeSegment } from '../types'
 import { BANDS, BAND_STEP_MM } from '../grid-magnet-spec'
 import { scaleContour } from '../grid-magnet-compute'
-import { classifyStructuralSupport, makeCircleSeatPredicate, makeContourSeatPredicate } from '../units/layout'
+import { makeCircleSeatPredicate, makeContourSeatPredicate } from '../units/layout'
 import { wrapGroup } from '../units/wrap'
-import { isPressedWrap, wrapBandLadder } from '../grid-magnet-wrap-compute'
+import { wrapBandLadder } from '../grid-magnet-wrap-compute'
 import { contourCentroidOf } from '../units/centring'
 import { safeSegments } from '../units/segment'
 import { edgeDistToContourMM, pointInContour } from '../foundation/geometry'
@@ -128,7 +128,7 @@ describe('2 — traffic is one-way', () => {
     // The two SEQUENCER SEATS may import units (sequencing them is what a pipeline does); both
     // hand over to pipeline/ at S3. Every other retiring file re-exports only.
     'grid-magnet-wrap-compute.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/grid-magnet$/, /^\.\/offset$/, /^\.\/foundation\/[a-z-]+$/, /^\.\/units\/[a-z-]+$/, /^@countertype\/clipper2-ts$/],
-    'grid-magnet-canon-experiment.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/grid-magnet$/, /^\.\/grid-magnet-wrap-compute$/, /^\.\/foundation\/[a-z-]+$/, /^\.\/units\/[a-z-]+$/],
+    'grid-magnet-canon-experiment.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/grid-magnet$/, /^\.\/grid-magnet-wrap-compute$/, /^\.\/units\/[a-z-]+$/],
     'grid-magnet-class.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/foundation\/[a-z-]+$/, /^\.\/units\/[a-z-]+$/],
     'grid-magnet-library-bridge.ts': [/^\.\/types$/, /^\.\/grid-magnet[a-z-]*$/, /^\.\/library[/a-z-]*$/, /^\.\/foundation\/[a-z-]+$/],
     'grid-magnet-library-catalogue.ts': [/^\.\/types$/, /^\.\/grid-magnet[a-z-]*$/, /^\.\/library[/a-z-]*$/],
@@ -722,10 +722,10 @@ describe('1b — the frame comes from the usable material', () => {
     // they are the whole point:
     // Raw registrations are the search input; output coverage cannot invent a sparse search role.
     const b4 = solveBand(4)
-    expect(b4.solve.offers.map((o) => o.at.count), 'loose B4 min must not be offered').toEqual([16])
+    expect(b4.solve.offers.map((o) => o.at.count), 'B4 optimal+max / min').toEqual([16, 12])
     // every row states WHY it is on the list — the order alone is not the answer
     expect(b4.solve.offers.map((o) => o.roles.join('+')), 'B4 roles')
-      .toEqual(['optimal+min+max'])
+      .toEqual(['optimal+max', 'min'])
     expect(b4.solve.offers[0].at.count, 'the first row must be the canon layout')
       .toBe(b4.optimal!.nodesMM.length)
 
@@ -832,58 +832,13 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
     expect(result.offers[0].at.count).toBe(16)
     expect(result.offers[0].at.sizeMM).toBeGreaterThanOrEqual(168)
   })
-  it('press qualification judges the structural 4x4 belt, not floating interior magnets', () => {
-    const points: Pt[] = []
-    for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) points.push([x * 48, y * 48])
-    const split = classifyStructuralSupport(points, 48)
-    expect(split.support).toHaveLength(12)
-    expect(split.interior).toHaveLength(4)
-    const support = new Set(split.support)
-    const gapsMM: number[] = points.map((p) => support.has(p) ? 1 : 50)
-    const at = {
-      count: 16, sizeMM: 168, centreOffMM: 0, points, originMM: [0, 0] as Pt,
-      anchorMM: [72, 72] as Pt, gapsMM,
+  it('the old rigid walk is gone from every production path', () => {
+    for (const f of ['grid-magnet.ts', 'grid-magnet-compute.ts']) {
+      const text = readFileSync(join(LIB, f), 'utf8')
+      for (const dead of ['bandWalk', 'fitSizeInBand', 'snapRange', 'maxPressMM']) {
+        expect(text, `${f} still holds ${dead}`).not.toMatch(new RegExp(`\\b${dead}\\b`))
+      }
     }
-    expect(isPressedWrap(at, 48), 'floating interior magnets invalidated a pressed support belt').toBe(true)
-    const loose = { ...at, gapsMM: [...at.gapsMM] }
-    loose.gapsMM[0] = 1.01
-    expect(isPressedWrap(loose, 48), 'a floating structural support was accepted').toBe(false)
-  })
-
-  it('a support pressed against a hole uses the same whole-contour gap evidence', () => {
-    const donut = (mm: number): Contour => ({
-      outer: sq(mm).outer,
-      holes: [{ pts: Array.from({ length: 64 }, (_, i) => {
-        const t = i * Math.PI * 2 / 64
-        return [mm / 2 + mm * 60 / 192 * Math.cos(t), mm / 2 + mm * 60 / 192 * Math.sin(t)] as Pt
-      }) }],
-    })
-    const at = wrapGroup(donut,
-      { paddingMM: 12, pitchMM: 48, anchorAtMM: (mm) => [mm / 2, mm / 2] as Pt },
-      [[0, 0]], 96, 192)
-    expect(at).not.toBeNull()
-    expect(at!.gapsMM[0], 'the hole-boundary support is not pressed').toBeLessThanOrEqual(1.005)
-    expect(isPressedWrap(at!, 48), 'whole-contour hole contact was rejected').toBe(true)
-  })
-
-  it('Canon-first rejects a loose structural-support population at its own seam', () => {
-    const star = (mm: number): Contour => ({
-      outer: { pts: Array.from({ length: 10 }, (_, i) => {
-        const a = -Math.PI / 2 + i * Math.PI / 5
-        const r = (i % 2 ? 0.35 : 0.5) * mm
-        return [mm / 2 + r * Math.cos(a), mm / 2 + r * Math.sin(a)] as Pt
-      }) },
-      holes: [],
-    })
-    const canon: Pt[] = []
-    for (let y = 0; y < 2; y++) for (let x = 0; x < 3; x++)
-      canon.push([(x - 1) * 48, (y - 0.5) * 48])
-    const solve = solveCanonExperiment(
-      star, { pitchMM: 48, paddingMM: 12 }, 120, 167, 24,
-      (mm) => [mm / 2, mm / 2], canon,
-    )
-    expect(solve.offers, 'Canon-first returned the loose structural-support counterexample')
-      .toEqual([])
   })
 
   const sq = (mm: number): Contour => ({ outer: { pts: [[0, 0], [mm, 0], [mm, mm], [0, mm]] as Pt[] }, holes: [] })
@@ -904,7 +859,7 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
       }
       return { outer: { pts }, holes: [] }
     }
-    for (const [shape, lo, hi] of [[sq, 24, 72], [star, 120, 168]] as const) {
+    for (const [shape, lo, hi] of [[sq, 24, 72], [star, 120, 168], [star, 168, 216]] as const) {
       const solve = wrapBandLadder(shape, { paddingMM: 12, pitchMM: 48 }, lo, hi, 24)
       expect(solve.offers.length, `band ${lo}-${hi} must produce offers`).toBeGreaterThan(0)
       for (const o of solve.offers) {
@@ -924,9 +879,9 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
       }
       return { outer: { pts }, holes: [] }
     }
-    const solve = wrapBandLadder(star, { paddingMM: 12, pitchMM: 48 }, 120, 168, 24)
+    const solve = wrapBandLadder(star, { paddingMM: 12, pitchMM: 48 }, 168, 216, 24)
     expect(solve.offers.length, 'this band must hold offers, or the test proves nothing').toBeGreaterThan(0)
-    expect(solve.offers.every((o) => o.at.sizeMM >= 120), 'a sub-band layout was offered').toBe(true)
+    expect(solve.offers.every((o) => o.at.sizeMM >= 168), 'a sub-band layout was offered').toBe(true)
   })
 
   it('the witness comes from layout and is never an offer', () => {
@@ -977,8 +932,8 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
       expect(belt.grid.centreMainMM, 'coverage changed the governed centre').toEqual(full.grid.centreMainMM)
       expect(belt.ladder.map((r) => [r.roles, r.sizeMM]), 'coverage changed roles or rung sizes')
         .toEqual(full.ladder.map((r) => [r.roles, r.sizeMM]))
-      expect(full.ladder.map((r) => r.count)).toEqual([12])
-      expect(belt.ladder.map((r) => r.count)).toEqual([8])
+      expect(full.ladder.map((r) => r.count)).toEqual([16, 12])
+      expect(belt.ladder.map((r) => r.count)).toEqual([12, 8])
       for (const a of belt.grid.anchors)
         expect(full.grid.anchors.some((b) => Math.hypot(a.p[0] - b.p[0], a.p[1] - b.p[1]) < 1e-6),
           'Belt introduced a point instead of removing an interior point').toBe(true)

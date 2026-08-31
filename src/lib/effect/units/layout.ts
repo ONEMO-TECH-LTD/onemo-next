@@ -17,12 +17,10 @@ import {
   BANDS, DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS, PADDING_FLOOR_MM, SNAP_STEP_MM,
 } from '../grid-magnet-spec'
 
-/** Classify the structural support belt independently of the Full/Belt delivery choice. */
-export function classifyStructuralSupport(
-  seated: ReadonlyArray<Pt>, step: number,
-): { support: Pt[]; interior: Pt[] } {
+/** Split seated nodes into perimeter belt and fully-surrounded interior. */
+function splitPerimeter(seated: ReadonlyArray<Pt>, step: number): { belt: Pt[]; interior: Pt[] } {
   const R = step * 1.45
-  const support: Pt[] = [], interior: Pt[] = []
+  const belt: Pt[] = [], interior: Pt[] = []
   for (let i = 0; i < seated.length; i++) {
     const p = seated[i]
     let l = false, r = false, u = false, d = false
@@ -33,9 +31,9 @@ export function classifyStructuralSupport(
       if (dx > 1) r = true; else if (dx < -1) l = true
       if (dy > 1) u = true; else if (dy < -1) d = true
     }
-    if (l && r && u && d) interior.push(p); else support.push(p)
+    if (l && r && u && d) interior.push(p); else belt.push(p)
   }
-  return { support, interior }
+  return { belt, interior }
 }
 
 // Moved out of foundation (F3): each had ONE unit consumer — this one. A primitive earns a
@@ -320,8 +318,8 @@ export function applyCoverage(
   pitch: number,
 ): { seated: Pt[]; interior: Pt[] } {
   if (!perimeterOnly || seated.length <= 4) return { seated, interior: [] }
-  const split = classifyStructuralSupport(seated, pitch)
-  if (split.support.length >= MIN_ANCHORS) return { seated: split.support, interior: split.interior }
+  const split = splitPerimeter(seated, pitch)
+  if (split.belt.length >= MIN_ANCHORS) return { seated: split.belt, interior: split.interior }
   return { seated, interior: [] }
 }
 
