@@ -32,6 +32,8 @@ const ctx = self as unknown as Worker
 // reused across interactions; a new shape clears everything. The per-size walk cache and the idle
 // prefetcher this comment used to describe were deleted with the rigid fallback.
 let shapeSig = ''
+/** The per-shape band table — Dan's "post load" step, computed once and read by every band. */
+const classCache = new Map<string, ReturnType<typeof classifyBands>>()
 const rungCache = new Map<string, BandSolve>()
 // ANCHOR BAKE — the centre measured ONCE per shape (at the largest size, all material present)
 // and scaled linearly per size. Positions are shape features; only qualification is size-
@@ -107,9 +109,23 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       // shape's own rim. A diamond and a square in one band do not share an outline range.
       const span = bandOuterMM(band, Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM))
       const anchorAt = anchorFnFor(sized, cfg, cfgSig, sig)
-      // STEP 1 + 2 — the classifier's own table: at each band's trial size, what frame the shape
-      // carries and where its centre sits. Measured once per shape; it decides nothing here yet.
-      const bandClasses = classifyBands(sized, cfg, anchorAt)
+      // STEP 1 + 2 — the classifier's own table, built ONCE PER SHAPE and read here.
+      //
+      // Dan said "post load"; it was being rebuilt inside every band request — all eleven rows,
+      // each an exact Clipper inset, thrown away and recomputed on the next band (QA F5). The
+      // answers were identical, so nothing was wrong on screen; it simply was not what he asked
+      // for, and it repeated the most expensive measurement in the solve.
+      //
+      // Keyed on everything the table depends on: the shape, and the classifier's own inputs —
+      // padding, ruler, pitch, centre mode and governor. Nothing else can move a row.
+      const classKey = JSON.stringify([sig, cfg.paddingMM, cfg.classifierRuler, cfg.pitchMM,
+        cfg.centreMode, cfg.governor])
+      let bandClasses = classCache.get(classKey)
+      if (!bandClasses) {
+        bandClasses = classifyBands(sized, cfg, anchorAt)
+        classCache.set(classKey, bandClasses)
+        if (classCache.size > 8) classCache.delete(classCache.keys().next().value!)
+      }
       const bandClass = bandClasses.find((row) => row.bandId === band.id) ?? null
       // the lookup digests the classifier's boxes; the classifier itself counts nothing
       const optimal = bandClass
@@ -133,7 +149,10 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         // RULE 4 (Dan, 08-24): prefer the tight solution closest to the centroid — never the
         // smallest at any centring cost. Among offers of the SAME COUNT as the tightest, within
         // half a pitch of it, the best-centred is the default landing. All offers stay visible.
-        const ruleIdx = defaultLanding(rungs, cfg.pitchMM ?? DEFAULT_PITCH_MM)
+        // when any holding rule is on, the ruled order decides and rule 4 does not override it
+        const h = cfg.holdingRules
+        const rulesActive = !!h && (h.perimeter || h.extremes || h.corners || h.gravity || h.universal || h.balance)
+        const ruleIdx = defaultLanding(rungs, cfg.pitchMM ?? DEFAULT_PITCH_MM, rulesActive)
         const idx = Math.min(stepSel ?? ruleIdx, rungs.length - 1)
         const at = rungs[idx].at
         const wcfg: WrapConfig = { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM, magnetDiaMM: undefined, anchorAtMM: () => at.anchorMM }

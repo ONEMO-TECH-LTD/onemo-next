@@ -26,7 +26,7 @@ const factsFor = (magnets: Pt[], shape: Contour = tall) => {
   const region = legalRegion(shape, RELEASED_PADDING_MM)!
   const box = legalRegionBoxMM(shape, RELEASED_PADDING_MM)!
   const gaps = unprotectedRegions(region, magnets, REACH)
-  return holdingFactsOf(magnets, box, gaps, 48, region)
+  return holdingFactsOf(magnets, box, gaps, [(box.minX+box.maxX)/2, (box.minY+box.maxY)/2], 48, region)
 }
 
 const signedAreaMM2 = (paths: NonNullable<ReturnType<typeof legalRegion>>) => {
@@ -251,7 +251,7 @@ describe('the toggle REACHES the ladder — not just the pressed state', () => {
           const box = legalRegionBoxMM(c, RELEASED_PADDING_MM)
           if (!region || !box) continue
           const f = holdingFactsOf(o.at.points, box,
-            unprotectedRegions(region, o.at.points, REACH), 48, region)
+            unprotectedRegions(region, o.at.points, REACH), o.at.anchorMM, 48, region)
           expect(f.holdsExtremes, `${name} B${id} ${o.roles.join('+')} does NOT hold the extremes`).toBe(true)
           checked++
         }
@@ -320,7 +320,8 @@ describe("RULE 3 is about SPANS, not vertices — Dan's batwoman head", () => {
   const factsIn = (shape: Contour, magnets: Pt[]) => {
     const region = legalRegion(shape, RELEASED_PADDING_MM)!
     const box = legalRegionBoxMM(shape, RELEASED_PADDING_MM)!
-    return holdingFactsOf(magnets, box, unprotectedRegions(region, magnets, REACH), 48, region)
+    return holdingFactsOf(magnets, box, unprotectedRegions(region, magnets, REACH),
+      [(box.minX + box.maxX) / 2, (box.minY + box.maxY) / 2], 48, region)
   }
 
   it('a WIDE span held at its two ends beats the same count held in the middle', () => {
@@ -400,7 +401,13 @@ describe('toggle 5 · THE ONE LAW, and toggle 6 · BALANCE', () => {
       revealMM: sizeMM, roles: [],
     })
     const preferred = at(100, 10), legacyCentred = at(101, 0)
-    expect(defaultLanding([preferred, legacyCentred], 48),
+    // QA's golden called defaultLanding with two arguments; their own repair says the override
+    // must not RUN when rules are active, so the seam is the third argument the worker now passes.
+    // With rules on, the ruled first row stands:
+    expect(defaultLanding([preferred, legacyCentred], 48, true),
       'the preference-ranked first row must remain selected').toBe(0)
+    // and with every rule off, Dan's rule 4 is untouched — it still prefers the better-centred
+    expect(defaultLanding([preferred, legacyCentred], 48, false),
+      'rule 4 must survive intact on the all-rules-off path').toBe(1)
   })
 })

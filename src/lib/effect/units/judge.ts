@@ -19,8 +19,14 @@ export function orderOffers(rungs: BandRung[]): BandRung[] {
 /** RULE 4 (Dan, 08-24): prefer the tight solution closest to the centroid — never the smallest at
  *  any centring cost. Among offers of the SAME COUNT as the tightest, within half a pitch of it,
  *  the best-centred is the default landing. Every other lawful offer stays visible. */
-export function defaultLanding(rungs: BandRung[], pitchMM: number): number {
+export function defaultLanding(rungs: BandRung[], pitchMM: number, rulesActive = false): number {
   if (!rungs.length) return 0
+  // WHEN DAN'S HOLDING RULES ARE ON, THEY DECIDE. Rule 4 was written for a ladder sorted by size,
+  // where rungs[0] is the tightest; the ruled list is sorted by his preferences instead, so
+  // re-running rule 4 over it silently overrode the answer his filters had chosen — the bench
+  // listed "optimal + min" first and drew "max" (QA F4). A filter that cannot change what you see
+  // is not a filter.
+  if (rulesActive) return 0
   const half = pitchMM / 2
   const c0 = rungs[0]
   let idx = 0
@@ -197,29 +203,47 @@ function boundarySegments(paths: Paths64): Seg[] {
  *  material is held — and which called every hold beside a smooth curve a corner. */
 function spanEndHolds(
   magnets: ReadonlyArray<Pt>, legalBox: { minX: number; minY: number; maxX: number; maxY: number },
-  reachMM: number,
+  legal: Paths64, reachMM: number,
 ): number {
   const w = legalBox.maxX - legalBox.minX, h = legalBox.maxY - legalBox.minY
   const portrait = h >= w
   let held = 0
   // the two extreme strips of the dominant axis — the "top and bottom" of Dan's description
   for (const far of [true, false]) {
-    const inStrip = magnets.filter((m) => portrait
-      ? (far ? m[1] >= legalBox.maxY - reachMM : m[1] <= legalBox.minY + reachMM)
-      : (far ? m[0] >= legalBox.maxX - reachMM : m[0] <= legalBox.minX + reachMM))
+    const lo = portrait ? legalBox.minY : legalBox.minX
+    const hi = portrait ? legalBox.maxY : legalBox.maxX
+    const from = far ? hi - reachMM : lo
+    const to = far ? hi : lo + reachMM
+    const inStrip = magnets.filter((m) => {
+      const along = portrait ? m[1] : m[0]
+      return along >= from && along <= to
+    })
     if (!inStrip.length) continue
-    // how wide the material is ACROSS that strip
-    const across = inStrip.map((m) => (portrait ? m[0] : m[1]))
-    const lo = portrait ? legalBox.minX : legalBox.minY
-    const hi = portrait ? legalBox.maxX : legalBox.maxY
-    if (hi - lo <= reachMM) {
-      // narrow enough that one disc covers it: any hold in the strip is the whole answer
-      held += inStrip.length ? 1 : 0
-      continue
+    // THE LOCAL SPAN, not the global box. Dan's batwoman: a wide body with a NARROW head. The head
+    // is 36mm across, so one magnet holds it — but the shape's bounding box is the body's width,
+    // and measuring that called the head wide and demanded two holds it can never have. The span
+    // is the material actually present in this strip, which is what he described.
+    const strip = Clipper.makePath(portrait
+      ? [Math.round(legalBox.minX * S), Math.round(from * S), Math.round(legalBox.maxX * S), Math.round(from * S),
+         Math.round(legalBox.maxX * S), Math.round(to * S), Math.round(legalBox.minX * S), Math.round(to * S)]
+      : [Math.round(from * S), Math.round(legalBox.minY * S), Math.round(to * S), Math.round(legalBox.minY * S),
+         Math.round(to * S), Math.round(legalBox.maxY * S), Math.round(from * S), Math.round(legalBox.maxY * S)])
+    const material = Clipper.intersect(legal, [strip], FillRule.NonZero)
+    if (!material || !material.length) continue
+    // each connected run of material in that strip is its own span with its own ends
+    for (const run of material) {
+      const across = run.map((q) => Number(portrait ? q.x : q.y) / S)
+      const rLo = Math.min(...across), rHi = Math.max(...across)
+      const here = inStrip.filter((m) => {
+        const a = portrait ? m[0] : m[1]
+        return a >= rLo - 1e-6 && a <= rHi + 1e-6
+      })
+      if (!here.length) continue
+      const at = here.map((m) => (portrait ? m[0] : m[1]))
+      if (rHi - rLo <= reachMM) { held++; continue }   // narrow: one hold is the whole answer
+      if (Math.min(...at) <= rLo + reachMM) held++
+      if (Math.max(...at) >= rHi - reachMM) held++
     }
-    // wider than a disc: it needs a hold at EACH end, and only the ends count
-    if (Math.min(...across) <= lo + reachMM) held++
-    if (Math.max(...across) >= hi - reachMM) held++
   }
   return held
 }
@@ -236,6 +260,10 @@ const segDistMM = (sg: Seg, p: Pt): number => {
 export function holdingFactsOf(
   magnets: ReadonlyArray<Pt>, legalBox: { minX: number; minY: number; maxX: number; maxY: number },
   gaps: UnprotectedPaths,
+  /** The GOVERNED CENTRE this answer was wrapped about — the point Dan's centring named. Balance
+   *  is measured around it, not the bounding box's midpoint: his rule is about CENTRING the hold,
+   *  and the box's middle is not where the engine centres (QA F3). */
+  anchorMM: Pt,
   /** The grid pitch. The reach is CLAMPED here, so no caller can widen Dan's 24-48mm by handing in
    *  a 96mm pitch — which is exactly how a 96mm bare end passed as "holding the extremes". */
   pitchMM: number,
@@ -256,7 +284,7 @@ export function holdingFactsOf(
   let perimeter = 0
   for (const m of magnets) if (segs.some((sg) => segDistMM(sg, m) <= reachMM)) perimeter++
   // RULE 3 — the ends of a span, not the vertices of an outline (Dan, 2026-08-31)
-  const corners = spanEndHolds(magnets, legalBox, reachMM)
+  const corners = spanEndHolds(magnets, legalBox, legal, reachMM)
   // RULE 2 — "extreme apart sides must be held ... top and bottom in portrait, right and left in
   // landscape". Held when the population reaches within Dan's OWN reach of both ends — never the
   // grid pitch, which at 96mm would accept a 96mm bare end (QA F3). A square has no dominant axis,
@@ -289,7 +317,7 @@ export function holdingFactsOf(
   // large lopsided flap; holding the extremes centred leaves a little bare on each side instead.
   // Same law as everything else — what differs is that it compares the two halves rather than the
   // total.
-  const midX = (legalBox.minX + legalBox.maxX) / 2, midY = (legalBox.minY + legalBox.maxY) / 2
+  const midX = anchorMM[0], midY = anchorMM[1]
   const half = (a: number, b: number, c: number, d: number) => {
     if (!gaps.length) return 0
     const cut = Clipper.makePath([Math.round(a * S), Math.round(b * S), Math.round(c * S), Math.round(b * S),

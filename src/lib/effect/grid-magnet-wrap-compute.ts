@@ -197,7 +197,8 @@ export function wrapBandLadder(
       const region = legalRegion(c, holdRadius)
       const box = legalRegionBoxMM(c, holdRadius)
       holdFacts.set(r, region && box
-        ? holdingFactsOf(r.at.points, box, unprotectedRegions(region, r.at.points, ruleReach), pitch, region)
+        ? holdingFactsOf(r.at.points, box, unprotectedRegions(region, r.at.points, ruleReach),
+          r.at.anchorMM, pitch, region)
         : null)
     }
     return holdFacts.get(r) ?? null
@@ -208,6 +209,23 @@ export function wrapBandLadder(
     const keep = (r: BandRung) => factsOf(r)?.holdsExtremes === true
     for (let i = rungs.length - 1; i >= 0; i--) if (!keep(rungs[i])) rungs.splice(i, 1)
     for (let i = canonRungs.length - 1; i >= 0; i--) if (!keep(canonRungs[i])) canonRungs.splice(i, 1)
+  }
+  // BALANCE IS AN ENFORCER TOO, so it belongs here beside extremes and not after the roles are
+  // picked. Applied at the end it could only remove the lopsided answer AFTER the balanced
+  // alternative had already lost its role and been discarded (QA F3).
+  if (rules?.balance) {
+    const trim = (pool: BandRung[]) => {
+      if (pool.length < 2) return
+      const measured = pool.map((r) => ({ r, f: factsOf(r) })).filter((x) => x.f !== null)
+      if (!measured.length) return
+      const best = Math.min(...measured.map((x) => x.f!.imbalance))
+      for (let i = pool.length - 1; i >= 0; i--) {
+        const f = factsOf(pool[i])
+        if (f === null || f.imbalance > best + 1e-9) pool.splice(i, 1)
+      }
+    }
+    trim(rungs)
+    trim(canonRungs)
   }
 
   // Of the suggested layout's landings, the one holding most of it; tightest breaks a tie. This is
