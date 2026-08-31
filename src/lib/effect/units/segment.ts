@@ -96,12 +96,12 @@ export function safeSegments(
   /** Regions of S ≥ thr: connectivity, deepest point, bbox and traced outlines. */
   const level = (thr: number): { comp: Int32Array; items: LevelItem[] } => {
     const comp = new Int32Array(nx * ny).fill(-1)
-    type Acc = { n: number; sx: number; sy: number; minX: number; minY: number; maxX: number; maxY: number; deepIdx: number; deepS: number }
+    type Acc = { n: number; sx: number; sy: number; minX: number; minY: number; maxX: number; maxY: number; deepIdx: number; deepS: number; deepTies: number[] }
     const accs: Acc[] = []
     for (let seed = 0; seed < nx * ny; seed++) {
       if (S[seed] < thr || comp[seed] >= 0) continue
       const id = accs.length
-      const acc: Acc = { n: 0, sx: 0, sy: 0, minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity, deepIdx: seed, deepS: -Infinity }
+      const acc: Acc = { n: 0, sx: 0, sy: 0, minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity, deepIdx: seed, deepS: -Infinity, deepTies: [] }
       accs.push(acc)
       const stack = [seed]
       comp[seed] = id
@@ -111,7 +111,8 @@ export function safeSegments(
         const px = x0 + ix * step, py = y0 + iy * step
         acc.n++
         acc.sx += px; acc.sy += py
-        if (S[i] > acc.deepS) { acc.deepS = S[i]; acc.deepIdx = i }
+        if (S[i] > acc.deepS) { acc.deepS = S[i]; acc.deepIdx = i; acc.deepTies = [i] }
+        else if (S[i] === acc.deepS) acc.deepTies.push(i)
         if (px < acc.minX) acc.minX = px; if (px > acc.maxX) acc.maxX = px
         if (py < acc.minY) acc.minY = py; if (py > acc.maxY) acc.maxY = py
         for (const j of [i - 1, i + 1, i - nx, i + nx]) {
@@ -122,16 +123,31 @@ export function safeSegments(
         }
       }
     }
+    const at = (i: number): Pt => [x0 + (i % nx) * step, y0 + ((i / nx) | 0) * step]
+    /** Keep the deepest clearance; resolve only equal-depth samples toward the component mean. */
+    const deepCentre = (a: Acc, id: number): Pt => {
+      const mean: Pt = [a.sx / a.n, a.sy / a.n]
+      const ix = Math.max(0, Math.min(nx - 1, Math.round((mean[0] - x0) / step)))
+      const iy = Math.max(0, Math.min(ny - 1, Math.round((mean[1] - y0) / step)))
+      if (comp[iy * nx + ix] === id && signed(mean) >= a.deepS) return mean
+      let best = a.deepTies[0]
+      let bestD = Infinity
+      for (const i of a.deepTies) {
+        const p = at(i)
+        const d = (p[0] - mean[0]) ** 2 + (p[1] - mean[1]) ** 2
+        if (d < bestD) { best = i; bestD = d }
+      }
+      return at(best)
+    }
     // Level-crossing segments per mesh cell, lerped; chained into closed rings.
     // 'light' skips outlines entirely — scoring needs centres/areas/boxes, only display needs rings.
     const segs: Array<[Pt, Pt]> = []
     if (detail === 'light') {
-      const at0 = (i: number): Pt => [x0 + (i % nx) * step, y0 + ((i / nx) | 0) * step]
       return {
         comp,
-        items: accs.map((a) => ({
+        items: accs.map((a, id) => ({
           areaMM2: a.n * step * step,
-          centreMM: at0(a.deepIdx),
+          centreMM: deepCentre(a, id),
           meanMM: [a.sx / a.n, a.sy / a.n] as Pt,
           peakClearMM: a.deepS + r + thr,
           bbox: { minX: a.minX, minY: a.minY, maxX: a.maxX, maxY: a.maxY },
@@ -202,12 +218,11 @@ export function safeSegments(
       const id = compAt(loop[0])
       if (id >= 0) ringsByComp[id].push(smoothLoop(loop, thr))
     }
-    const at = (i: number): Pt => [x0 + (i % nx) * step, y0 + ((i / nx) | 0) * step]
     return {
       comp,
       items: accs.map((a, id) => ({
         areaMM2: a.n * step * step,
-        centreMM: at(a.deepIdx),
+        centreMM: deepCentre(a, id),
         meanMM: [a.sx / a.n, a.sy / a.n] as Pt,
         peakClearMM: a.deepS + r + thr,
         bbox: { minX: a.minX, minY: a.minY, maxX: a.maxX, maxY: a.maxY },

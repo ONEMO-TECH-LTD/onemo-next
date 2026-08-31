@@ -148,8 +148,8 @@ export function computeGrid(
     legalBoxMM: legalRegionBoxMM(contourMM, r0),
     centresMM: [ruleTarget],
     centreMainMM: mainCentre,
-    // the same coverage rule the drawn answer gets, so the sparse registrations are comparable
-    seatings: seatings.map((seat) => applyCoverage(seat, perimeterOnly, pitch).seated),
+    // Search registrations stay raw; coverage is output processing for the drawn answer only.
+    seatings,
     // NO BELT ON THE SUGGESTED LAYOUT: a 3x3 IS nine magnets, and thinning it to a ring means the
     // answer returned is not the record that was looked up.
     canonSeatings,

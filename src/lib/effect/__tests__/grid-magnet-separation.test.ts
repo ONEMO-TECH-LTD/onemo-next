@@ -23,6 +23,7 @@ import { wrapGroup } from '../units/wrap'
 import { wrapBandLadder } from '../grid-magnet-wrap-compute'
 import { contourCentroidOf } from '../units/centring'
 import { safeSegments } from '../units/segment'
+import { edgeDistToContourMM, pointInContour } from '../foundation/geometry'
 import { contourCacheKey, makeSizer } from '../grid-magnet-bridge'
 import type { Contour, GridConfig, Pt } from '../types'
 
@@ -648,14 +649,34 @@ describe('1b — the frame comes from the usable material', () => {
     // prefilter by name.
     const sq = (mm: number): Contour =>
       ({ outer: { pts: [[0, 0], [mm, 0], [mm, mm], [0, mm]] as Pt[] }, holes: [] })
-    for (const [mm, expected] of [[120, [4, 6, 6, 8]], [168, [8, 10, 10, 12]]] as [number, number[]][]) {
+    for (const [mm, expected, drawn] of [[120, [4, 6, 6, 9], 8], [168, [9, 12, 12, 16], 12]] as [number, number[], number][]) {
       const g = computeGrid(sq(mm), { pitchMM: 48, paddingMM: 12 })
       expect(g.seatings.map((x) => x.length).sort((a, b) => a - b), mm + 'mm registrations')
         .toEqual(expected)
       // and the ANSWER is untouched: still the fullest, still what gets drawn
-      expect(g.anchors.length, mm + 'mm drawn answer moved').toBe(Math.max(...expected))
+      expect(g.anchors.length, mm + 'mm drawn answer moved').toBe(drawn)
     }
   })
+
+  it('coverage changes only the drawn output, never search registrations or B4 offers', () => {
+    const sq = (mm: number): Contour =>
+      ({ outer: { pts: [[0, 0], [mm, 0], [mm, mm], [0, mm]] as Pt[] }, holes: [] })
+    const full = computeGrid(sq(168), { pitchMM: 48, paddingMM: 12, perimeterOnly: false })
+    const belt = computeGrid(sq(168), { pitchMM: 48, paddingMM: 12, perimeterOnly: true })
+    expect(belt.seatings, 'coverage changed the search registrations').toEqual(full.seatings)
+    expect(belt.anchors, 'the belt must remain output processing').not.toEqual(full.anchors)
+
+    const band = BANDS.find((b) => b.id === 4)!
+    const anchorAt = (mm: number): Pt => [mm / 2, mm / 2]
+    const row = classifyBands(sq, { pitchMM: 48, paddingMM: 12 }, anchorAt).find((r) => r.bandId === 4)!
+    const canon = optimalLayoutForBox(48, 4, row.legalWidthMM, row.legalHeightMM)!.nodesMM
+      .map(([x, y]) => [x, y] as Pt)
+    const solve = (perimeterOnly: boolean) => wrapBandLadder(
+      sq, { pitchMM: 48, paddingMM: 12, perimeterOnly }, band.minMM + 24, band.maxMM + 24,
+      24, anchorAt, canon,
+    ).offers.map((o) => ({ roles: o.roles, count: o.at.count, sizeMM: o.at.sizeMM, points: o.at.points }))
+    expect(solve(true), 'coverage changed B4 search output').toEqual(solve(false))
+  }, 20_000)
 
   it('THE THREE ANSWERS: optimal first, then min and max, coincident rows collapsed', () => {
     // Dan, 2026-08-30: "band module must get recommendation from the classifier of optimal layout
@@ -675,14 +696,14 @@ describe('1b — the frame comes from the usable material', () => {
       return { solve, optimal }
     }
 
-    // B4 — three distinct answers. The counts are pinned because they are the whole point: the
-    // MIN is 10, and 10 is only reachable because every registration now survives. Winner-only
-    // cannot produce it — that path keeps the fullest at each size, so its MIN is 12.
+    // B4 — two distinct answers after coincident roles collapse. The counts are pinned because
+    // they are the whole point:
+    // Raw registrations are the search input; output coverage cannot invent a sparse search role.
     const b4 = solveBand(4)
-    expect(b4.solve.offers.map((o) => o.at.count), 'B4 optimal / min / max').toEqual([16, 10, 12])
+    expect(b4.solve.offers.map((o) => o.at.count), 'B4 optimal+max / min').toEqual([16, 12])
     // every row states WHY it is on the list — the order alone is not the answer
     expect(b4.solve.offers.map((o) => o.roles.join('+')), 'B4 roles')
-      .toEqual(['optimal', 'min', 'max'])
+      .toEqual(['optimal+max', 'min'])
     expect(b4.solve.offers[0].at.count, 'the first row must be the canon layout')
       .toBe(b4.optimal!.nodesMM.length)
 
@@ -706,7 +727,8 @@ describe('1b — the frame comes from the usable material', () => {
     const band4 = BANDS.find((b) => b.id === 4)!
     const bare = wrapBandLadder(sq, cfg, band4.minMM + 24, band4.maxMM + 24, 24, anchorAt)
     expect(bare.offers.length, 'without a canon there are at most two probes').toBeLessThanOrEqual(2)
-    expect(bare.offers.some((o) => o.at.count === 16), 'a canon answer appeared unasked').toBe(false)
+    expect(bare.offers.every((o) => !o.roles.includes('optimal')), 'an optimal role appeared without a canon')
+      .toBe(true)
   }, 20_000)
 
   it('COUNTEREXAMPLE: the frame counts past five', () => {
@@ -729,6 +751,51 @@ describe('1b — the frame comes from the usable material', () => {
   it('no mass anywhere is null, not a frame of one', () => {
     expect(frameOfMasses([], 48)).toBeNull()
     expect(frameOfMasses([segment({ minX: 0, minY: 0, maxX: 10, maxY: 10 }, [])], 48)).toBeNull()
+  })
+})
+
+describe('deepest safe points', () => {
+  const mirrorX = (c: Contour): Contour => ({
+    outer: { pts: c.outer.pts.map(([x, y]) => [-x, y] as Pt) },
+    holes: c.holes.map((h) => ({ pts: h.pts.map(([x, y]) => [-x, y] as Pt) })),
+  })
+
+  it('chooses the exact symmetric member of a non-grid-aligned deepest plateau in both paths', () => {
+    const expected: Pt = [51.3, 51.7]
+    const squircle: Contour = {
+      outer: { pts: Array.from({ length: 128 }, (_, i) => {
+        const t = i * Math.PI * 2 / 128
+        const c = Math.cos(t), s = Math.sin(t)
+        const q = (Math.abs(c) ** 4 + Math.abs(s) ** 4) ** -0.25
+        return [expected[0] + 51 * c * q, expected[1] + 51 * s * q] as Pt
+      }) }, holes: [],
+    }
+    for (const shape of [squircle, mirrorX(squircle)]) {
+      const want: Pt = shape === squircle ? expected : [-expected[0], expected[1]]
+      const light = safeSegments(shape, 12, 'light')[0].centreMM
+      const full = safeSegments(shape, 12, 'full')[0].centreMM
+      expect(light[0]).toBeCloseTo(want[0], 10)
+      expect(light[1]).toBeCloseTo(want[1], 10)
+      expect(full).toEqual(light)
+    }
+  })
+
+  it('keeps a concave mass centre inside its component at maximum sampled clearance', () => {
+    const concave: Contour = {
+      outer: { pts: [[0, 0], [100, 0], [100, 100], [70, 100], [70, 30], [30, 30], [30, 100], [0, 100]] },
+      holes: [],
+    }
+    const light = safeSegments(concave, 8, 'light')[0]
+    const full = safeSegments(concave, 8, 'full')[0]
+    expect(light.centreMM, 'light and full selected different deepest candidates').toEqual(full.centreMM)
+    expect(pointInContour(light.centreMM, concave), 'the component mean void was selected').toBe(true)
+    let sampledMax = -Infinity
+    for (let y = -2; y <= 102; y += 2) for (let x = -2; x <= 102; x += 2) {
+      const p: Pt = [x, y]
+      if (pointInContour(p, concave)) sampledMax = Math.max(sampledMax, edgeDistToContourMM(concave, p) - 8)
+    }
+    expect(edgeDistToContourMM(concave, light.centreMM) - 8, 'a shallower point was selected')
+      .toBeGreaterThanOrEqual(sampledMax)
   })
 })
 

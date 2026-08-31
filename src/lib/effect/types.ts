@@ -179,9 +179,9 @@ export interface GridResult {
   centresMM: Pt[]
   /** THE centre that governed the winning layout — the main point of the centring system. */
   centreMainMM: Pt
-  /** EVERY lawful registration at this size, coverage applied, not just the one drawn. The engine
-   *  always built these and kept only the fullest; the MIN answer cannot exist while the sparse
-   *  ones are discarded before anything can look at them. `anchors` is still the winner. */
+  /** EVERY raw lawful registration at this size, before output coverage, not just the one drawn.
+   *  The engine always built these and kept only the fullest; the MIN answer cannot exist while
+   *  sparse ones are discarded before anything can look at them. `anchors` is still the winner. */
   seatings: Pt[][]
   /** The suggested layout seated at the same four positions — empty unless one was handed in. */
   canonSeatings: Pt[][]

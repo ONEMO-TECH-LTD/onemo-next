@@ -823,7 +823,7 @@ function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, 
       <path d={d} fill="var(--suede)" fillOpacity={0.12} />
       <path d={d} fill="none" stroke="var(--suede-edge)"
         strokeOpacity={0.9} strokeWidth={1} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-      {/* Legal-area islands: coloured cells, dashed box, centre cross — engine y-up, drawn y-down. */}
+      {/* Legal-area islands: solid outlines and mass centres — engine y-up, drawn y-down. */}
       {segments.map((sg, si) => {
         const hue = SEG_HUES[si % SEG_HUES.length]
         const fs = 11 * spanMM / VP
@@ -833,8 +833,6 @@ function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, 
             return <path key={ri} d={d} fill={hue} fillOpacity={segFill ? 0.12 : 0} stroke={hue} strokeOpacity={0.85}
               strokeWidth={1.2} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
           })}
-          <rect x={sg.bbox.minX} y={-sg.bbox.maxY} width={sg.bbox.maxX - sg.bbox.minX} height={sg.bbox.maxY - sg.bbox.minY}
-            fill="none" stroke={hue} strokeOpacity={0.75} strokeDasharray="5 4" vectorEffect="non-scaling-stroke" />
           {/* Depth masses: the regions surviving the mass-depth probe, each with its own centre. */}
           {sg.masses.map((m, mi) => <g key={'m' + mi}>
             {m.rings.map((ring, ri) => {
