@@ -98,11 +98,24 @@ export interface HoldingRules {
 export const NO_HOLDING_RULES: HoldingRules =
   { perimeter: false, extremes: false, corners: false, gravity: false, universal: false, balance: false }
 
-/** DAN'S PROTECTION REACH — "further from the protected area than 24-48mm", clamped to his own
- *  range. It never expands with the grid: at 96mm pitch it stays 48, because nothing in his rule
- *  authorises a 96mm gap (QA F3). */
-export function protectionReachMM(pitchMM: number): number {
-  return Math.min(48, Math.max(24, pitchMM))
+/** DAN'S PROTECTION REACH — ONE CONSTANT, 48mm, independent of the grid pitch.
+ *
+ *  His rule fixes it: "the top when it is around 24-48mm thick is fine and can be held by one
+ *  magnet disk; when it is larger though... we need to hold it wit min 2 magnets". So one disc
+ *  holds a span up to 48mm and anything wider needs a hold at each end. The 24 is the lower end of
+ *  "fine", not a second threshold — and nothing in his words makes it depend on the pitch.
+ *
+ *  What was here was `min(48, max(24, pitchMM))`, which I invented: a formula over a range he gave
+ *  as a plain statement. It happened to return 48 at every released pitch, so it changed nothing —
+ *  it was simply not his rule wearing the shape of one. */
+export const PROTECTION_REACH_MM = 48
+
+/** The reach in force: the dashboard value when one is set, otherwise his default. ONE value drives
+ *  the material subtraction, the boundary-run measure, the span ends and the gravity strip — so
+ *  turning the dial moves every rule together and the canvas shows the same regions the rules
+ *  judged. */
+export function protectionReachMM(fromDash?: number): number {
+  return fromDash && fromDash > 0 ? fromDash : PROTECTION_REACH_MM
 }
 
 const S = 1000
@@ -159,6 +172,12 @@ export interface HoldingFacts {
   topUnprotectedMM2: number
   /** every point further than the reach from a magnet */
   unprotectedMM2: number
+  /** UNSUPPORTED BOUNDARY, in millimetres: how much of the shape's own outline has no magnet
+   *  holding it. This is the law Dan upheld for toggle 5 — "walk the material boundary, find
+   *  unheld runs longer than one disc's reach, hold their ends" — and it is a different question
+   *  from total unprotected AREA, which was standing in for it. A long thin bare edge and a fat
+   *  bare blob can have the same area and are not the same failure. */
+  unsupportedBoundaryMM: number
   /** HOW LOPSIDED that unprotected area is about the shape's own middle, 0 (even) to 1 (all on one
    *  side). Dan's balance law: one large flap on one side is worse than two small ones either
    *  side, even though both leave the same total bare. */
@@ -241,11 +260,40 @@ function spanEndHolds(
       if (!here.length) continue
       const at = here.map((m) => (portrait ? m[0] : m[1]))
       if (rHi - rLo <= reachMM) { held++; continue }   // narrow: one hold is the whole answer
-      if (Math.min(...at) <= rLo + reachMM) held++
-      if (Math.max(...at) >= rHi - reachMM) held++
+      // A HOLD CLAIMS ONE END, NEVER BOTH. Within the reach of an end AND on that end's side of
+      // the span — otherwise a single magnet in the middle of a 52mm span counted as holding both
+      // ends, which is precisely the flap Dan is describing: "the best hold is in the corners not
+      // in middle of each side".
+      const mid = (rLo + rHi) / 2
+      if (at.some((a) => a < mid && a - rLo <= reachMM)) held++
+      if (at.some((a) => a > mid && rHi - a <= reachMM)) held++
     }
   }
   return held
+}
+
+/** The gaps as plain millimetre rings, for drawing. The canvas must show the SAME regions the
+ *  rules judged — recomputing them on the page is how a picture and a verdict drift apart. */
+export function gapRingsMM(gaps: UnprotectedPaths): Pt[][] {
+  return gaps.map((path) => path.map((q) => [Number(q.x) / S, Number(q.y) / S] as Pt))
+}
+
+export function gapAreaMM2(gaps: UnprotectedPaths): number {
+  return areaOf(gaps)
+}
+
+/** Is a point inside a path set — even-odd over every ring, so holes subtract. */
+function pointInPaths(paths: Paths64, p: Pt): boolean {
+  let inside = false
+  const px = p[0] * S, py = p[1] * S
+  for (const path of paths) {
+    for (let i = 0, j = path.length - 1; i < path.length; j = i++) {
+      const xi = Number(path[i].x), yi = Number(path[i].y)
+      const xj = Number(path[j].x), yj = Number(path[j].y)
+      if ((yi > py) !== (yj > py) && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) inside = !inside
+    }
+  }
+  return inside
 }
 
 const segDistMM = (sg: Seg, p: Pt): number => {
@@ -260,20 +308,28 @@ const segDistMM = (sg: Seg, p: Pt): number => {
 export function holdingFactsOf(
   magnets: ReadonlyArray<Pt>, legalBox: { minX: number; minY: number; maxX: number; maxY: number },
   gaps: UnprotectedPaths,
-  /** The GOVERNED CENTRE this answer was wrapped about — the point Dan's centring named. Balance
-   *  is measured around it, not the bounding box's midpoint: his rule is about CENTRING the hold,
-   *  and the box's middle is not where the engine centres (QA F3). */
-  anchorMM: Pt,
+  /** The shape's own outline, for the boundary-run measure. */
+  outline: ReadonlyArray<Pt>,
+  /** THE SHAPE'S OWN CENTRE at this size — one reference shared by every candidate.
+   *
+   *  NOT the candidate's governed anchor: that moves as wrap slides each group, so measuring
+   *  balance about it compares each answer against a different origin and they stop being
+   *  comparable. Dan's rule is "centering IN THE SHAPE", which is a property of the shape, not of
+   *  where a particular answer's magnets ended up. */
+  shapeCentreMM: Pt,
   /** The grid pitch. The reach is CLAMPED here, so no caller can widen Dan's 24-48mm by handing in
    *  a 96mm pitch — which is exactly how a 96mm bare end passed as "holding the extremes". */
   pitchMM: number,
+  /** The reach in force — the dashboard value, or his 48mm default. */
+  reachOverrideMM: number | undefined,
   /** The legal region itself — REQUIRED. Rule 1 reads its real boundary: a magnet 5mm from the
    *  inner edge of a U is a perimeter hold, and a bounding box cannot see that, being 71mm away.
    *  The optional box fallback is gone: an API that still permits the implementation a
    *  counterexample disproved is an API that will be used that way (QA F2). */
   legal: Paths64,
 ): HoldingFacts {
-  const reachMM = protectionReachMM(pitchMM)
+  const reachMM = protectionReachMM(reachOverrideMM)
+  void pitchMM
   const w = legalBox.maxX - legalBox.minX, h = legalBox.maxY - legalBox.minY
   // RULE 1 and RULE 3 — PHYSICAL, measured against the legal region's own boundary. The previous
   // version reused the belt's "is this magnet surrounded by neighbours" test, which answers a
@@ -301,6 +357,27 @@ export function holdingFactsOf(
   // centroid reported zero top-gap for a region spanning the middle AND the whole top, because the
   // centroid sat in the middle (QA F4).
   const unprotectedMM2 = areaOf(gaps)
+  // THE BOUNDARY RUN — how much of the shape's own edge falls in unprotected material. This is the
+  // law Dan upheld for toggle 5: walk the material boundary and find what nothing holds. Measured
+  // from the CURRENT detector's own gaps, not from the legacy engine's separate geometry, so
+  // there is one source of truth and the canvas can draw exactly what the rule judged.
+  let unsupportedBoundaryMM = 0
+  if (gaps.length) {
+    for (let i = 0; i < outline.length; i++) {
+      const a = outline[i], b = outline[(i + 1) % outline.length]
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1])
+      if (len < 1e-9) continue
+      // sample the segment; each sample that lands in a gap contributes its share of the length
+      const steps = Math.max(2, Math.ceil(len / 2))
+      let bare = 0
+      for (let k = 0; k < steps; k++) {
+        const t = (k + 0.5) / steps
+        const q: Pt = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]
+        if (pointInPaths(gaps, q)) bare++
+      }
+      unsupportedBoundaryMM += (bare / steps) * len
+    }
+  }
   // THE TOP ZONE is one protection reach down from the top edge — derived from Dan's own 24-48mm
   // rather than the "top third" I had invented (QA F4/F6). It is the band where a bare patch is
   // beyond any magnet's hold AND at the top, which is what his gravity law describes.
@@ -317,7 +394,7 @@ export function holdingFactsOf(
   // large lopsided flap; holding the extremes centred leaves a little bare on each side instead.
   // Same law as everything else — what differs is that it compares the two halves rather than the
   // total.
-  const midX = anchorMM[0], midY = anchorMM[1]
+  const midX = shapeCentreMM[0], midY = shapeCentreMM[1]
   const half = (a: number, b: number, c: number, d: number) => {
     if (!gaps.length) return 0
     const cut = Clipper.makePath([Math.round(a * S), Math.round(b * S), Math.round(c * S), Math.round(b * S),
@@ -332,6 +409,7 @@ export function holdingFactsOf(
     : half(legalBox.minX, midY, legalBox.maxX, legalBox.maxY)
   const both = one + two
   return {
+    unsupportedBoundaryMM,
     perimeter, corners, holdsExtremes,
     topUnprotectedMM2: top && top.length ? areaOf(top) : 0,
     unprotectedMM2,
@@ -355,34 +433,47 @@ export function holdingFactsOf(
  *
  *  Ties keep their existing order, so a rule that cannot separate two offers does not disturb
  *  them. */
+/** THE ENFORCERS — the rules that REMOVE. Applied ONCE, to the whole candidate universe, before
+ *  any role is named.
+ *
+ *  Dan, 2026-08-31: "the detector inside the engine must verify each position meets the rules we
+ *  toggle selectively in the dash before calling it optimal max or min."
+ *
+ *  Enforcing per source pool was the defect: a lopsided canon answer survived because it was the
+ *  least lopsided of the CANON candidates, even when a balanced free answer sat in the other pool.
+ *  Balance is a property of the shape, not of which search found the answer, so the comparison has
+ *  to be made across everything on the table at once. */
+export function applyEnforcers<T>(
+  candidates: ReadonlyArray<T>, factsOf: (o: T) => HoldingFacts | null, rules: HoldingRules,
+): T[] {
+  let pool = [...candidates]
+  // 2 · EXTREMES — an answer that does not reach both ends is not an answer. Unmeasurable is not
+  // waved through: an enforcer that passes the unmeasured is no enforcer.
+  if (rules.extremes) pool = pool.filter((o) => factsOf(o)?.holdsExtremes === true)
+  // 6 · BALANCE — comparative, with no invented threshold: of what is on the table, the least
+  // lopsided stand. Ties survive together, so it only removes a genuinely worse balance.
+  if (rules.balance && pool.length > 1) {
+    const measured = pool.map((o) => ({ o, f: factsOf(o) })).filter((x) => x.f !== null)
+    if (measured.length) {
+      const best = Math.min(...measured.map((x) => x.f!.imbalance))
+      pool = measured.filter((x) => x.f!.imbalance <= best + 1e-9).map((x) => x.o)
+    }
+  }
+  return pool
+}
+
 export function applyHoldingRules<T>(
   offers: ReadonlyArray<T>, factsOf: (o: T) => HoldingFacts | null, rules: HoldingRules,
 ): T[] {
-  // 6 · BALANCE, an ENFORCER — it removes, it does not merely order. Dan, 2026-08-31: "if either
-  // option provides unprotected result we must choose centered... one large flap remaining
-  // lopsided is worse [than] 2 small on each side, so centering must be also enforcer."
-  //
-  // Comparative, with no invented threshold: of the answers on the table, the least lopsided
-  // stand and the rest go. Ties survive together, so it only ever removes a genuinely worse
-  // balance. An answer that cannot be measured is not waved through.
-  let pool = [...offers]
-  if (rules.balance && pool.length > 1) {
-    const scored = pool.map((o) => ({ o, f: factsOf(o) }))
-    const measurable = scored.filter((x) => x.f !== null)
-    if (measurable.length) {
-      const best = Math.min(...measurable.map((x) => x.f!.imbalance))
-      pool = measurable.filter((x) => x.f!.imbalance <= best + 1e-9).map((x) => x.o)
-    }
-  }
-  offers = pool
   const enabled: Array<(f: HoldingFacts) => number> = []
   // each returns "lower is better", so one comparator serves every rule
   if (rules.perimeter) enabled.push((f) => -f.perimeter)
   if (rules.corners) enabled.push((f) => -f.corners)
   if (rules.gravity) enabled.push((f) => f.topUnprotectedMM2)
-  // 5 · THE ONE LAW: what is left unheld beyond a disc's reach. Weighed evenly with the rest, so
-  // it can be run beside them and compared rather than replacing them.
-  if (rules.universal) enabled.push((f) => f.unprotectedMM2)
+  // 5 · THE ONE LAW: how much of the shape's own boundary nothing holds. Dan upheld the
+  // boundary-run reading — walk the material edge, find unheld runs, hold their ends — not total
+  // unprotected area, which was a proxy standing in for it.
+  if (rules.universal) enabled.push((f) => f.unsupportedBoundaryMM)
   if (!enabled.length) return [...offers]
 
   const facts = new Map<T, HoldingFacts | null>()

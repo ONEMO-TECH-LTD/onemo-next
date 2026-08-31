@@ -21,9 +21,9 @@ import { centeringAnchors, governMass } from './units/centring'
 import { CENTRE_MODE, GOVERNOR } from './grid-magnet-spec'
 import type { CentreMode, Governor } from './types'
 import { wrapGroup } from './units/wrap'
-import { applyHoldingRules, holdingFactsOf, inBand, orderOffers, protectionReachMM, unprotectedRegions, type HoldingFacts } from './units/judge'
+import { applyEnforcers, applyHoldingRules, gapAreaMM2, gapRingsMM, holdingFactsOf, inBand, orderOffers, protectionReachMM, unprotectedRegions, type HoldingFacts } from './units/judge'
 import { bestSeatedCandidate, fallbackRevealSizes } from './units/layout'
-import { legalRegion, legalRegionBoxMM } from './units/classifier'
+import { legalRegion, legalRegionBoxMM, materialRegion } from './units/classifier'
 
 
 /** mm → integer microns; Clipper64 is integer-robust. */
@@ -188,7 +188,7 @@ export function wrapBandLadder(
   // candidate held them, the row vanished instead of falling back to the lawful one. A filter must
   // constrain the POOLS, not the three survivors.
   const rules = cfg.holdingRules
-  const ruleReach = protectionReachMM(pitch)
+  const ruleReach = protectionReachMM(cfg.protectionReachMM)
   const holdRadius = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
   const holdFacts = new Map<BandRung, HoldingFacts | null>()
   const factsOf = (r: BandRung): HoldingFacts | null => {
@@ -196,48 +196,75 @@ export function wrapBandLadder(
       const c = sized(r.at.sizeMM)
       const region = legalRegion(c, holdRadius)
       const box = legalRegionBoxMM(c, holdRadius)
+      // gaps are measured on the MATERIAL, not on the centre-region: Dan's flap is bare fabric
+      const material = materialRegion(c)
+      const gaps = unprotectedRegions(material, r.at.points, ruleReach)
+      // the evidence travels WITH the answer, so the canvas draws what the rules judged
+      const facts0 = region && box ? null : null
+      void facts0
       holdFacts.set(r, region && box
-        ? holdingFactsOf(r.at.points, box, unprotectedRegions(region, r.at.points, ruleReach),
-          r.at.anchorMM, pitch, region)
+        ? holdingFactsOf(r.at.points, box, gaps, c.outer.pts,
+          // the SHAPE's centre at this size — one reference for every candidate, never the
+          // candidate's own anchor, which moves with the answer
+          [(box.minX + box.maxX) / 2, (box.minY + box.maxY) / 2], pitch, cfg.protectionReachMM, region)
         : null)
     }
-    return holdFacts.get(r) ?? null
-  }
-  if (rules?.extremes) {
-    // an offer that cannot be measured is NOT waved through: an enforcer that passes the unmeasured
-    // is no enforcer
-    const keep = (r: BandRung) => factsOf(r)?.holdsExtremes === true
-    for (let i = rungs.length - 1; i >= 0; i--) if (!keep(rungs[i])) rungs.splice(i, 1)
-    for (let i = canonRungs.length - 1; i >= 0; i--) if (!keep(canonRungs[i])) canonRungs.splice(i, 1)
-  }
-  // BALANCE IS AN ENFORCER TOO, so it belongs here beside extremes and not after the roles are
-  // picked. Applied at the end it could only remove the lopsided answer AFTER the balanced
-  // alternative had already lost its role and been discarded (QA F3).
-  if (rules?.balance) {
-    const trim = (pool: BandRung[]) => {
-      if (pool.length < 2) return
-      const measured = pool.map((r) => ({ r, f: factsOf(r) })).filter((x) => x.f !== null)
-      if (!measured.length) return
-      const best = Math.min(...measured.map((x) => x.f!.imbalance))
-      for (let i = pool.length - 1; i >= 0; i--) {
-        const f = factsOf(pool[i])
-        if (f === null || f.imbalance > best + 1e-9) pool.splice(i, 1)
-      }
+    const f = holdFacts.get(r) ?? null
+    if (f && !r.unprotected) {
+      const c = sized(r.at.sizeMM)
+      const material = materialRegion(c)
+      const gaps = unprotectedRegions(material, r.at.points, ruleReach)
+      r.unprotected = { ringsMM: gapRingsMM(gaps), areaMM2: gapAreaMM2(gaps), boundaryMM: f.unsupportedBoundaryMM }
     }
-    trim(rungs)
-    trim(canonRungs)
+    return f
+  }
+  // THE ENFORCERS RUN ONCE, OVER EVERYTHING, BEFORE ANY ROLE IS NAMED. Dan, 2026-08-31: "the
+  // detector inside the engine must verify each position meets the rules we toggle selectively in
+  // the dash before calling it optimal max or min."
+  //
+  // Over the COMBINED universe, not per pool. Enforcing separately let a lopsided canon answer
+  // survive because it was the least lopsided of the canon candidates — while a balanced free
+  // answer sat untouched in the other pool. Balance is a property of the shape, not of which
+  // search happened to find the answer.
+  if (rules && (rules.extremes || rules.balance)) {
+    const survivors = new Set(applyEnforcers([...canonRungs, ...rungs], factsOf, rules))
+    for (let i = canonRungs.length - 1; i >= 0; i--) if (!survivors.has(canonRungs[i])) canonRungs.splice(i, 1)
+    for (let i = rungs.length - 1; i >= 0; i--) if (!survivors.has(rungs[i])) rungs.splice(i, 1)
   }
 
-  // Of the suggested layout's landings, the one holding most of it; tightest breaks a tie. This is
-  // the one judgement in the path and it is Dan's own max-count rule, narrowed to the canon.
+  // THE PREFERENCES GUIDE EVERY ROLE, not just the order of the finished rows. Dan, 2026-08-31:
+  // "make sure that rule 2 or whatever the filters i asked to apply aplly to all results and guide
+  // them optimal and min-max."
+  //
+  // They do not overturn what each role MEANS — optimal is still the canon landing holding most of
+  // the layout, min is still the fewest magnets, max the most. They decide WHICH of the equally
+  // qualified candidates takes the role, where the tie-break used to be nothing more than the
+  // tightest size. So a role now goes to the best-held candidate among its own equals.
+  const prefsOn = !!rules && (rules.perimeter || rules.corners || rules.gravity || rules.universal)
+  const byPreference = (pool: BandRung[]): Map<BandRung, number> => {
+    const ranked = prefsOn ? applyHoldingRules(pool, factsOf, rules!) : pool
+    return new Map(ranked.map((r, i) => [r, i]))
+  }
+  const canonRank = byPreference(canonRungs)
+  const walkRank = byPreference(rungs)
+  const preferred = (rank: Map<BandRung, number>) => (a: BandRung, b: BandRung) =>
+    (rank.get(a) ?? 0) - (rank.get(b) ?? 0)
+
+  // Of the suggested layout's landings, the one holding most of it; then Dan's filters decide
+  // between equals, and only if they cannot does the tightest win.
   const optimal: BandRung | null = canonRungs
-    .sort((a, b) => b.at.count - a.at.count || a.at.sizeMM - b.at.sizeMM)[0] ?? null
+    .sort((a, b) => b.at.count - a.at.count || preferred(canonRank)(a, b) || a.at.sizeMM - b.at.sizeMM)[0] ?? null
 
   // MIN and MAX magnets in the range, from what the walk actually found. Dan's own words for
   // them, restored 2026-08-30 — they had been renamed to fewest/most, which he never asked for.
-  const byCount = [...rungs].sort((a, b) => a.at.count - b.at.count || a.at.sizeMM - b.at.sizeMM)
+  const byCount = [...rungs].sort((a, b) =>
+    a.at.count - b.at.count || preferred(walkRank)(a, b) || a.at.sizeMM - b.at.sizeMM)
   const min = byCount[0] ?? null
-  const max = byCount[byCount.length - 1] ?? null
+  // MAX takes the fullest, and among equally full ones the filters choose — so the last entry of
+  // an ascending sort is wrong here: it would hand the role to whichever equal came last.
+  const fullest = byCount.length ? byCount[byCount.length - 1].at.count : 0
+  const max = [...byCount].filter((r) => r.at.count === fullest)
+    .sort((a, b) => preferred(walkRank)(a, b) || a.at.sizeMM - b.at.sizeMM)[0] ?? null
 
   // COINCIDENT RESULTS COLLAPSE — the same answer is one row, whatever reached it first. Identity
   // is what SHIPS: the wrapped size and the magnet positions, never which probe proposed it.
@@ -257,5 +284,24 @@ export function wrapBandLadder(
   // above, on the pools.
   const ruled = rules && (rules.perimeter || rules.corners || rules.gravity || rules.universal || rules.balance)
     ? applyHoldingRules(offers, factsOf, rules) : offers
+  // THE EVIDENCE IS ALWAYS MEASURED for what ships, whether or not a rule is switched on. Dan,
+  // 2026-08-31: the unprotected area "was always shown in previous versions and the engine must
+  // know what they are". Three offers, so it costs three subtractions — and it means the canvas
+  // draws the gaps with every toggle OFF, which is how you judge whether switching one on helped.
+  for (const o of ruled) {
+    if (o.unprotected) continue
+    const c = sized(o.at.sizeMM)
+    const gaps = unprotectedRegions(materialRegion(c), o.at.points, ruleReach)
+    const region = legalRegion(c, holdRadius)
+    const box = legalRegionBoxMM(c, holdRadius)
+    const f = region && box
+      ? holdingFactsOf(o.at.points, box, gaps, c.outer.pts,
+        [(box.minX + box.maxX) / 2, (box.minY + box.maxY) / 2], pitch, cfg.protectionReachMM, region)
+      : null
+    o.unprotected = {
+      ringsMM: gapRingsMM(gaps), areaMM2: gapAreaMM2(gaps),
+      boundaryMM: f?.unsupportedBoundaryMM ?? 0,
+    }
+  }
   return { offers: ruled, bestSeated: bestSeatedCandidate(witnesses) }
 }

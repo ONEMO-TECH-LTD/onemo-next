@@ -99,7 +99,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       const aFn = anchorFnFor(sized, cfg, cfgSig, sig)
       const contour = sized(sizeMM)
       const grid = computeGrid(contour, aFn ? { ...cfg, centreOverrideMM: aFn(sizeMM) } : cfg)
-      ctx.postMessage({ id, model: { contour, grid, effSize: sizeMM, ladder: [], idx: 0, segments: grid.segments } })
+      ctx.postMessage({ id, model: { unprotected: null, contour, grid, effSize: sizeMM, ladder: [], idx: 0, segments: grid.segments } })
     } else {
       // THE REVERSAL — band in, count out. The material reveals each distinct layout across the
       // band's range (centre-rules seating); each is solved WHOLE by wrapGroup to its exact
@@ -162,6 +162,9 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         const segments = safeSegments(drawn.contour, r, 'full')
         const anchors = assignSizes(at.points, (cfg.plan ?? 'all6') as MagnetPlan)
         const ladder = rungs.map((rg) => ({ sizeMM: rg.at.sizeMM, count: rg.at.count, offMM: rg.at.centreOffMM, roles: rg.roles }))
+        // the DETECTOR'S OWN evidence for the selected answer, carried to the canvas so the picture
+        // and the verdict cannot drift apart (Dan, 2026-08-31)
+        const unprotected = rungs[idx]?.unprotected ?? null
         const bk = bakeOf(sized, cfg, sig)
         const cf = classFrameNodes(bk.segW, bk.segH, band.id, cfg.pitchMM)
         const refMM = sizeRange(Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)).maxMM
@@ -172,7 +175,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         ctx.postMessage({ id, model: {
           contour: drawn.contour, grid: { ...drawn.grid, anchors, segments },
           effSize: at.sizeMM, ladder, idx, segments, offMM: at.centreOffMM, recog,
-          bandClass, bandClasses, recommendation,
+          bandClass, bandClasses, recommendation, unprotected,
         } })
         return
       }

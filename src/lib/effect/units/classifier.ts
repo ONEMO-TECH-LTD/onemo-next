@@ -68,6 +68,31 @@ export function legalRegion(contour: Contour, spotRadiusMM: number): Paths64 | n
   return left && left.length ? left : null
 }
 
+/** THE MATERIAL ITSELF — the outline minus its holes, with no inset at all.
+ *
+ *  This is what the unprotected-area detector subtracts from, and it is NOT the legal region. The
+ *  legal region is the outline eroded by the rim: where a magnet CENTRE may sit. Dan's flap is
+ *  about material — "if the unprotected disk of its MATERIAL is 24-48mm" — and the material
+ *  extends a full rim beyond the legal region on every side.
+ *
+ *  Measuring gaps on the legal region reported BOT B2 as fully protected — two magnets' reach
+ *  blankets that small inner area — while the shape visibly had a bare right side. The detector
+ *  said zero, so every rule downstream had nothing to act on and the toggles changed nothing. */
+export function materialRegion(contour: Contour): Paths64 | null {
+  const flat: number[] = []
+  for (const [x, y] of contour.outer.pts) flat.push(Math.round(x * LEGAL_SCALE), Math.round(y * LEGAL_SCALE))
+  const outer = [Clipper.makePath(flat)]
+  if (!contour.holes.length) return outer
+  const holes: Paths64 = []
+  for (const h of contour.holes) {
+    const hf: number[] = []
+    for (const [x, y] of h.pts) hf.push(Math.round(x * LEGAL_SCALE), Math.round(y * LEGAL_SCALE))
+    holes.push(Clipper.makePath(hf))
+  }
+  const left = Clipper.difference(outer, holes, FillRule.NonZero)
+  return left && left.length ? left : null
+}
+
 /** The bounding extent of that region — what bands and frames are read from. Transform-invariant
  *  by construction: mirroring the shape mirrors the region exactly. */
 export function legalRegionBoxMM(contour: Contour, spotRadiusMM: number): BBox | null {

@@ -115,8 +115,24 @@ export interface WrapAt {
  *  collapsed, and says so. */
 export type RungRole = 'optimal' | 'min' | 'max'
 
+/** What the detector found for one answer — carried out so the CANVAS draws exactly what the rules
+ *  judged, rather than recomputing and possibly disagreeing (Dan, 2026-08-31: the unprotected area
+ *  must be shown, and the engine must know what it is). */
+export interface UnprotectedEvidence {
+  /** the unprotected material as rings, in mm, ready to draw */
+  ringsMM: Pt[][]
+  /** total unprotected material */
+  areaMM2: number
+  /** how much of the shape's own outline nothing holds */
+  boundaryMM: number
+}
+
 /** One rung the band offers: a revealed layout at its exact contact size. */
-export interface BandRung { at: WrapAt; revealMM: number; roles: RungRole[] }
+export interface BandRung {
+  at: WrapAt; revealMM: number; roles: RungRole[]
+  /** What the detector measured for this answer — present only when the rules ran. */
+  unprotected?: UnprotectedEvidence
+}
 
 /** What a band solve returns: the lawful offers judge allowed, and — only when there are none — a
  *  calibration witness layout selected from the SAME generated population. The witness is never an
@@ -142,6 +158,9 @@ export interface GridConfig {
    *  toggles on off and test the results like a filter indeed"). Omitted or all-false is the
    *  released behaviour — nothing is filtered and nothing is reordered. */
   holdingRules?: { perimeter: boolean; extremes: boolean; corners: boolean; gravity: boolean; universal: boolean; balance: boolean }
+  /** THE PROTECTION REACH, from the dashboard. Dan, 2026-08-31: "we can have it defined as value in
+   *  the dash". Default 48mm — his own boundary, where one disc still holds a span. */
+  protectionReachMM?: number
   pitchMM?: number
   paddingMM?: number
   /** Manual calibration: force this registration (mm phase) instead of searching. */

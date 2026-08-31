@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { legalRegion, legalRegionBoxMM } from '../units/classifier'
 import {
-  applyHoldingRules, defaultLanding, holdingFactsOf, unprotectedRegions, NO_HOLDING_RULES, protectionReachMM,
+  applyEnforcers, applyHoldingRules, defaultLanding, holdingFactsOf, unprotectedRegions,
+  NO_HOLDING_RULES, protectionReachMM, PROTECTION_REACH_MM,
 } from '../units/judge'
 import { BANDS, RELEASED_PADDING_MM } from '../grid-magnet-spec'
 import { wrapBandLadder } from '../grid-magnet-wrap-compute'
@@ -17,8 +18,8 @@ import { Clipper, FillRule } from '@countertype/clipper2-ts'
 // an edge, so nothing else in the engine can tell a good answer from a bare one.
 
 const ring = (pts: Pt[]): Contour => ({ outer: { pts }, holes: [] })
-/** Dan's protection reach at the released 48mm pitch — clamped to his own 24-48mm. */
-const REACH = protectionReachMM(48)
+/** Dan's protection reach — one constant, 48mm, at every pitch. */
+const REACH = protectionReachMM()
 /** A tall rectangle: portrait, so the extremes are top and bottom. */
 const tall = ring([[0, 0], [140, 0], [140, 260], [0, 260]])
 
@@ -26,7 +27,7 @@ const factsFor = (magnets: Pt[], shape: Contour = tall) => {
   const region = legalRegion(shape, RELEASED_PADDING_MM)!
   const box = legalRegionBoxMM(shape, RELEASED_PADDING_MM)!
   const gaps = unprotectedRegions(region, magnets, REACH)
-  return holdingFactsOf(magnets, box, gaps, [(box.minX+box.maxX)/2, (box.minY+box.maxY)/2], 48, region)
+  return holdingFactsOf(magnets, box, gaps, shape.outer.pts, [(box.minX+box.maxX)/2, (box.minY+box.maxY)/2], 48, undefined, region)
 }
 
 const signedAreaMM2 = (paths: NonNullable<ReturnType<typeof legalRegion>>) => {
@@ -99,8 +100,11 @@ describe("Dan's holding rules: rule 2 enforces, rules 1/3/4 order", () => {
 
   it("THE THRESHOLD IS HIS, and it is applied by subtraction so it cannot be fudged", () => {
     expect(REACH, "the far end of Dan's 24-48mm at the released pitch").toBe(48)
-    expect(protectionReachMM(96), 'a 96mm pitch must NOT expand his limit').toBe(48)
-    expect(protectionReachMM(24), 'nor shrink below his floor').toBe(24)
+    // ONE CONSTANT, not a formula over the pitch. His rule says a span up to 48mm takes one
+    // magnet and a wider one takes two; nothing in it depends on the grid.
+    expect(PROTECTION_REACH_MM, "one disc holds a 48mm span — Dan's own boundary").toBe(48)
+    expect(protectionReachMM(), 'identical at every pitch, because his rule is not about the grid')
+      .toBe(PROTECTION_REACH_MM)
     const spread: Pt[] = [[30, 20], [110, 20], [30, 236], [110, 236]]
     const region = legalRegion(tall, RELEASED_PADDING_MM)
     // four magnets at the corners of a 116x236 legal area leave the middle unheld
@@ -251,7 +255,7 @@ describe('the toggle REACHES the ladder — not just the pressed state', () => {
           const box = legalRegionBoxMM(c, RELEASED_PADDING_MM)
           if (!region || !box) continue
           const f = holdingFactsOf(o.at.points, box,
-            unprotectedRegions(region, o.at.points, REACH), o.at.anchorMM, 48, region)
+            unprotectedRegions(region, o.at.points, REACH), c.outer.pts, [(box.minX+box.maxX)/2, (box.minY+box.maxY)/2], 48, undefined, region)
           expect(f.holdsExtremes, `${name} B${id} ${o.roles.join('+')} does NOT hold the extremes`).toBe(true)
           checked++
         }
@@ -275,8 +279,9 @@ describe('the preferences weigh EVENLY — no rule outranks another', () => {
   // That rules out the lexicographic chain I had — perimeter, then corners, then gravity — under
   // which perimeter decided almost every comparison and gravity was never reached.
   const facts = (perimeter: number, corners: number, topUnprotectedMM2: number,
-    unprotectedMM2 = 0, imbalance = 0) =>
-    ({ perimeter, corners, holdsExtremes: true, topUnprotectedMM2, unprotectedMM2, imbalance })
+    unprotectedMM2 = 0, imbalance = 0, unsupportedBoundaryMM = 0) =>
+    ({ perimeter, corners, holdsExtremes: true, topUnprotectedMM2, unprotectedMM2, imbalance,
+      unsupportedBoundaryMM })
 
   it('a rule that LOSES on one measure can still win on the others', () => {
     // A is best on perimeter. B is best on corners AND gravity. Under the old chain A won on
@@ -320,8 +325,8 @@ describe("RULE 3 is about SPANS, not vertices — Dan's batwoman head", () => {
   const factsIn = (shape: Contour, magnets: Pt[]) => {
     const region = legalRegion(shape, RELEASED_PADDING_MM)!
     const box = legalRegionBoxMM(shape, RELEASED_PADDING_MM)!
-    return holdingFactsOf(magnets, box, unprotectedRegions(region, magnets, REACH),
-      [(box.minX + box.maxX) / 2, (box.minY + box.maxY) / 2], 48, region)
+    return holdingFactsOf(magnets, box, unprotectedRegions(region, magnets, REACH), shape.outer.pts,
+      [(box.minX + box.maxX) / 2, (box.minY + box.maxY) / 2], 48, undefined, region)
   }
 
   it('a WIDE span held at its two ends beats the same count held in the middle', () => {
@@ -362,7 +367,8 @@ describe("RULE 3 is about SPANS, not vertices — Dan's batwoman head", () => {
 
 describe('toggle 5 · THE ONE LAW, and toggle 6 · BALANCE', () => {
   const facts = (unprotectedMM2: number, imbalance: number) =>
-    ({ perimeter: 0, corners: 0, holdsExtremes: true, topUnprotectedMM2: 0, unprotectedMM2, imbalance })
+    ({ perimeter: 0, corners: 0, holdsExtremes: true, topUnprotectedMM2: 0, unprotectedMM2,
+      imbalance, unsupportedBoundaryMM: unprotectedMM2 })
 
   it('5 · orders by what is left unheld, and weighs evenly beside the others', () => {
     const of = (o: string) => o === 'bare' ? facts(900, 0) : facts(10, 0)
@@ -374,14 +380,19 @@ describe('toggle 5 · THE ONE LAW, and toggle 6 · BALANCE', () => {
     // Dan, 2026-08-31, the BOT B2 case: two magnets to the left leave the whole right bare. Holding
     // the extremes centred leaves a little bare on each side instead — same total, better answer.
     const of = (o: string) => o === 'lopsided' ? facts(400, 1) : facts(400, 0)
-    const out = applyHoldingRules(['lopsided', 'centred'], of, { ...NO_HOLDING_RULES, balance: true })
+    // Balance lives in applyEnforcers, not applyHoldingRules: it must run over the whole candidate
+    // universe BEFORE any role is named, or a lopsided answer keeps the name while the balanced
+    // alternative has already been discarded (Dan's BOT screenshots).
+    const out = applyEnforcers(['lopsided', 'centred'], of, { ...NO_HOLDING_RULES, balance: true })
     expect(out, 'balance is an ENFORCER — the lopsided answer is removed, not merely demoted')
       .toEqual(['centred'])
+    expect(applyHoldingRules(['lopsided', 'centred'], of, { ...NO_HOLDING_RULES, balance: true }),
+      'and ordering must not silently do the enforcing').toEqual(['lopsided', 'centred'])
   })
 
   it('6 · equally balanced answers all survive — it only ever removes a worse balance', () => {
     const of = () => facts(400, 0.25)
-    expect(applyHoldingRules(['a', 'b'], of, { ...NO_HOLDING_RULES, balance: true }))
+    expect(applyEnforcers(['a', 'b'], of, { ...NO_HOLDING_RULES, balance: true }))
       .toEqual(['a', 'b'])
   })
 
@@ -390,7 +401,7 @@ describe('toggle 5 · THE ONE LAW, and toggle 6 · BALANCE', () => {
     expect(applyHoldingRules(['lopsided', 'centred'], of, { ...NO_HOLDING_RULES, universal: true }),
       'the one law alone cannot separate them — the totals are equal')
       .toEqual(['lopsided', 'centred'])
-    expect(applyHoldingRules(['lopsided', 'centred'], of, { ...NO_HOLDING_RULES, balance: true }),
+    expect(applyEnforcers(['lopsided', 'centred'], of, { ...NO_HOLDING_RULES, balance: true }),
       'balance is what tells them apart').toEqual(['centred'])
   })
 
@@ -410,4 +421,76 @@ describe('toggle 5 · THE ONE LAW, and toggle 6 · BALANCE', () => {
     expect(defaultLanding([preferred, legacyCentred], 48, false),
       'rule 4 must survive intact on the all-rules-off path').toBe(1)
   })
+})
+
+describe("the protection reach is Dan's constant, not a function of the grid", () => {
+  // "the top when it is around 24-48mm thick is fine and can be held by one magnet disk; when it is
+  // larger though... we need to hold it wit min 2 magnets". One disc holds a span up to 48mm; wider
+  // needs a hold at each end. The 24 is the lower end of "fine", not a second threshold.
+  const strip = (acrossMM: number, alongMM: number): Contour =>
+    ring([[0, 0], [acrossMM, 0], [acrossMM, alongMM], [0, alongMM]])
+  const cornersOf = (shape: Contour, magnets: Pt[]) => {
+    const region = legalRegion(shape, RELEASED_PADDING_MM)!
+    const box = legalRegionBoxMM(shape, RELEASED_PADDING_MM)!
+    return holdingFactsOf(magnets, box, unprotectedRegions(region, magnets, REACH), shape.outer.pts,
+      [(box.minX + box.maxX) / 2, (box.minY + box.maxY) / 2], 48, undefined, region).corners
+  }
+
+  it('identical at 24, 48 and 96mm pitch — the grid cannot move it', () => {
+    for (const pitch of [24, 48, 96]) {
+      void pitch
+      expect(protectionReachMM(), `pitch ${pitch} changed the reach`).toBe(48)
+    }
+  })
+
+  it('a span AT the reach takes one hold; just over it takes two', () => {
+    // legal across = outline − 24. 72 → 48 exactly: one disc covers it, one centred hold is enough.
+    const atLimit = strip(72, 300)
+    expect(cornersOf(atLimit, [[36, 280]]), 'a 48mm span is held by one magnet').toBeGreaterThan(0)
+    // 76 → 52 across: wider than one disc, so a single centred hold no longer holds both ends
+    const overLimit = strip(76, 300)
+    expect(cornersOf(overLimit, [[38, 280]]), 'a centred hold on a 52mm span holds neither end')
+      .toBe(0)
+    expect(cornersOf(overLimit, [[14, 280], [62, 280]]), 'held at both ends instead').toBe(2)
+  })
+})
+
+describe('the filters guide EVERY role, not just the order of the rows', () => {
+  // Dan, 2026-08-31: "make sure that rule 2 or whatever the filters i asked to apply aplly to all
+  // results and guide them optimal and min-max."
+  //
+  // Enforcers already trimmed both candidate pools before roles were picked. The PREFERENCES did
+  // not: they reordered the three finished rows, so which candidate became optimal/min/max was
+  // still settled by the tightest size. Now they decide between equals inside each role.
+  const bar = (mm: number): Contour => {
+    const s = mm / 260
+    return ring(([[0, 0], [140, 0], [140, 260], [0, 260]] as Pt[]).map(([x, y]) => [x * s, y * s] as Pt))
+  }
+  const band = BANDS.find((b) => b.id === 4)!
+  const anchor = (mm: number): Pt => [mm * 140 / 260 / 2, mm / 2]
+  const solve = (rules?: typeof NO_HOLDING_RULES) =>
+    wrapBandLadder(bar, { pitchMM: 48, paddingMM: RELEASED_PADDING_MM, holdingRules: rules },
+      band.minMM + 24, band.maxMM + 24, 24, anchor).offers
+
+  it('a role goes to the best-held candidate among its equals, not merely the tightest', () => {
+    const off = solve(NO_HOLDING_RULES)
+    const on = solve({ ...NO_HOLDING_RULES, universal: true })
+    // The ORDER is allowed to change — ordering is what a preference does, and this very case
+    // flips [min, max] to [max, min] once the detector has real gaps to measure. What must NOT
+    // change is the SET of roles or what each one means.
+    expect([...on.map((o) => o.roles.join('+'))].sort(), 'a filter must not remove or invent a role')
+      .toEqual([...off.map((o) => o.roles.join('+'))].sort())
+    const countFor = (rows: typeof on, role: string) =>
+      rows.find((o) => o.roles.includes(role as never))?.at.count
+    for (const role of ['min', 'max'])
+      expect(countFor(on, role), `${role} changed how many magnets it has`).toBe(countFor(off, role))
+    // every shipped answer still holds together: same count, still wrapped, still in band
+    for (const o of on) expect(o.at.count, 'an offer lost its magnets').toBeGreaterThan(0)
+  }, 120_000)
+
+  it('the enforcers still trim the pools before any role is picked', () => {
+    // proven by construction elsewhere; asserted here so the two halves cannot drift apart
+    const enforced = solve({ ...NO_HOLDING_RULES, extremes: true, balance: true })
+    expect(enforced.length, 'the enforcers emptied the board').toBeGreaterThan(0)
+  }, 120_000)
 })

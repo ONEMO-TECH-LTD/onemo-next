@@ -95,6 +95,10 @@ export default function GridLab() {
   // DAN'S FOUR UNPROTECTED-AREA RULES, each on its own switch (2026-08-30: "i would make it
   // toggles on off and test the results like a filter indeed"). All off is the released path.
   const [hold, setHold] = useState({ perimeter: false, extremes: false, corners: false, gravity: false, universal: false, balance: false })
+  // THE PROTECTION REACH, on the dash. Dan, 2026-08-31: "we can have it defined as value in the
+  // dash". His 48mm is the default — the span one disc still holds — and moving it moves every
+  // rule and the drawn evidence together.
+  const [reach, setReach] = useState(48)
   /** Legal-area islands, coloured + boxed + centre-marked. */
   const [showSegs, setShowSegs] = useState(true)
   /** Coloured fills of the inner (legal) area — off leaves outlines only. */
@@ -281,7 +285,8 @@ export default function GridLab() {
   }, [src, preset, gen, p1, p2, sides, points, magic, cutC])
 
   // The solve runs in a worker so the page never freezes; the last result stays up while solving.
-  type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: Array<BandSnapPoint & { roles?: string[] }>; idx: number; segments: SafeSegment[]; stops?: Array<{ press: number; reveal: number }>; offMM?: number; recog?: { family: string; cols: number; rows: number; segWmm: number; segHmm: number }
+  type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: Array<BandSnapPoint & { roles?: string[] }>; idx: number; segments: SafeSegment[];
+    unprotected?: { ringsMM: Pt[][]; areaMM2: number; boundaryMM: number } | null; stops?: Array<{ press: number; reveal: number }>; offMM?: number; recog?: { family: string; cols: number; rows: number; segWmm: number; segHmm: number }
     /** STEP 1+2 — what the classifier read at this band's trial size, and the whole table. */
     /** the classifier's own row and the layout it recommended — carried for the readout, not
      *  rendered as a second panel (Dan: I did not ask for that) */
@@ -329,7 +334,7 @@ export default function GridLab() {
     const w = workerRef.current
     if (!w) return
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
-    const cfg = { pitchMM: pitch, paddingMM: pad, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle', classifierRuler: ruler, holdingRules: hold }
+    const cfg = { pitchMM: pitch, paddingMM: pad, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle', classifierRuler: ruler, holdingRules: hold, protectionReachMM: reach }
     // Manual in a band (forced registration OR manual band scale): the walk is meaningless —
     // solve that size directly, exactly like free mode, band chip stays active.
     const manualBand = manual !== null || bandScale !== null   // manual scale/pan: solved directly at the requested size
@@ -346,7 +351,7 @@ export default function GridLab() {
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler, hold])
+  }, [base, src, preset, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler, hold, reach])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -419,6 +424,7 @@ export default function GridLab() {
                     // 100% = the shape at half the board, so there is room around it (Dan).
                     viewport: { panMM: [0, 0] as Pt, zoom: camZoom * CAM_BASE },
                     segments: showSegs ? model!.segments : [], segFill: segFillN !== 0,
+                    unprotected: model!.unprotected ?? null,
                     onPan: (dx: number, dy: number) => setManual((m) => { const bx = m ? m.x : model!.grid.phaseMM[0], by = m ? m.y : model!.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } }),
                     onZoom: (f: number) => {
                       // Pinch = manual scaling WITHIN the band's range.
@@ -652,6 +658,14 @@ export default function GridLab() {
               word each; the settings panel's rows are nowrap, which is why sentence-long labels
               collided there. */}
           <Fold title="Holding rules">
+            <Slider label="Protection reach · one disc holds this span" unit="mm"
+              v={reach} set={(n) => setReach(Math.min(96, Math.max(12, n)))} min={12} max={96} />
+            {model?.unprotected && (
+              <div className="gl-field"><span>Unprotected · measured on the selected answer</span>
+                <div className="gl-snap">{Math.round(model.unprotected.areaMM2)} mm² ·{' '}
+                  {Math.round(model.unprotected.boundaryMM)} mm of edge unheld</div>
+              </div>
+            )}
             <div className="gl-field"><span>Enforcers · these remove answers</span>
               <div className="gl-seg gl-wrap">
                 {([['extremes', 'Extremes'], ['balance', 'Balance']] as const).map(([k, l]) =>
@@ -683,8 +697,12 @@ function dim(c: Contour, axis: 0 | 1): number {
 /** Island tints — screen colours only, one hue per segment, smallest first. */
 const SEG_HUES = ['#e0762f', '#7a4ae0', '#2fa864', '#e04a8f', '#2f9fe0']
 
-function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, onReset, onPickNode, viewport }: {
+function Stage({ contour, grid, lattice, box, segments, segFill, unprotected, onPan, onZoom, onReset, onPickNode, viewport }: {
   contour: Contour; grid: GridResult; lattice: boolean; box: boolean; segments: SafeSegment[]; segFill: boolean
+  /** THE DETECTOR'S OWN unprotected material for the SELECTED answer, drawn as it was measured —
+   *  never recomputed here, so the picture cannot disagree with the verdict. v1 drew this in red
+   *  and the page that did it was deleted (Dan, 2026-08-31). */
+  unprotected?: { ringsMM: Pt[][]; areaMM2: number; boundaryMM: number } | null
   onPan: (dxMM: number, dyMM: number) => void; onZoom: (f: number) => void; onReset: () => void
   /** Library authoring: a lattice spot was clicked (mm, engine y-up). Display layer only. */
   onPickNode?: (pMM: Pt) => void
@@ -933,6 +951,16 @@ function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, 
           <text {...lbl} x={lX + fs * 0.6} y={my} textAnchor="middle" transform={`rotate(90 ${lX + fs * 0.6} ${my})`}>{hTxt}</text>
         </g>)
       })()}
+      {/* UNPROTECTED MATERIAL — what nothing holds, exactly as the detector measured it. */}
+      {unprotected && unprotected.ringsMM.length > 0 && (
+        <g style={{ pointerEvents: 'none' }}>
+          {unprotected.ringsMM.map((ring, i) => (
+            <path key={'up' + i} d={'M ' + ring.map(([x, y]) => `${x.toFixed(2)} ${(-y).toFixed(2)}`).join(' L ') + ' Z'}
+              fill="#e5484d" fillOpacity={0.16} stroke="#e5484d" strokeOpacity={0.55}
+              strokeWidth={1} vectorEffect="non-scaling-stroke" />
+          ))}
+        </g>
+      )}
       {/* Every spot the bridge handed over: faint where empty, accent where a magnet seats. */}
       <g transform={pend.x || pend.y ? `translate(${pend.x} ${-pend.y})` : undefined}>
       {spots.map((sp, i) => {
