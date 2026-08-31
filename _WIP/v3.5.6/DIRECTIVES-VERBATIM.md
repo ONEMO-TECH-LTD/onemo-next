@@ -268,3 +268,92 @@ grey-off/blue-on as built evidence, not as a retained Dan turn.
 - **Precision or stop.** "You must not code opposite or shifted meaning based on my directive it is
   either that precision or you stop. No other code required and functions besides. Only what is
   asked"
+
+---
+
+# STEP 3 · 2026-08-31, 11:44 → 12:40 — the selection/detector directives
+
+> **Provenance note, stated because I got this wrong before.** The s62/lead day-file for 08-31
+> records Dan's 12:33:40, 12:33:54, 12:33:56, 12:37:44 and 12:37:46 turns as IMAGE-ONLY turns; the
+> text quoted beside those images below comes from the live session, not from vault text. The
+> 12:36:34 and 12:39:42 turns are present in the vault as text (day-file lines 762 and 792) and are
+> verified. Everything in 3.1–3.4 predates the compaction and is quoted from the live session.
+
+### 3.1 · The detector gates the naming (11:44–11:52)
+
+> "cause right now they actually affect nothing"
+
+> "balance is on and the bot has optimal position still exposing the right side"
+
+> "max option places magnets on horizontal axis leaving top and bottom unprotected"
+
+> "look forget about size of unprotected material we can have it defined as value in the dash -
+> blanket clipper 2 unptotected area was always shown in previous versions and the engine must know
+> what they are and apply rules to the areas / find prior code with ui on canvas also showing the
+> area unprotected and the detector inside the engine must verify each position meets the rules we
+> toggle selectively in the dash before calling it optimal max or min"
+
+> "also i can see the bot extremes toggle on and balance make no centering moves"
+
+> "centering must be precise"
+
+> "\"There is no prior canvas UI for unprotected area\" there is and wherever you borrowed clipper 2
+> code from prior version - assumptions not fact dear fucking grep last 3 weeks of transcripts and
+> commits and find it fucking moron"
+
+→ Four requirements: reach becomes a DASH VALUE; the unprotected area is DRAWN on canvas; the
+detector QUALIFIES each candidate before it may be named optimal/min/max; centring must be precise.
+The prior art is real — `grid-engine/page.tsx` at `a95e9ddd` drew `picked.flaps` red and reported
+`unheld Nmm`, and `grid-core.ts:1072` rejected any variant carrying flaps.
+
+### 3.2 · Balance still not enforcing; the free slider is blind (12:26, 12:33)
+
+> "balance is not providing centering enforcement"
+> — with `Screenshot 2026-08-31 at 12.25.30.png` (BOT · B2 · reach 24 · Balance ON · min+max
+> 99.58mm · 2⌾ · 2699 mm² · 119 mm of edge unheld)
+
+> "also free slider shows no real time unprotected area"
+
+### 3.3 · The protection reach default (12:27)
+
+> "unprotected area default protection reach is 24mm"
+
+→ Supersedes the QA-derived 48mm constant. 24mm is the reach OF ONE MAGNET from its own centre;
+one disc therefore covers a 48mm SPAN, which is the same law read at radius rather than diameter.
+
+### 3.4 · The filters do not select (12:33)
+
+> "i dont understand why the canon layout frame is not prefered here and wrong narrower rectangular
+> layout applied ?"
+
+> "min option gets the rifght layout but with all preferences switched on it must actually provide
+> the next option that covers all preferences"
+
+> "both are valid here  - - so your filters are not functional at all"
+
+> "answer me is this canon frame here or not"
+
+### 3.5 · No second centering module (12:36:34 — VERIFIED VAULT TEXT, day-file line 762)
+
+> "there can be no additional centering - the baked centering applies based on the selected
+> centering -period it is slop and wrong to introduce additional modules with existing modules
+> already acting as governing canon units - wrap/centering current units must not be poulted with
+> logic and code changed - nor there must be any additional conflicting unit dupes doing the same
+> thing"
+
+→ Centring is owned by the centring + wrap units alone. No parallel centring measure may exist
+anywhere else, `judge.ts` included. Wrap and centring may not be edited. No duplicate unit may do
+a job an existing unit already does.
+
+### 3.6 · The canon is never all-or-nothing (12:39:42 — VERIFIED VAULT TEXT, day-file line 792)
+
+> "there is never rule to fill entire canon - there is no all or nothing - the canon optimal route
+> is to test all combinations in the sweep engine that provides closest to canon layout even if the
+> seats are missing overall frame must be attempted to fit"
+
+→ The canon FRAME is attempted to fit across the sweep; the answer is the combination CLOSEST to
+the canon layout, missing seats and all. Not "fill it or fail", and not one landing per size.
+
+### 3.7 · This compilation (12:40:23 — VERIFIED VAULT TEXT, day-file line 798)
+
+> "read the scroll back identify all directives and compile as  brief sheet and task list now"
