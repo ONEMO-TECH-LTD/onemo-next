@@ -1,7 +1,7 @@
 // TEMPORARY dev-only canon-first experiment. The released ladder remains unchanged.
 import type { BandRung, BandSolve, CanonExperimentTrace, Contour, GridConfig, Pt, WrapConfig } from './types'
 import { computeGrid } from './grid-magnet'
-import { wrapBandLadder } from './grid-magnet-wrap-compute'
+import { isPressedWrap, wrapBandLadder } from './grid-magnet-wrap-compute'
 import { DEFAULT_PITCH_MM, PADDING_FLOOR_MM } from './grid-magnet-spec'
 import { fallbackRevealSizes, makeCircleSeatPredicate, makeContourSeatPredicate } from './units/layout'
 import { bbox } from './foundation/geometry'
@@ -32,7 +32,8 @@ export function solveCanonExperiment(
   const attempt = (pts: ReadonlyArray<Pt>): BandRung | null => {
     trace.wraps++
     const at = wrapGroup(sized, wcfg, pts, minMM, hiMM)
-    return at && inBand(at.sizeMM, loMM, hiMM) ? { at, revealMM: hiMM, roles: ['optimal'] } : null
+    return at && isPressedWrap(at, pitch) && inBand(at.sizeMM, loMM, hiMM)
+      ? { at, revealMM: hiMM, roles: ['optimal'] } : null
   }
 
   const whole = attempt(canonLocal)

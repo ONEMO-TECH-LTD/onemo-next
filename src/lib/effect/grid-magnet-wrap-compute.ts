@@ -11,7 +11,7 @@
  */
 
 import type { BandRung, BandSolve, Contour, GridConfig, GridResult, Pt, RungRole, WrapAt, WrapConfig } from './types'
-import { DEFAULT_PITCH_MM, MAGNET_DIA_SMALL_MM, MAGNET_DIA_LARGE_MM, PADDING_FLOOR_MM } from './grid-magnet-spec'
+import { DEFAULT_PITCH_MM, MAGNET_DIA_SMALL_MM, MAGNET_DIA_LARGE_MM, PADDING_FLOOR_MM, SNAP_STEP_MM } from './grid-magnet-spec'
 import { computeGrid } from './grid-magnet'
 import { bbox } from './foundation/geometry'
 import { contourCentroidOf } from './units/centring'
@@ -22,7 +22,7 @@ import { CENTRE_MODE, GOVERNOR } from './grid-magnet-spec'
 import type { CentreMode, Governor } from './types'
 import { wrapGroup } from './units/wrap'
 import { inBand, orderOffers } from './units/judge'
-import { bestSeatedCandidate, fallbackRevealSizes } from './units/layout'
+import { bestSeatedCandidate, classifyStructuralSupport, fallbackRevealSizes } from './units/layout'
 import { legalRegionBoxMM } from './units/classifier'
 
 
@@ -34,6 +34,12 @@ import { legalRegionBoxMM } from './units/classifier'
 // ladder until adapters land in S3. Re-exported so no consumer changes in the move.
 export { wrapGroup }
 export type { BandRung, BandSolve, WrapAt, WrapConfig } from './types'
+
+/** Every structural support disc must press the final material boundary within the ruled step. */
+export function isPressedWrap(at: WrapAt, pitchMM: number): boolean {
+  const support = new Set(classifyStructuralSupport(at.points, pitchMM).support)
+  return at.points.every((p, i) => !support.has(p) || (at.gapsMM[i] ?? Infinity) <= SNAP_STEP_MM + 0.005)
+}
 
 /** The wrapped answer as the canvas draws it. Display only — nothing is decided here. */
 export function wrapGrid(
@@ -78,8 +84,8 @@ export function wrapGrid(
  *       says which magnets the material carries. The layout is read off the material, not chosen.
  *   2 · WRAP — each distinct revealed layout is handed WHOLE to `wrapGroup`, the proven solver:
  *       the group starts centred on the governed anchor and shifts only the minimum a lawful
- *       tighter wrap demands, bisected to the exact contact size. At that size the lawful region
- *       has collapsed — the binding magnets are pressed, a gap is impossible by construction.
+ *       tighter wrap demands, bisected to the exact fit size. The shared press predicate then
+ *       rejects any result whose structural support belt still floats beyond the ruled step.
  *   3 · BAND MEMBERSHIP — a layout whose contact size falls outside the band belongs to another
  *       band and is not offered here (ruled 08-24).
  *
@@ -137,6 +143,7 @@ export function wrapBandLadder(
   const attempt = (pts: ReadonlyArray<Pt>, revealMM: number): BandRung | null => {
     const at = wrapGroup(sized, wcfg, localise(pts), minMM, hiMM)
     if (!at) return null
+    if (!isPressedWrap(at, pitch)) return null
     if (!inBand(at.sizeMM, loMM, hiMM)) return null   // judge: another band owns it
     return { at, revealMM, roles: [] }
   }
