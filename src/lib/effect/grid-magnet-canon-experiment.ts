@@ -31,9 +31,7 @@ export function solveCanonExperiment(
     populations: 0, wraps: 0, retained: 0, readded: 0 }
   const attempt = (pts: ReadonlyArray<Pt>): BandRung | null => {
     trace.wraps++
-    // This route answers the requested band. A canon that fits at the band floor is lawful here
-    // even when its unconstrained tight wrap belongs to a smaller band.
-    const at = wrapGroup(sized, wcfg, pts, loMM, hiMM)
+    const at = wrapGroup(sized, wcfg, pts, minMM, hiMM)
     return at && inBand(at.sizeMM, loMM, hiMM) ? { at, revealMM: hiMM, roles: ['optimal'] } : null
   }
 
