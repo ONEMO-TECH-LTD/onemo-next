@@ -195,6 +195,7 @@ interface LayoutPlacement {
    *  lattice there, the layout's own spots here. Same positions, same fits test, same everything
    *  after. Empty unless a layout was handed in. */
   canonSeatings: Pt[][]
+  temporaryPipelineCounts: { generated: number; seated: number }
 }
 
 /** THE WRAP LAW (Dan, 2026-08-20: "0 flap means magnets and edges touch"): wrap is each
@@ -244,6 +245,7 @@ export function registerLayout(
   const canonSeatings: Pt[][] = []
   let bestOx = 0, bestOy = 0, bestKx = 0, bestKy = 0
   let mainCentre: Pt = centres[0]
+  const temporaryPipelineCounts = { generated: 0, seated: 0 }
   if (fits && cfg.forcePhaseMM) {
     // Manual calibration: seat exactly at the given registration, no search.
     bestOx = mod(cfg.forcePhaseMM[0], pitch)
@@ -251,6 +253,8 @@ export function registerLayout(
     bestKx = mod(bestOx - (bb.maxX - bb.minX) / 2, pitch)
     bestKy = mod(bestOy - (bb.maxY - bb.minY) / 2, pitch)
     bestSeated = latticeAt(bb, pitch, bestOx, bestOy).filter(fits)
+    temporaryPipelineCounts.generated++
+    if (bestSeated.length) temporaryPipelineCounts.seated++
     if (bestSeated.length) seatings.push(bestSeated)
   } else if (fits) {
     // CENTRE RULES — no voting. Parity is DERIVED from the bbox axis classes (canon §4/§6):
@@ -261,9 +265,17 @@ export function registerLayout(
     // only sorts the non-canonical remainder. Centring is exact by construction.
     const bxc = ruleTarget[0] - bb.minX, byc = ruleTarget[1] - bb.minY
     const half = pitch / 2
-    const clsOf = (side: number) => bandOf(legalOfOuterMM(side, pad))?.id ?? BANDS[BANDS.length - 1].id
-    const canX = clsOf(bb.maxX - bb.minX) % 2 === 1 ? bxc : bxc + half
-    const canY = clsOf(bb.maxY - bb.minY) % 2 === 1 ? byc : byc + half
+    const filters = cfg.temporaryPipelineFilters
+    const bandX = bandOf(legalOfOuterMM(bb.maxX - bb.minX, pad))?.id
+    const bandY = bandOf(legalOfOuterMM(bb.maxY - bb.minY, pad))?.id
+    if (filters?.unknownParity === 'fail' && (bandX == null || bandY == null))
+      return { bb, pitch, reach, plan, perimeterOnly, outer, fits, segments, centres, ruleTarget,
+        bestSeated, bestOx, bestOy, bestKx, bestKy, mainCentre, seatings, canonSeatings,
+        temporaryPipelineCounts }
+    const clsX = bandX ?? BANDS[BANDS.length - 1].id
+    const clsY = bandY ?? BANDS[BANDS.length - 1].id
+    const canX = clsX % 2 === 1 ? bxc : bxc + half
+    const canY = clsY % 2 === 1 ? byc : byc + half
     const otherX = canX === bxc ? bxc + half : bxc
     const otherY = canY === byc ? byc + half : byc
     // canon = how many axes carry their class-derived parity (2 = the full canonical frame).
@@ -286,16 +298,27 @@ export function registerLayout(
       // pitch, -half and +half are equally centred and land on different material. Picking one is
       // the bias. Both are tried.
       if (canonLocalMM?.length) {
-        for (const sx of canonShifts(canonLocalMM[0][0], ruleTarget[0] - bb.minX, ox, pitch))
-          for (const sy of canonShifts(canonLocalMM[0][1], ruleTarget[1] - bb.minY, oy, pitch)) {
+        const shifts = (node: number, anchor: number, phase: number, span: number) => {
+          const nearest = canonShifts(node, anchor, phase, pitch)
+          if (filters?.placements !== 'all') return nearest
+          const n = Math.ceil(span / pitch) + 1
+          const out: number[] = []
+          for (const base of nearest) for (let k = -n; k <= n; k++) out.push(base + k * pitch)
+          return [...new Set(out)]
+        }
+        for (const sx of shifts(canonLocalMM[0][0], ruleTarget[0] - bb.minX, ox, bb.maxX - bb.minX))
+          for (const sy of shifts(canonLocalMM[0][1], ruleTarget[1] - bb.minY, oy, bb.maxY - bb.minY)) {
+            temporaryPipelineCounts.generated++
             const held = canonLocalMM
               .map(([lx, ly]) => [ruleTarget[0] + sx + lx, ruleTarget[1] + sy + ly] as Pt)
               .filter(fits)
-            if (held.length) canonSeatings.push(held)
+            if (held.length) { temporaryPipelineCounts.seated++; canonSeatings.push(held) }
           }
       }
       const seat = latticeAt(bb, pitch, ox, oy).filter(fits)
+      temporaryPipelineCounts.generated++
       if (!seat.length) continue
+      temporaryPipelineCounts.seated++
       seatings.push(seat)
       const excess = pressExcessMM(contourMM, seat, reach)
       const wins = !best
@@ -308,7 +331,8 @@ export function registerLayout(
   }
 
   return { bb, pitch, reach, plan, perimeterOnly, outer, fits, segments, centres, ruleTarget,
-    bestSeated, bestOx, bestOy, bestKx, bestKy, mainCentre, seatings, canonSeatings }
+    bestSeated, bestOx, bestOy, bestKx, bestKy, mainCentre, seatings, canonSeatings,
+    temporaryPipelineCounts }
 }
 
 /** Perimeter belt: with >4 seated, drop fully-surrounded interior nodes, never below the minimum. */

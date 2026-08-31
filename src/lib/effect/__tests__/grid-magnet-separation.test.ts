@@ -13,12 +13,12 @@ import { join } from 'node:path'
 import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 import { classifyBands, computeGrid } from '../grid-magnet'
-import { optimalLayoutForBox } from '../grid-magnet-library-catalogue'
+import { canonLayoutForFrame, optimalLayoutForBox } from '../grid-magnet-library-catalogue'
 import { frameOfMasses, positionsAcross } from '../units/classifier'
 import type { BBox, SafeMass, SafeSegment } from '../types'
 import { BANDS, BAND_STEP_MM } from '../grid-magnet-spec'
 import { scaleContour } from '../grid-magnet-compute'
-import { makeCircleSeatPredicate, makeContourSeatPredicate } from '../units/layout'
+import { makeCircleSeatPredicate, makeContourSeatPredicate, registerLayout } from '../units/layout'
 import { wrapGroup } from '../units/wrap'
 import { wrapBandLadder } from '../grid-magnet-wrap-compute'
 import { contourCentroidOf } from '../units/centring'
@@ -26,7 +26,7 @@ import { safeSegments } from '../units/segment'
 import { edgeDistToContourMM, pointInContour } from '../foundation/geometry'
 import { contourCacheKey, makeSizer, normBaseContour } from '../grid-magnet-bridge'
 import { getShape } from '@/lib/shape-library'
-import type { Contour, GridConfig, Pt } from '../types'
+import type { Contour, GridConfig, Pt, TemporaryPipelineFilters } from '../types'
 
 const LIB = join(process.cwd(), 'src/lib/effect')
 const PAGE = join(process.cwd(), 'src/app/(dev)/effect-creator/grid-centre/page.tsx')
@@ -302,7 +302,7 @@ describe('2d — the real shells are governed too', () => {
   // expires when the pipeline lands. Pinned exactly, so a stray import fails even where edges exist.
   const SHELL_UNIT_EDGES: Array<[string, readonly string[]]> = [
     [PAGE, []],
-    [WORKER, ['@/lib/effect/units/judge', '@/lib/effect/units/centring']],
+    [WORKER, ['@/lib/effect/units/classifier', '@/lib/effect/units/judge', '@/lib/effect/units/centring']],
   ]
 
   it('the page and worker hold exactly their pinned unit edges', () => {
@@ -696,6 +696,64 @@ describe('1b — the frame comes from the usable material', () => {
     }
   }, 120_000)
 
+  it('TEMPORARY pipeline switches reach their real decision points and counters', () => {
+    const defaults: TemporaryPipelineFilters = { frame: 'largest-fit', placements: 'nearest', translations: 'merge',
+      band: 'requested-only', pool: 'three-roles', unknownParity: 'largest-fallback',
+      beltStage: 'final' }
+    let frameDifference = false
+    for (let band = 1; band <= 5; band++) for (let w = 24; w <= 216; w += 12) for (let h = 24; h <= 216; h += 12) {
+      const exact = canonLayoutForFrame(48, positionsAcross(w, 48), positionsAcross(h, 48))
+      const largest = optimalLayoutForBox(48, band, w, h)
+      if ((exact?.id ?? null) !== (largest?.id ?? null)) {
+        frameDifference = true
+      }
+    }
+    expect(frameDifference, 'Exact and Largest fit have no counterexample').toBe(true)
+    expect(optimalLayoutForBox(48, 4, 120, 120)).toBeNull()
+
+    const sq = (mm: number): Contour => ({ outer: { pts: [[0, 0], [mm, 0], [mm, mm], [0, mm]] as Pt[] }, holes: [] })
+    const c = sq(216), centre: Pt = [108, 108]
+    const given = { segments: safeSegments(c, 12, 'light'), centres: [centre], ruleTarget: centre }
+    const nearest = registerLayout(c, { pitchMM: 48, paddingMM: 12,
+      temporaryPipelineFilters: defaults }, given, [[-24, 0], [24, 0]])
+    const all = registerLayout(c, { pitchMM: 48, paddingMM: 12,
+      temporaryPipelineFilters: { ...defaults, placements: 'all' } }, given, [[-24, 0], [24, 0]])
+    expect(all.canonSeatings.length, 'All placements did not expand canon landings')
+      .toBeGreaterThan(nearest.canonSeatings.length)
+
+    const band = BANDS.find((b) => b.id === 4)!
+    const solve = (patch: Partial<TemporaryPipelineFilters>) => wrapBandLadder(sq,
+      { pitchMM: 48, paddingMM: 12, perimeterOnly: true,
+        temporaryPipelineFilters: { ...defaults, ...patch } }, band.minMM + 24, band.maxMM + 24, 24,
+      (mm) => [mm / 2, mm / 2], [[-72, -72], [-72, -24], [-72, 24], [-72, 72], [-24, -72], [-24, -24], [-24, 24], [-24, 72], [24, -72], [24, -24], [24, 24], [24, 72], [72, -72], [72, -24], [72, 24], [72, 72]])
+    const merged = solve({ placements: 'all' }), kept = solve({ placements: 'all', translations: 'keep' })
+    expect(merged.diagnostics!.merged, 'Merge removed no translated population').toBeGreaterThan(0)
+    expect(kept.diagnostics!.generated).toBe(merged.diagnostics!.generated)
+    const fullPool = solve({ pool: 'full' })
+    expect(fullPool.offers.length, 'Full pool did not expose more lawful rungs')
+      .toBeGreaterThan(solve({}).offers.length)
+    expect(solve({ beltStage: 'pre-wrap' }).offers, 'Pre-wrap Belt did not change its named population')
+      .not.toEqual(solve({ beltStage: 'final' }).offers)
+
+    const huge = sq(600), hugeCentre: Pt = [300, 300]
+    const hugeGiven = { segments: safeSegments(huge, 12, 'light'), centres: [hugeCentre], ruleTarget: hugeCentre }
+    expect(registerLayout(huge, { pitchMM: 48, paddingMM: 12,
+      temporaryPipelineFilters: { ...defaults, unknownParity: 'fail' } }, hugeGiven).seatings).toEqual([])
+    expect(registerLayout(huge, { pitchMM: 48, paddingMM: 12,
+      temporaryPipelineFilters: defaults }, hugeGiven).seatings.length).toBeGreaterThan(0)
+
+    const released = wrapBandLadder(sq, { pitchMM: 48, paddingMM: 12, perimeterOnly: true },
+      band.minMM + 24, band.maxMM + 24, 24, (mm) => [mm / 2, mm / 2],
+      [[-72, -72], [-72, -24], [-72, 24], [-72, 72], [-24, -72], [-24, -24], [-24, 24], [-24, 72], [24, -72], [24, -24], [24, 24], [24, 72], [72, -72], [72, -24], [72, 24], [72, 72]])
+    const explicit = solve(defaults)
+    expect(explicit.offers).toEqual(released.offers)
+    expect(explicit.bestSeated).toEqual(released.bestSeated)
+    const page = pageText()
+    for (const label of ['FRAME', 'PLACEMENTS', 'TRANSLATIONS', 'BAND', 'POOL', 'UNKNOWN PARITY', 'BELT STAGE'])
+      expect(page, `${label} switch is not wired into the page`).toContain(`'${label}'`)
+    expect(page).toContain('temporaryPipelineFilters: pipelineFilters')
+  }, 120_000)
+
   it('THE THREE ANSWERS: optimal first, then min and max, coincident rows collapsed', () => {
     // Dan, 2026-08-30: "band module must get recommendation from the classifier of optimal layout
     // to try first from the canon ... and also try next best min magnet count in the range and max
@@ -873,7 +931,7 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
   it('the witness comes from layout and is never an offer', () => {
     const solve = wrapBandLadder(sq, { paddingMM: 12, pitchMM: 48 }, 24, 72, 24)
     expect(solve.bestSeated, 'layout must supply a witness').not.toBeNull()
-    expect(Object.keys(solve)).toEqual(['offers', 'bestSeated'])
+    expect(Object.keys(solve)).toEqual(['offers', 'bestSeated', 'diagnostics'])
     // The witness is a REVEAL size, not a wrapped offer: it carries no contact size at all.
     expect(solve.offers.some((o) => (o as unknown as { points?: unknown }).points !== undefined)).toBe(false)
   })
@@ -896,6 +954,8 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
       contour: Contour; effSize: number; idx: number
       ladder: Array<{ sizeMM: number; count: number; roles: string[] }>
       grid: { anchors: Array<{ p: Pt }>; phaseMM: Pt; centreMainMM: Pt }
+      pipelineDiagnostics?: { generated: number; seated: number; merged: number; wrapped: number; outOfBand: number; roleReduction: number; shown: number; rawMagnets: number; canonBand: number | null }
+      recommendation?: { id: string; cols: number; rows: number; count: number } | null
       diagnostic?: unknown
     } | null }
     const posted: Posted[] = []
@@ -905,11 +965,14 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
     g.self = stub
     try {
       const worker = await import('@/app/(dev)/effect-creator/grid-centre/solve.worker')
-      const squircle = normBaseContour(getShape('squircle', 1024, 1024), 1024)!
+      const squircle: Contour = { outer: { pts: [[0, 0], [1, 0], [1, 1], [0, 1]] }, holes: [] }
+      const filters: TemporaryPipelineFilters = { frame: 'largest-fit', placements: 'nearest',
+        translations: 'merge', band: 'requested-only', pool: 'three-roles',
+        unknownParity: 'largest-fallback', beltStage: 'final' }
       stub.onmessage!({ data: { id: 1, base: squircle, offsetMM: 0,
-        cfg: { ...cfg, perimeterOnly: false }, mode: 4, sizeMM: 0, stepSel: null } })
+        cfg: { ...cfg, perimeterOnly: false, temporaryPipelineFilters: filters }, mode: 4, sizeMM: 0, stepSel: null } })
       stub.onmessage!({ data: { id: 2, base: squircle, offsetMM: 0,
-        cfg: { ...cfg, perimeterOnly: true }, mode: 4, sizeMM: 0, stepSel: null } })
+        cfg: { ...cfg, perimeterOnly: true, temporaryPipelineFilters: filters }, mode: 4, sizeMM: 0, stepSel: null } })
       const full = posted[0].model!, belt = posted[1].model!
       expect(belt.idx, 'coverage changed the raw default row').toBe(full.idx)
       expect(belt.effSize, 'coverage changed the selected wrapped size').toBe(full.effSize)
@@ -919,13 +982,53 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
       expect(belt.ladder.map((r) => [r.roles, r.sizeMM]), 'coverage changed roles or rung sizes')
         .toEqual(full.ladder.map((r) => [r.roles, r.sizeMM]))
       expect(full.ladder.map((r) => r.count)).toEqual([16, 12])
-      expect(belt.ladder.map((r) => r.count)).toEqual([12, 8])
+      expect(belt.ladder.map((r) => r.count)).toEqual([12, 10])
       for (const a of belt.grid.anchors)
         expect(full.grid.anchors.some((b) => Math.hypot(a.p[0] - b.p[0], a.p[1] - b.p[1]) < 1e-6),
           'Belt introduced a point instead of removing an interior point').toBe(true)
 
-      stub.onmessage!({ data: { id: 3, base: star, offsetMM: 0, cfg, mode: 2, sizeMM: 0, stepSel: null } })
-      const model = posted[2]?.model
+      stub.onmessage!({ data: { id: 3, base: squircle, offsetMM: 0,
+        cfg: { ...cfg, perimeterOnly: true }, mode: 4, sizeMM: 0, stepSel: null } })
+      const legacy = posted[2].model!
+      expect({ idx: belt.idx, contour: belt.contour, effSize: belt.effSize, ladder: belt.ladder,
+        phase: belt.grid.phaseMM, centre: belt.grid.centreMainMM, anchors: belt.grid.anchors })
+        .toEqual({ idx: legacy.idx, contour: legacy.contour, effSize: legacy.effSize, ladder: legacy.ladder,
+          phase: legacy.grid.phaseMM, centre: legacy.grid.centreMainMM, anchors: legacy.grid.anchors })
+
+      stub.onmessage!({ data: { id: 4, base: squircle, offsetMM: 0,
+        cfg: { ...cfg, perimeterOnly: true, temporaryPipelineFilters: { ...filters, beltStage: 'pre-wrap' } }, mode: 4, sizeMM: 0, stepSel: null } })
+      expect(posted[3].model!.pipelineDiagnostics!.rawMagnets, 'real worker Belt-stage switch is inert')
+        .not.toBe(belt.pipelineDiagnostics!.rawMagnets)
+      stub.onmessage!({ data: { id: 5, base: squircle, offsetMM: 0,
+        cfg: { ...cfg, perimeterOnly: true, temporaryPipelineFilters: { ...filters, placements: 'all' } }, mode: 4, sizeMM: 0, stepSel: null } })
+      expect(posted[4].model!.pipelineDiagnostics!.generated).toBeGreaterThan(belt.pipelineDiagnostics!.generated)
+      stub.onmessage!({ data: { id: 6, base: squircle, offsetMM: 0,
+        cfg: { ...cfg, perimeterOnly: true, temporaryPipelineFilters: { ...filters, placements: 'all', translations: 'keep' } }, mode: 4, sizeMM: 0, stepSel: null } })
+      expect(posted[5].model!.pipelineDiagnostics!.merged).toBe(0)
+      stub.onmessage!({ data: { id: 7, base: squircle, offsetMM: 0,
+        cfg: { ...cfg, perimeterOnly: true, temporaryPipelineFilters: { ...filters, pool: 'full' } }, mode: 4, sizeMM: 0, stepSel: null } })
+      expect(posted[6].model!.pipelineDiagnostics!.shown).toBeGreaterThan(belt.pipelineDiagnostics!.shown)
+      stub.onmessage!({ data: { id: 8, base: star, offsetMM: 0,
+        cfg: { ...cfg, perimeterOnly: true, temporaryPipelineFilters: { ...filters, frame: 'exact', band: 'requested-lower' } }, mode: 4, sizeMM: 0, stepSel: null } })
+      expect(posted[7].model!.pipelineDiagnostics!.canonBand, 'lower-band mode found no canon').not.toBeNull()
+      expect(posted[7].model!.pipelineDiagnostics!.canonBand!, 'lower-band mode stepped upward').toBeLessThan(4)
+
+      stub.onmessage!({ data: { id: 12, base: squircle, offsetMM: 0,
+        cfg: { ...cfg, classifierRuler: 'outer', perimeterOnly: true, temporaryPipelineFilters: { ...filters, frame: 'largest-fit' } }, mode: 4, sizeMM: 0, stepSel: null } })
+      stub.onmessage!({ data: { id: 13, base: squircle, offsetMM: 0,
+        cfg: { ...cfg, classifierRuler: 'outer', perimeterOnly: true, temporaryPipelineFilters: { ...filters, frame: 'exact' } }, mode: 4, sizeMM: 0, stepSel: null } })
+      expect(posted[8].model!.recommendation, 'Largest fit worker fixture found no canon').not.toBeNull()
+      expect(posted[9].model!.recommendation, 'Exact unexpectedly matched the same worker frame').toBeNull()
+
+      stub.onmessage!({ data: { id: 10, base: squircle, offsetMM: 0,
+        cfg: { ...cfg, perimeterOnly: true, temporaryPipelineFilters: filters }, mode: 11, manualBand: true, sizeMM: 600, stepSel: null } })
+      stub.onmessage!({ data: { id: 11, base: squircle, offsetMM: 0,
+        cfg: { ...cfg, perimeterOnly: true, temporaryPipelineFilters: { ...filters, unknownParity: 'fail' } }, mode: 11, manualBand: true, sizeMM: 600, stepSel: null } })
+      expect(posted[10].model!.grid.anchors.length, 'largest parity fallback produced no worker result').toBeGreaterThan(0)
+      expect(posted[11].model!.grid.anchors.length, 'Fail parity still derived a worker seating').toBe(0)
+
+      stub.onmessage!({ data: { id: 9, base: star, offsetMM: 0, cfg, mode: 2, sizeMM: 0, stepSel: null } })
+      const model = posted[12]?.model
       expect(model, 'the worker posted no model').toBeTruthy()
       expect(model!.diagnostic, 'this band must be empty, or the test proves nothing').toBeTruthy()
       const sized = makeSizer(star, 0)
@@ -936,7 +1039,7 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
     } finally {
       g.self = prev
     }
-  })
+  }, 120_000)
 
   it('the shell never labels the witness a fit', () => {
     const page = readFileSync(join(process.cwd(), 'src/app/(dev)/effect-creator/grid-centre/page.tsx'), 'utf8')

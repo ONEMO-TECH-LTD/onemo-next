@@ -20,7 +20,7 @@ import { getShape, hasVectorDef, type VectorShapeKind } from '@/lib/shape-librar
 import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
-import type { Contour, Pt } from '@/lib/effect/types'
+import type { Contour, PipelineDiagnostics, Pt, TemporaryPipelineFilters } from '@/lib/effect/types'
 import { DEFAULT_PITCH_MM, type BandSnapPoint, type GridResult, type MagnetPlan, type SafeSegment } from '@/lib/effect/grid-magnet'
 import { bandOuterMM, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet'
 import { BANDS, CENTRE_MODE, GOVERNOR, PADDING_CEIL_MM, PADDING_FLOOR_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-magnet-spec'
@@ -43,6 +43,10 @@ const IMG = 1024
 /** Stage pixel size — element, px/mm scale and header label all derive from it. */
 const VP = 640
 const FIT = 0.86
+const RELEASED_FILTERS: TemporaryPipelineFilters = {
+  frame: 'largest-fit', placements: 'nearest', translations: 'merge', band: 'requested-only',
+  pool: 'three-roles', unknownParity: 'largest-fallback', beltStage: 'final',
+}
 
 const PRESETS: VectorShapeKind[] = ['squircle', 'square', 'circle', 'pill', 'heart', 'star', 'polygon', 'diamond', 'plus', 'teardrop', 'leaf', 'lens', 'bolt', 'sparkle', 'pinched', 'asterisk', 'bowtie']
 const GENS: { k: ShapeKind; label: string; p1: [string, string]; p2: [string, string]; p2min: number; p2max: number; p2start: number }[] = [
@@ -147,6 +151,7 @@ export default function GridLab() {
   /** Manual grid calibration — a forced registration (mm), or null for the engine's auto pick. */
   const [manual, setManual] = useState<{ x: number; y: number } | null>(null)
   const [coverage, setCoverage] = useState<'full' | 'perimeter'>('perimeter')
+  const [pipelineFilters, setPipelineFilters] = useState<TemporaryPipelineFilters>(RELEASED_FILTERS)
 
   // On load the bench opens on B1 or the last band you pushed (Dan, 08-25). usePersisted loads
   // in a post-mount effect, so read storage directly for the one decision that must be right on
@@ -283,7 +288,8 @@ export default function GridLab() {
     /** the classifier's own row and the layout it recommended — carried for the readout, not
      *  rendered as a second panel (Dan: I did not ask for that) */
     bandClass?: { bandId: number; seedMM: number; legalWidthMM: number; legalHeightMM: number; rulerWidthMM: number; rulerHeightMM: number } | null
-    recommendation?: { cols: number; rows: number; count: number } | null }
+    recommendation?: { cols: number; rows: number; count: number } | null
+    pipelineDiagnostics?: PipelineDiagnostics }
   const [model, setModel] = useState<Model | null>(null)
   const [solving, setSolving] = useState(false)
   // The overlay earns its place only on a REAL wait: it appears after a grace period, so the
@@ -326,7 +332,7 @@ export default function GridLab() {
     const w = workerRef.current
     if (!w) return
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
-    const cfg = { pitchMM: pitch, paddingMM: pad, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle', classifierRuler: ruler }
+    const cfg = { pitchMM: pitch, paddingMM: pad, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle', classifierRuler: ruler, temporaryPipelineFilters: pipelineFilters }
     // Manual in a band (forced registration OR manual band scale): the walk is meaningless —
     // solve that size directly, exactly like free mode, band chip stays active.
     const manualBand = manual !== null || bandScale !== null   // manual scale/pan: solved directly at the requested size
@@ -343,7 +349,7 @@ export default function GridLab() {
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler])
+  }, [base, src, preset, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler, pipelineFilters])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -641,6 +647,27 @@ export default function GridLab() {
                 {([[0, 'Smallest'], [1, 'Deepest'], [2, 'Top'], [3, 'Top-small']] as [number, string][]).map(([g, l]) =>
                   <button key={g} aria-pressed={governor === g} onClick={() => setGovernor(g)}>{l}</button>)}
               </div>
+            </div>}
+          </Fold>
+          <Fold title="PIPELINE FILTERS · TEMPORARY">
+            {([
+              ['FRAME', 'frame', [['exact', 'Exact'], ['largest-fit', 'Largest fit']]],
+              ['PLACEMENTS', 'placements', [['all', 'All'], ['nearest', 'Nearest']]],
+              ['TRANSLATIONS', 'translations', [['keep', 'Keep'], ['merge', 'Merge']]],
+              ['BAND', 'band', [['requested-lower', 'Requested + lower'], ['requested-only', 'Requested only']]],
+              ['POOL', 'pool', [['full', 'Full'], ['three-roles', 'Three roles']]],
+              ['UNKNOWN PARITY', 'unknownParity', [['fail', 'Fail'], ['largest-fallback', 'Largest fallback']]],
+              ['BELT STAGE', 'beltStage', [['final', 'Final'], ['pre-wrap', 'Pre-wrap']]],
+            ] as Array<[string, keyof TemporaryPipelineFilters, Array<[string, string]>]>).map(([label, key, opts]) =>
+              <div className="gl-field" key={key}><span>{label}</span><div className="gl-seg">
+                {opts.map(([value, text]) => <button key={value} aria-pressed={pipelineFilters[key] === value}
+                  onClick={() => setPipelineFilters((x) => ({ ...x, [key]: value }))}>{text}</button>)}
+              </div></div>)}
+            {model?.pipelineDiagnostics && <div className="gl-snap">
+              {(['generated', 'seated', 'merged', 'wrapped', 'outOfBand', 'roleReduction', 'shown', 'rawMagnets'] as const)
+                .map((k) => `${k === 'outOfBand' ? 'out of band' : k === 'roleReduction' ? 'role reduction' : k} ${model.pipelineDiagnostics![k]}`).join(' · ')}
+              {model.pipelineDiagnostics.canonBand ? ` · canon B${model.pipelineDiagnostics.canonBand}` : ''}
+              {perf.solveMs != null ? ` · solve ${Math.round(perf.solveMs)} ms` : ''}
             </div>}
           </Fold>
         </aside>

@@ -122,6 +122,23 @@ export interface BandRung { at: WrapAt; revealMM: number; roles: RungRole[] }
 export interface BandSolve {
   offers: BandRung[]
   bestSeated: { revealMM: number; points: Pt[] } | null
+  diagnostics?: PipelineDiagnostics
+}
+
+/** TEMPORARY admin experiment. Delete with the Pipeline Filters card after decisions. */
+export interface TemporaryPipelineFilters {
+  frame: 'exact' | 'largest-fit'
+  placements: 'all' | 'nearest'
+  translations: 'keep' | 'merge'
+  band: 'requested-lower' | 'requested-only'
+  pool: 'full' | 'three-roles'
+  unknownParity: 'fail' | 'largest-fallback'
+  beltStage: 'final' | 'pre-wrap'
+}
+
+export interface PipelineDiagnostics {
+  generated: number; seated: number; merged: number; wrapped: number
+  outOfBand: number; roleReduction: number; shown: number; rawMagnets: number; canonBand: number | null
 }
 
 // The engine's request/response vocabulary.
@@ -151,6 +168,8 @@ export interface GridConfig {
   segmentsDetail?: 'full' | 'light'
   plan?: MagnetPlan
   perimeterOnly?: boolean // default true — perimeter belt drops surrounded interior nodes
+  /** TEMPORARY page-session-only pipeline comparison. Never persist or publish. */
+  temporaryPipelineFilters?: TemporaryPipelineFilters
   /** The outline is a true circle: judge against the analytic curve, not its flattened chords. */
   circle?: boolean
 }
@@ -183,6 +202,8 @@ export interface GridResult {
   seatings: Pt[][]
   /** The suggested layout seated at the same four positions — empty unless one was handed in. */
   canonSeatings: Pt[][]
+  /** TEMPORARY Pipeline Filters stage counts. */
+  temporaryPipelineCounts?: { generated: number; seated: number }
 }
 
 export type CentreMode = 0 | 1 | 2 | 3 | 4 | 5

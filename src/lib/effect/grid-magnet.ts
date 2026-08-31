@@ -125,7 +125,8 @@ export function computeGrid(
   const ruleTarget0: Pt = cfg.centreOverrideMM ?? (mode0 === 2 ? (governMass(masses0, gov0, midY0)?.centreMM ?? centres0[0]) : centres0[0])
 
   const { bb, pitch, reach, plan, perimeterOnly, outer, segments, ruleTarget,
-    bestSeated, bestOx, bestOy, bestKx, bestKy, mainCentre, seatings, canonSeatings } =
+    bestSeated, bestOx, bestOy, bestKx, bestKy, mainCentre, seatings, canonSeatings,
+    temporaryPipelineCounts } =
     registerLayout(contourMM, cfg, { segments: segments0, centres: centres0, ruleTarget: ruleTarget0 },
       canonLocalMM)
 
@@ -153,6 +154,7 @@ export function computeGrid(
     // NO BELT ON THE SUGGESTED LAYOUT: a 3x3 IS nine magnets, and thinning it to a ring means the
     // answer returned is not the record that was looked up.
     canonSeatings,
+    temporaryPipelineCounts,
   }
 }
 

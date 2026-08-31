@@ -15,7 +15,7 @@ import { DEFAULT_PITCH_MM, MAGNET_DIA_SMALL_MM, MAGNET_DIA_LARGE_MM, PADDING_FLO
 import { computeGrid } from './grid-magnet'
 import { bbox } from './foundation/geometry'
 import { contourCentroidOf } from './units/centring'
-import { spotRadiusOf } from './units/layout'
+import { applyCoverage, spotRadiusOf } from './units/layout'
 import { safeSegments } from './units/segment'
 import { centeringAnchors, governMass } from './units/centring'
 import { CENTRE_MODE, GOVERNOR } from './grid-magnet-spec'
@@ -97,6 +97,9 @@ export function wrapBandLadder(
   anchorAtMM?: (mm: number) => Pt, optimalNodesMM?: ReadonlyArray<Pt>,
 ): BandSolve {
   const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
+  const filters = cfg.temporaryPipelineFilters
+  const stats = { generated: 0, seated: 0, merged: 0, wrapped: 0,
+    outOfBand: 0, roleReduction: 0, shown: 0, rawMagnets: 0, canonBand: null as number | null }
   const scanCfg: GridConfig = {
     ...cfg, perimeterOnly: false, segmentsDetail: 'light', forcePhaseMM: undefined,
   }
@@ -135,9 +138,12 @@ export function wrapBandLadder(
     return pts.map((p) => Math.round((p[0] - mx) / pitch) + ',' + Math.round((p[1] - my) / pitch)).sort().join(';')
   }
   const attempt = (pts: ReadonlyArray<Pt>, revealMM: number): BandRung | null => {
-    const at = wrapGroup(sized, wcfg, localise(pts), minMM, hiMM)
+    const group = filters?.beltStage === 'pre-wrap'
+      ? applyCoverage([...pts], cfg.perimeterOnly ?? true, pitch).seated : pts
+    const at = wrapGroup(sized, wcfg, localise(group), minMM, hiMM)
     if (!at) return null
-    if (!inBand(at.sizeMM, loMM, hiMM)) return null   // judge: another band owns it
+    stats.wrapped++
+    if (!inBand(at.sizeMM, loMM, hiMM)) { stats.outOfBand++; return null }
     return { at, revealMM, roles: [] }
   }
 
@@ -163,12 +169,14 @@ export function wrapBandLadder(
   for (const mm of fallbackRevealSizes(loMM, hiMM)) {
     const grid = computeGrid(sized(mm),
       anchorAtMM ? { ...scanCfg, centreOverrideMM: anchorAtMM(mm) } : scanCfg, canonLocal)
+    stats.generated += grid.temporaryPipelineCounts?.generated ?? 0
+    stats.seated += grid.temporaryPipelineCounts?.seated ?? 0
     const drawn = grid.anchors.map((a) => a.p)
     if (drawn.length) witnesses.push({ revealMM: mm, points: drawn })
     for (const pts of grid.seatings.length ? grid.seatings : [drawn]) {
       if (!pts.length) continue
       const id = identityOf(pts)
-      if (seen.has(id)) continue
+      if (filters?.translations !== 'keep' && seen.has(id)) { stats.merged++; continue }
       seen.add(id)
       const rung = attempt(pts, mm)
       if (rung) rungs.push(rung)
@@ -178,7 +186,7 @@ export function wrapBandLadder(
     for (const pts of grid.canonSeatings) {
       if (!pts.length) continue
       const id = identityOf(pts)
-      if (canonSeen.has(id)) continue
+      if (filters?.translations !== 'keep' && canonSeen.has(id)) { stats.merged++; continue }
       canonSeen.add(id)
       const rung = attempt(pts, mm)
       if (rung) canonRungs.push(rung)
@@ -210,5 +218,26 @@ export function wrapBandLadder(
     kept.set(key, r)
     offers.push(r)
   }
-  return { offers, bestSeated: bestSeatedCandidate(witnesses) }
+  if (filters?.pool === 'full') {
+    const all = [...canonRungs, ...rungs]
+    for (const r of all) {
+      if (r === optimal && !r.roles.includes('optimal')) r.roles.push('optimal')
+      if (r === min && !r.roles.includes('min')) r.roles.push('min')
+      if (r === max && !r.roles.includes('max')) r.roles.push('max')
+    }
+    const exact = new Map<string, BandRung>()
+    for (const r of all) {
+      const key = shipped(r), hit = exact.get(key)
+      if (hit) {
+        for (const role of r.roles) if (!hit.roles.includes(role)) hit.roles.push(role)
+      } else exact.set(key, r)
+    }
+    const full = [...exact.values()]
+    stats.rawMagnets = full.reduce((n, r) => n + r.at.count, 0)
+    stats.roleReduction = all.length - full.length; stats.shown = full.length
+    return { offers: full, bestSeated: bestSeatedCandidate(witnesses), diagnostics: stats }
+  }
+  stats.roleReduction = rungs.length + canonRungs.length - offers.length; stats.shown = offers.length
+  stats.rawMagnets = offers.reduce((n, r) => n + r.at.count, 0)
+  return { offers, bestSeated: bestSeatedCandidate(witnesses), diagnostics: stats }
 }

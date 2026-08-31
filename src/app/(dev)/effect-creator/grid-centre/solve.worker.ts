@@ -2,7 +2,7 @@
 // bridge/engine calls the page used to make inline, nothing computed here.
 
 import { BANDS, bandOuterMM, classifyBands, computeGrid, MIN_EFFECT_MM, type GridConfig } from '@/lib/effect/grid-magnet'
-import { optimalLayoutForBox } from '@/lib/effect/grid-magnet-library-catalogue'
+import { canonLayoutForFrame, optimalLayoutForBox } from '@/lib/effect/grid-magnet-library-catalogue'
 import { wrapBandLadder, wrapGrid, type BandSolve, type WrapConfig } from '@/lib/effect/grid-magnet-wrap-compute'
 import { bbox, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet-compute'
 import { contourCentroidOf } from '@/lib/effect/units/centring'
@@ -10,6 +10,7 @@ import { anchorBakeOf, anchorFromBake, applyCoverage, assignSizes, type AnchorBa
 import { classFrameNodes, shapeFamilyOf, type ShapeFamily } from '@/lib/effect/grid-magnet-class'
 
 import { defaultLanding } from '@/lib/effect/units/judge'
+import { positionsAcross } from '@/lib/effect/units/classifier'
 import { DEFAULT_PITCH_MM, PADDING_FLOOR_MM } from '@/lib/effect/grid-magnet-spec'
 import { contourCacheKey, makeSizer, sizeRange } from '@/lib/effect/grid-magnet-bridge'
 import type { Contour, Pt } from '@/lib/effect/types'
@@ -99,9 +100,11 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       const grid = computeGrid(contour, aFn ? { ...cfg, centreOverrideMM: aFn(sizeMM) } : cfg)
       ctx.postMessage({ id, model: { contour, grid, effSize: sizeMM, ladder: [], idx: 0, segments: grid.segments } })
     } else {
+      const filters = cfg.temporaryPipelineFilters
       // Coverage is delivery-only. The entire solve and its cache identity stay raw so toggling
       // Belt cannot change search, wrap, qualification, roles, placement or default selection.
-      const rawCfg: GridConfig = { ...cfg, perimeterOnly: false }
+      const rawCfg: GridConfig = { ...cfg, perimeterOnly: filters?.beltStage === 'pre-wrap'
+        ? (cfg.perimeterOnly ?? true) : false }
       const rawCfgSig = JSON.stringify(rawCfg)
       // THE REVERSAL — band in, count out. The material reveals each distinct layout across the
       // band's range (centre-rules seating); each is solved WHOLE by wrapGroup to its exact
@@ -116,9 +119,15 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       const bandClasses = classifyBands(sized, rawCfg, anchorAt)
       const bandClass = bandClasses.find((row) => row.bandId === band.id) ?? null
       // the lookup digests the classifier's boxes; the classifier itself counts nothing
-      const optimal = bandClass
-        ? optimalLayoutForBox(cfg.pitchMM ?? DEFAULT_PITCH_MM, band.id, bandClass.rulerWidthMM, bandClass.rulerHeightMM)
-        : null
+      const pitch0 = cfg.pitchMM ?? DEFAULT_PITCH_MM
+      const exact = bandClass ? canonLayoutForFrame(pitch0,
+        positionsAcross(bandClass.rulerWidthMM, pitch0), positionsAcross(bandClass.rulerHeightMM, pitch0)) : null
+      const lookup = (id: number) => filters?.frame === 'exact'
+        ? exact?.bandId === id ? exact : null
+        : bandClass ? optimalLayoutForBox(pitch0, id, bandClass.rulerWidthMM, bandClass.rulerHeightMM) : null
+      let optimal = filters?.band === 'requested-lower' ? null : lookup(band.id)
+      if (filters?.band === 'requested-lower')
+        for (let id = band.id; id >= 1 && !optimal; id--) optimal = lookup(id)
       const recommendation = optimal && bandClass
         ? { cols: optimal.frameCols, rows: optimal.frameRows, count: optimal.nodesMM.length,
             id: optimal.id, seedMM: bandClass.seedMM, anchorMM: bandClass.anchorMM }
@@ -129,6 +138,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         // the classifier measured the boxes, the lookup named the layout; the ladder tries it first
         const optimalNodes = optimal?.nodesMM.map(([x, y]) => [x, y] as Pt)
         solve = wrapBandLadder(sized, rawCfg, span.minMM, span.maxMM, MIN_EFFECT_MM, anchorAt, optimalNodes)
+        if (solve.diagnostics) solve.diagnostics.canonBand = optimal?.bandId ?? null
         rungCache.set(key, solve)
         if (rungCache.size > FITS_CAP) rungCache.delete(rungCache.keys().next().value!)
       }
@@ -140,7 +150,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
         const ruleIdx = defaultLanding(rawRungs, pitch)
         const idx = Math.min(stepSel ?? ruleIdx, rawRungs.length - 1)
-        const perimeterOnly = cfg.perimeterOnly ?? true
+        const perimeterOnly = filters?.beltStage === 'pre-wrap' ? false : (cfg.perimeterOnly ?? true)
         const rungs = rawRungs.map((rg) => {
           const points = applyCoverage([...rg.at.points], perimeterOnly, pitch).seated
           if (points.length === rg.at.points.length) return rg
@@ -167,6 +177,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
           contour: drawn.contour, grid: { ...drawn.grid, anchors, segments },
           effSize: at.sizeMM, ladder, idx, segments, offMM: at.centreOffMM, recog,
           bandClass, bandClasses, recommendation,
+          pipelineDiagnostics: solve.diagnostics,
         } })
         return
       }
