@@ -225,6 +225,11 @@ direct instruction immediately above still requires a toggle for each filter.
 
 ### 2.6 · The one law as toggle 5, and BALANCE as an enforcer (2026-08-31 09:53)
 
+→ **Context Dan upheld, from Kai at 09:41 (not Dan):** “walk the material's boundary; wherever an
+unheld run exceeds one disc's reach, that run needs holds at its extremes — and score an answer by
+how much of the boundary is left in runs longer than that. One measure, one toggle.” Without this
+proposal, “Your proposal ... is upheld” does not identify what Dan approved.
+
 > "Your proposal to create one rule is upheld do it. But keep the rest for comparison it will be
 > universal toggle 5 so that we test what works best.
 >
