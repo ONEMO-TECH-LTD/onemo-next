@@ -148,8 +148,11 @@ export function computeGrid(
     legalBoxMM: legalRegionBoxMM(contourMM, r0),
     centresMM: [ruleTarget],
     centreMainMM: mainCentre,
-    // the same coverage rule the drawn answer gets, so the sparse registrations are comparable
-    seatings: seatings.map((seat) => applyCoverage(seat, perimeterOnly, pitch).seated),
+    // RAW CONSTRUCTIONS. v1's law, grid-core.ts:603 — "Phase selection judges the construction; the
+    // final layout is delivery only." The belt is applied at delivery, to the chosen population,
+    // never to the candidates: trimming every registration here changed pool membership and dedupe
+    // identity, so Full grid and Perimeter belt returned different offers for one shape.
+    seatings,
     // NO BELT ON THE SUGGESTED LAYOUT: a 3x3 IS nine magnets, and thinning it to a ring means the
     // answer returned is not the record that was looked up.
     canonSeatings,

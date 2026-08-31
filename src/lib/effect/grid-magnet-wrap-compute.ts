@@ -13,6 +13,7 @@
 import type { BandRung, BandSolve, Contour, GridConfig, GridResult, Pt, RungRole, WrapAt, WrapConfig } from './types'
 import { DEFAULT_PITCH_MM, MAGNET_DIA_SMALL_MM, MAGNET_DIA_LARGE_MM, PADDING_FLOOR_MM } from './grid-magnet-spec'
 import { computeGrid } from './grid-magnet'
+import { applyCoverage } from './units/layout'
 import { bbox } from './foundation/geometry'
 import { contourCentroidOf } from './units/centring'
 import { spotRadiusOf } from './units/layout'
@@ -97,6 +98,8 @@ export function wrapBandLadder(
   anchorAtMM?: (mm: number) => Pt, optimalNodesMM?: ReadonlyArray<Pt>,
 ): BandSolve {
   const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
+  // the same default the v1 door uses (grid-core.ts:586): the belt is on unless turned off
+  const perimeterOnly = cfg.perimeterOnly ?? true
   const scanCfg: GridConfig = { ...cfg, segmentsDetail: 'light', forcePhaseMM: undefined }
   // Sequencer's job: derive the governed centre ONCE and hand it to wrap, which never computes
   // one for itself. Falls back to the same governed centre the old wrap derived internally, so the
@@ -196,17 +199,35 @@ export function wrapBandLadder(
 
   // COINCIDENT RESULTS COLLAPSE — the same answer is one row, whatever reached it first. Identity
   // is what SHIPS: the wrapped size and the magnet positions, never which probe proposed it.
+  // DELIVERY — v1's finalize (grid-core.ts:604), and the law above it: "Phase selection judges the
+  // construction; the final layout is delivery only."
+  //
+  // It happens HERE, after optimal/min/max are chosen, and NOT before the wrap. Belting the
+  // population first makes wrap solve the thinned set, and on a holed shape that moves the answer:
+  // a ring at B4 wrapped to 195.78mm raw and 168.05mm belted — measured, 2026-08-31. The wrap must
+  // settle the construction; only then does the shipped layout drop its interior.
+  //
+  // So the size, the origin and the governed anchor are carried across untouched, and only the
+  // population changes. Gaps travel with the magnets they belong to.
+  const deliver = (r: BandRung): BandRung => {
+    const seated = applyCoverage([...r.at.points], perimeterOnly, pitch).seated
+    if (seated.length === r.at.points.length) return r
+    const keep = new Set(seated.map((q) => q.join(',')))
+    return { ...r, at: { ...r.at, count: seated.length, points: seated,
+      gapsMM: r.at.gapsMM.filter((_, i) => keep.has(r.at.points[i].join(','))) } }
+  }
   const shipped = (r: BandRung) => r.at.sizeMM.toFixed(2) + '|' + identityOf(r.at.points)
   const offers: BandRung[] = []
   const kept = new Map<string, BandRung>()
   for (const [role, r] of [['optimal', optimal], ['min', min], ['max', max]] as Array<[RungRole, BandRung | null]>) {
     if (!r) continue
-    const key = shipped(r)
+    const d = deliver(r)
+    const key = shipped(d)
     const already = kept.get(key)
     if (already) { already.roles.push(role); continue }   // the same answer, reached twice: one row
-    r.roles = [role]
-    kept.set(key, r)
-    offers.push(r)
+    d.roles = [role]
+    kept.set(key, d)
+    offers.push(d)
   }
   return { offers, bestSeated: bestSeatedCandidate(witnesses) }
 }

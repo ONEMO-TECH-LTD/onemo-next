@@ -648,12 +648,18 @@ describe('1b — the frame comes from the usable material', () => {
     // prefilter by name.
     const sq = (mm: number): Contour =>
       ({ outer: { pts: [[0, 0], [mm, 0], [mm, mm], [0, mm]] as Pt[] }, holes: [] })
-    for (const [mm, expected] of [[120, [4, 6, 6, 8]], [168, [8, 10, 10, 12]]] as [number, number[]][]) {
+    // The registrations come back RAW — the belt is delivery, not selection (v1 grid-core.ts:603,
+    // "Phase selection judges the construction; the final layout is delivery only"). A 3x3 is nine
+    // here, not eight: trimming it at this point put the belt inside the search, which made Full
+    // grid and Perimeter belt return different offers for one shape.
+    for (const [mm, raw, drawn] of [[120, [4, 6, 6, 9], 8], [168, [9, 12, 12, 16], 12]] as [number, number[], number][]) {
       const g = computeGrid(sq(mm), { pitchMM: 48, paddingMM: 12 })
       expect(g.seatings.map((x) => x.length).sort((a, b) => a - b), mm + 'mm registrations')
-        .toEqual(expected)
-      // and the ANSWER is untouched: still the fullest, still what gets drawn
-      expect(g.anchors.length, mm + 'mm drawn answer moved').toBe(Math.max(...expected))
+        .toEqual(raw)
+      // and the DELIVERED answer is the fullest construction with its interior dropped — strictly
+      // fewer than the raw fullest, which is what proves the two stages are separate
+      expect(g.anchors.length, mm + 'mm drawn answer moved').toBe(drawn)
+      expect(drawn, mm + 'mm the belt must actually remove something').toBeLessThan(Math.max(...raw))
     }
   })
 
@@ -679,12 +685,17 @@ describe('1b — the frame comes from the usable material', () => {
     // MIN is 10, and 10 is only reachable because every registration now survives. Winner-only
     // cannot produce it — that path keeps the fullest at each size, so its MIN is 12.
     const b4 = solveBand(4)
-    expect(b4.solve.offers.map((o) => o.at.count), 'B4 optimal / min / max').toEqual([16, 10, 12])
+    // The canon 4x4 is sixteen nodes and ships as TWELVE: the belt drops its four interior magnets
+    // at delivery, at the same wrapped size, keeping the ring that pins the outline. The free
+    // walk's fullest is twelve too, so optimal and max are one answer and collapse.
+    expect(b4.solve.offers.map((o) => o.at.count), 'B4 optimal+max / min').toEqual([12, 10])
     // every row states WHY it is on the list — the order alone is not the answer
     expect(b4.solve.offers.map((o) => o.roles.join('+')), 'B4 roles')
-      .toEqual(['optimal', 'min', 'max'])
-    expect(b4.solve.offers[0].at.count, 'the first row must be the canon layout')
-      .toBe(b4.optimal!.nodesMM.length)
+      .toEqual(['optimal+max', 'min'])
+    // the first row is still the canon layout — delivered, so belted, never the raw sixteen
+    expect(b4.optimal!.nodesMM.length, 'the canon 4x4 is sixteen raw').toBe(16)
+    expect(b4.solve.offers[0].at.count, 'and ships as its ring')
+      .toBeLessThan(b4.optimal!.nodesMM.length)
 
     // B2 — the optimal IS the fullest, so those two rows are the same answer and COLLAPSE to one.
     // This is the case that proves the collapse: without it the same answer appears twice.
