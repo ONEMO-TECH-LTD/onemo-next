@@ -23,8 +23,9 @@ import { wrapGroup } from '../units/wrap'
 import { wrapBandLadder } from '../grid-magnet-wrap-compute'
 import { contourCentroidOf } from '../units/centring'
 import { safeSegments } from '../units/segment'
-import { edgeDistToContourMM, pointInContour } from '../foundation/geometry'
-import { contourCacheKey, makeSizer } from '../grid-magnet-bridge'
+import { bbox, edgeDistToContourMM, pointInContour } from '../foundation/geometry'
+import { contourCacheKey, makeSizer, normBaseContour } from '../grid-magnet-bridge'
+import { getShape } from '@/lib/shape-library'
 import type { Contour, GridConfig, Pt } from '../types'
 
 const LIB = join(process.cwd(), 'src/lib/effect')
@@ -658,24 +659,45 @@ describe('1b — the frame comes from the usable material', () => {
     }
   })
 
-  it('coverage changes only the drawn output, never search registrations or B4 offers', () => {
-    const sq = (mm: number): Contour =>
-      ({ outer: { pts: [[0, 0], [mm, 0], [mm, mm], [0, mm]] as Pt[] }, holes: [] })
-    const full = computeGrid(sq(168), { pitchMM: 48, paddingMM: 12, perimeterOnly: false })
-    const belt = computeGrid(sq(168), { pitchMM: 48, paddingMM: 12, perimeterOnly: true })
+  it('coverage belts only the delivered B4/B3 squircle offers, after raw search', () => {
+    const base = normBaseContour(getShape('squircle', 1024, 1024), 1024)!
+    const sized = makeSizer(base, 0)
+    const full = computeGrid(sized(168), { pitchMM: 48, paddingMM: 12, perimeterOnly: false })
+    const belt = computeGrid(sized(168), { pitchMM: 48, paddingMM: 12, perimeterOnly: true })
     expect(belt.seatings, 'coverage changed the search registrations').toEqual(full.seatings)
     expect(belt.anchors, 'the belt must remain output processing').not.toEqual(full.anchors)
 
-    const band = BANDS.find((b) => b.id === 4)!
-    const anchorAt = (mm: number): Pt => [mm / 2, mm / 2]
-    const row = classifyBands(sq, { pitchMM: 48, paddingMM: 12 }, anchorAt).find((r) => r.bandId === 4)!
-    const canon = optimalLayoutForBox(48, 4, row.legalWidthMM, row.legalHeightMM)!.nodesMM
-      .map(([x, y]) => [x, y] as Pt)
-    const solve = (perimeterOnly: boolean) => wrapBandLadder(
-      sq, { pitchMM: 48, paddingMM: 12, perimeterOnly }, band.minMM + 24, band.maxMM + 24,
-      24, anchorAt, canon,
-    ).offers.map((o) => ({ roles: o.roles, count: o.at.count, sizeMM: o.at.sizeMM, points: o.at.points }))
-    expect(solve(true), 'coverage changed B4 search output').toEqual(solve(false))
+    const baseBox = bbox(base.outer.pts)
+    const anchorAt = (mm: number): Pt => [
+      (baseBox.minX + baseBox.maxX) * mm / 2,
+      (baseBox.minY + baseBox.maxY) * mm / 2,
+    ]
+    const solve = (id: number, perimeterOnly: boolean) => {
+      const band = BANDS.find((b) => b.id === id)!
+      const row = classifyBands(sized, { pitchMM: 48, paddingMM: 12 }, anchorAt)
+        .find((r) => r.bandId === id)!
+      const canon = optimalLayoutForBox(48, id, row.legalWidthMM, row.legalHeightMM)!.nodesMM
+        .map(([x, y]) => [x, y] as Pt)
+      return wrapBandLadder(
+        sized, { pitchMM: 48, paddingMM: 12, perimeterOnly }, band.minMM + 24, band.maxMM + 24,
+        24, anchorAt, canon,
+      ).offers
+    }
+    const b4Full = solve(4, false), b4Belt = solve(4, true)
+    expect(b4Belt.map((o) => o.roles), 'coverage changed B4 roles').toEqual(b4Full.map((o) => o.roles))
+    expect(b4Belt.map((o) => o.at.sizeMM), 'coverage changed B4 wrapped sizes')
+      .toEqual(b4Full.map((o) => o.at.sizeMM))
+    expect(b4Full.map((o) => [o.at.sizeMM, o.at.count])).toEqual([[175.68, 16], [168, 12]])
+    expect(b4Belt.map((o) => [o.at.sizeMM, o.at.count])).toEqual([[175.68, 12], [168, 8]])
+    for (let i = 0; i < b4Belt.length; i++) for (const p of b4Belt[i].at.points)
+      expect(b4Full[i].at.points.some((q) => Math.hypot(p[0] - q[0], p[1] - q[1]) < 1e-6),
+        'belt introduced a point outside the corresponding full answer').toBe(true)
+
+    const b3Full = solve(3, false), b3Belt = solve(3, true)
+    const full9 = b3Full.find((o) => o.at.count === 9)!
+    const belt8 = b3Belt.find((o) => o.roles.some((r) => full9.roles.includes(r)))!
+    expect(belt8.at.sizeMM, 'B3 wrapped size changed').toBe(full9.at.sizeMM)
+    expect(belt8.at.count, 'B3 3×3 delivery did not lose its centre').toBe(8)
   }, 20_000)
 
   it('THE THREE ANSWERS: optimal first, then min and max, coincident rows collapsed', () => {
@@ -684,7 +706,7 @@ describe('1b — the frame comes from the usable material', () => {
     // - if they coincide or anything coincides we show only the single result".
     const sq = (mm: number): Contour =>
       ({ outer: { pts: [[0, 0], [mm, 0], [mm, mm], [0, mm]] as Pt[] }, holes: [] })
-    const cfg = { pitchMM: 48, paddingMM: 12 }
+    const cfg = { pitchMM: 48, paddingMM: 12, perimeterOnly: false }
     const anchorAt = (mm: number): Pt => [mm / 2, mm / 2]
     const rows = classifyBands(sq, cfg, anchorAt)
     const solveBand = (id: number) => {

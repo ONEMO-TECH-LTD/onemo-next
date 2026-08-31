@@ -15,7 +15,7 @@ import { DEFAULT_PITCH_MM, MAGNET_DIA_SMALL_MM, MAGNET_DIA_LARGE_MM, PADDING_FLO
 import { computeGrid } from './grid-magnet'
 import { bbox } from './foundation/geometry'
 import { contourCentroidOf } from './units/centring'
-import { spotRadiusOf } from './units/layout'
+import { applyCoverage, spotRadiusOf } from './units/layout'
 import { safeSegments } from './units/segment'
 import { centeringAnchors, governMass } from './units/centring'
 import { CENTRE_MODE, GOVERNOR } from './grid-magnet-spec'
@@ -97,6 +97,7 @@ export function wrapBandLadder(
   anchorAtMM?: (mm: number) => Pt, optimalNodesMM?: ReadonlyArray<Pt>,
 ): BandSolve {
   const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
+  const perimeterOnly = cfg.perimeterOnly ?? true
   const scanCfg: GridConfig = { ...cfg, segmentsDetail: 'light', forcePhaseMM: undefined }
   // Sequencer's job: derive the governed centre ONCE and hand it to wrap, which never computes
   // one for itself. Falls back to the same governed centre the old wrap derived internally, so the
@@ -133,7 +134,8 @@ export function wrapBandLadder(
     return pts.map((p) => Math.round((p[0] - mx) / pitch) + ',' + Math.round((p[1] - my) / pitch)).sort().join(';')
   }
   const attempt = (pts: ReadonlyArray<Pt>, revealMM: number): BandRung | null => {
-    const at = wrapGroup(sized, wcfg, localise(pts), minMM, hiMM)
+    const delivered = applyCoverage([...pts], perimeterOnly, pitch).seated
+    const at = wrapGroup(sized, wcfg, localise(delivered), minMM, hiMM)
     if (!at) return null
     if (!inBand(at.sizeMM, loMM, hiMM)) return null   // judge: another band owns it
     return { at, revealMM, roles: [] }
