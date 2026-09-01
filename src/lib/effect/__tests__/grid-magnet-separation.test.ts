@@ -1259,6 +1259,10 @@ describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside
     expect(priorityTupleOf(nodesOf(optimal), priority).slice(0, 4)).toEqual([1, 1, 1, 0])
     expect(priorityTupleOf(nodesOf(canon), priority)[3], 'the blind row must still carry its orphans — that is the comparison').toBeLessThan(0)
     expect(canon.at.sizeMM).toBeCloseTo(204.99, 2); expect(canon.at.count).toBe(9)
+    // Non-slim invariant (QA): a 3x4 frame is not slim, so no size ladder runs — optimal is its own
+    // tight wrap, and the trace counts exactly the wraps the two winners and settle needed.
+    expect(priority.slim).toBe(false)
+    expect(withPriority.trace.wraps).toBeLessThanOrEqual(2 + (withPriority.trace.readded > 0 ? 2 : 0) + 6)
     // OPEN — Dan has not ruled more-seats vs tightest when every priority ties; frozen array is 5 nodes.
   }, 180_000)
 
