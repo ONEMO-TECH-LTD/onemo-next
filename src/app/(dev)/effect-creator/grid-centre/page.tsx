@@ -21,6 +21,7 @@ import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
+import type { ProtectionEvidence } from '@/lib/effect/units/protection'
 import { DEFAULT_PITCH_MM, type BandSnapPoint, type GridResult, type MagnetPlan, type SafeSegment } from '@/lib/effect/grid-magnet'
 import { bandOuterMM, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet'
 import { BANDS, CENTRE_MODE, GOVERNOR, PADDING_CEIL_MM, PADDING_FLOOR_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-magnet-spec'
@@ -92,6 +93,8 @@ export default function GridLab() {
   // WHICH RULER the classifier reads. A test instrument so both can be tried on the same shape
   // (Dan, 2026-08-30: "i prefer testing both"); 'legal' is the released behaviour.
   const [ruler, setRuler] = useState<'legal' | 'outer'>('legal')
+  const [protectionPadding, setProtectionPadding] = useState(24)
+  const [showUnheld, setShowUnheld] = useState(true)
   /** Legal-area islands, coloured + boxed + centre-marked. */
   const [showSegs, setShowSegs] = useState(true)
   /** Coloured fills of the inner (legal) area — off leaves outlines only. */
@@ -279,6 +282,7 @@ export default function GridLab() {
 
   // The solve runs in a worker so the page never freezes; the last result stays up while solving.
   type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: Array<BandSnapPoint & { roles?: string[] }>; idx: number; segments: SafeSegment[]; stops?: Array<{ press: number; reveal: number }>; offMM?: number; recog?: { family: string; cols: number; rows: number; segWmm: number; segHmm: number }
+    unprotected?: ProtectionEvidence | null
     /** STEP 1+2 — what the classifier read at this band's trial size, and the whole table. */
     /** the classifier's own row and the layout it recommended — carried for the readout, not
      *  rendered as a second panel (Dan: I did not ask for that) */
@@ -337,13 +341,14 @@ export default function GridLab() {
       manualBand,
       sizeMM: manualBand ? (bandScale ?? effSizeRef.current ?? bandOuterMM(BANDS[0], pad).minMM) : 0,
       stepSel,
+      protectionPaddingMM: protectionPadding,
     }
     if (busyRef.current) { queuedRef.current = msg; setSolving(true); return }
     busyRef.current = true
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler])
+  }, [base, src, preset, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler, protectionPadding])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -416,6 +421,7 @@ export default function GridLab() {
                     // 100% = the shape at half the board, so there is room around it (Dan).
                     viewport: { panMM: [0, 0] as Pt, zoom: camZoom * CAM_BASE },
                     segments: showSegs ? model!.segments : [], segFill: segFillN !== 0,
+                    unprotected: showUnheld ? model!.unprotected ?? null : null,
                     onPan: (dx: number, dy: number) => setManual((m) => { const bx = m ? m.x : model!.grid.phaseMM[0], by = m ? m.y : model!.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } }),
                     onZoom: (f: number) => {
                       // Pinch = manual scaling WITHIN the band's range.
@@ -643,6 +649,17 @@ export default function GridLab() {
               </div>
             </div>}
           </Fold>
+          <Fold title="Protection">
+            <Slider label="Protection padding · from magnet edge" unit="mm"
+              v={protectionPadding} set={setProtectionPadding} min={0} max={96} />
+            {model?.unprotected && <div className="gl-field"><span>Unsupported material</span>
+              <div className="gl-snap">{model.unprotected.percent.toFixed(1)}% ·{' '}
+                {Math.round(model.unprotected.areaMM2)} mm² · {model.unprotected.patchCount} patch{model.unprotected.patchCount === 1 ? '' : 'es'} ·{' '}
+                {Math.round(model.unprotected.boundaryMM)} mm outer edge</div></div>}
+            <label className="gl-toggle"><span>Show unheld <small style={{ color: 'var(--ink-3)' }}>· measured material</small></span>
+              <input type="checkbox" checked={showUnheld} onChange={(event) => setShowUnheld(event.target.checked)} />
+            </label>
+          </Fold>
         </aside>
       </div>
     </div>
@@ -658,8 +675,9 @@ function dim(c: Contour, axis: 0 | 1): number {
 /** Island tints — screen colours only, one hue per segment, smallest first. */
 const SEG_HUES = ['#e0762f', '#7a4ae0', '#2fa864', '#e04a8f', '#2f9fe0']
 
-function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, onReset, onPickNode, viewport }: {
+function Stage({ contour, grid, lattice, box, segments, segFill, unprotected, onPan, onZoom, onReset, onPickNode, viewport }: {
   contour: Contour; grid: GridResult; lattice: boolean; box: boolean; segments: SafeSegment[]; segFill: boolean
+  unprotected?: ProtectionEvidence | null
   onPan: (dxMM: number, dyMM: number) => void; onZoom: (f: number) => void; onReset: () => void
   /** Library authoring: a lattice spot was clicked (mm, engine y-up). Display layer only. */
   onPickNode?: (pMM: Pt) => void
@@ -794,6 +812,9 @@ function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, 
       onDoubleClick={() => { setPend({ x: 0, y: 0 }); onReset() }}>
       {/* The ground: two-level mm rule anchored on the lattice, so intersections are the centres. */}
       <defs>
+        <pattern id="gl-unheld" width={4} height={4} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <line x1={0} y1={0} x2={0} y2={4} stroke="var(--warn, #e0762f)" strokeOpacity={0.38} strokeWidth={1.2} />
+        </pattern>
         <pattern id="gl-fine" width={grid.pitchCentreMM / 2} height={grid.pitchCentreMM / 2}
           patternUnits="userSpaceOnUse" x={Afy[0]} y={Afy[1]}>
           <path d={`M ${grid.pitchCentreMM / 2} 0 L 0 0 0 ${grid.pitchCentreMM / 2}`}
@@ -906,6 +927,11 @@ function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, 
           <text {...lbl} x={lX + fs * 0.6} y={my} textAnchor="middle" transform={`rotate(90 ${lX + fs * 0.6} ${my})`}>{hTxt}</text>
         </g>)
       })()}
+      {unprotected && unprotected.ringsMM.length > 0 && <path style={{ pointerEvents: 'none' }}
+        d={unprotected.ringsMM.map((ring) =>
+          'M ' + ring.map(([x, y]) => `${x.toFixed(2)} ${(-y).toFixed(2)}`).join(' L ') + ' Z').join(' ')}
+        fill="url(#gl-unheld)" stroke="var(--warn, #e0762f)" strokeOpacity={0.65}
+        fillRule="evenodd" clipRule="evenodd" strokeWidth={1} vectorEffect="non-scaling-stroke" />}
       {/* Every spot the bridge handed over: faint where empty, accent where a magnet seats. */}
       <g transform={pend.x || pend.y ? `translate(${pend.x} ${-pend.y})` : undefined}>
       {spots.map((sp, i) => {
