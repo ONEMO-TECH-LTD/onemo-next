@@ -3,14 +3,14 @@
 
 import { BANDS, bandOuterMM, classifyBands, computeGrid, MIN_EFFECT_MM, type GridConfig } from '@/lib/effect/grid-magnet'
 import { canonLayoutForFrame } from '@/lib/effect/grid-magnet-library-catalogue'
-import { wrapGrid, type BandSolve, type WrapConfig } from '@/lib/effect/grid-magnet-wrap-compute'
+import { wrapGrid, wrapGroup, type BandSolve, type WrapConfig } from '@/lib/effect/grid-magnet-wrap-compute'
 import { solveCanonExperiment } from '@/lib/effect/grid-magnet-canon-experiment'
 import { bbox, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet-compute'
 import { contourCentroidOf } from '@/lib/effect/units/centring'
 import { anchorBakeOf, anchorFromBake, applyCoverage, assignSizes, centeringAnchors, type AnchorBake, type CentreMode, type Governor, type MagnetPlan } from '@/lib/effect/grid-magnet-logic'
 import { classFrameNodes, shapeFamilyOf, type ShapeFamily } from '@/lib/effect/grid-magnet-class'
 
-import { defaultLanding } from '@/lib/effect/units/judge'
+import { defaultLanding, inBand, sparseExtremeHold } from '@/lib/effect/units/judge'
 import { positionsAcross } from '@/lib/effect/units/classifier'
 import { DEFAULT_PITCH_MM, PADDING_FLOOR_MM } from '@/lib/effect/grid-magnet-spec'
 import { contourCacheKey, makeSizer, sizeRange } from '@/lib/effect/grid-magnet-bridge'
@@ -136,10 +136,46 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       const key = JSON.stringify([rawCfgSig, band.id])
       let solve = rungCache.get(key)
       if (!solve) {
-        // the classifier measured the boxes, the lookup named the layout; the ladder tries it first
+        // One pipeline, three roles. Each candidate is wrapped before the enabled holding scores
+        // judge it; roles are assigned only after that. Belt remains delivery-only below.
         const optimalNodes = optimal?.nodesMM.map(([x, y]) => [x, y] as Pt)
-        solve = solveCanonExperiment(
+        const canonSolve = solveCanonExperiment(
           sized, rawCfg, span.minMM, span.maxMM, MIN_EFFECT_MM, anchorAt, optimalNodes ?? [])
+        const maxSolve = solveCanonExperiment(
+          sized, rawCfg, span.minMM, span.maxMM, MIN_EFFECT_MM, anchorAt, [])
+        const offers: BandSolve['offers'] = []
+        const canon = canonSolve.offers[0]
+        if (canon) offers.push({ ...canon, roles: ['optimal'] })
+        if (canon) {
+          const sparse = sparseExtremeHold(sized(canon.at.sizeMM), canon.at.points, canon.at.anchorMM)
+          if (sparse.length) {
+            const xs = sparse.map((p) => p[0]), ys = sparse.map((p) => p[1])
+            const cx = (Math.min(...xs) + Math.max(...xs)) / 2
+            const cy = (Math.min(...ys) + Math.max(...ys)) / 2
+            const local = sparse.map(([x, y]) => [x - cx, y - cy] as Pt)
+            const at = wrapGroup(sized, {
+              pitchMM: rawCfg.pitchMM, paddingMM: rawCfg.paddingMM, anchorAtMM: anchorAt,
+            }, local, MIN_EFFECT_MM, span.maxMM)
+            if (at && inBand(at.sizeMM, span.minMM, span.maxMM))
+              offers.push({ at, revealMM: canon.revealMM, roles: ['min'] })
+          }
+        }
+        const freeMax = maxSolve.offers[0]
+        if (freeMax) offers.push({ ...freeMax, roles: ['max'] })
+        const identityOf = (rung: BandSolve['offers'][number]) => rung.at.sizeMM.toFixed(2) + '|'
+          + rung.at.points.map(([x, y]) => `${x.toFixed(3)},${y.toFixed(3)}`).sort().join(';')
+        const unified: BandSolve['offers'] = []
+        const kept = new Map<string, BandSolve['offers'][number]>()
+        for (const rung of offers) {
+          const id2 = identityOf(rung), same = kept.get(id2)
+          if (same) {
+            for (const role of rung.roles) if (!same.roles.includes(role)) same.roles.push(role)
+          } else {
+            kept.set(id2, rung)
+            unified.push(rung)
+          }
+        }
+        solve = { offers: unified, bestSeated: maxSolve.bestSeated }
         rungCache.set(key, solve)
         if (rungCache.size > FITS_CAP) rungCache.delete(rungCache.keys().next().value!)
       }

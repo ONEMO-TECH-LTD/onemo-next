@@ -92,6 +92,10 @@ export default function GridLab() {
   // WHICH RULER the classifier reads. A test instrument so both can be tried on the same shape
   // (Dan, 2026-08-30: "i prefer testing both"); 'legal' is the released behaviour.
   const [ruler, setRuler] = useState<'legal' | 'outer'>('legal')
+  const [holdingRules, setHoldingRules] = useState({
+    universal: true, balance: true, perimeter: false,
+    extremes: false, ends: false, top: false,
+  })
   /** Legal-area islands, coloured + boxed + centre-marked. */
   const [showSegs, setShowSegs] = useState(true)
   /** Coloured fills of the inner (legal) area — off leaves outlines only. */
@@ -326,7 +330,7 @@ export default function GridLab() {
     const w = workerRef.current
     if (!w) return
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
-    const cfg = { pitchMM: pitch, paddingMM: pad, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle', classifierRuler: ruler }
+    const cfg = { pitchMM: pitch, paddingMM: pad, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle', classifierRuler: ruler, holdingRules }
     // Manual in a band (forced registration OR manual band scale): the walk is meaningless —
     // solve that size directly, exactly like free mode, band chip stays active.
     const manualBand = manual !== null || bandScale !== null   // manual scale/pan: solved directly at the requested size
@@ -343,7 +347,7 @@ export default function GridLab() {
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler])
+  }, [base, src, preset, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler, holdingRules])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -642,6 +646,18 @@ export default function GridLab() {
                   <button key={g} aria-pressed={governor === g} onClick={() => setGovernor(g)}>{l}</button>)}
               </div>
             </div>}
+          </Fold>
+          <Fold title="Holding filters">
+            <div className="gl-field"><span>Primary comparison</span><div className="gl-seg gl-wrap">
+              {([['universal', 'Universal'], ['balance', 'Balance']] as const).map(([key, label]) =>
+                <button key={key} aria-pressed={holdingRules[key]}
+                  onClick={() => setHoldingRules((rules) => ({ ...rules, [key]: !rules[key] }))}>{label}</button>)}
+            </div></div>
+            <div className="gl-field"><span>Rule comparison</span><div className="gl-seg gl-wrap">
+              {([['ends', 'Ends'], ['top', 'Top'], ['extremes', 'Extremes'], ['perimeter', 'Perimeter']] as const)
+                .map(([key, label]) => <button key={key} aria-pressed={holdingRules[key]}
+                  onClick={() => setHoldingRules((rules) => ({ ...rules, [key]: !rules[key] }))}>{label}</button>)}
+            </div></div>
           </Fold>
         </aside>
       </div>

@@ -126,6 +126,15 @@ export interface BandSolve {
   bestSeated: { revealMM: number; points: Pt[] } | null
 }
 
+export interface HoldingRules {
+  perimeter: boolean
+  extremes: boolean
+  ends: boolean
+  top: boolean
+  universal: boolean
+  balance: boolean
+}
+
 export interface CanonExperimentTrace {
   source: 'canon-full' | 'canon-partial' | 'free-fallback' | 'none'
   canonSeats: number; populations: number; wraps: number; retained: number; readded: number
@@ -146,6 +155,8 @@ export interface GridConfig {
    *  needs; legal gives 95.9 and returns nothing. One ruler yields a layout, the
    *  other yields silence, on the same shape at the same size. */
   classifierRuler?: 'legal' | 'outer'
+  /** Temporary comparison switches over candidate scoring. All false preserves base ordering. */
+  holdingRules?: HoldingRules
   pitchMM?: number
   paddingMM?: number
   /** Manual calibration: force this registration (mm phase) instead of searching. */

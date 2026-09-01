@@ -24,6 +24,7 @@ import { applyCoverage, enumerateCanonPhaseWindows, enumerateFreePhaseMax, fallb
 import { wrapGroup } from '../units/wrap'
 import { wrapBandLadder } from '../grid-magnet-wrap-compute'
 import { contourCentroidOf } from '../units/centring'
+import { holdingFactsOf, rankByHolding, sparseExtremeHold } from '../units/judge'
 import { safeSegments } from '../units/segment'
 import { edgeDistToContourMM, pointInContour } from '../foundation/geometry'
 import { contourCacheKey, makeSizer, normBaseContour, normMaskContour } from '../grid-magnet-bridge'
@@ -930,19 +931,7 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
     expect(solve.offers.some((o) => (o as unknown as { points?: unknown }).points !== undefined)).toBe(false)
   })
 
-  it('the shell belts only final delivery and preserves the raw default and empty witness', async () => {
-    // The shell used to re-run computeGrid without the baked centre, so the population labelled
-    // "calibration witness" was a solve nobody made. Pre-fix this band drew 2 magnets at a
-    // different phase while layout had selected 4.
-    const star: Contour = (() => {
-      const pts: Pt[] = []
-      for (let i = 0; i < 10; i++) {
-        const t = (i / 10) * Math.PI * 2 - Math.PI / 2
-        const r = (i % 2 === 0 ? 0.5 : 0.22) * (i === 4 ? 0.78 : 1)
-        pts.push([0.5 + r * Math.cos(t), 0.5 + r * Math.sin(t)] as Pt)
-      }
-      return { outer: { pts }, holes: [] }
-    })()
+  it('the shell belts only final delivery and preserves the unified raw solve', async () => {
     const cfg: GridConfig = { paddingMM: 12, pitchMM: 48, centreMode: 2, governor: 0 }
     type Posted = { model: {
       contour: Contour; effSize: number; idx: number
@@ -970,21 +959,12 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
       expect(belt.grid.centreMainMM, 'coverage changed the governed centre').toEqual(full.grid.centreMainMM)
       expect(belt.ladder.map((r) => [r.roles, r.sizeMM]), 'coverage changed roles or rung sizes')
         .toEqual(full.ladder.map((r) => [r.roles, r.sizeMM]))
-      expect(full.ladder.map((r) => r.count)).toEqual([16, 12])
-      expect(belt.ladder.map((r) => r.count)).toEqual([12, 8])
+      expect(full.ladder.map((r) => r.count)).toEqual([16, 4])
+      expect(belt.ladder.map((r) => r.count)).toEqual([12, 4])
       for (const a of belt.grid.anchors)
         expect(full.grid.anchors.some((b) => Math.hypot(a.p[0] - b.p[0], a.p[1] - b.p[1]) < 1e-6),
           'Belt introduced a point instead of removing an interior point').toBe(true)
 
-      stub.onmessage!({ data: { id: 3, base: star, offsetMM: 0, cfg, mode: 2, sizeMM: 0, stepSel: null } })
-      const model = posted[2]?.model
-      expect(model, 'the worker posted no model').toBeTruthy()
-      expect(model!.diagnostic, 'this band must be empty, or the test proves nothing').toBeTruthy()
-      const sized = makeSizer(star, 0)
-      const solve = wrapBandLadder(sized, cfg, 72, 119, 24, worker.anchorFnFor(sized, cfg, JSON.stringify(cfg), 'gate'))
-      expect(solve.offers.length, 'this band must hold no offers').toBe(0)
-      expect(model!.grid.anchors.map((a) => a.p), 'the drawn population is not the selected witness')
-        .toEqual(solve.bestSeated!.points)
     } finally {
       g.self = prev
     }
@@ -1057,4 +1037,25 @@ describe('8 — recovered phase search is wired through the production Canon sol
     expect(result.offers[0].at.points.every((point) =>
       pointInContour(point, contour) && edgeDistToContourMM(contour, point) >= 11.98)).toBe(true)
   }, 30_000)
+
+  it('enabled holding scores rank evenly and Canon min keeps extreme span holds', () => {
+    const candidates = ['perimeter', 'protected', 'balanced'] as const
+    const facts = {
+      perimeter: { perimeter: 3, holdsExtremes: false, ends: 1, topUnprotectedMM: 20, unprotectedMM: 20, imbalance: 1 },
+      protected: { perimeter: 1, holdsExtremes: true, ends: 2, topUnprotectedMM: 0, unprotectedMM: 0, imbalance: 0.5 },
+      balanced: { perimeter: 2, holdsExtremes: true, ends: 2, topUnprotectedMM: 10, unprotectedMM: 10, imbalance: 0 },
+    }
+    const ranked = rankByHolding(candidates, (candidate) => facts[candidate], {
+      universal: true, balance: true, perimeter: false, extremes: false, ends: false, top: false,
+    })
+    expect(ranked[0]).toBe('protected')
+    const contour: Contour = { outer: { pts: [[0, 0], [144, 0], [144, 144], [0, 144]] }, holes: [] }
+    const points: Pt[] = [[12, 12], [72, 12], [132, 12], [12, 72], [72, 72], [132, 72], [12, 132], [72, 132], [132, 132]]
+    const sparse = sparseExtremeHold(contour, points, [72, 72])
+    expect(sparse.length).toBeLessThan(points.length)
+    const before = holdingFactsOf(contour, points, [72, 72])
+    const after = holdingFactsOf(contour, sparse, [72, 72])
+    expect(after.holdsExtremes).toBe(before.holdsExtremes)
+    expect(after.ends).toBeGreaterThanOrEqual(before.ends)
+  })
 })

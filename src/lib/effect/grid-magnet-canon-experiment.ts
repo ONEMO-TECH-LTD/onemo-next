@@ -7,7 +7,7 @@ import {
 } from './units/layout'
 import { bbox } from './foundation/geometry'
 import { wrapGroup } from './units/wrap'
-import { inBand } from './units/judge'
+import { holdingFactsOf, inBand, rankByHolding } from './units/judge'
 
 const localise = (pts: ReadonlyArray<Pt>): Pt[] => {
   if (!pts.length) return []
@@ -101,7 +101,8 @@ export function solveCanonExperiment(
     lawful.sort((a, b) => a.rung.at.sizeMM - b.rung.at.sizeMM
       || a.rung.at.centreOffMM - b.rung.at.centreOffMM
       || a.candidate.id.localeCompare(b.candidate.id))
-    const winner = lawful[0]
+    const winner = rankByHolding(lawful, ({ rung }) =>
+      holdingFactsOf(sized(rung.at.sizeMM), rung.at.points, rung.at.anchorMM), cfg.holdingRules)[0]
     trace.source = 'canon-partial'; trace.retained = winner.rung.at.count
     trace.winningPhaseMM = winner.candidate.phaseMM
     trace.winningWindow = winner.candidate.window
@@ -162,7 +163,8 @@ export function solveCanonExperiment(
     if (atCount.length) {
       atCount.sort((a, b) => a.rung.at.sizeMM - b.rung.at.sizeMM
         || a.rung.at.centreOffMM - b.rung.at.centreOffMM || a.id.localeCompare(b.id))
-      const winner = atCount[0]
+      const winner = rankByHolding(atCount, ({ rung }) =>
+        holdingFactsOf(sized(rung.at.sizeMM), rung.at.points, rung.at.anchorMM), cfg.holdingRules)[0]
       trace.source = 'free-fallback'; trace.retained = winner.rung.at.count
       trace.winningPhaseMM = winner.phaseMM
       return finish({ offers: [winner.rung], bestSeated: bestSeatedCandidate(witnesses), trace })
