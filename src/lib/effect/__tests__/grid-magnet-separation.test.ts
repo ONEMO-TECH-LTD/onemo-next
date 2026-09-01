@@ -43,9 +43,12 @@ describe('protection diagnostic', () => {
     }
     const evidence = measureProtection(contour, [[100, 100]], 48, 24, [3])
     expect(evidence.patches.length, 'the counterexample produced no unsupported patch').toBeGreaterThan(0)
-    for (const patch of evidence.patches)
+    for (const patch of evidence.patches) {
+      expect(patch.witnessMM, 'the centred-hole fixture lost its available witness').not.toBeNull()
+      if (!patch.witnessMM) continue
       expect(Math.hypot(patch.witnessMM[0] - 100, patch.witnessMM[1] - 100),
         'patch witness landed in the 27mm protected hole').toBeGreaterThan(27)
+    }
   })
 
   it('locates witnesses for normal 3x3 Full and Belt delivery', () => {
@@ -58,8 +61,22 @@ describe('protection diagnostic', () => {
     for (const magnets of [full, belt]) {
       const evidence = measureProtection(contour, magnets, 48, 24, magnets.map(() => 3))
       expect(evidence.patches.length, 'ordinary delivery lost its unsupported patches').toBeGreaterThan(0)
-      expect(evidence.patches.every((patch) => Number.isFinite(patch.witnessMM[0])
-        && Number.isFinite(patch.witnessMM[1])), 'ordinary delivery produced an invalid witness').toBe(true)
+      expect(evidence.patches.filter((patch) => patch.witnessMM).every((patch) =>
+        Number.isFinite(patch.witnessMM![0]) && Number.isFinite(patch.witnessMM![1])),
+      'ordinary delivery produced an invalid witness').toBe(true)
+    }
+  })
+
+  it('keeps manual lattice phases diagnostic-safe', () => {
+    const contour: Contour = {
+      outer: { pts: [[0, 0], [200, 0], [200, 200], [0, 200]] }, holes: [],
+    }
+    for (let phaseY = 0; phaseY < 48; phaseY++) for (let phaseX = 0; phaseX < 48; phaseX++) {
+      const magnets: Pt[] = []
+      for (let y = phaseY; y <= 200; y += 48) for (let x = phaseX; x <= 200; x += 48)
+        if (x >= 12 && x <= 188 && y >= 12 && y <= 188) magnets.push([x, y])
+      expect(() => measureProtection(contour, magnets, 48, 24, magnets.map(() => 3)),
+        `manual phase ${phaseX},${phaseY} crashed the diagnostic`).not.toThrow()
     }
   })
 })

@@ -6,7 +6,7 @@ import { Clipper, FillRule, PointInPolygonResult, type Path64, type Paths64 } fr
 
 export interface UnsupportedPatch {
   areaMM2: number
-  witnessMM: Pt
+  witnessMM: Pt | null
 }
 export interface UnsupportedBoundaryInterval {
   a: Pt
@@ -250,13 +250,9 @@ function patchesOf(paths: Paths64): UnsupportedPatch[] {
   const outers = paths.filter((path) => Clipper.area(path) > 0)
   const holes = paths.filter((path) => Clipper.area(path) < 0)
   return outers.flatMap((path) => {
-    const ownedHoles = holes.filter((hole) => {
-      const witness = interiorWitness(hole, [])
-      if (!witness) throw new Error('Protection diagnostic could not locate an interior point for a hole.')
-      return pointRelation(path, witness) === PointInPolygonResult.IsInside
-    })
+    const ownedHoles = holes.filter((hole) => ringsOf([hole])[0]
+      .some((point) => pointRelation(path, point) !== PointInPolygonResult.IsOutside))
     const witnessMM = interiorWitness(path, ownedHoles)
-    if (!witnessMM) throw new Error('Protection diagnostic could not locate an interior point for an unsupported patch.')
     const holesArea = ownedHoles.reduce((sum, hole) =>
       sum + Math.abs(Number(Clipper.area(hole))) / (HOLD_SCALE * HOLD_SCALE), 0)
     return [{

@@ -976,7 +976,7 @@ function Stage({ contour, grid, lattice, box, segments, segFill, unprotected, on
           'M ' + ring.map(([x, y]) => `${x.toFixed(2)} ${(-y).toFixed(2)}`).join(' L ') + ' Z').join(' ')}
         fill="url(#gl-unheld)" stroke="var(--warn, #e0762f)" strokeOpacity={0.65}
         fillRule="evenodd" clipRule="evenodd" strokeWidth={1} vectorEffect="non-scaling-stroke" />}
-      {unprotected?.patches.map((patch, index) => <circle key={'patch' + index}
+      {unprotected?.patches.map((patch, index) => patch.witnessMM && <circle key={'patch' + index}
         cx={patch.witnessMM[0]} cy={-patch.witnessMM[1]} r={1.4} fill="none"
         stroke="var(--warn, #e0762f)" strokeWidth={1} vectorEffect="non-scaling-stroke" />)}
       {unprotected?.repairTargetMM && <g style={{ pointerEvents: 'none' }}>
