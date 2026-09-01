@@ -120,7 +120,32 @@ export interface BandRung {
   at: WrapAt
   revealMM: number
   roles: RungRole[]
-  unprotected?: { ringsMM: Pt[][]; areaMM2: number; boundaryMM: number }
+  unprotected?: UnprotectedEvidence
+}
+
+export interface UnsupportedPatch {
+  areaMM2: number
+  /** A point proven to lie inside this connected unsupported component. */
+  witnessMM: Pt
+}
+
+export interface UnsupportedBoundaryInterval {
+  a: Pt
+  b: Pt
+  lengthMM: number
+}
+
+/** One geometry object shared by scoring, repair, worker and canvas. */
+export interface UnprotectedEvidence {
+  /** Signed compound rings. The page renders them as one even-odd path. */
+  ringsMM: Pt[][]
+  materialAreaMM2: number
+  areaMM2: number
+  percent: number
+  patches: UnsupportedPatch[]
+  outerBoundary: UnsupportedBoundaryInterval[]
+  boundaryMM: number
+  repairTargetMM: Pt | null
 }
 
 /** What a band solve returns: the lawful offers judge allowed, and — only when there are none — a
@@ -146,6 +171,12 @@ export interface CanonExperimentTrace {
   phasePairs: number; windows: number; fitsCalls: number; cacheHits: number; elapsedMs: number
   winningPhaseMM?: Pt
   winningWindow?: Pt
+  repairCandidates?: number
+  repairShells?: number
+  repairSwaps?: number
+  repairWraps?: number
+  repairAdmitted?: number
+  repairedRoles?: RungRole[]
 }
 
 // The engine's request/response vocabulary.
@@ -162,6 +193,8 @@ export interface GridConfig {
   classifierRuler?: 'legal' | 'outer'
   /** Temporary comparison switches over candidate scoring. All false preserves base ordering. */
   holdingRules?: HoldingRules
+  /** Unsupported-material reach measured outward from each physical magnet edge. */
+  protectionPaddingMM?: number
   pitchMM?: number
   paddingMM?: number
   /** Manual calibration: force this registration (mm phase) instead of searching. */

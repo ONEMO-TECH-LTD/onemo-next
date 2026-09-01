@@ -8,6 +8,7 @@ import {
 import { bbox } from './foundation/geometry'
 import { wrapGroup } from './units/wrap'
 import { holdingFactsOf, inBand, rankByHolding, sparseExtremeHold } from './units/judge'
+import { magnetRadiiMM } from './grid-magnet-logic'
 
 const localise = (points: ReadonlyArray<Pt>): Pt[] => {
   if (!points.length) return []
@@ -29,6 +30,7 @@ type WrappedCandidate = {
   id: string
   phaseMM: Pt
   window?: Pt
+  frameMidMM?: Pt
 }
 
 type SearchCache = {
@@ -115,11 +117,10 @@ export function solveCanonExperiment(
     let value = factsCache.get(rung)
     if (!value) {
       value = holdingFactsOf(
-        sized(rung.at.sizeMM), rung.at.points, rung.at.anchorMM, rung.at.centreOffMM)
+        sized(rung.at.sizeMM), rung.at.points, rung.at.anchorMM, rung.at.centreOffMM,
+        pitch, cfg.protectionPaddingMM ?? 45, magnetRadiiMM(rung.at.points, cfg.plan ?? 'all6'))
       factsCache.set(rung, value)
-      rung.unprotected = {
-        ringsMM: value.ringsMM, areaMM2: value.unprotectedAreaMM2, boundaryMM: value.unprotectedMM,
-      }
+      rung.unprotected = value.evidence
     }
     return value
   }
@@ -130,7 +131,9 @@ export function solveCanonExperiment(
   const fullRows: WrappedCandidate[] = []
   for (const candidate of canon.values()) {
     const rung = wrap(candidate.points, candidate.revealMM, [0, 0])
-    if (rung) fullRows.push({ rung, id: candidate.id, phaseMM: candidate.phaseMM, window: candidate.window })
+    if (rung) fullRows.push({
+      rung, id: candidate.id, phaseMM: candidate.phaseMM, window: candidate.window, frameMidMM: [0, 0],
+    })
   }
   stable(fullRows)
   fullRows.sort((a, b) => b.rung.at.count - a.rung.at.count)
@@ -173,9 +176,80 @@ export function solveCanonExperiment(
     if (maxRows[index].rung.at.count < maxFreeCount) maxRows.splice(index, 1)
   stable(maxRows)
 
-  const scoredFull = rankByHolding([...fullRows, ...sparseRows], facts, cfg.holdingRules)
-  const scoredSparse = rankByHolding(sparseRows, facts, cfg.holdingRules)
-  const scoredMax = rankByHolding(maxRows, facts, cfg.holdingRules)
+  /** Dan's flap repair, bounded and role-safe: one same-count/same-phase swap per parent. */
+  const repairOn = !!cfg.holdingRules && (cfg.holdingRules.universal || cfg.holdingRules.top
+    || cfg.holdingRules.ends || cfg.holdingRules.balance)
+  const phaseOf = (points: ReadonlyArray<Pt>, contour: Contour): Pt => {
+    const box = bbox(contour.outer.pts), point = points[0]
+    const mod = (value: number) => ((value % pitch) + pitch) % pitch
+    return [mod(point[0] - box.minX), mod(point[1] - box.minY)]
+  }
+  const samePhase = (a: Pt, b: Pt) => {
+    const delta = (left: number, right: number) => Math.min(Math.abs(left - right), pitch - Math.abs(left - right))
+    return delta(a[0], b[0]) <= 0.01 && delta(a[1], b[1]) <= 0.01
+  }
+  const improves = (parent: ReturnType<typeof facts>, child: ReturnType<typeof facts>) =>
+    child.unprotectedMM < parent.unprotectedMM - 1e-6
+    || (Math.abs(child.unprotectedMM - parent.unprotectedMM) <= 1e-6
+      && child.unprotectedAreaMM2 < parent.unprotectedAreaMM2 - 1e-6)
+  const repairRows = (parents: WrappedCandidate[]): WrappedCandidate[] => {
+    if (!repairOn) return parents
+    const repaired = [...parents]
+    for (const parent of parents) {
+      trace.repairCandidates = (trace.repairCandidates ?? 0) + 1
+      const parentFacts = facts(parent), target = parentFacts.evidence?.repairTargetMM
+      if (!target) continue
+      const contour = sized(parent.rung.at.sizeMM), box = bbox(contour.outer.pts)
+      const radius = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
+      const fits = cfg.circle
+        ? makeCircleSeatPredicate((box.minX + box.maxX) / 2, (box.minY + box.maxY) / 2,
+          Math.max(box.maxX - box.minX, box.maxY - box.minY) / 2, radius)
+        : makeContourSeatPredicate(contour, radius)
+      if (!fits) continue
+      const parentPhase = phaseOf(parent.rung.at.points, contour)
+      const occupied = new Set(parent.rung.at.points.map(([x, y]) => `${x.toFixed(3)},${y.toFixed(3)}`))
+      const seats = latticeAt(box, pitch, parentPhase[0], parentPhase[1]).filter(fits)
+        .filter(([x, y]) => !occupied.has(`${x.toFixed(3)},${y.toFixed(3)}`))
+        .map((point) => ({ point, distance: Math.hypot(point[0] - target[0], point[1] - target[1]) }))
+        .sort((a, b) => a.distance - b.distance || a.point[0] - b.point[0] || a.point[1] - b.point[1])
+      const local = parent.rung.at.points.map(([x, y]) =>
+        [x - parent.rung.at.originMM[0], y - parent.rung.at.originMM[1]] as Pt)
+      let at = 0
+      while (at < seats.length) {
+        trace.repairShells = (trace.repairShells ?? 0) + 1
+        const distance = seats[at].distance, shell: Pt[] = []
+        while (at < seats.length && Math.abs(seats[at].distance - distance) <= 0.01) shell.push(seats[at++].point)
+        const admitted: WrappedCandidate[] = []
+        for (const worldSeat of shell) for (let remove = 0; remove < local.length; remove++) {
+          trace.repairSwaps = (trace.repairSwaps ?? 0) + 1
+          const localSeat: Pt = [worldSeat[0] - parent.rung.at.originMM[0], worldSeat[1] - parent.rung.at.originMM[1]]
+          const moved = local.map((point, index) => index === remove ? localSeat : point)
+          trace.repairWraps = (trace.repairWraps ?? 0) + 1
+          const rung = wrap(moved, parent.rung.revealMM, parent.frameMidMM)
+          if (!rung || rung.at.count !== parent.rung.at.count
+            || rung.at.centreOffMM > parent.rung.at.centreOffMM + 0.05
+            || !samePhase(parentPhase, phaseOf(rung.at.points, sized(rung.at.sizeMM)))) continue
+          const candidate: WrappedCandidate = {
+            ...parent, rung, id: `repair:${parent.id}:${remove}:${worldSeat[0].toFixed(3)},${worldSeat[1].toFixed(3)}`,
+          }
+          if (improves(parentFacts, facts(candidate))) {
+            admitted.push(candidate)
+            trace.repairAdmitted = (trace.repairAdmitted ?? 0) + 1
+          }
+        }
+        if (admitted.length) { repaired.push(...admitted); break }
+      }
+    }
+    return stable(repaired)
+  }
+
+  const repairedFullRows = repairRows(fullRows)
+  const repairedSparseRows = repairRows(sparseRows)
+  const repairedMaxRows = repairRows(maxRows)
+
+  const scoredFull = rankByHolding([...repairedFullRows, ...repairedSparseRows], facts, cfg.holdingRules)
+  const scoredSparse = rankByHolding(repairedSparseRows, facts, cfg.holdingRules)
+  const scoredMax = rankByHolding(repairedMaxRows, facts, cfg.holdingRules)
   const selected: Array<[BandRung | undefined, 'optimal' | 'min' | 'max', WrappedCandidate | undefined]> = [
     [scoredFull[0]?.rung, 'optimal', scoredFull[0]],
     [scoredSparse[0]?.rung, 'min', scoredSparse[0]],
@@ -189,6 +263,7 @@ export function solveCanonExperiment(
     const id = shipped(rung), same = kept.get(id)
     if (same) same.roles.push(role)
     else { const copy = { ...rung, roles: [role] }; kept.set(id, copy); offers.push(copy) }
+    if (candidate?.id.startsWith('repair:')) trace.repairedRoles = [...(trace.repairedRoles ?? []), role]
     if (role === 'optimal' && candidate) {
       trace.source = candidate.id.startsWith('s:') || rung.at.count < canonNodesMM.length
         ? 'canon-partial' : 'canon-full'
@@ -197,10 +272,9 @@ export function solveCanonExperiment(
   }
   for (const offer of offers) if (!offer.unprotected) {
     const value = holdingFactsOf(
-      sized(offer.at.sizeMM), offer.at.points, offer.at.anchorMM, offer.at.centreOffMM)
-    offer.unprotected = {
-      ringsMM: value.ringsMM, areaMM2: value.unprotectedAreaMM2, boundaryMM: value.unprotectedMM,
-    }
+      sized(offer.at.sizeMM), offer.at.points, offer.at.anchorMM, offer.at.centreOffMM,
+      pitch, cfg.protectionPaddingMM ?? 45, magnetRadiiMM(offer.at.points, cfg.plan ?? 'all6'))
+    offer.unprotected = value.evidence
   }
   if (!fullRows.length && scoredMax[0]) {
     trace.source = 'free-fallback'; trace.retained = scoredMax[0].rung.at.count
