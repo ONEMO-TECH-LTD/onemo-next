@@ -10,6 +10,7 @@ import { wrapGroup } from './units/wrap'
 import { inBand } from './units/judge'
 
 const localise = (pts: ReadonlyArray<Pt>): Pt[] => {
+  if (!pts.length) return []
   const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1])
   const cx = (Math.min(...xs) + Math.max(...xs)) / 2
   const cy = (Math.min(...ys) + Math.max(...ys)) / 2
