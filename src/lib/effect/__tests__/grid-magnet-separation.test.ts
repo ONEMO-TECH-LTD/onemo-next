@@ -130,7 +130,7 @@ describe('2 — traffic is one-way', () => {
     // The two SEQUENCER SEATS may import units (sequencing them is what a pipeline does); both
     // hand over to pipeline/ at S3. Every other retiring file re-exports only.
     'grid-magnet-wrap-compute.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/grid-magnet$/, /^\.\/offset$/, /^\.\/foundation\/[a-z-]+$/, /^\.\/units\/[a-z-]+$/, /^@countertype\/clipper2-ts$/],
-    'grid-magnet-canon-experiment.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/grid-magnet$/, /^\.\/grid-magnet-logic$/, /^\.\/grid-magnet-wrap-compute$/, /^\.\/foundation\/[a-z-]+$/, /^\.\/units\/[a-z-]+$/],
+    'grid-magnet-canon-experiment.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/grid-magnet$/, /^\.\/grid-magnet-wrap-compute$/, /^\.\/foundation\/[a-z-]+$/, /^\.\/units\/[a-z-]+$/],
     'grid-magnet-class.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/foundation\/[a-z-]+$/, /^\.\/units\/[a-z-]+$/],
     'grid-magnet-library-bridge.ts': [/^\.\/types$/, /^\.\/grid-magnet[a-z-]*$/, /^\.\/library[/a-z-]*$/, /^\.\/foundation\/[a-z-]+$/],
     'grid-magnet-library-catalogue.ts': [/^\.\/types$/, /^\.\/grid-magnet[a-z-]*$/, /^\.\/library[/a-z-]*$/],
@@ -1052,19 +1052,5 @@ describe('8 — recovered phase search is wired through the production Canon sol
       holes: [{ pts: [[60, 60], [140, 60], [140, 140], [60, 140]] }],
     }
     expect(holdingFactsOf(withHole, [], [100, 100]).unprotectedAreaMM2).toBeCloseTo(33600, 6)
-
-    const bridgeShape: Contour = { outer: { pts: [[0, 0], [200, 0], [200, 100], [0, 100]] }, holes: [] }
-    const adjacent: Pt[] = [[52, 50], [100, 50]]
-    const withSpan = holdingFactsOf(bridgeShape, adjacent, [100, 50], 0, 48, 0, [3, 3])
-    const withoutSpan = holdingFactsOf(bridgeShape, adjacent, [100, 50], 0, 47, 0, [3, 3])
-    expect(withSpan.unprotectedAreaMM2).toBeLessThan(withoutSpan.unprotectedAreaMM2)
-    expect(holdingFactsOf(bridgeShape, adjacent, [100, 50], 0, 48, 20, [3, 3]).unprotectedAreaMM2)
-      .toBeLessThan(withSpan.unprotectedAreaMM2)
-    const blockedBridge: Contour = {
-      outer: bridgeShape.outer,
-      holes: [{ pts: [[70, 40], [82, 40], [82, 60], [70, 60]] }],
-    }
-    expect(holdingFactsOf(blockedBridge, adjacent, [100, 50], 0, 48, 0, [3, 3]).unprotectedAreaMM2)
-      .toBeCloseTo(holdingFactsOf(blockedBridge, adjacent, [100, 50], 0, 47, 0, [3, 3]).unprotectedAreaMM2, 6)
   })
 })

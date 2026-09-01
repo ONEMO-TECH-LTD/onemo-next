@@ -4,7 +4,7 @@
 // magnet, never wraps and never mutates a population.
 
 import type { Contour, HoldingRules, Pt } from '../types'
-import { bbox, pointInContour } from '../foundation/geometry'
+import { bbox } from '../foundation/geometry'
 import { Clipper, FillRule, type Paths64 } from '@countertype/clipper2-ts'
 
 /** BAND MEMBERSHIP (Dan, 08-24): a layout whose TRUE wrapped size falls outside the band does not
@@ -29,74 +29,24 @@ export interface HoldingFacts {
 }
 
 type BoundaryGap = { a: Pt; b: Pt; length: number }
-type SupportSpan = { a: Pt; b: Pt; radius: number }
-
-function supportSpans(
-  contour: Contour, magnets: ReadonlyArray<Pt>, radii: ReadonlyArray<number>, edgePaddingMM: number,
-  pitchMM: number,
-): SupportSpan[] {
-  const spans: SupportSpan[] = []
-  for (let i = 0; i < magnets.length; i++) for (let j = i + 1; j < magnets.length; j++) {
-    const a = magnets[i], b = magnets[j]
-    const dx = Math.abs(a[0] - b[0]), dy = Math.abs(a[1] - b[1])
-    if (!((dx < 0.01 && Math.abs(dy - pitchMM) < 0.01)
-      || (dy < 0.01 && Math.abs(dx - pitchMM) < 0.01))) continue
-    const distance = Math.hypot(b[0] - a[0], b[1] - a[1])
-    const steps = Math.max(1, Math.ceil(distance))
-    let inside = true
-    for (let step = 0; step <= steps; step++) {
-      const t = step / steps
-      if (!pointInContour([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], contour)) {
-        inside = false; break
-      }
-    }
-    if (inside) spans.push({ a, b, radius: edgePaddingMM + Math.min(radii[i] ?? 3, radii[j] ?? 3) })
-  }
-  return spans
-}
-
-function spanInterval(edgeA: Pt, edgeB: Pt, span: SupportSpan): [number, number] | null {
-  const sx = span.b[0] - span.a[0], sy = span.b[1] - span.a[1], length = Math.hypot(sx, sy)
-  if (length < 1e-9) return null
-  const ux = sx / length, uy = sy / length
-  const along = (point: Pt) => (point[0] - span.a[0]) * ux + (point[1] - span.a[1]) * uy
-  const across = (point: Pt) => -(point[0] - span.a[0]) * uy + (point[1] - span.a[1]) * ux
-  let lo = 0, hi = 1
-  const clip = (v0: number, v1: number, min: number, max: number) => {
-    const d = v1 - v0
-    if (Math.abs(d) < 1e-12) return v0 >= min && v0 <= max
-    const t0 = (min - v0) / d, t1 = (max - v0) / d
-    lo = Math.max(lo, Math.min(t0, t1)); hi = Math.min(hi, Math.max(t0, t1))
-    return lo <= hi
-  }
-  return clip(along(edgeA), along(edgeB), 0, length)
-    && clip(across(edgeA), across(edgeB), -span.radius, span.radius) ? [lo, hi] : null
-}
 
 /** Exact unsupported intervals on the actual material boundary under 48mm magnet discs. */
-function boundaryGaps(
-  contour: Contour, magnets: ReadonlyArray<Pt>, protectionRadii: ReadonlyArray<number>, spans: ReadonlyArray<SupportSpan>,
-): BoundaryGap[] {
+function boundaryGaps(contour: Contour, magnets: ReadonlyArray<Pt>): BoundaryGap[] {
   const out: BoundaryGap[] = []
   for (const ring of [contour.outer, ...contour.holes]) for (let i = 0; i < ring.pts.length; i++) {
     const a = ring.pts[i], b = ring.pts[(i + 1) % ring.pts.length]
     const dx = b[0] - a[0], dy = b[1] - a[1], length = Math.hypot(dx, dy)
     if (length < 1e-9) continue
     const covered: Array<[number, number]> = []
-    for (let magnetIndex = 0; magnetIndex < magnets.length; magnetIndex++) {
-      const [mx, my] = magnets[magnetIndex], protectionRadius = protectionRadii[magnetIndex] ?? HOLD_REACH_MM
+    for (const [mx, my] of magnets) {
       const ux = dx / length, uy = dy / length
       const along = (mx - a[0]) * ux + (my - a[1]) * uy
       const across2 = (mx - (a[0] + along * ux)) ** 2 + (my - (a[1] + along * uy)) ** 2
-      const reach2 = protectionRadius ** 2 - across2
+      const reach2 = HOLD_REACH_MM ** 2 - across2
       if (reach2 < 0) continue
       const reach = Math.sqrt(reach2)
       const lo = Math.max(0, along - reach), hi = Math.min(length, along + reach)
       if (hi > lo) covered.push([lo, hi])
-    }
-    for (const span of spans) {
-      const interval = spanInterval(a, b, span)
-      if (interval) covered.push([interval[0] * length, interval[1] * length])
     }
     covered.sort((x, y) => x[0] - y[0])
     let at = 0
@@ -131,31 +81,18 @@ const nearBoundary = (contour: Contour, p: Pt): boolean => {
 const pathOf = (points: ReadonlyArray<Pt>) => Clipper.makePath(points.flatMap(([x, y]) =>
   [Math.round(x * HOLD_SCALE), Math.round(y * HOLD_SCALE)]))
 
-function unprotectedMaterial(
-  contour: Contour, magnets: ReadonlyArray<Pt>, protectionRadii: ReadonlyArray<number>, spans: ReadonlyArray<SupportSpan>,
-): Paths64 {
+function unprotectedMaterial(contour: Contour, magnets: ReadonlyArray<Pt>): Paths64 {
   let material: Paths64 = [pathOf(contour.outer.pts)]
   if (contour.holes.length) material = Clipper.difference(
     material, contour.holes.map((hole) => pathOf(hole.pts)), FillRule.NonZero)
   if (!magnets.length) return material
-  const sides = 72
-  const heldPaths = magnets.map(([mx, my], magnetIndex) => {
-    const radius = (protectionRadii[magnetIndex] ?? HOLD_REACH_MM) / Math.cos(Math.PI / sides)
-    return Clipper.makePath(Array.from({ length: sides }, (_, index) => {
+  const sides = 72, radius = HOLD_REACH_MM / Math.cos(Math.PI / sides)
+  const discs = magnets.map(([mx, my]) => Clipper.makePath(Array.from({ length: sides }, (_, index) => {
     const angle = index * Math.PI * 2 / sides
     return [Math.round((mx + Math.cos(angle) * radius) * HOLD_SCALE),
       Math.round((my + Math.sin(angle) * radius) * HOLD_SCALE)]
-    }).flat())
-  })
-  for (const span of spans) {
-    const dx = span.b[0] - span.a[0], dy = span.b[1] - span.a[1], length = Math.hypot(dx, dy)
-    const nx = -dy / length * span.radius, ny = dx / length * span.radius
-    heldPaths.push(pathOf([
-      [span.a[0] + nx, span.a[1] + ny], [span.b[0] + nx, span.b[1] + ny],
-      [span.b[0] - nx, span.b[1] - ny], [span.a[0] - nx, span.a[1] - ny],
-    ]))
-  }
-  const held = Clipper.union(heldPaths, FillRule.NonZero)
+  }).flat()))
+  const held = Clipper.union(discs, FillRule.NonZero)
   return held.length ? Clipper.difference(material, held, FillRule.NonZero) : material
 }
 
@@ -203,7 +140,6 @@ function spanEndHolds(contour: Contour, magnets: ReadonlyArray<Pt>): number {
 
 export function holdingFactsOf(
   contour: Contour, magnets: ReadonlyArray<Pt>, anchorMM: Pt, centreOffMM = 0,
-  pitchMM = 48, edgePaddingMM = 45, magnetRadiiMM: ReadonlyArray<number> = magnets.map(() => 3),
 ): HoldingFacts {
   const box = bbox(contour.outer.pts), w = box.maxX - box.minX, h = box.maxY - box.minY
   const square = Math.abs(w - h) < 1e-6
@@ -213,10 +149,8 @@ export function holdingFactsOf(
   const holdsExtremes = square
     ? held(0, box.minX, box.maxX) && held(1, box.minY, box.maxY)
     : h > w ? held(1, box.minY, box.maxY) : held(0, box.minX, box.maxX)
-  const protectionRadii = magnets.map((_, index) => edgePaddingMM + (magnetRadiiMM[index] ?? 3))
-  const spans = supportSpans(contour, magnets, magnetRadiiMM, edgePaddingMM, pitchMM)
-  const gaps = boundaryGaps(contour, magnets, protectionRadii, spans)
-  const unsupported = unprotectedMaterial(contour, magnets, protectionRadii, spans)
+  const gaps = boundaryGaps(contour, magnets)
+  const unsupported = unprotectedMaterial(contour, magnets)
   const areaIn = (minX: number, minY: number, maxX: number, maxY: number) => {
     if (!unsupported.length || maxX <= minX || maxY <= minY) return 0
     const rect = Clipper.makePath([
@@ -284,24 +218,17 @@ export function rankByHolding<T>(
 }
 
 /** Remove Canon seats greedily while preserving whole-shape extremes and semantic span ends. */
-export function sparseExtremeHold(
-  contour: Contour, points: ReadonlyArray<Pt>, anchorMM: Pt,
-  pitchMM = 48, edgePaddingMM = 45, magnetRadiiMM: ReadonlyArray<number> = points.map(() => 3),
-): Pt[] {
+export function sparseExtremeHold(contour: Contour, points: ReadonlyArray<Pt>, anchorMM: Pt): Pt[] {
   let kept = [...points]
-  const baseline = holdingFactsOf(contour, kept, anchorMM, 0, pitchMM, edgePaddingMM, magnetRadiiMM)
+  const baseline = holdingFactsOf(contour, kept, anchorMM)
   for (;;) {
     const options = kept.map((_, index) => kept.filter((__, i) => i !== index)).filter((candidate) => {
-      const facts = holdingFactsOf(contour, candidate, anchorMM, 0, pitchMM, edgePaddingMM,
-        candidate.map((point) => magnetRadiiMM[points.indexOf(point)] ?? 3))
+      const facts = holdingFactsOf(contour, candidate, anchorMM)
       return facts.holdsExtremes === baseline.holdsExtremes && facts.ends >= baseline.ends
     })
     if (!options.length) return kept
     options.sort((a, b) => {
-      const fa = holdingFactsOf(contour, a, anchorMM, 0, pitchMM, edgePaddingMM,
-        a.map((point) => magnetRadiiMM[points.indexOf(point)] ?? 3))
-      const fb = holdingFactsOf(contour, b, anchorMM, 0, pitchMM, edgePaddingMM,
-        b.map((point) => magnetRadiiMM[points.indexOf(point)] ?? 3))
+      const fa = holdingFactsOf(contour, a, anchorMM), fb = holdingFactsOf(contour, b, anchorMM)
       return fa.unprotectedMM - fb.unprotectedMM || fa.imbalance - fb.imbalance
     })
     kept = options[0]

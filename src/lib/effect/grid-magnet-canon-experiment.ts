@@ -8,7 +8,6 @@ import {
 import { bbox } from './foundation/geometry'
 import { wrapGroup } from './units/wrap'
 import { holdingFactsOf, inBand, rankByHolding, sparseExtremeHold } from './units/judge'
-import { magnetRadiiMM } from './grid-magnet-logic'
 
 const localise = (points: ReadonlyArray<Pt>): Pt[] => {
   if (!points.length) return []
@@ -116,8 +115,7 @@ export function solveCanonExperiment(
     let value = factsCache.get(rung)
     if (!value) {
       value = holdingFactsOf(
-        sized(rung.at.sizeMM), rung.at.points, rung.at.anchorMM, rung.at.centreOffMM,
-        pitch, cfg.protectionPaddingMM ?? 45, magnetRadiiMM(rung.at.points, cfg.plan ?? 'all6'))
+        sized(rung.at.sizeMM), rung.at.points, rung.at.anchorMM, rung.at.centreOffMM)
       factsCache.set(rung, value)
       rung.unprotected = {
         ringsMM: value.ringsMM, areaMM2: value.unprotectedAreaMM2, boundaryMM: value.unprotectedMM,
@@ -140,9 +138,7 @@ export function solveCanonExperiment(
   const sparseRows: WrappedCandidate[] = []
   for (const parent of fullRows) {
     const sparse = sparseExtremeHold(
-      sized(parent.rung.at.sizeMM), parent.rung.at.points, parent.rung.at.anchorMM,
-      pitch, cfg.protectionPaddingMM ?? 45,
-      magnetRadiiMM(parent.rung.at.points, cfg.plan ?? 'all6'))
+      sized(parent.rung.at.sizeMM), parent.rung.at.points, parent.rung.at.anchorMM)
     const rung = sparse.length ? wrap(localise(sparse), parent.rung.revealMM) : null
     if (rung) sparseRows.push({ ...parent, rung, id: `s:${parent.id}` })
   }
@@ -201,8 +197,7 @@ export function solveCanonExperiment(
   }
   for (const offer of offers) if (!offer.unprotected) {
     const value = holdingFactsOf(
-      sized(offer.at.sizeMM), offer.at.points, offer.at.anchorMM, offer.at.centreOffMM,
-      pitch, cfg.protectionPaddingMM ?? 45, magnetRadiiMM(offer.at.points, cfg.plan ?? 'all6'))
+      sized(offer.at.sizeMM), offer.at.points, offer.at.anchorMM, offer.at.centreOffMM)
     offer.unprotected = {
       ringsMM: value.ringsMM, areaMM2: value.unprotectedAreaMM2, boundaryMM: value.unprotectedMM,
     }
