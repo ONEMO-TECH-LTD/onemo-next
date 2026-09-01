@@ -120,7 +120,6 @@ export interface BandRung {
   at: WrapAt; revealMM: number; roles: RungRole[]
   /** How many of the canon layout's magnets the material refused. Absent when it held whole —
    *  a shortfall is recorded, never silent (Dan, 2026-08-30). */
-  omittedFromOptimal?: number
 }
 
 /** What a band solve returns: the lawful offers judge allowed, and — only when there are none — a
