@@ -3,7 +3,7 @@
 // The rules that were buried inside the band ladder (S2 step 6). Judge decides; it never places a
 // magnet, never wraps and never mutates a population.
 
-import type { BandRung, Contour, HoldingRules, Pt } from '../types'
+import type { Contour, HoldingRules, Pt } from '../types'
 import { bbox } from '../foundation/geometry'
 import { Clipper, FillRule, type Paths64 } from '@countertype/clipper2-ts'
 
@@ -11,32 +11,6 @@ import { Clipper, FillRule, type Paths64 } from '@countertype/clipper2-ts'
  *  exist in that band. No clamping to band floors — the size decides, not the request. */
 export function inBand(sizeMM: number, loMM: number, hiMM: number): boolean {
   return !(sizeMM < loMM - 0.005 || sizeMM > hiMM + 0.005)
-}
-
-/** Offers stand smallest-first. Ordering is judgement, not sequencing. */
-export function orderOffers(rungs: BandRung[]): BandRung[] {
-  return [...rungs].sort((a, b) => a.at.sizeMM - b.at.sizeMM)
-}
-
-/** RULE 4 (Dan, 08-24): prefer the tight solution closest to the centroid — never the smallest at
- *  any centring cost. Among offers of the SAME COUNT as the tightest, within half a pitch of it,
- *  the best-centred is the default landing. Every other lawful offer stays visible. */
-export function defaultLanding(rungs: BandRung[], pitchMM: number): number {
-  if (!rungs.length) return 0
-  const half = pitchMM / 2
-  const c0 = rungs[0]
-  let idx = 0
-  for (let i = 1; i < rungs.length; i++) {
-    const r = rungs[i]
-    if (r.at.count !== c0.at.count || r.at.sizeMM > c0.at.sizeMM + half) continue
-    if (r.at.centreOffMM < rungs[idx].at.centreOffMM - 0.01) idx = i
-  }
-  return idx
-}
-
-export const NO_HOLDING_RULES: HoldingRules = {
-  perimeter: false, extremes: false, ends: false, top: false,
-  universal: false, balance: false,
 }
 
 const HOLD_REACH_MM = 48
@@ -51,7 +25,7 @@ export interface HoldingFacts {
   imbalance: number
 }
 
-type BoundaryGap = { point: Pt; length: number }
+type BoundaryGap = { a: Pt; b: Pt; length: number }
 
 /** Exact unsupported intervals on the actual material boundary under 48mm magnet discs. */
 function boundaryGaps(contour: Contour, magnets: ReadonlyArray<Pt>): BoundaryGap[] {
@@ -75,8 +49,11 @@ function boundaryGaps(contour: Contour, magnets: ReadonlyArray<Pt>): BoundaryGap
     let at = 0
     const add = (lo: number, hi: number) => {
       if (hi <= lo + 1e-7) return
-      const mid = (lo + hi) / 2
-      out.push({ point: [a[0] + dx * mid / length, a[1] + dy * mid / length], length: hi - lo })
+      out.push({
+        a: [a[0] + dx * lo / length, a[1] + dy * lo / length],
+        b: [a[0] + dx * hi / length, a[1] + dy * hi / length],
+        length: hi - lo,
+      })
     }
     for (const [lo, hi] of covered) {
       add(at, lo)
@@ -145,10 +122,18 @@ export function holdingFactsOf(contour: Contour, magnets: ReadonlyArray<Pt>, anc
     : h > w ? held(1, box.minY, box.maxY) : held(0, box.minX, box.maxX)
   const gaps = boundaryGaps(contour, magnets)
   let top = 0, one = 0, two = 0
+  const splitAt = (gap: BoundaryGap, axis: 0 | 1, cut: number): [number, number] => {
+    const av = gap.a[axis], bv = gap.b[axis]
+    if (av <= cut && bv <= cut) return [gap.length, 0]
+    if (av >= cut && bv >= cut) return [0, gap.length]
+    const t = Math.max(0, Math.min(1, (cut - av) / (bv - av)))
+    return av < cut ? [gap.length * t, gap.length * (1 - t)]
+      : [gap.length * (1 - t), gap.length * t]
+  }
   for (const gap of gaps) {
-    if (gap.point[1] >= box.maxY - HOLD_REACH_MM) top += gap.length
-    const side = h >= w ? gap.point[0] < anchorMM[0] : gap.point[1] < anchorMM[1]
-    if (side) one += gap.length; else two += gap.length
+    top += splitAt(gap, 1, box.maxY - HOLD_REACH_MM)[1]
+    const halves = h >= w ? splitAt(gap, 0, anchorMM[0]) : splitAt(gap, 1, anchorMM[1])
+    one += halves[0]; two += halves[1]
   }
   const total = one + two
   return {
