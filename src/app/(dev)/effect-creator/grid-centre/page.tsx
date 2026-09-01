@@ -20,7 +20,7 @@ import { getShape, hasVectorDef, type VectorShapeKind } from '@/lib/shape-librar
 import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
-import type { CanonExperimentTrace, Contour, Pt } from '@/lib/effect/types'
+import type { Contour, Pt } from '@/lib/effect/types'
 import { DEFAULT_PITCH_MM, type BandSnapPoint, type GridResult, type MagnetPlan, type SafeSegment } from '@/lib/effect/grid-magnet'
 import { bandOuterMM, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet'
 import { BANDS, CENTRE_MODE, GOVERNOR, PADDING_CEIL_MM, PADDING_FLOOR_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-magnet-spec'
@@ -147,7 +147,6 @@ export default function GridLab() {
   /** Manual grid calibration — a forced registration (mm), or null for the engine's auto pick. */
   const [manual, setManual] = useState<{ x: number; y: number } | null>(null)
   const [coverage, setCoverage] = useState<'full' | 'perimeter'>('perimeter')
-  const [canonExperiment, setCanonExperiment] = useState(false)
 
   // On load the bench opens on B1 or the last band you pushed (Dan, 08-25). usePersisted loads
   // in a post-mount effect, so read storage directly for the one decision that must be right on
@@ -284,8 +283,7 @@ export default function GridLab() {
     /** the classifier's own row and the layout it recommended — carried for the readout, not
      *  rendered as a second panel (Dan: I did not ask for that) */
     bandClass?: { bandId: number; seedMM: number; legalWidthMM: number; legalHeightMM: number; rulerWidthMM: number; rulerHeightMM: number } | null
-    recommendation?: { cols: number; rows: number; count: number } | null
-    canonExperimentTrace?: CanonExperimentTrace }
+    recommendation?: { cols: number; rows: number; count: number } | null }
   const [model, setModel] = useState<Model | null>(null)
   const [solving, setSolving] = useState(false)
   // The overlay earns its place only on a REAL wait: it appears after a grace period, so the
@@ -339,14 +337,13 @@ export default function GridLab() {
       manualBand,
       sizeMM: manualBand ? (bandScale ?? effSizeRef.current ?? bandOuterMM(BANDS[0], pad).minMM) : 0,
       stepSel,
-      canonExperiment,
     }
     if (busyRef.current) { queuedRef.current = msg; setSolving(true); return }
     busyRef.current = true
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler, canonExperiment])
+  }, [base, src, preset, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -644,25 +641,6 @@ export default function GridLab() {
                 {([[0, 'Smallest'], [1, 'Deepest'], [2, 'Top'], [3, 'Top-small']] as [number, string][]).map(([g, l]) =>
                   <button key={g} aria-pressed={governor === g} onClick={() => setGovernor(g)}>{l}</button>)}
               </div>
-            </div>}
-          </Fold>
-          <Fold title="CANON SOLVER · EXPERIMENT">
-            <div className="gl-field"><span>Route</span><div className="gl-seg">
-              <button aria-pressed={!canonExperiment} onClick={() => setCanonExperiment(false)}>Current</button>
-              <button aria-pressed={canonExperiment} onClick={() => setCanonExperiment(true)}>Canon first</button>
-            </div></div>
-            {model?.canonExperimentTrace && <div className="gl-snap">
-              {model.canonExperimentTrace.source} · canon {model.canonExperimentTrace.canonSeats}
-              {' · '}populations {model.canonExperimentTrace.populations}
-              {' · '}wraps {model.canonExperimentTrace.wraps}
-              {' · '}retained {model.canonExperimentTrace.retained}
-              {' · '}readded {model.canonExperimentTrace.readded}
-              {' · '}phases {model.canonExperimentTrace.phasePairs}
-              {' · '}windows {model.canonExperimentTrace.windows}
-              {' · '}fits {model.canonExperimentTrace.fitsCalls}/{model.canonExperimentTrace.cacheHits}
-              {' · '}{model.canonExperimentTrace.elapsedMs}ms
-              {model.canonExperimentTrace.winningPhaseMM
-                ? ` · win ${model.canonExperimentTrace.winningPhaseMM.join(',')}` : ''}
             </div>}
           </Fold>
         </aside>

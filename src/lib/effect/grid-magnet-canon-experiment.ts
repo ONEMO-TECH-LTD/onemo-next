@@ -10,6 +10,7 @@ import { wrapGroup } from './units/wrap'
 import { inBand } from './units/judge'
 
 const localise = (pts: ReadonlyArray<Pt>): Pt[] => {
+  if (!pts.length) return []
   const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1])
   const cx = (Math.min(...xs) + Math.max(...xs)) / 2
   const cy = (Math.min(...ys) + Math.max(...ys)) / 2
@@ -107,7 +108,7 @@ export function solveCanonExperiment(
     return finish({ offers: [winner.rung], bestSeated: null, trace })
   }
 
-  const free = new Map<string, { points: Pt[]; revealMM: number; id: string }>()
+  const free = new Map<string, { points: Pt[]; revealMM: number; id: string; phaseMM: Pt }>()
   const witnesses: Array<{ revealMM: number; points: Pt[] }> = []
   for (const mm of fallbackRevealSizes(loMM, hiMM)) {
     const search = enumerateFreePhaseMax(sized(mm), { ...cfg, perimeterOnly: false },
@@ -118,7 +119,9 @@ export function solveCanonExperiment(
     for (const candidate of search.candidates) {
       witnesses.push({ revealMM: mm, points: candidate.points })
       const id = freeIdentity(candidate.points, pitch)
-      if (!free.has(id)) free.set(id, { points: candidate.points, revealMM: mm, id })
+      if (!free.has(id)) free.set(id, {
+        points: candidate.points, revealMM: mm, id, phaseMM: candidate.phaseMM,
+      })
     }
   }
   trace.populations = free.size
@@ -146,22 +149,23 @@ export function solveCanonExperiment(
   }
   for (let i = 0; i < ordered.length;) {
     const count = ordered[i].points.length
-    const atCount: Array<{ rung: BandRung; id: string }> = []
+    const atCount: Array<{ rung: BandRung; id: string; phaseMM: Pt }> = []
     while (i < ordered.length && ordered[i].points.length === count) {
       const candidate = ordered[i++]
       trace.wraps++
       const at = wrapGroup(sized, freeWcfg, localise(candidate.points), minMM, hiMM)
       if (at && inBand(at.sizeMM, loMM, hiMM)) {
         const raw: BandRung = { at, revealMM: candidate.revealMM, roles: ['max'] }
-        atCount.push({ rung: settleFree(raw), id: candidate.id })
+        atCount.push({ rung: settleFree(raw), id: candidate.id, phaseMM: candidate.phaseMM })
       }
     }
     if (atCount.length) {
       atCount.sort((a, b) => a.rung.at.sizeMM - b.rung.at.sizeMM
         || a.rung.at.centreOffMM - b.rung.at.centreOffMM || a.id.localeCompare(b.id))
-      const winner = atCount[0].rung
-      trace.source = 'free-fallback'; trace.retained = winner.at.count
-      return finish({ offers: [winner], bestSeated: bestSeatedCandidate(witnesses), trace })
+      const winner = atCount[0]
+      trace.source = 'free-fallback'; trace.retained = winner.rung.at.count
+      trace.winningPhaseMM = winner.phaseMM
+      return finish({ offers: [winner.rung], bestSeated: bestSeatedCandidate(witnesses), trace })
     }
   }
   return finish({ offers: [], bestSeated: bestSeatedCandidate(witnesses), trace })

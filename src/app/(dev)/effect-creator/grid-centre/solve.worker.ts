@@ -2,12 +2,12 @@
 // bridge/engine calls the page used to make inline, nothing computed here.
 
 import { BANDS, bandOuterMM, classifyBands, computeGrid, MIN_EFFECT_MM, type GridConfig } from '@/lib/effect/grid-magnet'
-import { canonLayoutForFrame, optimalLayoutForBox } from '@/lib/effect/grid-magnet-library-catalogue'
-import { wrapBandLadder, wrapGrid, type BandSolve, type WrapConfig } from '@/lib/effect/grid-magnet-wrap-compute'
+import { canonLayoutForFrame } from '@/lib/effect/grid-magnet-library-catalogue'
+import { wrapGrid, type BandSolve, type WrapConfig } from '@/lib/effect/grid-magnet-wrap-compute'
 import { solveCanonExperiment } from '@/lib/effect/grid-magnet-canon-experiment'
 import { bbox, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet-compute'
 import { contourCentroidOf } from '@/lib/effect/units/centring'
-import { anchorBakeOf, anchorFromBake, applyCoverage, assignSizes, type AnchorBake, type CentreMode, type Governor, type MagnetPlan } from '@/lib/effect/grid-magnet-logic'
+import { anchorBakeOf, anchorFromBake, applyCoverage, assignSizes, centeringAnchors, type AnchorBake, type CentreMode, type Governor, type MagnetPlan } from '@/lib/effect/grid-magnet-logic'
 import { classFrameNodes, shapeFamilyOf, type ShapeFamily } from '@/lib/effect/grid-magnet-class'
 
 import { defaultLanding } from '@/lib/effect/units/judge'
@@ -26,7 +26,6 @@ interface SolveRequest {
   manualBand?: boolean
   sizeMM: number
   stepSel: number | null
-  canonExperiment?: boolean
 }
 
 const ctx = self as unknown as Worker
@@ -69,10 +68,17 @@ function bakeOf(
  *  it must call the real bake, not a stand-in. */
 export function anchorFnFor(
   sized: (mm: number) => import('@/lib/effect/types').Contour, cfg: GridConfig, cfgSig: string, shapeSig2: string,
-): ((mm: number) => import('@/lib/effect/types').Pt) | undefined {
+): (mm: number) => import('@/lib/effect/types').Pt {
   const mode = (cfg.centreMode ?? 2) as CentreMode
+  if (mode === 1) return (mm: number) => {
+    const contour = sized(mm)
+    const outer = contour.outer.pts
+    const bb = bbox(outer)
+    const boxC: Pt = [(bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2]
+    const r = spotRadiusOf(Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM))
+    return centeringAnchors(1, safeSegments(contour, r, 'light'), boxC, contourCentroidOf(contour))[0] ?? boxC
+  }
   const hit = bakeOf(sized, cfg, shapeSig2)
-  if (mode === 1) return undefined                    // Core: live by definition (class still baked)
   // Dan, verified visually 2026-08-25: the centre does not change with scale — the shape is
   // fixed. So the SELECTION is made once too, at full size, and that one point IS the anchor
   // at every size, scaled linearly. No per-size re-election.
@@ -86,7 +92,7 @@ export function anchorFnFor(
 const FITS_CAP = 12
 
 ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
-  const { id, base, offsetMM, cfg, mode, manualBand, sizeMM, stepSel, canonExperiment } = e.data
+  const { id, base, offsetMM, cfg, mode, manualBand, sizeMM, stepSel } = e.data
   try {
     const sized = makeSizer(base, offsetMM)
     // Cache identity is the shape itself — every ring, exactly. A rolling hash of ring counts
@@ -99,7 +105,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       // one seated solve at that exact state, no ladder, no snapping.
       const aFn = anchorFnFor(sized, cfg, cfgSig, sig)
       const contour = sized(sizeMM)
-      const grid = computeGrid(contour, aFn ? { ...cfg, centreOverrideMM: aFn(sizeMM) } : cfg)
+      const grid = computeGrid(contour, { ...cfg, centreOverrideMM: aFn(sizeMM) })
       ctx.postMessage({ id, model: { contour, grid, effSize: sizeMM, ladder: [], idx: 0, segments: grid.segments } })
     } else {
       // Coverage is delivery-only. The entire solve and its cache identity stay raw so toggling
@@ -120,21 +126,20 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       const bandClass = bandClasses.find((row) => row.bandId === band.id) ?? null
       // the lookup digests the classifier's boxes; the classifier itself counts nothing
       const pitch0 = cfg.pitchMM ?? DEFAULT_PITCH_MM
-      const optimal = bandClass ? (canonExperiment
+      const optimal = bandClass
         ? canonLayoutForFrame(pitch0, positionsAcross(bandClass.rulerWidthMM, pitch0), positionsAcross(bandClass.rulerHeightMM, pitch0))
-        : optimalLayoutForBox(pitch0, band.id, bandClass.rulerWidthMM, bandClass.rulerHeightMM)) : null
+        : null
       const recommendation = optimal && bandClass
         ? { cols: optimal.frameCols, rows: optimal.frameRows, count: optimal.nodesMM.length,
             id: optimal.id, seedMM: bandClass.seedMM, anchorMM: bandClass.anchorMM }
         : null
-      const key = JSON.stringify([rawCfgSig, band.id, !!canonExperiment])
+      const key = JSON.stringify([rawCfgSig, band.id])
       let solve = rungCache.get(key)
       if (!solve) {
         // the classifier measured the boxes, the lookup named the layout; the ladder tries it first
         const optimalNodes = optimal?.nodesMM.map(([x, y]) => [x, y] as Pt)
-        solve = canonExperiment && optimalNodes?.length && anchorAt
-          ? solveCanonExperiment(sized, rawCfg, span.minMM, span.maxMM, MIN_EFFECT_MM, anchorAt, optimalNodes)
-          : wrapBandLadder(sized, rawCfg, span.minMM, span.maxMM, MIN_EFFECT_MM, anchorAt, optimalNodes)
+        solve = solveCanonExperiment(
+          sized, rawCfg, span.minMM, span.maxMM, MIN_EFFECT_MM, anchorAt, optimalNodes ?? [])
         rungCache.set(key, solve)
         if (rungCache.size > FITS_CAP) rungCache.delete(rungCache.keys().next().value!)
       }
@@ -173,7 +178,6 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
           contour: drawn.contour, grid: { ...drawn.grid, anchors, segments },
           effSize: at.sizeMM, ladder, idx, segments, offMM: at.centreOffMM, recog,
           bandClass, bandClasses, recommendation,
-          canonExperimentTrace: 'trace' in solve ? solve.trace : undefined,
         } })
         return
       }
@@ -185,9 +189,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       // The witness DRAWN is the witness layout SELECTED — one solve, at the same baked centre the
       // ladder used. Re-solving WITHOUT that centre drew a different population under the same
       // label: evidence of a solve nobody made.
-      const grid = computeGrid(contour, anchorAt
-        ? { ...cfg, centreOverrideMM: anchorAt(bestSeatedMM) }
-        : cfg)
+      const grid = computeGrid(contour, { ...cfg, centreOverrideMM: anchorAt(bestSeatedMM) })
       ctx.postMessage({ id, model: {
         contour, grid, effSize: bestSeatedMM, ladder: [], idx: 0, segments: grid.segments,
         offers: [], diagnostic: { reason: 'no-lawful-offer', bestSeatedMM },
