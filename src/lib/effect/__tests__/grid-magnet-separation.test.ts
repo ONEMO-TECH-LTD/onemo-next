@@ -12,7 +12,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import ts from 'typescript'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { bandOuterMM, classifyBands, computeGrid } from '../grid-magnet'
 import { canonLayoutForFrame, optimalLayoutForBox } from '../grid-magnet-library-catalogue'
 import { solveCanonExperiment } from '../grid-magnet-canon-experiment'
@@ -20,7 +20,7 @@ import { canonPriorityOf, frameOfMasses, positionsAcross } from '../units/classi
 import type { BBox, SafeMass, SafeSegment } from '../types'
 import { BANDS, BAND_STEP_MM } from '../grid-magnet-spec'
 import { scaleContour } from '../grid-magnet-compute'
-import { applyCoverage, enumerateCanonPhaseWindows, enumerateFreePhaseMax, fallbackRevealSizes, makeCircleSeatPredicate, makeContourSeatPredicate } from '../units/layout'
+import { applyCoverage, enumerateCanonPhaseWindows, enumerateFreePhaseMax, fallbackRevealSizes, makeCircleSeatPredicate, makeContourSeatPredicate, priorityTupleOf } from '../units/layout'
 import { wrapGroup } from '../units/wrap'
 import { wrapBandLadder } from '../grid-magnet-wrap-compute'
 import { contourCentroidOf } from '../units/centring'
@@ -1179,4 +1179,109 @@ describe('9 — priority hold points are classifier data', () => {
     expect(canonPriorityOf(frame(2, 3), 4800)!.topIds).toHaveLength(6)
     expect(canonPriorityOf([])).toBeNull()
   })
+})
+
+describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside it', () => {
+  // Gate 2 (Dan, 2026-09-01): "max must be conditional … try full frame but sacrifice parts of it
+  // and position in favour of the priorities"; "old blind canon better to be kept for comparison
+  // and fall back too". Gated against the frozen oracle by exact field. OPEN here, not weakened:
+  // bot-b4 exact node array (Dan has not yet ruled more-seats vs tightest when priorities tie),
+  // every unsupportedAreaImbalance field (protector iteration), butterfly, and bot-b2 centring
+  // (Gate 3 slim ladder).
+  const AUTHORITY = JSON.parse(readFileSync(join(process.cwd(), 'src/lib/effect/__tests__/fixtures/balanced-manual-authority.json'), 'utf8')) as {
+    fixtures: Array<{ id: string; asset: string; band: number; deliveredCanonNodes: Array<[number, number]> }>
+  }
+  const fixture = (id: string) => AUTHORITY.fixtures.find((f) => f.id === id)!
+  const cutout = (asset: string): Contour => {
+    const { PNG } = nodeRequire('pngjs') as { PNG: { sync: { read(data: Buffer): { width: number; height: number; data: Uint8Array } } } }
+    const png = PNG.sync.read(readFileSync(join(process.cwd(), asset)))
+    const mask = new Uint8Array(png.width * png.height)
+    for (let i = 0; i < mask.length; i++) if (png.data[i * 4 + 3] > 128) mask[i] = 1
+    return normMaskContour(mask, png.width, png.height)!
+  }
+  const workerAnchor = async (sized: (mm: number) => Contour, cfg: GridConfig, sig: string) => {
+    const g = globalThis as { self?: unknown }
+    const previous = g.self
+    if (!g.self) g.self = { postMessage: () => undefined, onmessage: null }
+    try {
+      const worker = await import('@/app/(dev)/effect-creator/grid-centre/solve.worker')
+      return worker.anchorFnFor(sized, cfg, JSON.stringify(cfg), sig)
+    } finally { g.self = previous }
+  }
+  const cfg: GridConfig = { pitchMM: 48, paddingMM: 12, perimeterOnly: false, centreMode: 2, governor: 0 }
+  const solveFixture = async (id: string) => {
+    const fx = fixture(id)
+    const sized = makeSizer(cutout(fx.asset), 0)
+    const anchorAt = await workerAnchor(sized, cfg, 'gate2-' + id)
+    const band = BANDS.find((b) => b.id === fx.band)!
+    const span = bandOuterMM(band, 12)
+    const row = classifyBands(sized, cfg, anchorAt, [band]).find((r) => r.bandId === fx.band)!
+    const canon = canonLayoutForFrame(48, positionsAcross(row.rulerWidthMM, 48), positionsAcross(row.rulerHeightMM, 48))!
+    const nodes = canon.nodesMM.map(([x, y]) => [x, y] as Pt)
+    const xs = nodes.map((p) => p[0]), ys = nodes.map((p) => p[1])
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2
+    const local = nodes.map(([x, y]) => [x - cx, y - cy] as Pt)
+    const priority = canonPriorityOf(local, 48)!
+    const minX = Math.min(...local.map((p) => p[0])), minY = Math.min(...local.map((p) => p[1]))
+    const colRow = local.map(([x, y]) => [Math.round((x - minX) / 48), Math.round((y - minY) / 48)] as [number, number])
+    const nodesOf = (o: { at: { points: Pt[]; originMM: Pt } }) => o.at.points
+      .map(([x, y]) => local.findIndex(([a, b]) => Math.abs(a - (x - o.at.originMM[0])) < 1e-6 && Math.abs(b - (y - o.at.originMM[1])) < 1e-6))
+    const withPriority = solveCanonExperiment(sized, cfg, span.minMM, span.maxMM, 24, anchorAt, nodes, priority)
+    const blindOnly = solveCanonExperiment(sized, cfg, span.minMM, span.maxMM, 24, anchorAt, nodes)
+    return { fx, priority, colRow, nodesOf, withPriority, blindOnly }
+  }
+  const sortedPairs = (xs: Array<[number, number]>) => xs.map((p) => p.join(',')).sort()
+
+  it('duck-b3: optimal is exactly the frozen top-corner + bottom-corner set; canon is today\'s answer, untouched', async () => {
+    const { fx, priority, colRow, nodesOf, withPriority, blindOnly } = await solveFixture('duck-b3')
+    const optimal = withPriority.offers.find((o) => o.roles.includes('optimal'))!
+    const canon = withPriority.offers.find((o) => o.roles.includes('canon'))!
+    expect(sortedPairs(nodesOf(optimal).map((i) => colRow[i]))).toEqual(sortedPairs(fx.deliveredCanonNodes))
+    expect(priorityTupleOf(nodesOf(optimal), priority).slice(0, 4)).toEqual([1, 1, 1, 0])
+    // relevantAxisCentreOffMM <= optimal (frozen comparator; vertical shape → x)
+    expect(Math.abs(optimal.at.originMM[0] - optimal.at.anchorMM[0]))
+      .toBeLessThanOrEqual(Math.abs(canon.at.originMM[0] - canon.at.anchorMM[0]))
+    // the blind row IS the parent's Optimal, byte-for-behaviour
+    expect(canon.at.sizeMM).toBeCloseTo(143.84, 2); expect(canon.at.count).toBe(4)
+    expect(blindOnly.offers).toHaveLength(1)
+    expect(blindOnly.offers[0].at.sizeMM).toBe(canon.at.sizeMM)
+    expect(blindOnly.offers[0].at.points).toEqual(canon.at.points)
+    expect(blindOnly.offers[0].roles).toEqual(['optimal'])
+  }, 120_000)
+
+  it('bot-b4: optimal holds top, both bottom corners, an interior row and no orphans; canon pinned; exact nodes OPEN', async () => {
+    const { priority, nodesOf, withPriority } = await solveFixture('bot-b4')
+    const optimal = withPriority.offers.find((o) => o.roles.includes('optimal'))!
+    const canon = withPriority.offers.find((o) => o.roles.includes('canon'))!
+    expect(priorityTupleOf(nodesOf(optimal), priority).slice(0, 4)).toEqual([1, 1, 1, 0])
+    expect(priorityTupleOf(nodesOf(canon), priority)[3], 'the blind row must still carry its orphans — that is the comparison').toBeLessThan(0)
+    expect(canon.at.sizeMM).toBeCloseTo(204.99, 2); expect(canon.at.count).toBe(9)
+    // OPEN — Dan has not ruled more-seats vs tightest when every priority ties; frozen array is 5 nodes.
+  }, 180_000)
+
+  it('batwoman-b3: today\'s answer already satisfies every priority, so the rows collapse and say so', async () => {
+    const { priority, nodesOf, withPriority } = await solveFixture('batwoman-b3')
+    expect(withPriority.offers).toHaveLength(1)
+    expect(withPriority.offers[0].roles).toEqual(['optimal', 'canon'])
+    expect(priorityTupleOf(nodesOf(withPriority.offers[0]), priority).slice(0, 4)).toEqual([1, 1, 1, 0])
+    expect(withPriority.offers[0].at.sizeMM).toBeCloseTo(140.97, 2)
+  }, 120_000)
+
+  it('the worker lands on optimal, never on the canon comparison row', async () => {
+    type Posted = { model: { idx: number; ladder: Array<{ roles: string[]; sizeMM: number }> } | null }
+    const posted: Posted[] = []
+    const stub = { onmessage: null as ((e: { data: unknown }) => void) | null, postMessage: (m: unknown) => { posted.push(m as never) } }
+    const g = globalThis as { self?: unknown }
+    const prev = g.self
+    g.self = stub
+    try {
+      vi.resetModules()   // the worker binds onmessage at import; an earlier import in this file bound another stub
+      await import('@/app/(dev)/effect-creator/grid-centre/solve.worker')
+      const duck = cutout(fixture('duck-b3').asset)
+      stub.onmessage!({ data: { id: 1, base: duck, offsetMM: 0, cfg, mode: 3, sizeMM: 0, stepSel: null } })
+      const model = posted[0].model!
+      expect(model.ladder.map((r) => r.roles)).toEqual([['optimal'], ['canon']])
+      expect(model.idx, 'Rule 4 must not promote the comparison row').toBe(0)
+    } finally { g.self = prev }
+  }, 120_000)
 })

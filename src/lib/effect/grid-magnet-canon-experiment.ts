@@ -1,13 +1,13 @@
 // TEMPORARY dev-only Canon smart-search. The released Current route remains unchanged.
-import type { BandRung, BandSolve, CanonExperimentTrace, Contour, GridConfig, Pt, WrapConfig } from './types'
+import type { BandRung, BandSolve, CanonExperimentTrace, CanonPriority, Contour, GridConfig, Pt, WrapConfig } from './types'
 import { DEFAULT_PITCH_MM, PADDING_FLOOR_MM, PHASE_STEP_MM } from './grid-magnet-spec'
 import {
   bestSeatedCandidate, enumerateCanonPhaseWindows, enumerateFreePhaseMax, fallbackRevealSizes,
-  latticeAt, makeCircleSeatPredicate, makeContourSeatPredicate, type CanonPhaseCandidate,
+  latticeAt, makeCircleSeatPredicate, makeContourSeatPredicate, priorityTupleOf, type CanonPhaseCandidate,
 } from './units/layout'
 import { bbox } from './foundation/geometry'
 import { wrapGroup } from './units/wrap'
-import { inBand } from './units/judge'
+import { inBand, orderCanonOffers } from './units/judge'
 
 const localise = (pts: ReadonlyArray<Pt>): Pt[] => {
   if (!pts.length) return []
@@ -30,6 +30,8 @@ const freeIdentity = (pts: ReadonlyArray<Pt>, pitch: number): string => {
 export function solveCanonExperiment(
   sized: (mm: number) => Contour, cfg: GridConfig, loMM: number, hiMM: number, minMM: number,
   anchorAtMM: (mm: number) => Pt, canonNodesMM: ReadonlyArray<Pt>,
+  /** Priority hold points from the classifier. Absent = today's blind-count behaviour only. */
+  priority?: CanonPriority,
 ): BandSolve & { trace: CanonExperimentTrace } {
   const started = Date.now()
   const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
@@ -54,7 +56,8 @@ export function solveCanonExperiment(
   const whole = attemptCanon(canonLocal)
   if (whole) {
     trace.source = 'canon-full'; trace.populations = 1; trace.retained = whole.at.count
-    return finish({ offers: [whole], bestSeated: null, trace })
+    // The whole frame holds every priority by construction: one row, both roles.
+    return finish({ offers: [{ ...whole, roles: priority ? ['optimal', 'canon'] : ['optimal'] }], bestSeated: null, trace })
   }
 
   const settleCanon = (seed: ReadonlyArray<Pt>, first: BandRung): BandRung => {
@@ -78,15 +81,27 @@ export function solveCanonExperiment(
     }
   }
 
+  // One sweep, two accumulators (Dan, 2026-09-01: "max must be conditional"). Reveals walk
+  // LARGEST-FIRST so the fullest priority window is found at once and floors every later reveal;
+  // candidate points are frame-local, so which reveal first produced an id never changes its wrap.
   const candidates = new Map<string, CanonPhaseCandidate>()
-  for (const mm of fallbackRevealSizes(loMM, hiMM)) {
+  const priorityCandidates = new Map<string, CanonPhaseCandidate>()
+  let priorityFloor: number[] | undefined
+  for (const mm of fallbackRevealSizes(loMM, hiMM).reverse()) {
     const search = enumerateCanonPhaseWindows(sized(mm), { ...cfg, perimeterOnly: false },
-      canonLocal, anchorAtMM(mm), mm, PHASE_STEP_MM)
+      canonLocal, anchorAtMM(mm), mm, PHASE_STEP_MM, priority, priorityFloor)
     trace.phasePairs += search.phasePairs
     trace.windows += search.windows
     trace.fitsCalls += search.fitsCalls
     trace.cacheHits += search.cacheHits
     for (const candidate of search.candidates) if (!candidates.has(candidate.id)) candidates.set(candidate.id, candidate)
+    if (priority) for (const candidate of search.priorityCandidates) {
+      const tuple = priorityTupleOf(candidate.id.split(',').map(Number), priority)
+      const cmp = priorityFloor ? tuple.map((v, i) => v - priorityFloor![i]).find((d) => d !== 0) ?? 0 : 1
+      if (cmp < 0) continue
+      if (cmp > 0) { priorityFloor = tuple; priorityCandidates.clear() }
+      if (!priorityCandidates.has(candidate.id)) priorityCandidates.set(candidate.id, candidate)
+    }
   }
   trace.populations = candidates.size
   const maxCanonCount = Math.max(0, ...[...candidates.values()].map((x) => x.points.length))
@@ -105,7 +120,19 @@ export function solveCanonExperiment(
     trace.source = 'canon-partial'; trace.retained = winner.rung.at.count
     trace.winningPhaseMM = winner.candidate.phaseMM
     trace.winningWindow = winner.candidate.window
-    return finish({ offers: [winner.rung], bestSeated: null, trace })
+    if (!priority) return finish({ offers: [winner.rung], bestSeated: null, trace })
+    // PRIORITY-MAX OPTIMAL. Wrapped without settle: settling re-adds every fitting frame node and
+    // would undo the very seats the priorities chose to give up. The blind row keeps its settle.
+    const priorityLawful = orderCanonOffers([...priorityCandidates.values()].flatMap((candidate) => {
+      const rung = attemptCanon(candidate.points)
+      return rung ? [{ rung, id: candidate.id }] : []
+    }))
+    const blind: BandRung = { ...winner.rung, roles: ['canon'] }
+    if (!priorityLawful.length) return finish({ offers: [blind], bestSeated: null, trace })
+    const optimal: BandRung = { ...priorityLawful[0].rung, roles: ['optimal'] }
+    const same = Math.abs(optimal.at.sizeMM - blind.at.sizeMM) < 0.005
+      && identity(optimal.at.points, pitch) === identity(blind.at.points, pitch)
+    return finish({ offers: same ? [{ ...blind, roles: ['optimal', 'canon'] }] : [optimal, blind], bestSeated: null, trace })
   }
 
   const free = new Map<string, { points: Pt[]; revealMM: number; id: string; phaseMM: Pt }>()

@@ -110,10 +110,11 @@ export interface WrapAt {
   gapsMM: number[]
 }
 
-/** WHY a row is on the list. The three answers Dan asked for: the canon layout the classifier
- *  recommended, the MIN magnets in the range, and the MAX. A row that is two of these at once
- *  collapsed, and says so. */
-export type RungRole = 'optimal' | 'min' | 'max'
+/** WHY a row is on the list. `optimal` is the priority-max Canon (Dan, 2026-09-01: "max must be
+ *  conditional … max must become true optimal"); `canon` is the blind-count Canon kept beside it
+ *  for comparison and as fallback; `max` is the free-grid maximum, the last resort; `min` is
+ *  historical and currently unemitted. A row that is two of these at once collapsed, and says so. */
+export type RungRole = 'optimal' | 'min' | 'max' | 'canon'
 
 /** One rung the band offers: a revealed layout at its exact contact size. */
 export interface BandRung { at: WrapAt; revealMM: number; roles: RungRole[] }

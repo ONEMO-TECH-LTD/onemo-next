@@ -31,3 +31,12 @@ export function defaultLanding(rungs: BandRung[], pitchMM: number): number {
   }
   return idx
 }
+
+/** THE OPTIMAL ORDER (Dan, 2026-09-01) among wrapped priority candidates. The priority tuple has
+ *  already decided WHICH node sets are offered; among lawful wraps of those, the tightest stands,
+ *  then the closest to the governed centre, then a stable id. Pure ordering — no geometry. */
+export function orderCanonOffers<T extends { rung: BandRung; id: string }>(rows: T[]): T[] {
+  return [...rows].sort((a, b) => a.rung.at.sizeMM - b.rung.at.sizeMM
+    || a.rung.at.centreOffMM - b.rung.at.centreOffMM
+    || a.id.localeCompare(b.id))
+}

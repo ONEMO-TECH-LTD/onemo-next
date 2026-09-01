@@ -12,7 +12,7 @@ import { anchorBakeOf, anchorFromBake, applyCoverage, assignSizes, centeringAnch
 import { classFrameNodes, shapeFamilyOf, type ShapeFamily } from '@/lib/effect/grid-magnet-class'
 
 import { defaultLanding } from '@/lib/effect/units/judge'
-import { positionsAcross } from '@/lib/effect/units/classifier'
+import { canonPriorityOf, positionsAcross } from '@/lib/effect/units/classifier'
 import { DEFAULT_PITCH_MM, PADDING_FLOOR_MM } from '@/lib/effect/grid-magnet-spec'
 import { contourCacheKey, makeSizer, sizeRange } from '@/lib/effect/grid-magnet-bridge'
 import type { Contour, Pt } from '@/lib/effect/types'
@@ -150,8 +150,15 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       if (!solve) {
         // the classifier measured the boxes, the lookup named the layout; the ladder tries it first
         const optimalNodes = optimal?.nodesMM.map(([x, y]) => [x, y] as Pt)
+        // Priority hold points are read off the same frame the classifier named; local coords are
+        // the solver's own convention (frame-centred), so the ids match the solver's populations.
+        const priority = optimalNodes?.length ? (() => {
+          const xs = optimalNodes.map((p) => p[0]), ys = optimalNodes.map((p) => p[1])
+          const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2
+          return canonPriorityOf(optimalNodes.map(([x, y]) => [x - cx, y - cy] as Pt), pitch0)
+        })() ?? undefined : undefined
         solve = solveCanonExperiment(
-          sized, rawCfg, span.minMM, span.maxMM, MIN_EFFECT_MM, anchorAt, optimalNodes ?? [])
+          sized, rawCfg, span.minMM, span.maxMM, MIN_EFFECT_MM, anchorAt, optimalNodes ?? [], priority)
         rungCache.set(key, solve)
         if (rungCache.size > FITS_CAP) rungCache.delete(rungCache.keys().next().value!)
       }
@@ -161,7 +168,11 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         // smallest at any centring cost. Among offers of the SAME COUNT as the tightest, within
         // half a pitch of it, the best-centred is the default landing. All offers stay visible.
         const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
-        const ruleIdx = defaultLanding(rawRungs, pitch)
+        // The default landing is Optimal's rule and stays Optimal's: the `canon` comparison row is
+        // never the drawn default, however well it scores on Rule 4.
+        const landing = rawRungs.filter((rg) => rg.roles.includes('optimal'))
+        const ruleIdx = landing.length
+          ? rawRungs.indexOf(landing[defaultLanding(landing, pitch)]) : defaultLanding(rawRungs, pitch)
         const idx = Math.min(stepSel ?? ruleIdx, rawRungs.length - 1)
         const perimeterOnly = cfg.perimeterOnly ?? true
         const rungs = rawRungs.map((rg) => {

@@ -6,7 +6,7 @@
 //
 // The voting sweep is gone (step 4a): centre-rules parity is the only registration path.
 
-import type { BBox, Contour, GridConfig, Pt, SafeSegment } from '../types'
+import type { BBox, CanonPriority, Contour, GridConfig, Pt, SafeSegment } from '../types'
 import { holds, prepare } from '@/lib/grid-engine/compute/geometry'
 import type { Band } from '../grid-magnet-spec'
 import { MIN_ANCHORS } from '../grid-magnet-spec'
@@ -180,11 +180,38 @@ export interface CanonPhaseCandidate {
 }
 
 export interface CanonPhaseSearch {
+  /** Blind-count winners — today's rule, byte-for-behaviour. */
   candidates: CanonPhaseCandidate[]
+  /** Priority-max winners — present only when a CanonPriority was supplied. */
+  priorityCandidates: CanonPhaseCandidate[]
   phasePairs: number
   windows: number
   fitsCalls: number
   cacheHits: number
+}
+
+/** THE PRIORITY TUPLE (Dan, 2026-09-01), highest first: top row held · both bottom corners held ·
+ *  an interior row held (1 when the frame has none to ask for) · fewest left↔right orphans · most
+ *  seats. Computed from held node ids alone, so it costs the same per window as counting did. */
+export function priorityTupleOf(heldIds: ReadonlyArray<number>, priority: CanonPriority, scratch?: Uint8Array): number[] {
+  const held = scratch ?? new Uint8Array(priority.mirrorOf.length)
+  if (scratch) held.fill(0)
+  for (const i of heldIds) held[i] = 1
+  const any = (ids: ReadonlyArray<number>) => ids.some((i) => held[i] === 1) ? 1 : 0
+  const both = priority.bottomCornerIds.every((i) => held[i] === 1) ? 1 : 0
+  const interior = priority.interiorRowIds.length === 0 ? 1
+    : priority.interiorRowIds.some((row) => row.some((i) => held[i] === 1)) ? 1 : 0
+  let orphans = 0
+  for (const i of heldIds) { const m = priority.mirrorOf[i]; if (m !== -1 && held[m] !== 1) orphans++ }
+  return [any(priority.topIds), both, interior, 0 - orphans, heldIds.length]
+}
+
+const fullPriority = (t: ReadonlyArray<number> | null): t is number[] =>
+  !!t && t[0] === 1 && t[1] === 1 && t[2] === 1 && t[3] === 0
+
+const tupleCmp = (a: ReadonlyArray<number>, b: ReadonlyArray<number>): number => {
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] - b[i]
+  return 0
 }
 
 export interface FreePhaseCandidate { points: Pt[]; phaseMM: Pt; revealMM: number }
@@ -237,9 +264,13 @@ export function enumerateFreePhaseMax(
 /** Exhaustive finite-Canon placement over one pitch. Centre seeds phase order; it never limits it. */
 export function enumerateCanonPhaseWindows(
   contour: Contour, cfg: GridConfig, canonLocalMM: ReadonlyArray<Pt>, anchorMM: Pt,
-  revealMM: number, stepMM = PHASE_STEP_MM,
+  revealMM: number, stepMM = PHASE_STEP_MM, priority?: CanonPriority,
+  /** The best priority tuple already found at another reveal — a floor this reveal must beat.
+   *  Lets the caller walk reveals largest-first and prune every later one as hard as counting. */
+  priorityFloor?: ReadonlyArray<number>,
 ): CanonPhaseSearch {
-  if (!canonLocalMM.length) return { candidates: [], phasePairs: 0, windows: 0, fitsCalls: 0, cacheHits: 0 }
+  const empty = { candidates: [], priorityCandidates: [], phasePairs: 0, windows: 0, fitsCalls: 0, cacheHits: 0 }
+  if (!canonLocalMM.length) return empty
   const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
   const step = Math.max(1, stepMM)
   const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
@@ -248,7 +279,7 @@ export function enumerateCanonPhaseWindows(
   const fits = cfg.circle
     ? makeCircleSeatPredicate(cx, cy, Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY) / 2, pad)
     : makeContourSeatPredicate(contour, pad)
-  if (!fits) return { candidates: [], phasePairs: 0, windows: 0, fitsCalls: 0, cacheHits: 0 }
+  if (!fits) return empty
 
   const node0 = canonLocalMM[0]
   const rel = canonLocalMM.map(([x, y]) => [x - node0[0], y - node0[1]] as Pt)
@@ -277,10 +308,23 @@ export function enumerateCanonPhaseWindows(
     phaseRows.push({ px, py, count })
   }
   phaseRows.sort((a, b) => b.count - a.count || a.px - b.px || a.py - b.py)
-  const unique = new Map<string, CanonPhaseCandidate & { anchorDistance: number }>()
+  // TWO ACCUMULATORS, ONE PASS (QA F1, 2026-09-01). Every window is computed once and its held ids
+  // feed both: the blind-count map — today's rule, updated only while this phase can still tie the
+  // blind maximum — and, when a priority is supplied, the priority-tuple map. The loop ends only when
+  // neither can improve. Dan: "max must be conditional … try full frame but sacrifice parts of it
+  // and position in favour of the priorities".
+  type Row = CanonPhaseCandidate & { anchorDistance: number; tuple?: number[] }
+  const unique = new Map<string, Row>()
+  const byPriority = new Map<string, Row>()
+  const scratch = priority ? new Uint8Array(canonLocalMM.length) : undefined
   let maxCount = 0
+  let bestTuple: number[] | null = priorityFloor ? [...priorityFloor] : null
   for (const { px, py, count: phaseCount } of phaseRows) {
-    if (phaseCount < maxCount) break // no Canon window can exceed its phase's free population
+    const blindOpen = phaseCount >= maxCount
+    // A phase with fewer free seats than the best full-priority window's count cannot beat it: the
+    // first four slots are already maximal there (three 1-bits and zero orphans), so only count could.
+    const priorityOpen = !!priority && !(fullPriority(bestTuple) && phaseCount < bestTuple[4])
+    if (!blindOpen && !priorityOpen) break
     const baseX = bb.minX + px, baseY = bb.minY + py
     const ix0 = Math.ceil((bb.minX - relMaxX - baseX) / pitch)
     const ix1 = Math.floor((bb.maxX - relMinX - baseX) / pitch)
@@ -294,21 +338,32 @@ export function enumerateCanonPhaseWindows(
         const absolute: Pt = [first[0] + rel[i][0], first[1] + rel[i][1]]
         if (fitsM(absolute)) { held.push(canonLocalMM[i]); ids.push(i) }
       }
-      if (!held.length || held.length < maxCount) continue
-      if (held.length > maxCount) { maxCount = held.length; unique.clear() }
+      if (!held.length) continue
       const id = ids.join(',')
       const frameCentre: Pt = [first[0] - node0[0], first[1] - node0[1]]
       const anchorDistance = Math.hypot(frameCentre[0] - anchorMM[0], frameCentre[1] - anchorMM[1])
-      const candidate = { points: held, id, phaseMM: [px, py] as Pt,
-        window: [ix, iy] as Pt, revealMM, anchorDistance }
-      const previous = unique.get(id)
-      if (!previous || anchorDistance < previous.anchorDistance) unique.set(id, candidate)
+      const row: Row = { points: held, id, phaseMM: [px, py] as Pt, window: [ix, iy] as Pt, revealMM, anchorDistance }
+      if (blindOpen && held.length >= maxCount) {
+        if (held.length > maxCount) { maxCount = held.length; unique.clear() }
+        const previous = unique.get(id)
+        if (!previous || anchorDistance < previous.anchorDistance) unique.set(id, row)
+      }
+      // Once a full-priority window exists only count can beat it — the cheap skip counting had.
+      if (priorityOpen && !(fullPriority(bestTuple) && ids.length < bestTuple[4])) {
+        const tuple = priorityTupleOf(ids, priority!, scratch)
+        const cmp = bestTuple ? tupleCmp(tuple, bestTuple) : 1
+        if (cmp < 0) continue
+        if (cmp > 0) { bestTuple = tuple; byPriority.clear() }
+        const previous = byPriority.get(id)
+        if (!previous || anchorDistance < previous.anchorDistance) byPriority.set(id, { ...row, tuple })
+      }
     }
   }
+  const strip = (x: Row): CanonPhaseCandidate =>
+    ({ points: x.points, id: x.id, phaseMM: x.phaseMM, window: x.window, revealMM: x.revealMM })
   return {
-    candidates: [...unique.values()].map((x) => ({
-      points: x.points, id: x.id, phaseMM: x.phaseMM, window: x.window, revealMM: x.revealMM,
-    })),
+    candidates: [...unique.values()].map(strip),
+    priorityCandidates: [...byPriority.values()].map(strip),
     phasePairs: phaseX.length * phaseY.length, windows, fitsCalls, cacheHits,
   }
 }
