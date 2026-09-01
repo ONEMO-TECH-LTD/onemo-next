@@ -20,7 +20,7 @@ import { frameOfMasses, positionsAcross } from '../units/classifier'
 import type { BBox, SafeMass, SafeSegment } from '../types'
 import { BANDS, BAND_STEP_MM } from '../grid-magnet-spec'
 import { scaleContour } from '../grid-magnet-compute'
-import { applyCoverage, enumerateCanonPhaseWindows, enumerateFreePhaseMax, makeCircleSeatPredicate, makeContourSeatPredicate } from '../units/layout'
+import { applyCoverage, enumerateCanonPhaseWindows, enumerateFreePhaseMax, fallbackRevealSizes, makeCircleSeatPredicate, makeContourSeatPredicate } from '../units/layout'
 import { wrapGroup } from '../units/wrap'
 import { wrapBandLadder } from '../grid-magnet-wrap-compute'
 import { contourCentroidOf } from '../units/centring'
@@ -995,4 +995,66 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
     expect(page).not.toMatch(/nothing fully fits in this band/)
     expect(page).toMatch(/no lawful offer in this band/)
   })
+})
+
+describe('8 — recovered phase search is wired through the production Canon solver', () => {
+  const workerAnchorFor = async (
+    sized: (mm: number) => Contour, cfg: GridConfig, sig: string,
+  ): Promise<(mm: number) => Pt> => {
+    const g = globalThis as { self?: unknown }
+    const previous = g.self
+    if (!g.self) g.self = { postMessage: () => undefined, onmessage: null }
+    try {
+      const worker = await import('@/app/(dev)/effect-creator/grid-centre/solve.worker')
+      return worker.anchorFnFor(sized, cfg, JSON.stringify(cfg), sig)!
+    } finally {
+      g.self = previous
+    }
+  }
+
+  it('production Canon solve finds and wraps Batwoman B4 raw9', async () => {
+    const { PNG } = nodeRequire('pngjs') as { PNG: { sync: { read(data: Buffer): { width: number; height: number; data: Uint8Array } } } }
+    const png = PNG.sync.read(readFileSync(join(process.cwd(), 'public/grid-engine/cutouts/BAT-WOMAN.png')))
+    const mask = new Uint8Array(png.width * png.height)
+    for (let i = 0; i < mask.length; i++) if (png.data[i * 4 + 3] > 128) mask[i] = 1
+    const base = normMaskContour(mask, png.width, png.height)!
+    const sized = makeSizer(base, 0)
+    const cfg: GridConfig = { pitchMM: 48, paddingMM: 12, perimeterOnly: false, centreMode: 2, governor: 0 }
+    const anchorAt = await workerAnchorFor(sized, cfg, 'batwoman-canon-integration')
+    const span = bandOuterMM(BANDS.find((x) => x.id === 4)!, 12)
+    const row = classifyBands(sized, cfg, anchorAt).find((x) => x.bandId === 4)!
+    const canon = canonLayoutForFrame(48,
+      positionsAcross(row.rulerWidthMM, 48), positionsAcross(row.rulerHeightMM, 48))!
+    const canonNodes = canon.nodesMM.map(([x, y]) => [x, y] as Pt)
+    const result = solveCanonExperiment(sized, cfg, span.minMM, span.maxMM, 24, anchorAt, canonNodes)
+    expect(result.trace).toMatchObject({ source: 'canon-partial', canonSeats: 16, retained: 9 })
+    expect(result.trace.winningPhaseMM).toBeDefined()
+    expect(result.trace.winningWindow).toBeDefined()
+    expect(result.offers).toHaveLength(1)
+    expect(result.offers[0].at.count).toBe(9)
+    expect(result.offers[0].at.sizeMM).toBeCloseTo(198.59, 1)
+    expect(applyCoverage(result.offers[0].at.points, true, 48).seated).toHaveLength(8)
+    expect(readFileSync(join(LIB, 'grid-magnet-canon-experiment.ts'), 'utf8')).not.toMatch(/\bwrapBandLadder\b/)
+  }, 60_000)
+
+  it('production Canon solve uses full-phase free maximum only as fallback', async () => {
+    const square = (mm: number): Contour => ({
+      outer: { pts: [[0, 0], [mm, 0], [mm, mm], [0, mm]] as Pt[] }, holes: [],
+    })
+    const cfg: GridConfig = { pitchMM: 48, paddingMM: 12, perimeterOnly: false, centreMode: 2, governor: 0 }
+    const anchorAt = await workerAnchorFor(square, cfg, 'square-free-fallback-integration')
+    const result = solveCanonExperiment(square, cfg, 168, 170, 24, anchorAt, [[0, 0]])
+    const fullPhaseMax = Math.max(...fallbackRevealSizes(168, 170).flatMap((mm) =>
+      enumerateFreePhaseMax(square(mm), cfg, anchorAt(mm), mm).candidates.map((x) => x.points.length)))
+    expect(result.trace.source).toBe('free-fallback')
+    expect(result.trace.winningPhaseMM).toBeDefined()
+    expect(result.offers).toHaveLength(1)
+    expect(result.offers[0].roles).toEqual(['max'])
+    expect(result.offers[0].at.count).toBe(fullPhaseMax)
+    expect(result.offers[0].at.sizeMM).toBeGreaterThanOrEqual(168)
+    expect(result.offers[0].at.sizeMM).toBeLessThanOrEqual(170)
+    const contour = square(result.offers[0].at.sizeMM)
+    expect(result.offers[0].at.points.every((point) =>
+      pointInContour(point, contour) && edgeDistToContourMM(contour, point) >= 11.98)).toBe(true)
+  }, 30_000)
 })
