@@ -3,7 +3,7 @@ import type { BandRung, BandSolve, CanonExperimentTrace, CanonPriority, Contour,
 import { DEFAULT_PITCH_MM, PADDING_FLOOR_MM, PHASE_STEP_MM, SNAP_STEP_MM } from './grid-magnet-spec'
 import {
   bestSeatedCandidate, enumerateCanonPhaseWindows, enumerateFreePhaseMax, fallbackRevealSizes,
-  latticeAt, makeCircleSeatPredicate, makeContourSeatPredicate, priorityTupleOf, type CanonPhaseCandidate,
+  latticeAt, makeCircleSeatPredicate, makeContourSeatPredicate, priorityTupleOf, tupleCmp, type CanonPhaseCandidate,
 } from './units/layout'
 import { bbox } from './foundation/geometry'
 import { wrapGroup } from './units/wrap'
@@ -110,7 +110,7 @@ export function solveCanonExperiment(
     for (const candidate of search.candidates) if (!candidates.has(candidate.id)) candidates.set(candidate.id, candidate)
     if (priority) for (const candidate of search.priorityCandidates) {
       const tuple = priorityTupleOf(candidate.id.split(',').map(Number), priority)
-      const cmp = priorityFloor ? tuple.map((v, i) => v - priorityFloor![i]).find((d) => d !== 0) ?? 0 : 1
+      const cmp = priorityFloor ? tupleCmp(tuple, priorityFloor) : 1
       if (cmp < 0) continue
       if (cmp > 0) { priorityFloor = tuple; priorityCandidates.clear() }
       if (!priorityCandidates.has(candidate.id)) priorityCandidates.set(candidate.id, candidate)

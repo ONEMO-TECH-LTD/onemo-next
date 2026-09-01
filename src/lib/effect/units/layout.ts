@@ -209,7 +209,8 @@ export function priorityTupleOf(heldIds: ReadonlyArray<number>, priority: CanonP
 const fullPriority = (t: ReadonlyArray<number> | null): t is number[] =>
   !!t && t[0] === 1 && t[1] === 1 && t[2] === 1 && t[3] === 0
 
-const tupleCmp = (a: ReadonlyArray<number>, b: ReadonlyArray<number>): number => {
+/** Lexicographic tuple order — shared by the enumeration and the solver's cross-reveal floor. */
+export const tupleCmp = (a: ReadonlyArray<number>, b: ReadonlyArray<number>): number => {
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] - b[i]
   return 0
 }
@@ -321,7 +322,7 @@ export function enumerateCanonPhaseWindows(
   // blind maximum — and, when a priority is supplied, the priority-tuple map. The loop ends only when
   // neither can improve. Dan: "max must be conditional … try full frame but sacrifice parts of it
   // and position in favour of the priorities".
-  type Row = CanonPhaseCandidate & { anchorDistance: number; tuple?: number[] }
+  type Row = CanonPhaseCandidate & { anchorDistance: number }
   const unique = new Map<string, Row>()
   const byPriority = new Map<string, Row>()
   const scratch = priority ? new Uint8Array(canonLocalMM.length) : undefined
@@ -361,7 +362,7 @@ export function enumerateCanonPhaseWindows(
         if (cmp < 0) continue
         if (cmp > 0) { bestTuple = tuple; byPriority.clear() }
         const previous = byPriority.get(id)
-        if (!previous || anchorDistance < previous.anchorDistance) byPriority.set(id, { ...row, tuple })
+        if (!previous || anchorDistance < previous.anchorDistance) byPriority.set(id, row)
       }
     }
   }
