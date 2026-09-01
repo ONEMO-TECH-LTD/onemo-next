@@ -635,6 +635,15 @@ describe('1b — the frame comes from the usable material', () => {
     expect(rows.map((r) => r.bandId), 'a band was dropped').toEqual(BANDS.map((b) => b.id))
   })
 
+  it('measures only the admin-selected compute scope without deleting band definitions', () => {
+    const unit = (mm: number): Contour =>
+      ({ outer: { pts: [[0, 0], [mm, 0], [mm, mm], [0, mm]] as Pt[] }, holes: [] })
+    const selected = BANDS.filter((band) => [2, 4, 7].includes(band.id))
+    expect(classifyBands(unit, { pitchMM: 48, paddingMM: 12 }, undefined, selected)
+      .map((row) => row.bandId)).toEqual([2, 4, 7])
+    expect(BANDS).toHaveLength(11)
+  })
+
   it('STEP 1+2: the LOOKUP digests those boxes and names the optimal layout in that band', () => {
     const at = (w: number, h: number, band: number) => optimalLayoutForBox(48, band, w, h)
     // a square legal box takes the square; a band above it takes nothing, and says so rather

@@ -29,6 +29,8 @@ interface SolveRequest {
   stepSel: number | null
   /** Display-only protector input. It deliberately lives outside GridConfig. */
   protectionPaddingMM?: number
+  /** Admin compute scope. Band definitions remain complete; only enabled rows are measured. */
+  activeBandIds?: number[]
 }
 
 const ctx = self as unknown as Worker
@@ -95,7 +97,8 @@ export function anchorFnFor(
 const FITS_CAP = 12
 
 ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
-  const { id, base, offsetMM, cfg, mode, manualBand, sizeMM, stepSel, protectionPaddingMM = 24 } = e.data
+  const { id, base, offsetMM, cfg, mode, manualBand, sizeMM, stepSel, protectionPaddingMM = 24,
+    activeBandIds = BANDS.map((band) => band.id) } = e.data
   try {
     const sized = makeSizer(base, offsetMM)
     // Cache identity is the shape itself — every ring, exactly. A rolling hash of ring counts
@@ -122,14 +125,16 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       // THE REVERSAL — band in, count out. The material reveals each distinct layout across the
       // band's range (centre-rules seating); each is solved WHOLE by wrapGroup to its exact
       // contact size. Composition only: the wrap engine is transferred untouched.
-      const band = BANDS.find((b) => b.id === mode) ?? BANDS[0]
+      const activeBands = BANDS.filter((band) => activeBandIds.includes(band.id))
+      if (!activeBands.length) throw new Error('Grid Centre requires at least one active band.')
+      const band = activeBands.find((candidate) => candidate.id === mode) ?? activeBands[0]
       // The band is a LEGAL range; the ladder scans OUTLINE sizes, so it converts through this
       // shape's own rim. A diamond and a square in one band do not share an outline range.
       const span = bandOuterMM(band, Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM))
       const anchorAt = anchorFnFor(sized, rawCfg, rawCfgSig, sig)
       // STEP 1 + 2 — the classifier's own table: at each band's trial size, what frame the shape
       // carries and where its centre sits. Measured once per shape; it decides nothing here yet.
-      const bandClasses = classifyBands(sized, rawCfg, anchorAt)
+      const bandClasses = classifyBands(sized, rawCfg, anchorAt, activeBands)
       const bandClass = bandClasses.find((row) => row.bandId === band.id) ?? null
       // the lookup digests the classifier's boxes; the classifier itself counts nothing
       const pitch0 = cfg.pitchMM ?? DEFAULT_PITCH_MM

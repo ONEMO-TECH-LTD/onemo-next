@@ -52,6 +52,7 @@ const GENS: { k: ShapeKind; label: string; p1: [string, string]; p2: [string, st
   { k: 'daisy', label: 'Daisy', p1: ['Depth', '%'], p2: ['Petals', ''], p2min: 5, p2max: 12, p2start: 8 },
   { k: 'pinwheel', label: 'Pinwheel', p1: ['Swirl', '%'], p2: ['Blades', ''], p2min: 3, p2max: 8, p2start: 5 },
 ]
+const ALL_BAND_IDS = BANDS.map((band) => band.id)
 
 type Src = 'preset' | 'gen' | 'magic' | 'cut'
 type MagicState = { vshape: VShape; maskH: number; adapter: string; imgUrl: string } | null
@@ -101,6 +102,10 @@ export default function GridLab() {
   const [segFillN, setSegFillN] = usePersisted('segFill', 1)
   /** A band id snaps to that band's fit ladder; 'free' is the continuous slider. */
   const [mode, setMode] = useState<number>(1)
+  /** Admin compute scope — the popup edits a draft; Save applies and persists it. */
+  const [activeBandIds, setActiveBandIds] = useState<number[]>([])
+  const [bandScopeReady, setBandScopeReady] = useState(false)
+  const [bandScopeDraft, setBandScopeDraft] = useState<number[] | null>(null)
   /** Top-level view — the bench, or the layout-library review tab. */
   const [tab, setTab] = useState<'bench' | 'library'>('bench')
   /** Library authoring selection — the bridge turns it into the ONE canvas's model. */
@@ -156,12 +161,32 @@ export default function GridLab() {
   // first paint.
   useEffect(() => {
     try {
-      const bs = +(localStorage.getItem('grid-centre.band') ?? '1') || 1
-      const b = BANDS.find((x) => x.id === bs) ?? BANDS[0]
-      setMode(b.id)
-    } catch { }
+      const saved = JSON.parse(localStorage.getItem('grid-centre.activeBands') ?? 'null')
+      const active = Array.isArray(saved)
+        ? ALL_BAND_IDS.filter((id) => saved.includes(id)) : ALL_BAND_IDS
+      const next = active.length ? active : ALL_BAND_IDS
+      setActiveBandIds(next)
+      const selected = +(localStorage.getItem('grid-centre.band') ?? '1') || 1
+      setMode(next.includes(selected) ? selected : next[0])
+    } catch { setActiveBandIds(ALL_BAND_IDS); setMode(ALL_BAND_IDS[0]) }
+    setBandScopeReady(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const saveBandScope = () => {
+    if (!bandScopeDraft?.length) return
+    const next = bandScopeDraft
+    setActiveBandIds(next)
+    setBandScopeDraft(null)
+    try { localStorage.setItem('grid-centre.activeBands', JSON.stringify(next)) } catch { }
+    if (!next.includes(mode)) {
+      const replacement = next.reduce((best, bandId) =>
+        Math.abs(bandId - mode) < Math.abs(best - mode) ? bandId : best, next[0])
+      setMode(replacement)
+      setStepSel(null); setManual(null); setBandScale(null)
+      try { localStorage.setItem('grid-centre.band', String(replacement)) } catch { }
+    }
+  }
 
   /** Baseline handling: "save" stamps the current dials as the working default; "reset" restores
    *  the saved baseline, or spec defaults when none was saved. */
@@ -328,7 +353,7 @@ export default function GridLab() {
   }, [])
   useEffect(() => {
     const w = workerRef.current
-    if (!w) return
+    if (!w || !bandScopeReady) return
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
     const cfg = { pitchMM: pitch, paddingMM: pad, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle', classifierRuler: ruler }
     // Manual in a band (forced registration OR manual band scale): the walk is meaningless —
@@ -342,13 +367,14 @@ export default function GridLab() {
       sizeMM: manualBand ? (bandScale ?? effSizeRef.current ?? bandOuterMM(BANDS[0], pad).minMM) : 0,
       stepSel,
       protectionPaddingMM: protectionPadding,
+      activeBandIds,
     }
     if (busyRef.current) { queuedRef.current = msg; setSolving(true); return }
     busyRef.current = true
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler, protectionPadding])
+  }, [base, src, preset, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler, protectionPadding, activeBandIds, bandScopeReady])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -478,11 +504,28 @@ export default function GridLab() {
               setLibrarySel(r.sel)
             }} /> : null}</> : <>
           <Fold title="Grid settings">
-            <div className="gl-field"><span>Band · the offer list</span>
-              <div className="gl-seg gl-bandrow">
-                {BANDS.map((b) =>
-                  <button key={b.id} aria-pressed={mode === b.id} onClick={() => { setMode(b.id); setStepSel(null); setManual(null); setBandScale(null); try { localStorage.setItem('grid-centre.band', String(b.id)) } catch { } }}>B{b.id}</button>)}
+            <div className="gl-field gl-bandfield">
+              <div className="gl-fieldhead"><span>Band · available</span>
+                <button className="gl-edit" onClick={() => setBandScopeDraft((draft) => draft ? null : [...activeBandIds])}>Edit</button>
               </div>
+              <div className="gl-seg gl-bandactive">
+                {BANDS.filter((b) => activeBandIds.includes(b.id)).map((b) =>
+                  <button key={b.id} aria-pressed={mode === b.id}
+                    onClick={() => { setMode(b.id); setStepSel(null); setManual(null); setBandScale(null); try { localStorage.setItem('grid-centre.band', String(b.id)) } catch { } }}>B{b.id}</button>)}
+              </div>
+              {bandScopeDraft && <div className="gl-scope-pop" role="dialog" aria-label="Edit compute scope">
+                <div className="gl-glabel">Compute scope</div>
+                <div className="gl-seg gl-bandrow gl-scope">
+                  {BANDS.map((b) => <button key={b.id} aria-pressed={bandScopeDraft.includes(b.id)}
+                    onClick={() => setBandScopeDraft((draft) => {
+                      if (!draft) return null
+                      const enabled = draft.includes(b.id)
+                      if (enabled && draft.length === 1) return draft
+                      return ALL_BAND_IDS.filter((id) => id === b.id ? !enabled : draft.includes(id))
+                    })}>B{b.id}</button>)}
+                </div>
+                <button className="gl-scope-save" onClick={saveBandScope}>Save</button>
+              </div>}
             </div>
             {true && <>
               {/* The FIT READOUT is gone (Dan, 2026-08-30: "this panel text I said to remove, there
@@ -1105,8 +1148,15 @@ const CSS = `
 /* BAND ROW — six per row, so eleven bands read 6 + 5 on two lines instead of eleven squashed
    into one strip (Dan, 2026-08-30). A grid rather than wrap so the break is the same every time. */
 .gl-seg.gl-bandrow{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px}
+.gl-bandactive{display:grid;grid-template-columns:repeat(auto-fit,minmax(48px,1fr))}
 .gl-seg button:hover{color:var(--ink)}
 .gl-seg button[aria-pressed=true]{background:var(--accent);color:#fff;box-shadow:0 1px 2px #0002}
+.gl-seg button:disabled{opacity:.28;cursor:not-allowed}
+.gl-scope button[aria-pressed=false]{opacity:.45}
+.gl-bandfield{position:relative}.gl-fieldhead{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.gl-edit{font:650 10.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--accent);background:none;border:0;padding:2px;cursor:pointer}
+.gl-scope-pop{position:absolute;z-index:8;top:22px;left:0;right:0;display:flex;flex-direction:column;gap:10px;padding:12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 35px #0003}
+.gl-scope-save{font:650 12px var(--sans);color:#fff;background:var(--accent);border:0;border-radius:8px;padding:8px;cursor:pointer}
 .gl-field{display:flex;flex-direction:column;gap:8px;font:600 10.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
 .gl-field select{font:500 13px var(--sans);color:var(--ink);background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:9px;cursor:pointer}
 .gl-upload{font:600 13px var(--sans);color:#fff;background:var(--accent);border:0;border-radius:10px;padding:11px;cursor:pointer;width:100%}

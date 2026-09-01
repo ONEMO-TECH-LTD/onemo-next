@@ -19,6 +19,7 @@ import {
   GOVERNOR,
   PADDING_FLOOR_MM,
   SNAP_STEP_MM,
+  type Band,
 } from './grid-magnet-spec'
 import { contactPointsMM } from './grid-magnet-compute'
 import { applyCoverage } from './units/layout'
@@ -69,11 +70,12 @@ export interface BandClass {
  *  wrap does — this sequences units, it does not reach sideways for a centre. */
 export function classifyBands(
   sized: (mm: number) => Contour, cfg: GridConfig, anchorAt?: (mm: number) => Pt,
+  bands: ReadonlyArray<Band> = BANDS,
 ): BandClass[] {
   const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
   const r = spotRadiusOf(pad)
   const rows: BandClass[] = []
-  for (const band of BANDS) {
+  for (const band of bands) {
     // No board skip. A trial size past the board is not an error and guards nothing — the previous
     // skip was invented, and it silently deleted B9-B11 because the size ceiling still reads the
     // COLUMN count for both axes and so believes the board is square.
