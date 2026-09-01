@@ -25,6 +25,7 @@ import { wrapGroup } from '../units/wrap'
 import { wrapBandLadder } from '../grid-magnet-wrap-compute'
 import { contourCentroidOf } from '../units/centring'
 import { safeSegments } from '../units/segment'
+import { measureProtection } from '../units/protection'
 import { edgeDistToContourMM, pointInContour } from '../foundation/geometry'
 import { contourCacheKey, makeSizer, normBaseContour, normMaskContour } from '../grid-magnet-bridge'
 import { getShape } from '@/lib/shape-library'
@@ -33,6 +34,35 @@ import type { Contour, GridConfig, Pt } from '../types'
 const LIB = join(process.cwd(), 'src/lib/effect')
 const PAGE = join(process.cwd(), 'src/app/(dev)/effect-creator/grid-centre/page.tsx')
 const nodeRequire = createRequire(import.meta.url)
+
+describe('protection diagnostic', () => {
+  it('places every unsupported-patch witness in compound material, outside protected holes', () => {
+    const contour: Contour = {
+      outer: { pts: [[0, 0], [200, 0], [200, 200], [0, 200]] },
+      holes: [],
+    }
+    const evidence = measureProtection(contour, [[100, 100]], 48, 24, [3])
+    expect(evidence.patches.length, 'the counterexample produced no unsupported patch').toBeGreaterThan(0)
+    for (const patch of evidence.patches)
+      expect(Math.hypot(patch.witnessMM[0] - 100, patch.witnessMM[1] - 100),
+        'patch witness landed in the 27mm protected hole').toBeGreaterThan(27)
+  })
+
+  it('locates witnesses for normal 3x3 Full and Belt delivery', () => {
+    const contour: Contour = {
+      outer: { pts: [[0, 0], [200, 0], [200, 200], [0, 200]] },
+      holes: [],
+    }
+    const full = [52, 100, 148].flatMap((y) => [52, 100, 148].map((x) => [x, y] as Pt))
+    const belt = full.filter(([x, y]) => x !== 100 || y !== 100)
+    for (const magnets of [full, belt]) {
+      const evidence = measureProtection(contour, magnets, 48, 24, magnets.map(() => 3))
+      expect(evidence.patches.length, 'ordinary delivery lost its unsupported patches').toBeGreaterThan(0)
+      expect(evidence.patches.every((patch) => Number.isFinite(patch.witnessMM[0])
+        && Number.isFinite(patch.witnessMM[1])), 'ordinary delivery produced an invalid witness').toBe(true)
+    }
+  })
+})
 
 // DERIVED, never hand-listed: the previous five-name list omitted wrap-compute, class and the
 // worker — and wrap-compute imports four units and sequences them, invisibly.
