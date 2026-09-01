@@ -42,7 +42,7 @@ const wrapCache = new Map<string, BandRung | null>()
 
 export function solveCanonExperiment(
   sized: (mm: number) => Contour, cfg: GridConfig, loMM: number, hiMM: number, minMM: number,
-  anchorAtMM: (mm: number) => Pt, canonNodesMM: ReadonlyArray<Pt>,
+  anchorAtMM: (mm: number) => Pt, canonNodesMM: ReadonlyArray<Pt>, cacheIdentity?: string,
 ): BandSolve & { trace: CanonExperimentTrace } {
   const started = Date.now(), pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
   const canonLocal = localise(canonNodesMM)
@@ -53,13 +53,10 @@ export function solveCanonExperiment(
   const canon = new Map<string, CanonPhaseCandidate>()
   const free = new Map<string, FreePhaseCandidate>()
   const witnesses: Array<{ revealMM: number; points: Pt[] }> = []
-  const contourKey = (contour: Contour) => [contour.outer, ...contour.holes]
-    .map((ring) => ring.pts.map(([x, y]) => `${x.toFixed(3)},${y.toFixed(3)}`).join(';')).join('|')
-  const searchKey = JSON.stringify([
-    contourKey(sized(hiMM)), loMM, hiMM, pitch, cfg.paddingMM, cfg.circle,
-    anchorAtMM(loMM), anchorAtMM(hiMM), canonLocal,
-  ])
-  const cached = searchCache.get(searchKey)
+  const searchKey = cacheIdentity ? JSON.stringify([
+    cacheIdentity, loMM, hiMM, pitch, cfg.paddingMM, cfg.circle, canonLocal,
+  ]) : null
+  const cached = searchKey ? searchCache.get(searchKey) : undefined
 
   if (cached) {
     for (const [id, candidate] of cached.canon) canon.set(id, candidate)
@@ -91,25 +88,26 @@ export function solveCanonExperiment(
     }
   }
   if (!cached) {
-    searchCache.set(searchKey, {
+    if (searchKey) searchCache.set(searchKey, {
       canon: [...canon], free: [...free], witnesses: [...witnesses],
       phasePairs: trace.phasePairs, windows: trace.windows,
       fitsCalls: trace.fitsCalls, cacheHits: trace.cacheHits,
     })
-    if (searchCache.size > 12) searchCache.delete(searchCache.keys().next().value!)
+    if (searchKey && searchCache.size > 12) searchCache.delete(searchCache.keys().next().value!)
   }
   trace.populations = canon.size + free.size
 
   const wrap = (points: ReadonlyArray<Pt>, revealMM: number, frameMidMM?: Pt): BandRung | null => {
-    const key = searchKey + '|' + revealMM + '|' + (frameMidMM?.join(',') ?? '') + '|'
-      + points.map(([x, y]) => `${x.toFixed(3)},${y.toFixed(3)}`).sort().join(';')
-    if (wrapCache.has(key)) return wrapCache.get(key) ?? null
+    const key = searchKey ? JSON.stringify([
+      searchKey, minMM, revealMM, frameMidMM, points,
+    ]) : null
+    if (key && wrapCache.has(key)) return wrapCache.get(key) ?? null
     trace.wraps++
     const wcfg: WrapConfig = { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM, anchorAtMM, frameMidMM }
     const at = wrapGroup(sized, wcfg, points, minMM, revealMM)
     const rung = at && inBand(at.sizeMM, loMM, hiMM) ? { at, revealMM, roles: [] as BandRung['roles'] } : null
-    wrapCache.set(key, rung)
-    if (wrapCache.size > 512) wrapCache.delete(wrapCache.keys().next().value!)
+    if (key) wrapCache.set(key, rung)
+    if (key && wrapCache.size > 512) wrapCache.delete(wrapCache.keys().next().value!)
     return rung
   }
   const facts = ({ rung }: WrappedCandidate) =>

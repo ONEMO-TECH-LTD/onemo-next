@@ -904,7 +904,7 @@ describe('8 — recovered phase search is wired through the production Canon sol
     })
     const solve = (enabled: Partial<NonNullable<GridConfig['holdingRules']>>) => {
       const result = solveCanonExperiment(sized, { ...baseCfg, holdingRules: rules(enabled) },
-        span.minMM, span.maxMM, 24, anchorAt, nodes)
+        span.minMM, span.maxMM, 24, anchorAt, nodes, 'bot-scoring-shared')
       return result.offers.find((offer) => offer.roles.includes('optimal'))!
     }
     const off = solve({}), universal = solve({ universal: true }), balance = solve({ balance: true })
@@ -917,7 +917,20 @@ describe('8 — recovered phase search is wired through the production Canon sol
     expect(identity(balance)).not.toBe(identity(off))
     expect(identity(combined)).not.toBe(identity(off))
     expect(top.roles).toContain('optimal')
-  }, 30_000)
+
+    const anchorA = (mm: number): Pt => [mm * 0.4, mm * 0.6]
+    const anchorB = (mm: number): Pt => mm === 168 || mm === 215 ? anchorA(mm)
+      : [mm * 0.4 + 24 * Math.sin(Math.PI * (mm - 168) / 47), mm * 0.6]
+    const anchorResult = (anchor: (mm: number) => Pt, cacheIdentity: string) =>
+      solveCanonExperiment(sized, baseCfg, span.minMM, span.maxMM, 24, anchor, nodes, cacheIdentity)
+    const signature = (result: ReturnType<typeof anchorResult>) => JSON.stringify(result.offers.map((offer) => ({
+      roles: offer.roles, size: offer.at.sizeMM, off: offer.at.centreOffMM, points: offer.at.points,
+    })))
+    const coldA = anchorResult(anchorA, 'bot-anchor-a'), coldB = anchorResult(anchorB, 'bot-anchor-b')
+    expect(signature(coldA)).not.toBe(signature(coldB))
+    expect(signature(anchorResult(anchorA, 'bot-anchor-a'))).toBe(signature(coldA))
+    expect(signature(anchorResult(anchorB, 'bot-anchor-b'))).toBe(signature(coldB))
+  }, 90_000)
 
   it('lower reveal preserves a lawful higher-count Canon around a scaling hole', () => {
     const sized = (mm: number): Contour => ({

@@ -137,8 +137,12 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       if (!solve) {
         // One traversal returns the three post-wrap, scored roles. Belt remains delivery-only below.
         const optimalNodes = optimal?.nodesMM.map(([x, y]) => [x, y] as Pt)
+        const discoveryIdentity = JSON.stringify([
+          sig, band.id, rawCfg.pitchMM, rawCfg.paddingMM, rawCfg.circle,
+          rawCfg.centreMode, rawCfg.governor,
+        ])
         solve = solveCanonExperiment(
-          sized, rawCfg, span.minMM, span.maxMM, MIN_EFFECT_MM, anchorAt, optimalNodes ?? [])
+          sized, rawCfg, span.minMM, span.maxMM, MIN_EFFECT_MM, anchorAt, optimalNodes ?? [], discoveryIdentity)
         rungCache.set(key, solve)
         if (rungCache.size > FITS_CAP) rungCache.delete(rungCache.keys().next().value!)
       }
