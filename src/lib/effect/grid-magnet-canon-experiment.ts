@@ -118,7 +118,7 @@ export function solveCanonExperiment(
     if (!value) {
       value = holdingFactsOf(
         sized(rung.at.sizeMM), rung.at.points, rung.at.anchorMM, rung.at.centreOffMM,
-        pitch, cfg.protectionPaddingMM ?? 45, magnetRadiiMM(rung.at.points, cfg.plan ?? 'all6'))
+        pitch, cfg.protectionPaddingMM ?? 24, magnetRadiiMM(rung.at.points, cfg.plan ?? 'all6'))
       factsCache.set(rung, value)
       rung.unprotected = value.evidence
     }
@@ -273,7 +273,7 @@ export function solveCanonExperiment(
   for (const offer of offers) if (!offer.unprotected) {
     const value = holdingFactsOf(
       sized(offer.at.sizeMM), offer.at.points, offer.at.anchorMM, offer.at.centreOffMM,
-      pitch, cfg.protectionPaddingMM ?? 45, magnetRadiiMM(offer.at.points, cfg.plan ?? 'all6'))
+      pitch, cfg.protectionPaddingMM ?? 24, magnetRadiiMM(offer.at.points, cfg.plan ?? 'all6'))
     offer.unprotected = value.evidence
   }
   if (!fullRows.length && scoredMax[0]) {

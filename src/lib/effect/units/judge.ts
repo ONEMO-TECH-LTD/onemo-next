@@ -295,7 +295,7 @@ function spanEndHolds(contour: Contour, magnets: ReadonlyArray<Pt>, reachMM = HO
 
 export function holdingFactsOf(
   contour: Contour, magnets: ReadonlyArray<Pt>, anchorMM: Pt, centreOffMM = 0,
-  pitchMM = 48, edgePaddingMM = 45, magnetRadiiMM: ReadonlyArray<number> = magnets.map(() => 3),
+  pitchMM = 48, edgePaddingMM = 24, magnetRadiiMM: ReadonlyArray<number> = magnets.map(() => 3),
 ): HoldingFacts {
   const protectionRadii = magnets.map((_, index) => edgePaddingMM + (magnetRadiiMM[index] ?? 3))
   const spans = supportSpans(contour, magnets, protectionRadii, pitchMM)

@@ -97,7 +97,7 @@ export default function GridLab() {
     universal: false, balance: false, perimeter: false,
     extremes: false, ends: false, top: false,
   })
-  const [protectionPadding, setProtectionPadding] = useState(45)
+  const [protectionPadding, setProtectionPadding] = useState(24)
   const [showUnheld, setShowUnheld] = useState(true)
   /** Legal-area islands, coloured + boxed + centre-marked. */
   const [showSegs, setShowSegs] = useState(true)
