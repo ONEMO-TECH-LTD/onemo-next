@@ -31,6 +31,15 @@ type WrappedCandidate = {
   window?: Pt
 }
 
+type SearchCache = {
+  canon: Array<[string, CanonPhaseCandidate]>
+  free: Array<[string, FreePhaseCandidate]>
+  witnesses: Array<{ revealMM: number; points: Pt[] }>
+  phasePairs: number; windows: number; fitsCalls: number; cacheHits: number
+}
+const searchCache = new Map<string, SearchCache>()
+const wrapCache = new Map<string, BandRung | null>()
+
 export function solveCanonExperiment(
   sized: (mm: number) => Contour, cfg: GridConfig, loMM: number, hiMM: number, minMM: number,
   anchorAtMM: (mm: number) => Pt, canonNodesMM: ReadonlyArray<Pt>,
@@ -44,13 +53,21 @@ export function solveCanonExperiment(
   const canon = new Map<string, CanonPhaseCandidate>()
   const free = new Map<string, FreePhaseCandidate>()
   const witnesses: Array<{ revealMM: number; points: Pt[] }> = []
+  const contourKey = (contour: Contour) => [contour.outer, ...contour.holes]
+    .map((ring) => ring.pts.map(([x, y]) => `${x.toFixed(3)},${y.toFixed(3)}`).join(';')).join('|')
+  const searchKey = JSON.stringify([
+    contourKey(sized(hiMM)), loMM, hiMM, pitch, cfg.paddingMM, cfg.circle,
+    anchorAtMM(loMM), anchorAtMM(hiMM), canonLocal,
+  ])
+  const cached = searchCache.get(searchKey)
 
-  const allRevealSizes = fallbackRevealSizes(loMM, hiMM)
-  // Scaling holes can swallow a lower-reveal population, so supplied-hole contours require every
-  // 1mm event. Current traced cutouts are outer-only: their full-phase maximum is discovered at
-  // the ceiling and exact wrap performs the size solve.
-  const revealSizes = sized(hiMM).holes.length ? allRevealSizes : [allRevealSizes.at(-1) ?? hiMM]
-  for (const mm of revealSizes) {
+  if (cached) {
+    for (const [id, candidate] of cached.canon) canon.set(id, candidate)
+    for (const [id, candidate] of cached.free) free.set(id, candidate)
+    witnesses.push(...cached.witnesses)
+    trace.phasePairs = cached.phasePairs; trace.windows = cached.windows
+    trace.fitsCalls = cached.fitsCalls; trace.cacheHits = cached.cacheHits
+  } else for (const mm of fallbackRevealSizes(loMM, hiMM)) {
     if (canonLocal.length) {
       const search = enumerateCanonPhaseWindows(
         sized(mm), { ...cfg, perimeterOnly: false }, canonLocal, anchorAtMM(mm), mm, PHASE_STEP_MM)
@@ -73,13 +90,27 @@ export function solveCanonExperiment(
       }
     }
   }
+  if (!cached) {
+    searchCache.set(searchKey, {
+      canon: [...canon], free: [...free], witnesses: [...witnesses],
+      phasePairs: trace.phasePairs, windows: trace.windows,
+      fitsCalls: trace.fitsCalls, cacheHits: trace.cacheHits,
+    })
+    if (searchCache.size > 12) searchCache.delete(searchCache.keys().next().value!)
+  }
   trace.populations = canon.size + free.size
 
   const wrap = (points: ReadonlyArray<Pt>, revealMM: number, frameMidMM?: Pt): BandRung | null => {
+    const key = searchKey + '|' + revealMM + '|' + (frameMidMM?.join(',') ?? '') + '|'
+      + points.map(([x, y]) => `${x.toFixed(3)},${y.toFixed(3)}`).sort().join(';')
+    if (wrapCache.has(key)) return wrapCache.get(key) ?? null
     trace.wraps++
     const wcfg: WrapConfig = { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM, anchorAtMM, frameMidMM }
     const at = wrapGroup(sized, wcfg, points, minMM, revealMM)
-    return at && inBand(at.sizeMM, loMM, hiMM) ? { at, revealMM, roles: [] } : null
+    const rung = at && inBand(at.sizeMM, loMM, hiMM) ? { at, revealMM, roles: [] as BandRung['roles'] } : null
+    wrapCache.set(key, rung)
+    if (wrapCache.size > 512) wrapCache.delete(wrapCache.keys().next().value!)
+    return rung
   }
   const facts = ({ rung }: WrappedCandidate) =>
     holdingFactsOf(sized(rung.at.sizeMM), rung.at.points, rung.at.anchorMM)
