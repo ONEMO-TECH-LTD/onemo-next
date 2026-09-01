@@ -657,6 +657,12 @@ export default function GridLab() {
               {' · '}wraps {model.canonExperimentTrace.wraps}
               {' · '}retained {model.canonExperimentTrace.retained}
               {' · '}readded {model.canonExperimentTrace.readded}
+              {' · '}phases {model.canonExperimentTrace.phasePairs}
+              {' · '}windows {model.canonExperimentTrace.windows}
+              {' · '}fits {model.canonExperimentTrace.fitsCalls}/{model.canonExperimentTrace.cacheHits}
+              {' · '}{model.canonExperimentTrace.elapsedMs}ms
+              {model.canonExperimentTrace.winningPhaseMM
+                ? ` · win ${model.canonExperimentTrace.winningPhaseMM.join(',')}` : ''}
             </div>}
           </Fold>
         </aside>

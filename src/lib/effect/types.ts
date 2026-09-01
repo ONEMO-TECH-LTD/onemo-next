@@ -129,6 +129,9 @@ export interface BandSolve {
 export interface CanonExperimentTrace {
   source: 'canon-full' | 'canon-partial' | 'free-fallback' | 'none'
   canonSeats: number; populations: number; wraps: number; retained: number; readded: number
+  phasePairs: number; windows: number; fitsCalls: number; cacheHits: number; elapsedMs: number
+  winningPhaseMM?: Pt
+  winningWindow?: Pt
 }
 
 // The engine's request/response vocabulary.

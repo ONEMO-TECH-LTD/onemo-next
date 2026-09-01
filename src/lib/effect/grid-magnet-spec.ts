@@ -88,6 +88,9 @@ export const BANDS: ReadonlyArray<Band> = Object.freeze([
 /** Snap scan size step. */
 export const SNAP_STEP_MM = 1
 
+/** Canon-smart placement resolution — one full lattice period is searched at this step. */
+export const PHASE_STEP_MM = 1
+
 
 /** REMOVED 2026-08-30 (Dan): the mass-depth dial and its 16mm default. Nothing ruled the 16 — it was
  *  4mm past the padding for no reason anyone could trace — and it was measurably harmful: a region

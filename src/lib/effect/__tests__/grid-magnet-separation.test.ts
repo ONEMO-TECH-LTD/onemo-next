@@ -9,28 +9,30 @@
 //   5. the solve is deterministic — same inputs, same layout, whatever mode asked
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
-import { classifyBands, computeGrid } from '../grid-magnet'
+import { bandOuterMM, classifyBands, computeGrid } from '../grid-magnet'
 import { canonLayoutForFrame, optimalLayoutForBox } from '../grid-magnet-library-catalogue'
 import { solveCanonExperiment } from '../grid-magnet-canon-experiment'
 import { frameOfMasses, positionsAcross } from '../units/classifier'
 import type { BBox, SafeMass, SafeSegment } from '../types'
 import { BANDS, BAND_STEP_MM } from '../grid-magnet-spec'
 import { scaleContour } from '../grid-magnet-compute'
-import { makeCircleSeatPredicate, makeContourSeatPredicate } from '../units/layout'
+import { applyCoverage, enumerateCanonPhaseWindows, enumerateFreePhaseMax, makeCircleSeatPredicate, makeContourSeatPredicate } from '../units/layout'
 import { wrapGroup } from '../units/wrap'
 import { wrapBandLadder } from '../grid-magnet-wrap-compute'
 import { contourCentroidOf } from '../units/centring'
 import { safeSegments } from '../units/segment'
 import { edgeDistToContourMM, pointInContour } from '../foundation/geometry'
-import { contourCacheKey, makeSizer, normBaseContour } from '../grid-magnet-bridge'
+import { contourCacheKey, makeSizer, normBaseContour, normMaskContour } from '../grid-magnet-bridge'
 import { getShape } from '@/lib/shape-library'
 import type { Contour, GridConfig, Pt } from '../types'
 
 const LIB = join(process.cwd(), 'src/lib/effect')
 const PAGE = join(process.cwd(), 'src/app/(dev)/effect-creator/grid-centre/page.tsx')
+const nodeRequire = createRequire(import.meta.url)
 
 // DERIVED, never hand-listed: the previous five-name list omitted wrap-compute, class and the
 // worker — and wrap-compute imports four units and sequences them, invisibly.
@@ -128,7 +130,7 @@ describe('2 — traffic is one-way', () => {
     // The two SEQUENCER SEATS may import units (sequencing them is what a pipeline does); both
     // hand over to pipeline/ at S3. Every other retiring file re-exports only.
     'grid-magnet-wrap-compute.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/grid-magnet$/, /^\.\/offset$/, /^\.\/foundation\/[a-z-]+$/, /^\.\/units\/[a-z-]+$/, /^@countertype\/clipper2-ts$/],
-    'grid-magnet-canon-experiment.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/grid-magnet$/, /^\.\/grid-magnet-wrap-compute$/, /^\.\/units\/[a-z-]+$/],
+    'grid-magnet-canon-experiment.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/grid-magnet$/, /^\.\/grid-magnet-wrap-compute$/, /^\.\/foundation\/[a-z-]+$/, /^\.\/units\/[a-z-]+$/],
     'grid-magnet-class.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/foundation\/[a-z-]+$/, /^\.\/units\/[a-z-]+$/],
     'grid-magnet-library-bridge.ts': [/^\.\/types$/, /^\.\/grid-magnet[a-z-]*$/, /^\.\/library[/a-z-]*$/, /^\.\/foundation\/[a-z-]+$/],
     'grid-magnet-library-catalogue.ts': [/^\.\/types$/, /^\.\/grid-magnet[a-z-]*$/, /^\.\/library[/a-z-]*$/],
@@ -699,6 +701,42 @@ describe('1b — the frame comes from the usable material', () => {
       expect(beltSolve, `${name}: coverage changed the raw band solve`).toEqual(fullSolve)
     }
   }, 120_000)
+
+  it('Canon smart-search finds Batwoman raw9 outside the four Centre-rules phases', () => {
+    const { PNG } = nodeRequire('pngjs') as { PNG: { sync: { read(data: Buffer): { width: number; height: number; data: Uint8Array } } } }
+    const png = PNG.sync.read(readFileSync(join(process.cwd(), 'public/grid-engine/cutouts/BAT-WOMAN.png')))
+    const mask = new Uint8Array(png.width * png.height)
+    for (let i = 0; i < mask.length; i++) if (png.data[i * 4 + 3] > 128) mask[i] = 1
+    const base = normMaskContour(mask, png.width, png.height)!
+    const sized = makeSizer(base, 0)
+    const cfg: GridConfig = { pitchMM: 48, paddingMM: 12, perimeterOnly: false, centreMode: 2, governor: 0 }
+    const anchorAt = (mm: number): Pt => [86 / 201 * mm, 128 / 201 * mm]
+    const row = classifyBands(sized, cfg, anchorAt).find((x) => x.bandId === 4)!
+    const cols = positionsAcross(row.rulerWidthMM, 48), rows = positionsAcross(row.rulerHeightMM, 48)
+    expect([cols, rows], 'Batwoman B4 classifier frame changed').toEqual([4, 4])
+    const canon = canonLayoutForFrame(48, cols, rows)!
+    const local = (() => {
+      const pts = canon.nodesMM.map(([x, y]) => [x, y] as Pt)
+      const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1])
+      const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2
+      return pts.map(([x, y]) => [x - cx, y - cy] as Pt)
+    })()
+    const search = enumerateCanonPhaseWindows(sized(201), cfg, local, anchorAt(201), 201)
+    const winner = search.candidates.find((x) => x.points.length === 9)
+    expect(winner, 'full-phase search lost the nine-seat Canon window').toBeDefined()
+    const fourPhase = computeGrid(sized(201), { ...cfg, centreOverrideMM: anchorAt(201) }, local)
+    expect(Math.max(...fourPhase.canonSeatings.map((x) => x.length)), 'four-phase mutation stopped proving the gap')
+      .toBe(6)
+    expect(Math.max(...enumerateFreePhaseMax(sized(201), cfg, anchorAt(201), 201).candidates
+      .map((x) => x.points.length)), 'recovered free fallback lost the same phase search').toBe(9)
+    const span = bandOuterMM(BANDS.find((x) => x.id === 4)!, 12)
+    const at = wrapGroup(sized, { pitchMM: 48, paddingMM: 12, anchorAtMM: anchorAt, frameMidMM: [0, 0] },
+      winner!.points, 24, span.maxMM)
+    expect(at).not.toBeNull()
+    expect(at!.count).toBe(9)
+    expect(at!.sizeMM).toBeCloseTo(198.59, 1)
+    expect(applyCoverage(at!.points, true, 48).seated).toHaveLength(8)
+  }, 30_000)
 
   it('THE THREE ANSWERS: optimal first, then min and max, coincident rows collapsed', () => {
     // Dan, 2026-08-30: "band module must get recommendation from the classifier of optimal layout

@@ -14,7 +14,7 @@ import {
   bbox, edgeDistMM, edgeDistToContourMM, pointInOuter,
 } from '../foundation/geometry'
 import {
-  BANDS, DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS, PADDING_FLOOR_MM, SNAP_STEP_MM,
+  BANDS, DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS, PADDING_FLOOR_MM, PHASE_STEP_MM, SNAP_STEP_MM,
 } from '../grid-magnet-spec'
 
 /** Split seated nodes into perimeter belt and fully-surrounded interior. */
@@ -169,6 +169,148 @@ function canonShifts(nodeOffset: number, anchorFromMin: number, targetPhase: num
   const low = need - pitch                       // the same phase, the other side of zero
   if (Math.abs(Math.abs(need) - half) < 1e-9) return [low, need]
   return [Math.abs(need) <= Math.abs(low) ? need : low]
+}
+
+export interface CanonPhaseCandidate {
+  points: Pt[]
+  id: string
+  phaseMM: Pt
+  window: Pt
+  revealMM: number
+}
+
+export interface CanonPhaseSearch {
+  candidates: CanonPhaseCandidate[]
+  phasePairs: number
+  windows: number
+  fitsCalls: number
+  cacheHits: number
+}
+
+export interface FreePhaseCandidate { points: Pt[]; phaseMM: Pt; revealMM: number }
+export interface FreePhaseSearch {
+  candidates: FreePhaseCandidate[]
+  phasePairs: number
+  fitsCalls: number
+  cacheHits: number
+}
+
+/** Historical Voting's proven count pass, without weights or policy: every phase, maxima only. */
+export function enumerateFreePhaseMax(
+  contour: Contour, cfg: GridConfig, anchorMM: Pt, revealMM: number, stepMM = PHASE_STEP_MM,
+): FreePhaseSearch {
+  const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
+  const step = Math.max(1, stepMM)
+  const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
+  const bb = bbox(contour.outer.pts)
+  const cx = (bb.minX + bb.maxX) / 2, cy = (bb.minY + bb.maxY) / 2
+  const fits = cfg.circle
+    ? makeCircleSeatPredicate(cx, cy, Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY) / 2, pad)
+    : makeContourSeatPredicate(contour, pad)
+  if (!fits) return { candidates: [], phasePairs: 0, fitsCalls: 0, cacheHits: 0 }
+  const phaseX: number[] = [], phaseY: number[] = []
+  for (let k = 0; k < pitch; k += step) {
+    phaseX.push(mod(anchorMM[0] - bb.minX + k, pitch))
+    phaseY.push(mod(anchorMM[1] - bb.minY + k, pitch))
+  }
+  const memo = new Map<string, boolean>()
+  let fitsCalls = 0, cacheHits = 0, maxCount = 0
+  const fitsM = (p: Pt) => {
+    const key = `${Math.round(p[0] * 1000)},${Math.round(p[1] * 1000)}`
+    const hit = memo.get(key)
+    if (hit !== undefined) { cacheHits++; return hit }
+    fitsCalls++
+    const value = fits(p)
+    memo.set(key, value)
+    return value
+  }
+  const candidates: FreePhaseCandidate[] = []
+  for (const px of phaseX) for (const py of phaseY) {
+    const points = latticeAt(bb, pitch, px, py).filter(fitsM)
+    if (!points.length || points.length < maxCount) continue
+    if (points.length > maxCount) { maxCount = points.length; candidates.length = 0 }
+    candidates.push({ points, phaseMM: [px, py], revealMM })
+  }
+  return { candidates, phasePairs: phaseX.length * phaseY.length, fitsCalls, cacheHits }
+}
+
+/** Exhaustive finite-Canon placement over one pitch. Centre seeds phase order; it never limits it. */
+export function enumerateCanonPhaseWindows(
+  contour: Contour, cfg: GridConfig, canonLocalMM: ReadonlyArray<Pt>, anchorMM: Pt,
+  revealMM: number, stepMM = PHASE_STEP_MM,
+): CanonPhaseSearch {
+  if (!canonLocalMM.length) return { candidates: [], phasePairs: 0, windows: 0, fitsCalls: 0, cacheHits: 0 }
+  const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
+  const step = Math.max(1, stepMM)
+  const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
+  const bb = bbox(contour.outer.pts)
+  const cx = (bb.minX + bb.maxX) / 2, cy = (bb.minY + bb.maxY) / 2
+  const fits = cfg.circle
+    ? makeCircleSeatPredicate(cx, cy, Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY) / 2, pad)
+    : makeContourSeatPredicate(contour, pad)
+  if (!fits) return { candidates: [], phasePairs: 0, windows: 0, fitsCalls: 0, cacheHits: 0 }
+
+  const node0 = canonLocalMM[0]
+  const rel = canonLocalMM.map(([x, y]) => [x - node0[0], y - node0[1]] as Pt)
+  const relXs = rel.map((p) => p[0]), relYs = rel.map((p) => p[1])
+  const relMinX = Math.min(...relXs), relMaxX = Math.max(...relXs)
+  const relMinY = Math.min(...relYs), relMaxY = Math.max(...relYs)
+  const phaseX: number[] = [], phaseY: number[] = []
+  for (let k = 0; k < pitch; k += step) {
+    phaseX.push(mod(anchorMM[0] - bb.minX + k, pitch))
+    phaseY.push(mod(anchorMM[1] - bb.minY + k, pitch))
+  }
+  const memo = new Map<string, boolean>()
+  let fitsCalls = 0, cacheHits = 0, windows = 0
+  const fitsM = (p: Pt) => {
+    const key = `${Math.round(p[0] * 1000)},${Math.round(p[1] * 1000)}`
+    const hit = memo.get(key)
+    if (hit !== undefined) { cacheHits++; return hit }
+    fitsCalls++
+    const value = fits(p)
+    memo.set(key, value)
+    return value
+  }
+  const phaseRows: Array<{ px: number; py: number; count: number }> = []
+  for (const px of phaseX) for (const py of phaseY) {
+    const count = latticeAt(bb, pitch, px, py).filter(fitsM).length
+    phaseRows.push({ px, py, count })
+  }
+  phaseRows.sort((a, b) => b.count - a.count || a.px - b.px || a.py - b.py)
+  const unique = new Map<string, CanonPhaseCandidate & { anchorDistance: number }>()
+  let maxCount = 0
+  for (const { px, py, count: phaseCount } of phaseRows) {
+    if (phaseCount < maxCount) break // no Canon window can exceed its phase's free population
+    const baseX = bb.minX + px, baseY = bb.minY + py
+    const ix0 = Math.ceil((bb.minX - relMaxX - baseX) / pitch)
+    const ix1 = Math.floor((bb.maxX - relMinX - baseX) / pitch)
+    const iy0 = Math.ceil((bb.minY - relMaxY - baseY) / pitch)
+    const iy1 = Math.floor((bb.maxY - relMinY - baseY) / pitch)
+    for (let ix = ix0; ix <= ix1; ix++) for (let iy = iy0; iy <= iy1; iy++) {
+      windows++
+      const first: Pt = [baseX + ix * pitch, baseY + iy * pitch]
+      const held: Pt[] = [], ids: number[] = []
+      for (let i = 0; i < canonLocalMM.length; i++) {
+        const absolute: Pt = [first[0] + rel[i][0], first[1] + rel[i][1]]
+        if (fitsM(absolute)) { held.push(canonLocalMM[i]); ids.push(i) }
+      }
+      if (!held.length || held.length < maxCount) continue
+      if (held.length > maxCount) { maxCount = held.length; unique.clear() }
+      const id = ids.join(',')
+      const frameCentre: Pt = [first[0] - node0[0], first[1] - node0[1]]
+      const anchorDistance = Math.hypot(frameCentre[0] - anchorMM[0], frameCentre[1] - anchorMM[1])
+      const candidate = { points: held, id, phaseMM: [px, py] as Pt,
+        window: [ix, iy] as Pt, revealMM, anchorDistance }
+      const previous = unique.get(id)
+      if (!previous || anchorDistance < previous.anchorDistance) unique.set(id, candidate)
+    }
+  }
+  return {
+    candidates: [...unique.values()].map((x) => ({
+      points: x.points, id: x.id, phaseMM: x.phaseMM, window: x.window, revealMM: x.revealMM,
+    })),
+    phasePairs: phaseX.length * phaseY.length, windows, fitsCalls, cacheHits,
+  }
 }
 
 /** What layout decided — placement only; the caller turns it into the engine's result. */
