@@ -107,32 +107,45 @@ export function solveCanonExperiment(
   const maxCanonCount = Math.max(0, ...[...candidates.values()].map((x) => x.points.length))
   const fullest = [...candidates.values()].filter((x) => x.points.length === maxCanonCount)
     .sort((a, b) => a.id.localeCompare(b.id))
+  // TWO INDEPENDENT WINNERS from one enumeration (QA F1, 2026-09-01). The blind row and the
+  // priority row are each wrapped on their own; either may exist without the other, and only when
+  // neither wraps in-band does the solve fall to the free-grid maximum.
   const lawful: Array<{ rung: BandRung; candidate: CanonPhaseCandidate }> = []
   for (const candidate of fullest) {
     const rung = attemptCanon(candidate.points)
     if (rung) lawful.push({ rung: settleCanon(candidate.points, rung), candidate })
   }
-  if (lawful.length) {
-    lawful.sort((a, b) => a.rung.at.sizeMM - b.rung.at.sizeMM
-      || a.rung.at.centreOffMM - b.rung.at.centreOffMM
-      || a.candidate.id.localeCompare(b.candidate.id))
-    const winner = lawful[0]
-    trace.source = 'canon-partial'; trace.retained = winner.rung.at.count
-    trace.winningPhaseMM = winner.candidate.phaseMM
-    trace.winningWindow = winner.candidate.window
-    if (!priority) return finish({ offers: [winner.rung], bestSeated: null, trace })
+  lawful.sort((a, b) => a.rung.at.sizeMM - b.rung.at.sizeMM
+    || a.rung.at.centreOffMM - b.rung.at.centreOffMM
+    || a.candidate.id.localeCompare(b.candidate.id))
+  if (!priority) {
+    if (lawful.length) {
+      const winner = lawful[0]
+      trace.source = 'canon-partial'; trace.retained = winner.rung.at.count
+      trace.winningPhaseMM = winner.candidate.phaseMM
+      trace.winningWindow = winner.candidate.window
+      return finish({ offers: [winner.rung], bestSeated: null, trace })
+    }
+  } else {
     // PRIORITY-MAX OPTIMAL. Wrapped without settle: settling re-adds every fitting frame node and
     // would undo the very seats the priorities chose to give up. The blind row keeps its settle.
     const priorityLawful = orderCanonOffers([...priorityCandidates.values()].flatMap((candidate) => {
       const rung = attemptCanon(candidate.points)
-      return rung ? [{ rung, id: candidate.id }] : []
+      return rung ? [{ rung, id: candidate.id, candidate }] : []
     }))
-    const blind: BandRung = { ...winner.rung, roles: ['canon'] }
-    if (!priorityLawful.length) return finish({ offers: [blind], bestSeated: null, trace })
-    const optimal: BandRung = { ...priorityLawful[0].rung, roles: ['optimal'] }
-    const same = Math.abs(optimal.at.sizeMM - blind.at.sizeMM) < 0.005
-      && identity(optimal.at.points, pitch) === identity(blind.at.points, pitch)
-    return finish({ offers: same ? [{ ...blind, roles: ['optimal', 'canon'] }] : [optimal, blind], bestSeated: null, trace })
+    const blind: BandRung | null = lawful.length ? { ...lawful[0].rung, roles: ['canon'] } : null
+    const optimal: BandRung | null = priorityLawful.length ? { ...priorityLawful[0].rung, roles: ['optimal'] } : null
+    if (blind || optimal) {
+      const lead = (optimal ? priorityLawful[0] : lawful[0]) as { rung: BandRung; candidate: CanonPhaseCandidate }
+      trace.source = 'canon-partial'; trace.retained = lead.rung.at.count
+      trace.winningPhaseMM = lead.candidate.phaseMM
+      trace.winningWindow = lead.candidate.window
+      if (!blind) return finish({ offers: [optimal!], bestSeated: null, trace })
+      if (!optimal) return finish({ offers: [blind], bestSeated: null, trace })
+      const same = Math.abs(optimal.at.sizeMM - blind.at.sizeMM) < 0.005
+        && identity(optimal.at.points, pitch) === identity(blind.at.points, pitch)
+      return finish({ offers: same ? [{ ...blind, roles: ['optimal', 'canon'] }] : [optimal, blind], bestSeated: null, trace })
+    }
   }
 
   const free = new Map<string, { points: Pt[]; revealMM: number; id: string; phaseMM: Pt }>()

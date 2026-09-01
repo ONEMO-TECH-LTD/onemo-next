@@ -302,10 +302,18 @@ export function enumerateCanonPhaseWindows(
     memo.set(key, value)
     return value
   }
-  const phaseRows: Array<{ px: number; py: number; count: number }> = []
+  // Canon nodes sit ON the lattice, so a window's node is lawful iff its lattice index is in this
+  // phase's free set. Integer index keys replace 16 string-keyed lookups per window — the same
+  // answer, an order of magnitude cheaper, for both accumulators.
+  const relIx = rel.map((p) => Math.round(p[0] / pitch)), relIy = rel.map((p) => Math.round(p[1] / pitch))
+  const IDX = 1 << 16
+  const phaseRows: Array<{ px: number; py: number; count: number; free: Set<number> }> = []
   for (const px of phaseX) for (const py of phaseY) {
-    const count = latticeAt(bb, pitch, px, py).filter(fitsM).length
-    phaseRows.push({ px, py, count })
+    const baseX = bb.minX + px, baseY = bb.minY + py
+    const free = new Set<number>()
+    for (const q of latticeAt(bb, pitch, px, py)) if (fitsM(q))
+      free.add(Math.round((q[0] - baseX) / pitch) * IDX + Math.round((q[1] - baseY) / pitch))
+    phaseRows.push({ px, py, count: free.size, free })
   }
   phaseRows.sort((a, b) => b.count - a.count || a.px - b.px || a.py - b.py)
   // TWO ACCUMULATORS, ONE PASS (QA F1, 2026-09-01). Every window is computed once and its held ids
@@ -319,7 +327,7 @@ export function enumerateCanonPhaseWindows(
   const scratch = priority ? new Uint8Array(canonLocalMM.length) : undefined
   let maxCount = 0
   let bestTuple: number[] | null = priorityFloor ? [...priorityFloor] : null
-  for (const { px, py, count: phaseCount } of phaseRows) {
+  for (const { px, py, count: phaseCount, free } of phaseRows) {
     const blindOpen = phaseCount >= maxCount
     // A phase with fewer free seats than the best full-priority window's count cannot beat it: the
     // first four slots are already maximal there (three 1-bits and zero orphans), so only count could.
@@ -334,10 +342,8 @@ export function enumerateCanonPhaseWindows(
       windows++
       const first: Pt = [baseX + ix * pitch, baseY + iy * pitch]
       const held: Pt[] = [], ids: number[] = []
-      for (let i = 0; i < canonLocalMM.length; i++) {
-        const absolute: Pt = [first[0] + rel[i][0], first[1] + rel[i][1]]
-        if (fitsM(absolute)) { held.push(canonLocalMM[i]); ids.push(i) }
-      }
+      for (let i = 0; i < canonLocalMM.length; i++)
+        if (free.has((ix + relIx[i]) * IDX + (iy + relIy[i]))) { held.push(canonLocalMM[i]); ids.push(i) }
       if (!held.length) continue
       const id = ids.join(',')
       const frameCentre: Pt = [first[0] - node0[0], first[1] - node0[1]]

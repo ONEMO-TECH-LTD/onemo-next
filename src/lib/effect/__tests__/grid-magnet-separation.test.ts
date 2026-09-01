@@ -18,7 +18,7 @@ import { canonLayoutForFrame, optimalLayoutForBox } from '../grid-magnet-library
 import { solveCanonExperiment } from '../grid-magnet-canon-experiment'
 import { canonPriorityOf, frameOfMasses, positionsAcross } from '../units/classifier'
 import type { BBox, SafeMass, SafeSegment } from '../types'
-import { BANDS, BAND_STEP_MM } from '../grid-magnet-spec'
+import { BANDS, BAND_STEP_MM, PHASE_STEP_MM } from '../grid-magnet-spec'
 import { scaleContour } from '../grid-magnet-compute'
 import { applyCoverage, enumerateCanonPhaseWindows, enumerateFreePhaseMax, fallbackRevealSizes, makeCircleSeatPredicate, makeContourSeatPredicate, priorityTupleOf } from '../units/layout'
 import { wrapGroup } from '../units/wrap'
@@ -1187,7 +1187,8 @@ describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside
   // and fall back too". Gated against the frozen oracle by exact field. OPEN here, not weakened:
   // bot-b4 exact node array (Dan has not yet ruled more-seats vs tightest when priorities tie),
   // every unsupportedAreaImbalance field (protector iteration), butterfly, and bot-b2 centring
-  // (Gate 3 slim ladder).
+  // (Gate 3 slim ladder). QA F1 (priority-only lawful answer when the blind wrap fails in-band) is
+  // fixed in the solver; no cutout in the corpus exhibits it, so it is stated here, not fixtured.
   const AUTHORITY = JSON.parse(readFileSync(join(process.cwd(), 'src/lib/effect/__tests__/fixtures/balanced-manual-authority.json'), 'utf8')) as {
     fixtures: Array<{ id: string; asset: string; band: number; deliveredCanonNodes: Array<[number, number]> }>
   }
@@ -1265,6 +1266,30 @@ describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside
     expect(withPriority.offers[0].roles).toEqual(['optimal', 'canon'])
     expect(priorityTupleOf(nodesOf(withPriority.offers[0]), priority).slice(0, 4)).toEqual([1, 1, 1, 0])
     expect(withPriority.offers[0].at.sizeMM).toBeCloseTo(140.97, 2)
+  }, 120_000)
+
+  it('dual accumulator: a lower-count phase wins priority while the blind result is byte-identical (QA F2)', async () => {
+    // Duck B4 at 213 mm: the blind maximum is an 8-seat lopsided set; the best priority set is a
+    // 6-seat symmetric one that lives in a phase with fewer free seats. The blind output must not
+    // move when a priority is supplied, and the priority output must be the lower-count identity.
+    const sized = makeSizer(cutout('public/grid-engine/cutouts/DUCK.png'), 0)
+    const anchorAt = await workerAnchor(sized, cfg, 'gate2-dual-accumulator')
+    const row = classifyBands(sized, cfg, anchorAt, [BANDS.find((b) => b.id === 4)!]).find((r) => r.bandId === 4)!
+    const canon = canonLayoutForFrame(48, positionsAcross(row.rulerWidthMM, 48), positionsAcross(row.rulerHeightMM, 48))!
+    const nodes = canon.nodesMM.map(([x, y]) => [x, y] as Pt)
+    const xs = nodes.map((p) => p[0]), ys = nodes.map((p) => p[1])
+    const local = nodes.map(([x, y]) => [x - (Math.min(...xs) + Math.max(...xs)) / 2, y - (Math.min(...ys) + Math.max(...ys)) / 2] as Pt)
+    const priority = canonPriorityOf(local, 48)!
+    const blind = enumerateCanonPhaseWindows(sized(213), cfg, local, anchorAt(213), 213)
+    const both = enumerateCanonPhaseWindows(sized(213), cfg, local, anchorAt(213), 213, PHASE_STEP_MM, priority)
+    expect(both.candidates, 'supplying a priority changed the blind result').toEqual(blind.candidates)
+    expect(both.priorityCandidates.length).toBeGreaterThan(0)
+    const blindMax = Math.max(...blind.candidates.map((c) => c.points.length))
+    const priorityCount = both.priorityCandidates[0].points.length
+    expect(priorityCount, 'the proof needs a LOWER-count priority winner').toBeLessThan(blindMax)
+    for (const c of both.priorityCandidates)
+      expect(priorityTupleOf(c.id.split(',').map(Number), priority).slice(0, 4)).toEqual([1, 1, 1, 0])
+    expect(blind.priorityCandidates).toEqual([])
   }, 120_000)
 
   it('the worker lands on optimal, never on the canon comparison row', async () => {
