@@ -805,6 +805,7 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
       contour: Contour; effSize: number; idx: number
       ladder: Array<{ sizeMM: number; count: number; roles: string[] }>
       grid: { anchors: Array<{ p: Pt }>; phaseMM: Pt; centreMainMM: Pt }
+      unprotected?: { ringsMM: Pt[][]; areaMM2: number; boundaryMM: number } | null
       diagnostic?: unknown
     } | null }
     const posted: Posted[] = []
@@ -825,6 +826,7 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
       expect(belt.contour, 'coverage changed the selected outline').toEqual(full.contour)
       expect(belt.grid.phaseMM, 'coverage changed placement').toEqual(full.grid.phaseMM)
       expect(belt.grid.centreMainMM, 'coverage changed the governed centre').toEqual(full.grid.centreMainMM)
+      expect(belt.unprotected, 'Belt changed the scoring evidence').toEqual(full.unprotected)
       expect(belt.ladder.map((r) => [r.roles, r.sizeMM]), 'coverage changed roles or rung sizes')
         .toEqual(full.ladder.map((r) => [r.roles, r.sizeMM]))
       expect(full.ladder.map((r) => r.count)).toEqual([16, 3])
@@ -1026,5 +1028,29 @@ describe('8 — recovered phase search is wired through the production Canon sol
       .toBeGreaterThan(holdingFactsOf(symmetric, midSides, [100, 100]).ends)
     const narrow: Contour = { outer: { pts: [[0, 0], [40, 0], [40, 100], [0, 100]] }, holes: [] }
     expect(holdingFactsOf(narrow, [[20, 0], [20, 100]], [20, 50]).ends).toBe(2)
+
+    const balanceFacts = {
+      off: { ...facts.balanced, centreOffMM: 10, imbalance: 0 },
+      center: { ...facts.balanced, centreOffMM: 0, imbalance: 1 },
+    }
+    const balanceRules = {
+      universal: false, balance: true, perimeter: false, extremes: false, ends: false, top: false,
+    }
+    expect(rankByHolding(['off', 'center'], (key) => balanceFacts[key as keyof typeof balanceFacts], balanceRules)[0]).toBe('center')
+    expect(rankByHolding(['center', 'off'], (key) => balanceFacts[key as keyof typeof balanceFacts], balanceRules)[0]).toBe('center')
+
+    const protectedCentre = holdingFactsOf(symmetric, [[100, 100]], [100, 100])
+    expect(protectedCentre.unprotectedAreaMM2).toBeCloseTo(32757.16, 1)
+    const signedArea = (ring: Pt[]) => ring.reduce((sum, point, index) => {
+      const next = ring[(index + 1) % ring.length]
+      return sum + point[0] * next[1] - next[0] * point[1]
+    }, 0) / 2
+    expect(Math.abs(protectedCentre.ringsMM.reduce((sum, ring) => sum + signedArea(ring), 0)))
+      .toBeCloseTo(protectedCentre.unprotectedAreaMM2, 1)
+    const withHole: Contour = {
+      outer: symmetric.outer,
+      holes: [{ pts: [[60, 60], [140, 60], [140, 140], [60, 140]] }],
+    }
+    expect(holdingFactsOf(withHole, [], [100, 100]).unprotectedAreaMM2).toBeCloseTo(33600, 6)
   })
 })

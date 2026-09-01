@@ -67,6 +67,7 @@ function usePersisted(key: string, initial: number): [number, (n: number) => voi
 }
 
 export default function GridLab() {
+  const [solveEnabled, setSolveEnabled] = useState(false)
   const [src, setSrc] = useState<Src>('preset')
   const [preset, setPreset] = useState<VectorShapeKind>('squircle')
   const [gen, setGen] = useState<ShapeKind>('blob')
@@ -93,7 +94,7 @@ export default function GridLab() {
   // (Dan, 2026-08-30: "i prefer testing both"); 'legal' is the released behaviour.
   const [ruler, setRuler] = useState<'legal' | 'outer'>('legal')
   const [holdingRules, setHoldingRules] = useState({
-    universal: true, balance: true, perimeter: false,
+    universal: false, balance: false, perimeter: false,
     extremes: false, ends: false, top: false,
   })
   /** Legal-area islands, coloured + boxed + centre-marked. */
@@ -195,6 +196,7 @@ export default function GridLab() {
   }, [])
 
   function cutFile(f: File) {
+    setSolveEnabled(true)
     const loaded = loadImage(f, magic?.imgUrl)
     if (!loaded) { setMagStatus('error:that file is not an image'); return }
     setSrc('magic'); setMagStatus('cutting')
@@ -227,6 +229,7 @@ export default function GridLab() {
     }).catch(() => { })
   }, [])
   async function loadLib(name: string) {
+    setSolveEnabled(true)
     setSrc('magic'); setMagStatus('cutting')
     try {
       const res = await fetch(LIB_RAW + encodeURIComponent(name))
@@ -237,6 +240,7 @@ export default function GridLab() {
   }
   /** Cutout path: no AI — decode (browser IO), hand the alpha mask to the bridge to trace. */
   async function loadCut(name: string) {
+    setSolveEnabled(true)
     setSrc('cut'); setCutStatus('tracing')
     const t0 = performance.now()
     try {
@@ -330,6 +334,7 @@ export default function GridLab() {
   useEffect(() => {
     const w = workerRef.current
     if (!w) return
+    if (!solveEnabled) { setModel(null); return }
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
     const cfg = { pitchMM: pitch, paddingMM: pad, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle', classifierRuler: ruler, holdingRules }
     // Manual in a band (forced registration OR manual band scale): the walk is meaningless —
@@ -348,7 +353,7 @@ export default function GridLab() {
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler, holdingRules])
+  }, [base, src, preset, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler, holdingRules, solveEnabled])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -379,8 +384,8 @@ export default function GridLab() {
             <button aria-pressed={false} onClick={() => setTab('library')}>Library</button>
           </div>
           <div className="gl-seg gl-libbar-tabs">
-            <button aria-pressed={src === 'preset'} onClick={() => setSrc('preset')}>Presets</button>
-            <button aria-pressed={src === 'gen'} onClick={() => setSrc('gen')}>Generators</button>
+            <button aria-pressed={src === 'preset'} onClick={() => { setSrc('preset'); setSolveEnabled(true) }}>Presets</button>
+            <button aria-pressed={src === 'gen'} onClick={() => { setSrc('gen'); setSolveEnabled(true) }}>Generators</button>
             <button aria-pressed={src === 'magic'} onClick={() => setSrc('magic')}>AI Magic</button>
             <button aria-pressed={src === 'cut'} onClick={() => setSrc('cut')}>Cutouts</button>
           </div>
@@ -435,7 +440,7 @@ export default function GridLab() {
               ? <Empty text={magStatus.startsWith('error') ? magStatus.slice(6) : magStatus === 'downloading-model' ? 'Downloading the cut-out model…' : magStatus.startsWith('cutting') ? 'Cutting out the shape…' : 'Upload an image to cut its outline'} spin={magStatus === 'downloading-model' || magStatus.startsWith('cutting')} />
               : src === 'cut'
                 ? <Empty text={cutStatus.startsWith('error') ? cutStatus.slice(6) : cutStatus === 'tracing' ? 'Tracing the outline…' : 'Pick a cutout from the library'} spin={cutStatus === 'tracing'} />
-                : <Empty text="shape unavailable" />)}
+                : <Empty text={solveEnabled ? 'shape unavailable' : 'Pick a shape to solve'} />)}
           </div>
         </section>
 
@@ -576,7 +581,7 @@ export default function GridLab() {
             {src === 'preset' && <>
               <div className="gl-lib">
                 {PRESETS.map((k) => (
-                  <button key={k} aria-pressed={preset === k} onClick={() => setPreset(k as VectorShapeKind)}><b>{k}</b></button>
+                  <button key={k} aria-pressed={preset === k} onClick={() => { setPreset(k as VectorShapeKind); setSolveEnabled(true) }}><b>{k}</b></button>
                 ))}
               </div>
               {preset === 'polygon' && <Slider label="Sides" v={sides} set={setSides} min={3} max={12} />}
@@ -585,7 +590,7 @@ export default function GridLab() {
 
             {src === 'gen' && <>
               <div className="gl-seg gl-wrap">
-                {GENS.map(g => <button key={g.k} aria-pressed={gen === g.k} onClick={() => { setGen(g.k); setP1(50); setP2(g.p2start) }}>{g.label}</button>)}
+                {GENS.map(g => <button key={g.k} aria-pressed={gen === g.k} onClick={() => { setGen(g.k); setP1(50); setP2(g.p2start); setSolveEnabled(true) }}>{g.label}</button>)}
               </div>
               <Slider label={genDef.p1[0]} unit={genDef.p1[1]} v={p1} set={setP1} min={0} max={100} />
               <Slider label={genDef.p2[0]} v={p2} set={setP2} min={genDef.p2min} max={genDef.p2max} />
@@ -928,12 +933,11 @@ function Stage({ contour, grid, lattice, box, segments, segFill, unprotected, on
           <text {...lbl} x={lX + fs * 0.6} y={my} textAnchor="middle" transform={`rotate(90 ${lX + fs * 0.6} ${my})`}>{hTxt}</text>
         </g>)
       })()}
-      {unprotected && unprotected.ringsMM.length > 0 && <g style={{ pointerEvents: 'none' }}>
-        {unprotected.ringsMM.map((ring, index) => <path key={'up' + index}
-          d={'M ' + ring.map(([x, y]) => `${x.toFixed(2)} ${(-y).toFixed(2)}`).join(' L ') + ' Z'}
-          fill="#e5484d" fillOpacity={0.16} stroke="#e5484d" strokeOpacity={0.55}
-          strokeWidth={1} vectorEffect="non-scaling-stroke" />)}
-      </g>}
+      {unprotected && unprotected.ringsMM.length > 0 && <path style={{ pointerEvents: 'none' }}
+        d={unprotected.ringsMM.map((ring) =>
+          'M ' + ring.map(([x, y]) => `${x.toFixed(2)} ${(-y).toFixed(2)}`).join(' L ') + ' Z').join(' ')}
+        fill="#e5484d" fillOpacity={0.16} stroke="#e5484d" strokeOpacity={0.55}
+        fillRule="evenodd" clipRule="evenodd" strokeWidth={1} vectorEffect="non-scaling-stroke" />}
       {/* Every spot the bridge handed over: faint where empty, accent where a magnet seats. */}
       <g transform={pend.x || pend.y ? `translate(${pend.x} ${-pend.y})` : undefined}>
       {spots.map((sp, i) => {

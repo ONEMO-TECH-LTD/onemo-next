@@ -191,8 +191,7 @@ export function rankByHolding<T>(
   if (rules.ends) ruleset.push([(f) => -f.ends])
   if (rules.top) ruleset.push([(f) => f.topUnprotectedMM])
   if (rules.universal) ruleset.push([(f) => f.unprotectedAreaMM2, (f) => f.unprotectedMM])
-  if (rules.balance) ruleset.push([(f) => f.centreOffMM, (f) => f.imbalance])
-  if (!ruleset.length) return [...candidates]
+  if (!ruleset.length && !rules.balance) return [...candidates]
   const facts = new Map(candidates.map((candidate) => [candidate, factsOf(candidate)]))
   const totals = new Map(candidates.map((candidate) => [candidate, 0]))
   for (const measures of ruleset) for (const measure of measures) {
@@ -202,6 +201,17 @@ export function rankByHolding<T>(
     for (let i = 0; i < rows.length; i++) {
       if (i && Math.abs(rows[i].value - rows[i - 1].value) > 1e-9) rank = i
       totals.set(rows[i].candidate, (totals.get(rows[i].candidate) ?? 0) + rank / measures.length)
+    }
+  }
+  if (rules.balance) {
+    const rows = candidates.map((candidate) => ({ candidate, facts: facts.get(candidate)! }))
+      .sort((a, b) => a.facts.centreOffMM - b.facts.centreOffMM
+        || a.facts.imbalance - b.facts.imbalance)
+    let rank = 0
+    for (let index = 0; index < rows.length; index++) {
+      if (index && (Math.abs(rows[index].facts.centreOffMM - rows[index - 1].facts.centreOffMM) > 1e-9
+        || Math.abs(rows[index].facts.imbalance - rows[index - 1].facts.imbalance) > 1e-9)) rank = index
+      totals.set(rows[index].candidate, (totals.get(rows[index].candidate) ?? 0) + rank)
     }
   }
   return [...candidates].sort((a, b) => (totals.get(a) ?? 0) - (totals.get(b) ?? 0))
