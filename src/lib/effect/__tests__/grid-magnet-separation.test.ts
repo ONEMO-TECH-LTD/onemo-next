@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest'
 import { bandOuterMM, classifyBands, computeGrid } from '../grid-magnet'
 import { canonLayoutForFrame, optimalLayoutForBox } from '../grid-magnet-library-catalogue'
 import { solveCanonExperiment } from '../grid-magnet-canon-experiment'
-import { frameOfMasses, positionsAcross } from '../units/classifier'
+import { canonPriorityOf, frameOfMasses, positionsAcross } from '../units/classifier'
 import type { BBox, SafeMass, SafeSegment } from '../types'
 import { BANDS, BAND_STEP_MM } from '../grid-magnet-spec'
 import { scaleContour } from '../grid-magnet-compute'
@@ -1113,4 +1113,59 @@ describe('8 — recovered phase search is wired through the production Canon sol
     expect(result.offers[0].at.points.every((point) =>
       pointInContour(point, contour) && edgeDistToContourMM(contour, point) >= 11.98)).toBe(true)
   }, 30_000)
+})
+
+describe('9 — priority hold points are classifier data', () => {
+  // Gate 1 (2026-09-01): source + unit only. Nothing consumes this yet; no runtime claim is made.
+  const frame = (cols: number, rows: number): Pt[] => {
+    const out: Pt[] = []
+    for (let ix = 0; ix < cols; ix++) for (let iy = 0; iy < rows; iy++)
+      out.push([(ix - (cols - 1) / 2) * 48, (iy - (rows - 1) / 2) * 48])
+    return out                                   // id = ix * rows + iy
+  }
+  const id = (cols: number, rows: number, ix: number, iy: number) => ix * rows + iy
+  const sorted = (xs: number[]) => [...xs].sort((a, b) => a - b)
+
+  it('portrait 2x3: top row first, bottom row the other extreme, no interior, mirrored across x', () => {
+    const p = canonPriorityOf(frame(2, 3), 100, 200)!
+    expect(sorted(p.topIds)).toEqual([id(2,3,0,2), id(2,3,1,2)])
+    expect(p.longExtremeIds.map(sorted)).toEqual([[id(2,3,0,0), id(2,3,1,0)], [id(2,3,0,2), id(2,3,1,2)]])
+    expect(p.interiorLineIds).toEqual([])
+    expect(p.mirrorOf[id(2,3,0,1)]).toBe(id(2,3,1,1))
+    expect(p.slim).toBe(true)
+  })
+  it('landscape 3x2: top row is still first; extremes are the left and right columns', () => {
+    const p = canonPriorityOf(frame(3, 2), 200, 100)!
+    expect(sorted(p.topIds)).toEqual([id(3,2,0,1), id(3,2,1,1), id(3,2,2,1)])
+    expect(p.longExtremeIds.map(sorted)).toEqual([[id(3,2,0,0), id(3,2,0,1)], [id(3,2,2,0), id(3,2,2,1)]])
+    expect(p.interiorLineIds).toEqual([])
+    expect(p.mirrorOf[id(3,2,1,0)]).toBe(id(3,2,1,1))   // mirrored across the long (x) axis: rows swap
+    expect(p.slim).toBe(true)
+  })
+  it('square 3x3 reads as portrait; the centre node is its own mirror; not slim', () => {
+    const p = canonPriorityOf(frame(3, 3), 150, 150)!
+    expect(sorted(p.topIds)).toEqual([id(3,3,0,2), id(3,3,1,2), id(3,3,2,2)])
+    expect(p.longExtremeIds.map(sorted)).toEqual([[id(3,3,0,0), id(3,3,1,0), id(3,3,2,0)], [id(3,3,0,2), id(3,3,1,2), id(3,3,2,2)]])
+    expect(p.interiorLineIds).toEqual([])
+    expect(p.mirrorOf[id(3,3,1,1)]).toBe(-1)
+    expect(p.mirrorOf[id(3,3,0,1)]).toBe(id(3,3,2,1))
+    expect(p.slim).toBe(false)
+  })
+  it('3-line strip 1x3 needs no interior; 4-line 3x4 offers each interior row separately', () => {
+    const three = canonPriorityOf(frame(1, 3), 50, 150)!
+    expect(three.interiorLineIds).toEqual([])
+    expect(three.mirrorOf.every((m) => m === -1)).toBe(true)
+    const four = canonPriorityOf(frame(3, 4), 150, 200)!
+    expect(four.interiorLineIds.map(sorted)).toEqual([
+      [id(3,4,0,1), id(3,4,1,1), id(3,4,2,1)], [id(3,4,0,2), id(3,4,1,2), id(3,4,2,2)]])
+    expect(sorted(four.topIds)).toEqual([id(3,4,0,3), id(3,4,1,3), id(3,4,2,3)])
+    expect(four.slim).toBe(false)
+  })
+  it('each derivation is load-bearing: swapping the shape box flips the long axis, not the top', () => {
+    const asPortrait = canonPriorityOf(frame(3, 2), 100, 200)!   // same frame, shape now tall
+    const asLandscape = canonPriorityOf(frame(3, 2), 200, 100)!
+    expect(sorted(asPortrait.topIds)).toEqual(sorted(asLandscape.topIds))
+    expect(asPortrait.longExtremeIds.map(sorted)).not.toEqual(asLandscape.longExtremeIds.map(sorted))
+    expect(canonPriorityOf([], 1, 1)).toBeNull()
+  })
 })

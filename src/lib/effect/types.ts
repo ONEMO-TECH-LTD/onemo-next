@@ -126,6 +126,24 @@ export interface BandSolve {
   bestSeated: { revealMM: number; points: Pt[] } | null
 }
 
+/** PRIORITY HOLD POINTS on a Canon frame (Dan, 2026-09-01) — which frame nodes matter, as explicit
+ *  node-id groups so every orientation reads the same way. Classifier data; layout and judge consume.
+ *  - topIds: the frame's highest line — "top is always number 1 priority … cause we have gravity".
+ *  - longExtremeIds: the two extreme lines of the shape's LONG axis (portrait: bottom/top rows,
+ *    landscape: left/right columns). "extremes are the utmost priority".
+ *  - interiorLineIds: one id-list per interior long-axis line, present only when that axis carries
+ *    four or more lines — "with 3 rows … it is unnecessary we can skip mid".
+ *  - mirrorOf: partner across the long axis, -1 when the node is its own — the orphan test.
+ *  - slim: the classifier's existing slim rule (minor axis ≤ 2 lines); slim frames may centre
+ *    before they tighten. */
+export interface CanonPriority {
+  topIds: number[]
+  longExtremeIds: [number[], number[]]
+  interiorLineIds: number[][]
+  mirrorOf: number[]
+  slim: boolean
+}
+
 export interface CanonExperimentTrace {
   source: 'canon-full' | 'canon-partial' | 'free-fallback' | 'none'
   canonSeats: number; populations: number; wraps: number; retained: number; readded: number

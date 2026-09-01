@@ -5,7 +5,7 @@
 // live callers (the worker and the catalogue matcher) and dies in S4 once the catalogue answers.
 
 import { Clipper, FillRule, JoinType, EndType, type Paths64 } from '@countertype/clipper2-ts'
-import type { AxisClass, BBox, Contour, FrameKind, Pt, SafeSegment, ShapeClass } from '../types'
+import type { AxisClass, BBox, CanonPriority, Contour, FrameKind, Pt, SafeSegment, ShapeClass } from '../types'
 import { bbox } from '../foundation/geometry'
 import { MANUFACTURING_OFFSET_ARC_TOLERANCE_MM } from '../offset'
 import { BAND_STEP_MM, DEFAULT_PITCH_MM, MIN_EFFECT_MM, type Band } from '../grid-magnet-spec'
@@ -210,4 +210,49 @@ export function classFrameNodes(
   const cols = (tall ? m : n) as AxisClass
   const rows = (tall ? n : m) as AxisClass
   return { cols, rows, nodes: frameNodes(cols, rows, pitchMM) }
+}
+
+
+// ─── PRIORITY HOLD POINTS ───────────────────────────────────────────────────────────────────────
+// Dan, 2026-09-01: "add priority hold points to the canon". The classifier already knows the frame
+// and the shape's outer box; naming which frame nodes matter is classification, not placement. Data
+// only — layout and judge decide what to do with it. No catalogue field, no lookup, no shape names.
+
+/** Which nodes of a Canon frame are priority holds, for a shape of this outer size.
+ *
+ *  Lines are read off the frame's own node coordinates (index = round((v − min) / pitch)). The
+ *  TOP line is the highest y-line in every orientation — gravity does not care which axis is long.
+ *  The long axis comes from the shape's outer box, never from the frame: a portrait Batwoman wearing
+ *  a 3×2 legal Canon still has its top/bottom as the extremes. */
+export function canonPriorityOf(
+  canonLocalMM: ReadonlyArray<Pt>, outerWidthMM: number, outerHeightMM: number,
+  pitchMM: number = DEFAULT_PITCH_MM,
+): CanonPriority | null {
+  if (!canonLocalMM.length) return null
+  const lineIdx = (axis: 0 | 1): number[] => {
+    const vs = canonLocalMM.map((p) => p[axis]), min = Math.min(...vs)
+    return vs.map((v) => Math.round((v - min) / pitchMM))
+  }
+  const col = lineIdx(0), row = lineIdx(1)
+  const cols = Math.max(...col) + 1, rows = Math.max(...row) + 1
+  const idsOn = (line: number[], k: number): number[] =>
+    canonLocalMM.map((_, i) => i).filter((i) => line[i] === k)
+
+  const topIds = idsOn(row, rows - 1)
+  // Long axis from the SHAPE. Ties (square) read as portrait so top/bottom stay the extremes.
+  const portrait = outerHeightMM >= outerWidthMM
+  const long = portrait ? row : col, longLines = portrait ? rows : cols
+  const cross = portrait ? col : row, crossLines = portrait ? cols : rows
+  const longExtremeIds: [number[], number[]] = [idsOn(long, 0), idsOn(long, longLines - 1)]
+  const interiorLineIds: number[][] = []
+  if (longLines >= 4) for (let k = 1; k < longLines - 1; k++) interiorLineIds.push(idsOn(long, k))
+  const at = new Map<string, number>()
+  canonLocalMM.forEach((_, i) => at.set(long[i] + ':' + cross[i], i))
+  const mirrorOf = canonLocalMM.map((_, i) => {
+    const m = at.get(long[i] + ':' + (crossLines - 1 - cross[i]))
+    return m === undefined || m === i ? -1 : m
+  })
+  // Slim is the classifier's existing rule (FrameKind): a minor axis of one or two lines.
+  const slim = Math.min(cols, rows) <= 2
+  return { topIds, longExtremeIds, interiorLineIds, mirrorOf, slim }
 }
