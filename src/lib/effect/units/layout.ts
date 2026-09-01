@@ -206,6 +206,13 @@ export function priorityTupleOf(heldIds: ReadonlyArray<number>, priority: CanonP
   return [any(priority.topIds), both, interior, 0 - orphans, heldIds.length]
 }
 
+/** The held ids with every unmatched seat removed — a seat whose mirror partner is absent goes,
+ *  its partner (absent) is nothing to keep. Ids stay sorted as given. */
+export function symmetricCore(heldIds: ReadonlyArray<number>, priority: CanonPriority): number[] {
+  const held = new Set(heldIds)
+  return heldIds.filter((i) => { const m = priority.mirrorOf[i]; return m === -1 || held.has(m) })
+}
+
 const fullPriority = (t: ReadonlyArray<number> | null): t is number[] =>
   !!t && t[0] === 1 && t[1] === 1 && t[2] === 1 && t[3] === 0
 
@@ -357,12 +364,21 @@ export function enumerateCanonPhaseWindows(
       }
       // Once a full-priority window exists only count can beat it — the cheap skip counting had.
       if (priorityOpen && !(fullPriority(bestTuple) && ids.length < bestTuple[4])) {
-        const tuple = priorityTupleOf(ids, priority!, scratch)
-        const cmp = bestTuple ? tupleCmp(tuple, bestTuple) : 1
-        if (cmp < 0) continue
-        if (cmp > 0) { bestTuple = tuple; byPriority.clear() }
-        const previous = byPriority.get(id)
-        if (!previous || anchorDistance < previous.anchorDistance) byPriority.set(id, row)
+        // Every window offers two candidates: everything that fits, and its SYMMETRIC CORE — the
+        // same seats with unmatched ones dropped. Dan: "try full frame but sacrifice parts of it …
+        // in favour of the priorities". A shape whose arm is 0.2 mm too thin for one mirror seat
+        // should lose that seat's partner, not carry an orphan. One rule, every frame.
+        const core = symmetricCore(ids, priority!)
+        for (const cand of core.length === ids.length ? [ids] : [ids, core]) {
+          const tuple = priorityTupleOf(cand, priority!, scratch)
+          const cmp = bestTuple ? tupleCmp(tuple, bestTuple) : 1
+          if (cmp < 0) continue
+          if (cmp > 0) { bestTuple = tuple; byPriority.clear() }
+          const cid = cand === ids ? id : cand.join(',')
+          const previous = byPriority.get(cid)
+          if (!previous || anchorDistance < previous.anchorDistance)
+            byPriority.set(cid, cand === ids ? row : { ...row, id: cid, points: cand.map((i) => canonLocalMM[i]) })
+        }
       }
     }
   }

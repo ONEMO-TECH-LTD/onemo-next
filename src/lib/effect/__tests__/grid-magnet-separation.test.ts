@@ -20,7 +20,7 @@ import { canonPriorityOf, frameOfMasses, positionsAcross } from '../units/classi
 import type { BBox, SafeMass, SafeSegment } from '../types'
 import { BANDS, BAND_STEP_MM, PHASE_STEP_MM } from '../grid-magnet-spec'
 import { scaleContour } from '../grid-magnet-compute'
-import { applyCoverage, enumerateCanonPhaseWindows, enumerateFreePhaseMax, fallbackRevealSizes, makeCircleSeatPredicate, makeContourSeatPredicate, priorityTupleOf } from '../units/layout'
+import { applyCoverage, enumerateCanonPhaseWindows, enumerateFreePhaseMax, fallbackRevealSizes, makeCircleSeatPredicate, makeContourSeatPredicate, priorityTupleOf, symmetricCore } from '../units/layout'
 import { wrapGroup } from '../units/wrap'
 import { wrapBandLadder } from '../grid-magnet-wrap-compute'
 import { contourCentroidOf } from '../units/centring'
@@ -1314,6 +1314,29 @@ describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside
     expect(optimal.at.sizeMM).toBeCloseTo(146.11, 2)
     expect(Math.abs(optimal.at.originMM[0] - optimal.at.anchorMM[0])).toBeLessThan(3)
   }, 120_000)
+
+  it('a window also offers its symmetric core: an orphan is dropped, not carried (BOT B5)', async () => {
+    // Dan, 2026-09-01: "try full frame but sacrifice parts of it … in favour of the priorities".
+    // BOT B5's fullest priority window has one unmatched seat (its mirror is 11.8 mm from the
+    // edge — 0.2 mm short of lawful). Optimal must be the symmetric core, not the orphaned set.
+    const sized = makeSizer(cutout('public/grid-engine/cutouts/BOT.png'), 0)
+    const anchorAt = await workerAnchor(sized, cfg, 'gate2-symmetric-core')
+    const band = BANDS.find((b) => b.id === 5)!
+    const span = bandOuterMM(band, 12)
+    const row = classifyBands(sized, cfg, anchorAt, [band]).find((r) => r.bandId === 5)!
+    const canon = canonLayoutForFrame(48, positionsAcross(row.rulerWidthMM, 48), positionsAcross(row.rulerHeightMM, 48))!
+    const nodes = canon.nodesMM.map(([x, y]) => [x, y] as Pt)
+    const xs = nodes.map((p) => p[0]), ys = nodes.map((p) => p[1])
+    const local = nodes.map(([x, y]) => [x - (Math.min(...xs) + Math.max(...xs)) / 2, y - (Math.min(...ys) + Math.max(...ys)) / 2] as Pt)
+    const priority = canonPriorityOf(local, 48)!
+    const solve = solveCanonExperiment(sized, cfg, span.minMM, span.maxMM, 24, anchorAt, nodes, priority)
+    const optimal = solve.offers.find((o) => o.roles.includes('optimal'))!
+    const ids = optimal.at.points.map(([x, y]) => local.findIndex(([a, b]) => Math.abs(a - (x - optimal.at.originMM[0])) < 1e-6 && Math.abs(b - (y - optimal.at.originMM[1])) < 1e-6))
+    expect(priorityTupleOf(ids, priority).slice(0, 4)).toEqual([1, 1, 1, 0])
+    // and the pure helper: dropping orphans keeps self-mirrored and paired seats only
+    expect(symmetricCore([0, 1, 2], { ...priority, mirrorOf: [-1, 2, 1] })).toEqual([0, 1, 2])
+    expect(symmetricCore([0, 1], { ...priority, mirrorOf: [-1, 2, 1] })).toEqual([0])
+  }, 300_000)
 
   it('the worker lands on optimal, never on the canon comparison row', async () => {
     type Posted = { model: { idx: number; ladder: Array<{ roles: string[]; sizeMM: number }> } | null }
