@@ -21,7 +21,6 @@ import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt } from '@/lib/effect/types'
-import type { ProtectionEvidence } from '@/lib/effect/units/protection'
 import { DEFAULT_PITCH_MM, type BandSnapPoint, type GridResult, type MagnetPlan, type SafeSegment } from '@/lib/effect/grid-magnet'
 import { bandOuterMM, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet'
 import { BANDS, CENTRE_MODE, GOVERNOR, PADDING_CEIL_MM, PADDING_FLOOR_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-magnet-spec'
@@ -68,7 +67,6 @@ function usePersisted(key: string, initial: number): [number, (n: number) => voi
 }
 
 export default function GridLab() {
-  const [solveEnabled, setSolveEnabled] = useState(false)
   const [src, setSrc] = useState<Src>('preset')
   const [preset, setPreset] = useState<VectorShapeKind>('squircle')
   const [gen, setGen] = useState<ShapeKind>('blob')
@@ -94,12 +92,6 @@ export default function GridLab() {
   // WHICH RULER the classifier reads. A test instrument so both can be tried on the same shape
   // (Dan, 2026-08-30: "i prefer testing both"); 'legal' is the released behaviour.
   const [ruler, setRuler] = useState<'legal' | 'outer'>('legal')
-  const [holdingRules, setHoldingRules] = useState({
-    universal: false, balance: false, perimeter: false,
-    extremes: false, ends: false, top: false,
-  })
-  const [protectionPadding, setProtectionPadding] = useState(24)
-  const [showUnheld, setShowUnheld] = useState(true)
   /** Legal-area islands, coloured + boxed + centre-marked. */
   const [showSegs, setShowSegs] = useState(true)
   /** Coloured fills of the inner (legal) area — off leaves outlines only. */
@@ -199,7 +191,6 @@ export default function GridLab() {
   }, [])
 
   function cutFile(f: File) {
-    setSolveEnabled(true)
     const loaded = loadImage(f, magic?.imgUrl)
     if (!loaded) { setMagStatus('error:that file is not an image'); return }
     setSrc('magic'); setMagStatus('cutting')
@@ -232,7 +223,6 @@ export default function GridLab() {
     }).catch(() => { })
   }, [])
   async function loadLib(name: string) {
-    setSolveEnabled(true)
     setSrc('magic'); setMagStatus('cutting')
     try {
       const res = await fetch(LIB_RAW + encodeURIComponent(name))
@@ -243,7 +233,6 @@ export default function GridLab() {
   }
   /** Cutout path: no AI — decode (browser IO), hand the alpha mask to the bridge to trace. */
   async function loadCut(name: string) {
-    setSolveEnabled(true)
     setSrc('cut'); setCutStatus('tracing')
     const t0 = performance.now()
     try {
@@ -290,7 +279,6 @@ export default function GridLab() {
 
   // The solve runs in a worker so the page never freezes; the last result stays up while solving.
   type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: Array<BandSnapPoint & { roles?: string[] }>; idx: number; segments: SafeSegment[]; stops?: Array<{ press: number; reveal: number }>; offMM?: number; recog?: { family: string; cols: number; rows: number; segWmm: number; segHmm: number }
-    unprotected?: ProtectionEvidence | null
     /** STEP 1+2 — what the classifier read at this band's trial size, and the whole table. */
     /** the classifier's own row and the layout it recommended — carried for the readout, not
      *  rendered as a second panel (Dan: I did not ask for that) */
@@ -337,9 +325,8 @@ export default function GridLab() {
   useEffect(() => {
     const w = workerRef.current
     if (!w) return
-    if (!solveEnabled) { setModel(null); return }
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
-    const cfg = { pitchMM: pitch, paddingMM: pad, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle', classifierRuler: ruler, holdingRules }
+    const cfg = { pitchMM: pitch, paddingMM: pad, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle', classifierRuler: ruler }
     // Manual in a band (forced registration OR manual band scale): the walk is meaningless —
     // solve that size directly, exactly like free mode, band chip stays active.
     const manualBand = manual !== null || bandScale !== null   // manual scale/pan: solved directly at the requested size
@@ -350,14 +337,13 @@ export default function GridLab() {
       manualBand,
       sizeMM: manualBand ? (bandScale ?? effSizeRef.current ?? bandOuterMM(BANDS[0], pad).minMM) : 0,
       stepSel,
-      protectionPaddingMM: protectionPadding,
     }
     if (busyRef.current) { queuedRef.current = msg; setSolving(true); return }
     busyRef.current = true
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler, holdingRules, protectionPadding, solveEnabled])
+  }, [base, src, preset, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -388,8 +374,8 @@ export default function GridLab() {
             <button aria-pressed={false} onClick={() => setTab('library')}>Library</button>
           </div>
           <div className="gl-seg gl-libbar-tabs">
-            <button aria-pressed={src === 'preset'} onClick={() => { setSrc('preset'); setSolveEnabled(true) }}>Presets</button>
-            <button aria-pressed={src === 'gen'} onClick={() => { setSrc('gen'); setSolveEnabled(true) }}>Generators</button>
+            <button aria-pressed={src === 'preset'} onClick={() => setSrc('preset')}>Presets</button>
+            <button aria-pressed={src === 'gen'} onClick={() => setSrc('gen')}>Generators</button>
             <button aria-pressed={src === 'magic'} onClick={() => setSrc('magic')}>AI Magic</button>
             <button aria-pressed={src === 'cut'} onClick={() => setSrc('cut')}>Cutouts</button>
           </div>
@@ -430,7 +416,6 @@ export default function GridLab() {
                     // 100% = the shape at half the board, so there is room around it (Dan).
                     viewport: { panMM: [0, 0] as Pt, zoom: camZoom * CAM_BASE },
                     segments: showSegs ? model!.segments : [], segFill: segFillN !== 0,
-                    unprotected: showUnheld ? model!.unprotected ?? null : null,
                     onPan: (dx: number, dy: number) => setManual((m) => { const bx = m ? m.x : model!.grid.phaseMM[0], by = m ? m.y : model!.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } }),
                     onZoom: (f: number) => {
                       // Pinch = manual scaling WITHIN the band's range.
@@ -444,7 +429,7 @@ export default function GridLab() {
               ? <Empty text={magStatus.startsWith('error') ? magStatus.slice(6) : magStatus === 'downloading-model' ? 'Downloading the cut-out model…' : magStatus.startsWith('cutting') ? 'Cutting out the shape…' : 'Upload an image to cut its outline'} spin={magStatus === 'downloading-model' || magStatus.startsWith('cutting')} />
               : src === 'cut'
                 ? <Empty text={cutStatus.startsWith('error') ? cutStatus.slice(6) : cutStatus === 'tracing' ? 'Tracing the outline…' : 'Pick a cutout from the library'} spin={cutStatus === 'tracing'} />
-                : <Empty text={solveEnabled ? 'shape unavailable' : 'Pick a shape to solve'} />)}
+                : <Empty text="shape unavailable" />)}
           </div>
         </section>
 
@@ -585,7 +570,7 @@ export default function GridLab() {
             {src === 'preset' && <>
               <div className="gl-lib">
                 {PRESETS.map((k) => (
-                  <button key={k} aria-pressed={preset === k} onClick={() => { setPreset(k as VectorShapeKind); setSolveEnabled(true) }}><b>{k}</b></button>
+                  <button key={k} aria-pressed={preset === k} onClick={() => setPreset(k as VectorShapeKind)}><b>{k}</b></button>
                 ))}
               </div>
               {preset === 'polygon' && <Slider label="Sides" v={sides} set={setSides} min={3} max={12} />}
@@ -594,7 +579,7 @@ export default function GridLab() {
 
             {src === 'gen' && <>
               <div className="gl-seg gl-wrap">
-                {GENS.map(g => <button key={g.k} aria-pressed={gen === g.k} onClick={() => { setGen(g.k); setP1(50); setP2(g.p2start); setSolveEnabled(true) }}>{g.label}</button>)}
+                {GENS.map(g => <button key={g.k} aria-pressed={gen === g.k} onClick={() => { setGen(g.k); setP1(50); setP2(g.p2start) }}>{g.label}</button>)}
               </div>
               <Slider label={genDef.p1[0]} unit={genDef.p1[1]} v={p1} set={setP1} min={0} max={100} />
               <Slider label={genDef.p2[0]} v={p2} set={setP2} min={genDef.p2min} max={genDef.p2max} />
@@ -658,27 +643,6 @@ export default function GridLab() {
               </div>
             </div>}
           </Fold>
-          <Fold title="Holding filters">
-            <Slider label="Protection padding · from magnet edge" unit="mm"
-              v={protectionPadding} set={setProtectionPadding} min={0} max={96} />
-            {model?.unprotected && <div className="gl-field"><span>Unsupported material</span>
-              <div className="gl-snap">{model.unprotected.percent.toFixed(1)}% ·{' '}
-                {Math.round(model.unprotected.areaMM2)} mm² · {model.unprotected.patchCount} patch{model.unprotected.patchCount === 1 ? '' : 'es'} ·{' '}
-                {Math.round(model.unprotected.boundaryMM)} mm outer edge</div></div>}
-            <label className="gl-toggle"><span>Show unheld <small style={{ color: 'var(--ink-3)' }}>· exact scored material</small></span>
-              <input type="checkbox" checked={showUnheld} onChange={(event) => setShowUnheld(event.target.checked)} />
-            </label>
-            <div className="gl-field"><span>Primary comparison</span><div className="gl-seg gl-wrap">
-              {([['universal', 'Universal'], ['balance', 'Balance']] as const).map(([key, label]) =>
-                <button key={key} aria-pressed={holdingRules[key]}
-                  onClick={() => setHoldingRules((rules) => ({ ...rules, [key]: !rules[key] }))}>{label}</button>)}
-            </div></div>
-            <div className="gl-field"><span>Rule comparison</span><div className="gl-seg gl-wrap">
-              {([['ends', 'Ends'], ['top', 'Top'], ['extremes', 'Extremes'], ['perimeter', 'Perimeter']] as const)
-                .map(([key, label]) => <button key={key} aria-pressed={holdingRules[key]}
-                  onClick={() => setHoldingRules((rules) => ({ ...rules, [key]: !rules[key] }))}>{label}</button>)}
-            </div></div>
-          </Fold>
         </aside>
       </div>
     </div>
@@ -694,9 +658,8 @@ function dim(c: Contour, axis: 0 | 1): number {
 /** Island tints — screen colours only, one hue per segment, smallest first. */
 const SEG_HUES = ['#e0762f', '#7a4ae0', '#2fa864', '#e04a8f', '#2f9fe0']
 
-function Stage({ contour, grid, lattice, box, segments, segFill, unprotected, onPan, onZoom, onReset, onPickNode, viewport }: {
+function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, onReset, onPickNode, viewport }: {
   contour: Contour; grid: GridResult; lattice: boolean; box: boolean; segments: SafeSegment[]; segFill: boolean
-  unprotected?: ProtectionEvidence | null
   onPan: (dxMM: number, dyMM: number) => void; onZoom: (f: number) => void; onReset: () => void
   /** Library authoring: a lattice spot was clicked (mm, engine y-up). Display layer only. */
   onPickNode?: (pMM: Pt) => void
@@ -831,9 +794,6 @@ function Stage({ contour, grid, lattice, box, segments, segFill, unprotected, on
       onDoubleClick={() => { setPend({ x: 0, y: 0 }); onReset() }}>
       {/* The ground: two-level mm rule anchored on the lattice, so intersections are the centres. */}
       <defs>
-        <pattern id="gl-unheld" width={4} height={4} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-          <line x1={0} y1={0} x2={0} y2={4} stroke="var(--warn, #e0762f)" strokeOpacity={0.38} strokeWidth={1.2} />
-        </pattern>
         <pattern id="gl-fine" width={grid.pitchCentreMM / 2} height={grid.pitchCentreMM / 2}
           patternUnits="userSpaceOnUse" x={Afy[0]} y={Afy[1]}>
           <path d={`M ${grid.pitchCentreMM / 2} 0 L 0 0 0 ${grid.pitchCentreMM / 2}`}
@@ -946,11 +906,6 @@ function Stage({ contour, grid, lattice, box, segments, segFill, unprotected, on
           <text {...lbl} x={lX + fs * 0.6} y={my} textAnchor="middle" transform={`rotate(90 ${lX + fs * 0.6} ${my})`}>{hTxt}</text>
         </g>)
       })()}
-      {unprotected && unprotected.ringsMM.length > 0 && <path style={{ pointerEvents: 'none' }}
-        d={unprotected.ringsMM.map((ring) =>
-          'M ' + ring.map(([x, y]) => `${x.toFixed(2)} ${(-y).toFixed(2)}`).join(' L ') + ' Z').join(' ')}
-        fill="url(#gl-unheld)" stroke="var(--warn, #e0762f)" strokeOpacity={0.65}
-        fillRule="evenodd" clipRule="evenodd" strokeWidth={1} vectorEffect="non-scaling-stroke" />}
       {/* Every spot the bridge handed over: faint where empty, accent where a magnet seats. */}
       <g transform={pend.x || pend.y ? `translate(${pend.x} ${-pend.y})` : undefined}>
       {spots.map((sp, i) => {

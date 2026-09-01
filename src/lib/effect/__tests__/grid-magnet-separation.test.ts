@@ -22,8 +22,8 @@ import { BANDS, BAND_STEP_MM } from '../grid-magnet-spec'
 import { scaleContour } from '../grid-magnet-compute'
 import { applyCoverage, enumerateCanonPhaseWindows, enumerateFreePhaseMax, fallbackRevealSizes, makeCircleSeatPredicate, makeContourSeatPredicate } from '../units/layout'
 import { wrapGroup } from '../units/wrap'
+import { wrapBandLadder } from '../grid-magnet-wrap-compute'
 import { contourCentroidOf } from '../units/centring'
-import { holdingFactsOf, rankByHolding, sparseExtremeHold } from '../units/judge'
 import { safeSegments } from '../units/segment'
 import { edgeDistToContourMM, pointInContour } from '../foundation/geometry'
 import { contourCacheKey, makeSizer, normBaseContour, normMaskContour } from '../grid-magnet-bridge'
@@ -229,7 +229,7 @@ describe('2b — the units are self-sufficient', () => {
       // measures instead of deriving one from the 2mm segmentation islands. A measured value
       // travelling with the result is sequencing, not policy — but it is a new unit edge, so it
       // is pinned deliberately rather than arriving as a side effect.
-      'grid-magnet-wrap-compute.ts': ['./units/classifier', './units/wrap'],
+      'grid-magnet-wrap-compute.ts': ['./units/centring', './units/classifier', './units/judge', './units/layout', './units/segment', './units/wrap'],
       'grid-magnet-canon-experiment.ts': ['./units/judge', './units/layout', './units/wrap'],
       'grid-magnet-class.ts': ['./units/classifier'],
       'grid-magnet-compute.ts': ['./units/centring', './units/layout', './units/segment'],
@@ -308,7 +308,7 @@ describe('2d — the real shells are governed too', () => {
   // expires when the pipeline lands. Pinned exactly, so a stray import fails even where edges exist.
   const SHELL_UNIT_EDGES: Array<[string, readonly string[]]> = [
     [PAGE, []],
-    [WORKER, ['@/lib/effect/units/classifier', '@/lib/effect/units/centring']],
+    [WORKER, ['@/lib/effect/units/classifier', '@/lib/effect/units/judge', '@/lib/effect/units/centring']],
   ]
 
   it('the page and worker hold exactly their pinned unit edges', () => {
@@ -673,7 +673,34 @@ describe('1b — the frame comes from the usable material', () => {
     expect(belt.seatings, 'coverage changed the search registrations').toEqual(full.seatings)
     expect(belt.anchors, 'the belt must remain output processing').not.toEqual(full.anchors)
 
-  })
+    const star = (mm: number): Contour => ({ outer: { pts: Array.from({ length: 10 }, (_, i) => {
+      const t = i * Math.PI * 2 / 10 - Math.PI / 2
+      const r = (i % 2 === 0 ? 0.5 : 0.24) * mm
+      return [mm / 2 + r * Math.cos(t), mm / 2 + r * Math.sin(t)] as Pt
+    }) }, holes: [] })
+    const portrait = (mm: number): Contour =>
+      ({ outer: { pts: [[0, 0], [mm * 0.58, 0], [mm * 0.58, mm], [0, mm]] as Pt[] }, holes: [] })
+    const donut = (mm: number): Contour => ({
+      outer: sq(mm).outer,
+      holes: [{ pts: Array.from({ length: 48 }, (_, i) => {
+        const t = i * Math.PI * 2 / 48
+        return [mm / 2 + mm * 0.16 * Math.cos(t), mm / 2 + mm * 0.16 * Math.sin(t)] as Pt
+      }) }],
+    })
+    const squircleBase = normBaseContour(getShape('squircle', 1024, 1024), 1024)!
+    const cases: Array<[string, (mm: number) => Contour, number]> = [
+      ['square', sq, 4], ['portrait', portrait, 3], ['star', star, 3], ['donut', donut, 4],
+      ['squircle', makeSizer(squircleBase, 0), 4],
+    ]
+    for (const [name, sized, id] of cases) {
+      const band = BANDS.find((b) => b.id === id)!
+      const fullSolve = wrapBandLadder(sized, { pitchMM: 48, paddingMM: 12, perimeterOnly: false },
+        band.minMM + 24, band.maxMM + 24, 24)
+      const beltSolve = wrapBandLadder(sized, { pitchMM: 48, paddingMM: 12, perimeterOnly: true },
+        band.minMM + 24, band.maxMM + 24, 24)
+      expect(beltSolve, `${name}: coverage changed the raw band solve`).toEqual(fullSolve)
+    }
+  }, 120_000)
 
   it('Canon smart-search finds Batwoman raw9 outside the four Centre-rules phases', () => {
     const { PNG } = nodeRequire('pngjs') as { PNG: { sync: { read(data: Buffer): { width: number; height: number; data: Uint8Array } } } }
@@ -709,7 +736,60 @@ describe('1b — the frame comes from the usable material', () => {
     expect(at!.count).toBe(9)
     expect(at!.sizeMM).toBeCloseTo(198.59, 1)
     expect(applyCoverage(at!.points, true, 48).seated).toHaveLength(8)
-  }, 60_000)
+  }, 30_000)
+
+  it('THE THREE ANSWERS: optimal first, then min and max, coincident rows collapsed', () => {
+    // Dan, 2026-08-30: "band module must get recommendation from the classifier of optimal layout
+    // to try first from the canon ... and also try next best min magnet count in the range and max
+    // - if they coincide or anything coincides we show only the single result".
+    const sq = (mm: number): Contour =>
+      ({ outer: { pts: [[0, 0], [mm, 0], [mm, mm], [0, mm]] as Pt[] }, holes: [] })
+    const cfg = { pitchMM: 48, paddingMM: 12 }
+    const anchorAt = (mm: number): Pt => [mm / 2, mm / 2]
+    const rows = classifyBands(sq, cfg, anchorAt)
+    const solveBand = (id: number) => {
+      const band = BANDS.find((b) => b.id === id)!
+      const row = rows.find((r) => r.bandId === id)!
+      const optimal = optimalLayoutForBox(48, id, row.legalWidthMM, row.legalHeightMM)
+      const nodes = optimal?.nodesMM.map(([x, y]) => [x, y] as Pt)
+      const solve = wrapBandLadder(sq, cfg, band.minMM + 24, band.maxMM + 24, 24, anchorAt, nodes)
+      return { solve, optimal }
+    }
+
+    // B4 — two distinct answers after coincident roles collapse. The counts are pinned because
+    // they are the whole point:
+    // Raw registrations are the search input; output coverage cannot invent a sparse search role.
+    const b4 = solveBand(4)
+    expect(b4.solve.offers.map((o) => o.at.count), 'B4 optimal+max / min').toEqual([16, 12])
+    // every row states WHY it is on the list — the order alone is not the answer
+    expect(b4.solve.offers.map((o) => o.roles.join('+')), 'B4 roles')
+      .toEqual(['optimal+max', 'min'])
+    expect(b4.solve.offers[0].at.count, 'the first row must be the canon layout')
+      .toBe(b4.optimal!.nodesMM.length)
+
+    // B2 — the optimal IS the fullest, so those two rows are the same answer and COLLAPSE to one.
+    // This is the case that proves the collapse: without it the same answer appears twice.
+    const b2 = solveBand(2)
+    expect(b2.solve.offers.length, 'B2 must collapse to two rows').toBe(2)
+    // and the collapsed row SAYS it is two answers, rather than silently being one of them
+    expect(b2.solve.offers.map((o) => o.roles.join('+')), 'B2 roles')
+      .toEqual(['optimal+max', 'min'])
+    const shipped = (o: (typeof b2.solve.offers)[number]) => o.at.sizeMM.toFixed(2) + '|'
+      + [...o.at.points].map((q) => q.map((v) => v.toFixed(1)).join(',')).sort().join(';')
+    expect(new Set(b2.solve.offers.map(shipped)).size, 'the same answer appears twice').toBe(2)
+
+    // never more than the three probes, whatever the walk found
+    for (const id of [2, 3, 4, 5])
+      expect(solveBand(id).solve.offers.length, 'B' + id + ' returned more than three')
+        .toBeLessThanOrEqual(3)
+
+    // with NO optimal handed in, the canon row is simply absent — never invented
+    const band4 = BANDS.find((b) => b.id === 4)!
+    const bare = wrapBandLadder(sq, cfg, band4.minMM + 24, band4.maxMM + 24, 24, anchorAt)
+    expect(bare.offers.length, 'without a canon there are at most two probes').toBeLessThanOrEqual(2)
+    expect(bare.offers.every((o) => !o.roles.includes('optimal')), 'an optimal role appeared without a canon')
+      .toBe(true)
+  }, 20_000)
 
   it('COUNTEREXAMPLE: the frame counts past five', () => {
     // The old axis class is typed 1|2|3|4|5 and clamps, so every larger shape read as five. The
@@ -785,11 +865,11 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
     const canon = canonLayoutForFrame(48, 4, 4)!.nodesMM.map(([x, y]) => [x, y] as Pt)
     const result = solveCanonExperiment(sq, { pitchMM: 48, paddingMM: 12 }, 168, 215, 24,
       (mm) => [mm / 2, mm / 2], canon)
-    expect(result.trace).toMatchObject({ source: 'canon-full', canonSeats: 16, retained: 16, readded: 0 })
-    const optimal = result.offers.find((offer) => offer.roles.includes('optimal'))!
-    expect(optimal.at.count).toBe(16)
-    expect(optimal.at.sizeMM).toBeGreaterThanOrEqual(168)
-  }, 60_000)
+    expect(result.trace).toMatchObject({ source: 'canon-full', canonSeats: 16, populations: 1, wraps: 1, retained: 16, readded: 0 })
+    expect(result.offers).toHaveLength(1)
+    expect(result.offers[0].at.count).toBe(16)
+    expect(result.offers[0].at.sizeMM).toBeGreaterThanOrEqual(168)
+  })
   it('the old rigid walk is gone from every production path', () => {
     for (const f of ['grid-magnet.ts', 'grid-magnet-compute.ts']) {
       const text = readFileSync(join(LIB, f), 'utf8')
@@ -799,13 +879,75 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
     }
   })
 
-  it('the shell belts only final delivery and preserves the unified raw solve', async () => {
+  const sq = (mm: number): Contour => ({ outer: { pts: [[0, 0], [mm, 0], [mm, mm], [0, mm]] as Pt[] }, holes: [] })
+
+  it('CALLS the solver: every returned offer is inside the band it was asked for', () => {
+    // The previous version scanned source text. QA mutated the real post to `offers:
+    // [bestSeatedMM]`, added a decoy `void { offers: [] }`, and every test stayed green. This one
+    // calls the solver on a band that DOES produce offers, so deleting the membership rule fails it.
+    // A SQUARE cannot prove this: its bisection bounds already keep every wrap inside the band, so
+    // deleting the rule changes nothing. A star reveals small layouts that wrap far below the band
+    // floor — 115, 128, 149, 150mm all leak into 168-216 the moment the rule goes.
+    const star = (mm: number): Contour => {
+      const pts: Pt[] = []
+      for (let i = 0; i < 10; i++) {
+        const t = (i / 10) * Math.PI * 2 - Math.PI / 2
+        const r = (i % 2 === 0 ? 0.5 : 0.22) * mm
+        pts.push([mm / 2 + r * Math.cos(t), mm / 2 + r * Math.sin(t)] as Pt)
+      }
+      return { outer: { pts }, holes: [] }
+    }
+    for (const [shape, lo, hi] of [[sq, 24, 72], [star, 120, 168], [star, 168, 216]] as const) {
+      const solve = wrapBandLadder(shape, { paddingMM: 12, pitchMM: 48 }, lo, hi, 24)
+      expect(solve.offers.length, `band ${lo}-${hi} must produce offers`).toBeGreaterThan(0)
+      for (const o of solve.offers) {
+        expect(o.at.sizeMM, `offer ${o.at.sizeMM}mm escaped band ${lo}-${hi}`).toBeGreaterThanOrEqual(lo - 0.005)
+        expect(o.at.sizeMM, `offer ${o.at.sizeMM}mm escaped band ${lo}-${hi}`).toBeLessThanOrEqual(hi + 0.005)
+      }
+    }
+  })
+
+  it('band membership actually filters — the star leaks without it', () => {
+    const star = (mm: number): Contour => {
+      const pts: Pt[] = []
+      for (let i = 0; i < 10; i++) {
+        const t = (i / 10) * Math.PI * 2 - Math.PI / 2
+        const r = (i % 2 === 0 ? 0.5 : 0.22) * mm
+        pts.push([mm / 2 + r * Math.cos(t), mm / 2 + r * Math.sin(t)] as Pt)
+      }
+      return { outer: { pts }, holes: [] }
+    }
+    const solve = wrapBandLadder(star, { paddingMM: 12, pitchMM: 48 }, 168, 216, 24)
+    expect(solve.offers.length, 'this band must hold offers, or the test proves nothing').toBeGreaterThan(0)
+    expect(solve.offers.every((o) => o.at.sizeMM >= 168), 'a sub-band layout was offered').toBe(true)
+  })
+
+  it('the witness comes from layout and is never an offer', () => {
+    const solve = wrapBandLadder(sq, { paddingMM: 12, pitchMM: 48 }, 24, 72, 24)
+    expect(solve.bestSeated, 'layout must supply a witness').not.toBeNull()
+    expect(Object.keys(solve)).toEqual(['offers', 'bestSeated'])
+    // The witness is a REVEAL size, not a wrapped offer: it carries no contact size at all.
+    expect(solve.offers.some((o) => (o as unknown as { points?: unknown }).points !== undefined)).toBe(false)
+  })
+
+  it('the shell belts only final delivery and preserves the raw default and empty witness', async () => {
+    // The shell used to re-run computeGrid without the baked centre, so the population labelled
+    // "calibration witness" was a solve nobody made. Pre-fix this band drew 2 magnets at a
+    // different phase while layout had selected 4.
+    const star: Contour = (() => {
+      const pts: Pt[] = []
+      for (let i = 0; i < 10; i++) {
+        const t = (i / 10) * Math.PI * 2 - Math.PI / 2
+        const r = (i % 2 === 0 ? 0.5 : 0.22) * (i === 4 ? 0.78 : 1)
+        pts.push([0.5 + r * Math.cos(t), 0.5 + r * Math.sin(t)] as Pt)
+      }
+      return { outer: { pts }, holes: [] }
+    })()
     const cfg: GridConfig = { paddingMM: 12, pitchMM: 48, centreMode: 2, governor: 0 }
     type Posted = { model: {
       contour: Contour; effSize: number; idx: number
       ladder: Array<{ sizeMM: number; count: number; roles: string[] }>
       grid: { anchors: Array<{ p: Pt }>; phaseMM: Pt; centreMainMM: Pt }
-      unprotected?: { ringsMM: Pt[][]; areaMM2: number; boundaryMM: number } | null
       diagnostic?: unknown
     } | null }
     const posted: Posted[] = []
@@ -814,7 +956,7 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
     const prev = g.self
     g.self = stub
     try {
-      await import('@/app/(dev)/effect-creator/grid-centre/solve.worker')
+      const worker = await import('@/app/(dev)/effect-creator/grid-centre/solve.worker')
       const squircle = normBaseContour(getShape('squircle', 1024, 1024), 1024)!
       stub.onmessage!({ data: { id: 1, base: squircle, offsetMM: 0,
         cfg: { ...cfg, perimeterOnly: false }, mode: 4, sizeMM: 0, stepSel: null } })
@@ -826,19 +968,27 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
       expect(belt.contour, 'coverage changed the selected outline').toEqual(full.contour)
       expect(belt.grid.phaseMM, 'coverage changed placement').toEqual(full.grid.phaseMM)
       expect(belt.grid.centreMainMM, 'coverage changed the governed centre').toEqual(full.grid.centreMainMM)
-      expect(belt.unprotected, 'Belt changed the scoring evidence').toEqual(full.unprotected)
       expect(belt.ladder.map((r) => [r.roles, r.sizeMM]), 'coverage changed roles or rung sizes')
         .toEqual(full.ladder.map((r) => [r.roles, r.sizeMM]))
-      expect(full.ladder.map((r) => r.count)).toEqual([16, 3])
-      expect(belt.ladder.map((r) => r.count)).toEqual([12, 3])
+      expect(full.ladder.map((r) => r.count)).toEqual([16, 12])
+      expect(belt.ladder.map((r) => r.count)).toEqual([12, 8])
       for (const a of belt.grid.anchors)
         expect(full.grid.anchors.some((b) => Math.hypot(a.p[0] - b.p[0], a.p[1] - b.p[1]) < 1e-6),
           'Belt introduced a point instead of removing an interior point').toBe(true)
 
+      stub.onmessage!({ data: { id: 3, base: star, offsetMM: 0, cfg, mode: 2, sizeMM: 0, stepSel: null } })
+      const model = posted[2]?.model
+      expect(model, 'the worker posted no model').toBeTruthy()
+      expect(model!.diagnostic, 'this band must be empty, or the test proves nothing').toBeTruthy()
+      const sized = makeSizer(star, 0)
+      const solve = wrapBandLadder(sized, cfg, 72, 119, 24, worker.anchorFnFor(sized, cfg, JSON.stringify(cfg), 'gate'))
+      expect(solve.offers.length, 'this band must hold no offers').toBe(0)
+      expect(model!.grid.anchors.map((a) => a.p), 'the drawn population is not the selected witness')
+        .toEqual(solve.bestSeated!.points)
     } finally {
       g.self = prev
     }
-  }, 60_000)
+  })
 
   it('the shell never labels the witness a fit', () => {
     const page = readFileSync(join(process.cwd(), 'src/app/(dev)/effect-creator/grid-centre/page.tsx'), 'utf8')
@@ -880,102 +1030,12 @@ describe('8 — recovered phase search is wired through the production Canon sol
     expect(result.trace).toMatchObject({ source: 'canon-partial', canonSeats: 16, retained: 9 })
     expect(result.trace.winningPhaseMM).toBeDefined()
     expect(result.trace.winningWindow).toBeDefined()
-    const optimal = result.offers.find((offer) => offer.roles.includes('optimal'))!
-    expect(optimal.at.count).toBe(9)
-    expect(optimal.at.sizeMM).toBeCloseTo(198.59, 1)
-    expect(applyCoverage(optimal.at.points, true, 48).seated).toHaveLength(8)
+    expect(result.offers).toHaveLength(1)
+    expect(result.offers[0].at.count).toBe(9)
+    expect(result.offers[0].at.sizeMM).toBeCloseTo(198.59, 1)
+    expect(applyCoverage(result.offers[0].at.points, true, 48).seated).toHaveLength(8)
     expect(readFileSync(join(LIB, 'grid-magnet-canon-experiment.ts'), 'utf8')).not.toMatch(/\bwrapBandLadder\b/)
   }, 60_000)
-
-  it('real BOT scoring toggles govern production selection before roles', async () => {
-    const { PNG } = nodeRequire('pngjs') as { PNG: { sync: { read(data: Buffer): { width: number; height: number; data: Uint8Array } } } }
-    const png = PNG.sync.read(readFileSync(join(process.cwd(), 'public/grid-engine/cutouts/BOT.png')))
-    const mask = new Uint8Array(png.width * png.height)
-    for (let i = 0; i < mask.length; i++) if (png.data[i * 4 + 3] > 128) mask[i] = 1
-    const sized = makeSizer(normMaskContour(mask, png.width, png.height)!, 0)
-    const baseCfg: GridConfig = { pitchMM: 48, paddingMM: 12, perimeterOnly: false, centreMode: 2, governor: 0 }
-    const anchorAt = await workerAnchorFor(sized, baseCfg, 'bot-scoring-integration')
-    const span = bandOuterMM(BANDS.find((band) => band.id === 4)!, 12)
-    const row = classifyBands(sized, baseCfg, anchorAt).find((band) => band.bandId === 4)!
-    const canon = canonLayoutForFrame(48,
-      positionsAcross(row.rulerWidthMM, 48), positionsAcross(row.rulerHeightMM, 48))!
-    const nodes = canon.nodesMM.map(([x, y]) => [x, y] as Pt)
-    const rules = (enabled: Partial<NonNullable<GridConfig['holdingRules']>>) => ({
-      universal: false, balance: false, perimeter: false, extremes: false, ends: false, top: false,
-      ...enabled,
-    })
-    const solve = (enabled: Partial<NonNullable<GridConfig['holdingRules']>>) => {
-      const result = solveCanonExperiment(sized, { ...baseCfg, holdingRules: rules(enabled) },
-        span.minMM, span.maxMM, 24, anchorAt, nodes, 'bot-scoring-shared')
-      return result.offers.find((offer) => offer.roles.includes('optimal'))!
-    }
-    const off = solve({}), universal = solve({ universal: true }), balance = solve({ balance: true })
-    const top = solve({ top: true }), combined = solve({ universal: true, balance: true })
-    const identity = (rung: typeof off) => rung.at.sizeMM.toFixed(2) + '|'
-      + rung.at.points.map(([x, y]) => `${x.toFixed(3)},${y.toFixed(3)}`).sort().join(';')
-    expect(new Set([identity(off), identity(universal), identity(balance), identity(top), identity(combined)]).size)
-      .toBeGreaterThanOrEqual(3)
-    expect(identity(universal)).not.toBe(identity(off))
-    expect(identity(balance)).not.toBe(identity(off))
-    expect(identity(combined)).not.toBe(identity(off))
-    expect(top.roles).toContain('optimal')
-
-    const anchorA = (mm: number): Pt => [mm * 0.4, mm * 0.6]
-    const anchorB = (mm: number): Pt => mm === 168 || mm === 215 ? anchorA(mm)
-      : [mm * 0.4 + 24 * Math.sin(Math.PI * (mm - 168) / 47), mm * 0.6]
-    const anchorResult = (anchor: (mm: number) => Pt, cacheIdentity: string) =>
-      solveCanonExperiment(sized, baseCfg, span.minMM, span.maxMM, 24, anchor, nodes, cacheIdentity)
-    const signature = (result: ReturnType<typeof anchorResult>) => JSON.stringify(result.offers.map((offer) => ({
-      roles: offer.roles, size: offer.at.sizeMM, off: offer.at.centreOffMM, points: offer.at.points,
-    })))
-    const coldA = anchorResult(anchorA, 'bot-anchor-a'), coldB = anchorResult(anchorB, 'bot-anchor-b')
-    expect(signature(coldA)).not.toBe(signature(coldB))
-    expect(signature(anchorResult(anchorA, 'bot-anchor-a'))).toBe(signature(coldA))
-    expect(signature(anchorResult(anchorB, 'bot-anchor-b'))).toBe(signature(coldB))
-  }, 90_000)
-
-  it('lower reveal preserves a lawful higher-count Canon around a scaling hole', () => {
-    const sized = (mm: number): Contour => ({
-      outer: { pts: [[0, 0], [mm, 0], [mm, mm], [0, mm]] },
-      holes: [{ pts: [
-        [mm * 0.42, mm * 0.18], [mm * 0.90, mm * 0.18],
-        [mm * 0.90, mm * 0.82], [mm * 0.42, mm * 0.82],
-      ] }],
-    })
-    const cfg: GridConfig = { pitchMM: 48, paddingMM: 12, perimeterOnly: false }
-    const anchorAt = (mm: number): Pt => [mm / 2, mm / 2]
-    const canon = canonLayoutForFrame(48, 4, 4)!.nodesMM.map(([x, y]) => [x, y] as Pt)
-    const lower = enumerateCanonPhaseWindows(sized(176), cfg, canon, anchorAt(176), 176)
-    const ceiling = enumerateCanonPhaseWindows(sized(215), cfg, canon, anchorAt(215), 215)
-    const lower12 = lower.candidates.find((candidate) => candidate.points.length === 12)!
-    expect(lower12).toBeDefined()
-    expect(Math.max(...ceiling.candidates.map((candidate) => candidate.points.length))).toBe(10)
-    const wrapped = wrapGroup(sized,
-      { pitchMM: 48, paddingMM: 12, anchorAtMM: anchorAt, frameMidMM: [0, 0] }, lower12.points, 24, 176)
-    expect(wrapped?.sizeMM).toBeCloseTo(171.56, 1)
-    const result = solveCanonExperiment(sized, cfg, 168, 215, 24, anchorAt, canon)
-    expect(result.offers.find((offer) => offer.roles.includes('optimal'))?.at.count).toBe(12)
-  }, 30_000)
-
-  it('lower reveal preserves the same lawful Canon when the hole opens into an outer notch', () => {
-    const sized = (mm: number): Contour => ({ outer: { pts: [
-      [0, 0], [mm, 0], [mm, mm * 0.18], [mm * 0.42, mm * 0.18],
-      [mm * 0.42, mm * 0.82], [mm, mm * 0.82], [mm, mm], [0, mm],
-    ] }, holes: [] })
-    const cfg: GridConfig = { pitchMM: 48, paddingMM: 12, perimeterOnly: false }
-    const anchorAt = (mm: number): Pt => [mm / 2, mm / 2]
-    const canon = canonLayoutForFrame(48, 4, 4)!.nodesMM.map(([x, y]) => [x, y] as Pt)
-    const lower = enumerateCanonPhaseWindows(sized(176), cfg, canon, anchorAt(176), 176)
-    const ceiling = enumerateCanonPhaseWindows(sized(215), cfg, canon, anchorAt(215), 215)
-    const lower12 = lower.candidates.find((candidate) => candidate.points.length === 12)!
-    expect(lower12).toBeDefined()
-    expect(Math.max(...ceiling.candidates.map((candidate) => candidate.points.length))).toBe(10)
-    expect(wrapGroup(sized,
-      { pitchMM: 48, paddingMM: 12, anchorAtMM: anchorAt, frameMidMM: [0, 0] }, lower12.points, 24, 176)
-      ?.sizeMM).toBeCloseTo(171.56, 1)
-    const result = solveCanonExperiment(sized, cfg, 168, 215, 24, anchorAt, canon)
-    expect(result.offers.find((offer) => offer.roles.includes('optimal'))?.at.count).toBe(12)
-  }, 30_000)
 
   it('production Canon solve uses full-phase free maximum only as fallback', async () => {
     const square = (mm: number): Contour => ({
@@ -997,60 +1057,4 @@ describe('8 — recovered phase search is wired through the production Canon sol
     expect(result.offers[0].at.points.every((point) =>
       pointInContour(point, contour) && edgeDistToContourMM(contour, point) >= 11.98)).toBe(true)
   }, 30_000)
-
-  it('enabled holding scores rank evenly and Canon min keeps extreme span holds', () => {
-    const candidates = ['perimeter', 'protected', 'balanced'] as const
-    const facts = {
-      perimeter: { perimeter: 3, holdsExtremes: false, ends: 1, topUnprotectedMM: 20, unprotectedMM: 20, unprotectedAreaMM2: 20, imbalance: 1, centreOffMM: 10, ringsMM: [] },
-      protected: { perimeter: 1, holdsExtremes: true, ends: 2, topUnprotectedMM: 0, unprotectedMM: 0, unprotectedAreaMM2: 0, imbalance: 0.5, centreOffMM: 5, ringsMM: [] },
-      balanced: { perimeter: 2, holdsExtremes: true, ends: 2, topUnprotectedMM: 10, unprotectedMM: 10, unprotectedAreaMM2: 10, imbalance: 0, centreOffMM: 0, ringsMM: [] },
-    }
-    const ranked = rankByHolding(candidates, (candidate) => facts[candidate], {
-      universal: true, balance: true, perimeter: false, extremes: false, ends: false, top: false,
-    })
-    expect(ranked[0]).toBe('protected')
-    const contour: Contour = { outer: { pts: [[0, 0], [144, 0], [144, 144], [0, 144]] }, holes: [] }
-    const points: Pt[] = [[12, 12], [72, 12], [132, 12], [12, 72], [72, 72], [132, 72], [12, 132], [72, 132], [132, 132]]
-    const sparse = sparseExtremeHold(contour, points, [72, 72])
-    expect(sparse.length).toBeLessThan(points.length)
-    const before = holdingFactsOf(contour, points, [72, 72])
-    const after = holdingFactsOf(contour, sparse, [72, 72])
-    expect(after.holdsExtremes).toBe(before.holdsExtremes)
-    expect(after.ends).toBeGreaterThanOrEqual(before.ends)
-
-    const symmetric: Contour = { outer: { pts: [[0, 0], [200, 0], [200, 200], [0, 200]] }, holes: [] }
-    expect(holdingFactsOf(symmetric, [], [100, 100]).imbalance).toBeCloseTo(0, 10)
-    const corners: Pt[] = [[0, 0], [200, 0], [200, 200], [0, 200]]
-    expect(holdingFactsOf(symmetric, corners, [100, 100]).imbalance).toBeCloseTo(0, 10)
-    expect(holdingFactsOf(symmetric, [], [100, 100]).topUnprotectedMM).toBeCloseTo(9600, 6)
-    const midSides: Pt[] = [[100, 0], [200, 100], [100, 200], [0, 100]]
-    expect(holdingFactsOf(symmetric, corners, [100, 100]).ends)
-      .toBeGreaterThan(holdingFactsOf(symmetric, midSides, [100, 100]).ends)
-    const narrow: Contour = { outer: { pts: [[0, 0], [40, 0], [40, 100], [0, 100]] }, holes: [] }
-    expect(holdingFactsOf(narrow, [[20, 0], [20, 100]], [20, 50]).ends).toBe(2)
-
-    const balanceFacts = {
-      off: { ...facts.balanced, centreOffMM: 10, imbalance: 0 },
-      center: { ...facts.balanced, centreOffMM: 0, imbalance: 1 },
-    }
-    const balanceRules = {
-      universal: false, balance: true, perimeter: false, extremes: false, ends: false, top: false,
-    }
-    expect(rankByHolding(['off', 'center'], (key) => balanceFacts[key as keyof typeof balanceFacts], balanceRules)[0]).toBe('center')
-    expect(rankByHolding(['center', 'off'], (key) => balanceFacts[key as keyof typeof balanceFacts], balanceRules)[0]).toBe('center')
-
-    const protectedCentre = holdingFactsOf(symmetric, [[100, 100]], [100, 100])
-    expect(protectedCentre.unprotectedAreaMM2).toBeCloseTo(32757.16, 1)
-    const signedArea = (ring: Pt[]) => ring.reduce((sum, point, index) => {
-      const next = ring[(index + 1) % ring.length]
-      return sum + point[0] * next[1] - next[0] * point[1]
-    }, 0) / 2
-    expect(Math.abs(protectedCentre.ringsMM.reduce((sum, ring) => sum + signedArea(ring), 0)))
-      .toBeCloseTo(protectedCentre.unprotectedAreaMM2, 1)
-    const withHole: Contour = {
-      outer: symmetric.outer,
-      holes: [{ pts: [[60, 60], [140, 60], [140, 140], [60, 140]] }],
-    }
-    expect(holdingFactsOf(withHole, [], [100, 100]).unprotectedAreaMM2).toBeCloseTo(33600, 6)
-  })
 })

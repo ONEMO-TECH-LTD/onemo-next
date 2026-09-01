@@ -116,12 +116,7 @@ export interface WrapAt {
 export type RungRole = 'optimal' | 'min' | 'max'
 
 /** One rung the band offers: a revealed layout at its exact contact size. */
-export interface BandRung {
-  at: WrapAt
-  revealMM: number
-  roles: RungRole[]
-  unprotected?: { ringsMM: Pt[][]; areaMM2: number; boundaryMM: number }
-}
+export interface BandRung { at: WrapAt; revealMM: number; roles: RungRole[] }
 
 /** What a band solve returns: the lawful offers judge allowed, and — only when there are none — a
  *  calibration witness layout selected from the SAME generated population. The witness is never an
@@ -129,15 +124,6 @@ export interface BandRung {
 export interface BandSolve {
   offers: BandRung[]
   bestSeated: { revealMM: number; points: Pt[] } | null
-}
-
-export interface HoldingRules {
-  perimeter: boolean
-  extremes: boolean
-  ends: boolean
-  top: boolean
-  universal: boolean
-  balance: boolean
 }
 
 export interface CanonExperimentTrace {
@@ -160,8 +146,6 @@ export interface GridConfig {
    *  needs; legal gives 95.9 and returns nothing. One ruler yields a layout, the
    *  other yields silence, on the same shape at the same size. */
   classifierRuler?: 'legal' | 'outer'
-  /** Temporary comparison switches over candidate scoring. All false preserves base ordering. */
-  holdingRules?: HoldingRules
   pitchMM?: number
   paddingMM?: number
   /** Manual calibration: force this registration (mm phase) instead of searching. */

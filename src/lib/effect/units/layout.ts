@@ -181,7 +181,6 @@ export interface CanonPhaseCandidate {
 
 export interface CanonPhaseSearch {
   candidates: CanonPhaseCandidate[]
-  freeCandidates: FreePhaseCandidate[]
   phasePairs: number
   windows: number
   fitsCalls: number
@@ -240,7 +239,7 @@ export function enumerateCanonPhaseWindows(
   contour: Contour, cfg: GridConfig, canonLocalMM: ReadonlyArray<Pt>, anchorMM: Pt,
   revealMM: number, stepMM = PHASE_STEP_MM,
 ): CanonPhaseSearch {
-  if (!canonLocalMM.length) return { candidates: [], freeCandidates: [], phasePairs: 0, windows: 0, fitsCalls: 0, cacheHits: 0 }
+  if (!canonLocalMM.length) return { candidates: [], phasePairs: 0, windows: 0, fitsCalls: 0, cacheHits: 0 }
   const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
   const step = Math.max(1, stepMM)
   const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
@@ -249,7 +248,7 @@ export function enumerateCanonPhaseWindows(
   const fits = cfg.circle
     ? makeCircleSeatPredicate(cx, cy, Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY) / 2, pad)
     : makeContourSeatPredicate(contour, pad)
-  if (!fits) return { candidates: [], freeCandidates: [], phasePairs: 0, windows: 0, fitsCalls: 0, cacheHits: 0 }
+  if (!fits) return { candidates: [], phasePairs: 0, windows: 0, fitsCalls: 0, cacheHits: 0 }
 
   const node0 = canonLocalMM[0]
   const rel = canonLocalMM.map(([x, y]) => [x - node0[0], y - node0[1]] as Pt)
@@ -272,10 +271,10 @@ export function enumerateCanonPhaseWindows(
     memo.set(key, value)
     return value
   }
-  const phaseRows: Array<{ px: number; py: number; points: Pt[]; count: number }> = []
+  const phaseRows: Array<{ px: number; py: number; count: number }> = []
   for (const px of phaseX) for (const py of phaseY) {
-    const points = latticeAt(bb, pitch, px, py).filter(fitsM)
-    phaseRows.push({ px, py, points, count: points.length })
+    const count = latticeAt(bb, pitch, px, py).filter(fitsM).length
+    phaseRows.push({ px, py, count })
   }
   phaseRows.sort((a, b) => b.count - a.count || a.px - b.px || a.py - b.py)
   const unique = new Map<string, CanonPhaseCandidate & { anchorDistance: number }>()
@@ -310,8 +309,6 @@ export function enumerateCanonPhaseWindows(
     candidates: [...unique.values()].map((x) => ({
       points: x.points, id: x.id, phaseMM: x.phaseMM, window: x.window, revealMM: x.revealMM,
     })),
-    freeCandidates: phaseRows.filter((row) => row.count === phaseRows[0]?.count && row.count > 0)
-      .map((row) => ({ points: row.points, phaseMM: [row.px, row.py], revealMM })),
     phasePairs: phaseX.length * phaseY.length, windows, fitsCalls, cacheHits,
   }
 }

@@ -7,10 +7,10 @@ import { wrapGrid, type BandSolve, type WrapConfig } from '@/lib/effect/grid-mag
 import { solveCanonExperiment } from '@/lib/effect/grid-magnet-canon-experiment'
 import { bbox, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet-compute'
 import { contourCentroidOf } from '@/lib/effect/units/centring'
-import { measureProtection } from '@/lib/effect/units/protection'
 import { anchorBakeOf, anchorFromBake, applyCoverage, assignSizes, centeringAnchors, type AnchorBake, type CentreMode, type Governor, type MagnetPlan } from '@/lib/effect/grid-magnet-logic'
 import { classFrameNodes, shapeFamilyOf, type ShapeFamily } from '@/lib/effect/grid-magnet-class'
 
+import { defaultLanding } from '@/lib/effect/units/judge'
 import { positionsAcross } from '@/lib/effect/units/classifier'
 import { DEFAULT_PITCH_MM, PADDING_FLOOR_MM } from '@/lib/effect/grid-magnet-spec'
 import { contourCacheKey, makeSizer, sizeRange } from '@/lib/effect/grid-magnet-bridge'
@@ -26,8 +26,6 @@ interface SolveRequest {
   manualBand?: boolean
   sizeMM: number
   stepSel: number | null
-  /** Display-only protector input. It deliberately lives outside GridConfig. */
-  protectionPaddingMM?: number
 }
 
 const ctx = self as unknown as Worker
@@ -94,7 +92,7 @@ export function anchorFnFor(
 const FITS_CAP = 12
 
 ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
-  const { id, base, offsetMM, cfg, mode, manualBand, sizeMM, stepSel, protectionPaddingMM = 24 } = e.data
+  const { id, base, offsetMM, cfg, mode, manualBand, sizeMM, stepSel } = e.data
   try {
     const sized = makeSizer(base, offsetMM)
     // Cache identity is the shape itself — every ring, exactly. A rolling hash of ring counts
@@ -108,11 +106,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       const aFn = anchorFnFor(sized, cfg, cfgSig, sig)
       const contour = sized(sizeMM)
       const grid = computeGrid(contour, { ...cfg, centreOverrideMM: aFn(sizeMM) })
-      ctx.postMessage({ id, model: {
-        contour, grid, effSize: sizeMM, ladder: [], idx: 0, segments: grid.segments,
-        unprotected: measureProtection(contour, grid.anchors.map((anchor) => anchor.p),
-          cfg.pitchMM ?? DEFAULT_PITCH_MM, protectionPaddingMM, (cfg.plan ?? 'all6') as MagnetPlan),
-      } })
+      ctx.postMessage({ id, model: { contour, grid, effSize: sizeMM, ladder: [], idx: 0, segments: grid.segments } })
     } else {
       // Coverage is delivery-only. The entire solve and its cache identity stay raw so toggling
       // Belt cannot change search, wrap, qualification, roles, placement or default selection.
@@ -142,14 +136,10 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
       const key = JSON.stringify([rawCfgSig, band.id])
       let solve = rungCache.get(key)
       if (!solve) {
-        // One traversal returns the three post-wrap, scored roles. Belt remains delivery-only below.
+        // the classifier measured the boxes, the lookup named the layout; the ladder tries it first
         const optimalNodes = optimal?.nodesMM.map(([x, y]) => [x, y] as Pt)
-        const discoveryIdentity = JSON.stringify([
-          sig, band.id, rawCfg.pitchMM, rawCfg.paddingMM, rawCfg.circle,
-          rawCfg.centreMode, rawCfg.governor,
-        ])
         solve = solveCanonExperiment(
-          sized, rawCfg, span.minMM, span.maxMM, MIN_EFFECT_MM, anchorAt, optimalNodes ?? [], discoveryIdentity)
+          sized, rawCfg, span.minMM, span.maxMM, MIN_EFFECT_MM, anchorAt, optimalNodes ?? [])
         rungCache.set(key, solve)
         if (rungCache.size > FITS_CAP) rungCache.delete(rungCache.keys().next().value!)
       }
@@ -159,8 +149,8 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         // smallest at any centring cost. Among offers of the SAME COUNT as the tightest, within
         // half a pitch of it, the best-centred is the default landing. All offers stay visible.
         const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
-        const ruleIdx = rawRungs.findIndex((rung) => rung.roles.includes('optimal'))
-        const idx = Math.min(stepSel ?? Math.max(0, ruleIdx), rawRungs.length - 1)
+        const ruleIdx = defaultLanding(rawRungs, pitch)
+        const idx = Math.min(stepSel ?? ruleIdx, rawRungs.length - 1)
         const perimeterOnly = cfg.perimeterOnly ?? true
         const rungs = rawRungs.map((rg) => {
           const points = applyCoverage([...rg.at.points], perimeterOnly, pitch).seated
@@ -176,8 +166,6 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         const r = spotRadiusOf(pad)
         const segments = safeSegments(drawn.contour, r, 'full')
         const anchors = assignSizes(at.points, (cfg.plan ?? 'all6') as MagnetPlan)
-        const deliveredEvidence = measureProtection(drawn.contour, at.points, pitch,
-          protectionPaddingMM, (cfg.plan ?? 'all6') as MagnetPlan)
         const ladder = rungs.map((rg) => ({ sizeMM: rg.at.sizeMM, count: rg.at.count, offMM: rg.at.centreOffMM, roles: rg.roles }))
         const bk = bakeOf(sized, cfg, sig)
         const cf = classFrameNodes(bk.segW, bk.segH, band.id, cfg.pitchMM)
@@ -189,7 +177,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         ctx.postMessage({ id, model: {
           contour: drawn.contour, grid: { ...drawn.grid, anchors, segments },
           effSize: at.sizeMM, ladder, idx, segments, offMM: at.centreOffMM, recog,
-          bandClass, bandClasses, recommendation, unprotected: deliveredEvidence,
+          bandClass, bandClasses, recommendation,
         } })
         return
       }
