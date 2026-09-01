@@ -45,10 +45,10 @@ export function solveCanonExperiment(
   const free = new Map<string, FreePhaseCandidate>()
   const witnesses: Array<{ revealMM: number; points: Pt[] }> = []
 
-  const allRevealSizes = fallbackRevealSizes(loMM, hiMM)
-  // Uniform scaling makes adjacent 1mm reveal states overwhelmingly redundant. Search every
-  // twelfth reveal plus the band ceiling; wrap and final-seat settlement recover the exact size.
-  const revealSizes = allRevealSizes.filter((_, index) => index % 12 === 0 || index === allRevealSizes.length - 1)
+  // Full phase search at the largest reveal contains every maximum-count population available
+  // below it; exact wrap then shrinks the selected fixed population to contact size. No sampled
+  // reveal stride and no second size approximation.
+  const revealSizes = [fallbackRevealSizes(loMM, hiMM).at(-1) ?? hiMM]
   for (const mm of revealSizes) {
     if (canonLocal.length) {
       const search = enumerateCanonPhaseWindows(

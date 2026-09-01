@@ -885,6 +885,40 @@ describe('8 — recovered phase search is wired through the production Canon sol
     expect(readFileSync(join(LIB, 'grid-magnet-canon-experiment.ts'), 'utf8')).not.toMatch(/\bwrapBandLadder\b/)
   }, 60_000)
 
+  it('real BOT scoring toggles govern production selection before roles', async () => {
+    const { PNG } = nodeRequire('pngjs') as { PNG: { sync: { read(data: Buffer): { width: number; height: number; data: Uint8Array } } } }
+    const png = PNG.sync.read(readFileSync(join(process.cwd(), 'public/grid-engine/cutouts/BOT.png')))
+    const mask = new Uint8Array(png.width * png.height)
+    for (let i = 0; i < mask.length; i++) if (png.data[i * 4 + 3] > 128) mask[i] = 1
+    const sized = makeSizer(normMaskContour(mask, png.width, png.height)!, 0)
+    const baseCfg: GridConfig = { pitchMM: 48, paddingMM: 12, perimeterOnly: false, centreMode: 2, governor: 0 }
+    const anchorAt = await workerAnchorFor(sized, baseCfg, 'bot-scoring-integration')
+    const span = bandOuterMM(BANDS.find((band) => band.id === 4)!, 12)
+    const row = classifyBands(sized, baseCfg, anchorAt).find((band) => band.bandId === 4)!
+    const canon = canonLayoutForFrame(48,
+      positionsAcross(row.rulerWidthMM, 48), positionsAcross(row.rulerHeightMM, 48))!
+    const nodes = canon.nodesMM.map(([x, y]) => [x, y] as Pt)
+    const rules = (enabled: Partial<NonNullable<GridConfig['holdingRules']>>) => ({
+      universal: false, balance: false, perimeter: false, extremes: false, ends: false, top: false,
+      ...enabled,
+    })
+    const solve = (enabled: Partial<NonNullable<GridConfig['holdingRules']>>) => {
+      const result = solveCanonExperiment(sized, { ...baseCfg, holdingRules: rules(enabled) },
+        span.minMM, span.maxMM, 24, anchorAt, nodes)
+      return result.offers.find((offer) => offer.roles.includes('optimal'))!
+    }
+    const off = solve({}), universal = solve({ universal: true }), balance = solve({ balance: true })
+    const top = solve({ top: true }), combined = solve({ universal: true, balance: true })
+    const identity = (rung: typeof off) => rung.at.sizeMM.toFixed(2) + '|'
+      + rung.at.points.map(([x, y]) => `${x.toFixed(3)},${y.toFixed(3)}`).sort().join(';')
+    expect(new Set([identity(off), identity(universal), identity(balance), identity(top)]).size)
+      .toBeGreaterThanOrEqual(3)
+    expect(identity(universal)).not.toBe(identity(off))
+    expect(identity(balance)).not.toBe(identity(off))
+    expect(identity(combined)).toBe(identity(balance))
+    expect(top.roles).toContain('optimal')
+  }, 20_000)
+
   it('production Canon solve uses full-phase free maximum only as fallback', async () => {
     const square = (mm: number): Contour => ({
       outer: { pts: [[0, 0], [mm, 0], [mm, mm], [0, mm]] as Pt[] }, holes: [],
