@@ -3,7 +3,7 @@
 // The rules that were buried inside the band ladder (S2 step 6). Judge decides; it never places a
 // magnet, never wraps and never mutates a population.
 
-import type { BandRung } from '../types'
+import type { BandRung, CanonPriority } from '../types'
 
 /** BAND MEMBERSHIP (Dan, 08-24): a layout whose TRUE wrapped size falls outside the band does not
  *  exist in that band. No clamping to band floors — the size decides, not the request. */
@@ -32,11 +32,22 @@ export function defaultLanding(rungs: BandRung[], pitchMM: number): number {
   return idx
 }
 
+/** Cross-axis displacement of a wrapped Canon rung — the frame centre IS `originMM` for Canon
+ *  wraps (frameMidMM is the frame origin), so no geometry is recomputed here. */
+export function centringMM(at: BandRung['at'], axis: 0 | 1): number {
+  return Math.abs(at.originMM[axis] - at.anchorMM[axis])
+}
+
 /** THE OPTIMAL ORDER (Dan, 2026-09-01) among wrapped priority candidates. The priority tuple has
- *  already decided WHICH node sets are offered; among lawful wraps of those, the tightest stands,
- *  then the closest to the governed centre, then a stable id. Pure ordering — no geometry. */
-export function orderCanonOffers<T extends { rung: BandRung; id: string }>(rows: T[]): T[] {
-  return [...rows].sort((a, b) => a.rung.at.sizeMM - b.rung.at.sizeMM
+ *  already decided WHICH node sets are offered; among lawful wraps of those:
+ *  - slim frames: centring + size, mm for mm — "if we have scale bandwidth we can afford to fit
+ *    closer to center … still keeping it the tightest possible". A millimetre of growth must buy a
+ *    millimetre of centring or the tighter placement stands. No weight, no tolerance.
+ *  - every other frame: the tightest stands.
+ *  Then the closest to the governed centre, then a stable id. Pure ordering — no geometry. */
+export function orderCanonOffers<T extends { rung: BandRung; id: string }>(rows: T[], priority?: CanonPriority): T[] {
+  const key = (r: T) => priority?.slim ? centringMM(r.rung.at, priority.centreAxis) + r.rung.at.sizeMM : r.rung.at.sizeMM
+  return [...rows].sort((a, b) => key(a) - key(b)
     || a.rung.at.centreOffMM - b.rung.at.centreOffMM
     || a.id.localeCompare(b.id))
 }

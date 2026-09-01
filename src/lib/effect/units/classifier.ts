@@ -253,5 +253,6 @@ export function canonPriorityOf(
   })
   // Slim is the classifier's existing rule (FrameKind): a minor axis of one or two lines.
   const slim = Math.min(cols, rows) <= 2
-  return { topIds, topCornerIds, bottomCornerIds, interiorRowIds, mirrorOf, slim }
+  const centreAxis: 0 | 1 = cols <= rows ? 0 : 1
+  return { topIds, topCornerIds, bottomCornerIds, interiorRowIds, mirrorOf, slim, centreAxis }
 }

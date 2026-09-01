@@ -1,13 +1,13 @@
 // TEMPORARY dev-only Canon smart-search. The released Current route remains unchanged.
 import type { BandRung, BandSolve, CanonExperimentTrace, CanonPriority, Contour, GridConfig, Pt, WrapConfig } from './types'
-import { DEFAULT_PITCH_MM, PADDING_FLOOR_MM, PHASE_STEP_MM } from './grid-magnet-spec'
+import { DEFAULT_PITCH_MM, PADDING_FLOOR_MM, PHASE_STEP_MM, SNAP_STEP_MM } from './grid-magnet-spec'
 import {
   bestSeatedCandidate, enumerateCanonPhaseWindows, enumerateFreePhaseMax, fallbackRevealSizes,
   latticeAt, makeCircleSeatPredicate, makeContourSeatPredicate, priorityTupleOf, type CanonPhaseCandidate,
 } from './units/layout'
 import { bbox } from './foundation/geometry'
 import { wrapGroup } from './units/wrap'
-import { inBand, orderCanonOffers } from './units/judge'
+import { centringMM, inBand, orderCanonOffers } from './units/judge'
 
 const localise = (pts: ReadonlyArray<Pt>): Pt[] => {
   if (!pts.length) return []
@@ -56,8 +56,21 @@ export function solveCanonExperiment(
   const whole = attemptCanon(canonLocal)
   if (whole) {
     trace.source = 'canon-full'; trace.populations = 1; trace.retained = whole.at.count
-    // The whole frame holds every priority by construction: one row, both roles.
-    return finish({ offers: [{ ...whole, roles: priority ? ['optimal', 'canon'] : ['optimal'] }], bestSeated: null, trace })
+    if (!priority) return finish({ offers: [whole], bestSeated: null, trace })
+    // The whole frame holds every priority by construction. A slim whole frame may still centre
+    // (Gate 3): the same size ladder as the partial path, on the same unchanged Wrap unit.
+    const blind: BandRung = { ...whole, roles: ['canon'] }
+    if (!priority.slim) return finish({ offers: [{ ...whole, roles: ['optimal', 'canon'] }], bestSeated: null, trace })
+    const rows = [{ rung: whole, id: 'whole' }]
+    const ceiling = Math.min(hiMM, whole.at.sizeMM + centringMM(whole.at, priority.centreAxis))
+    for (let mm = whole.at.sizeMM + SNAP_STEP_MM; mm <= ceiling + 1e-9; mm += SNAP_STEP_MM) {
+      trace.wraps++
+      const at = wrapGroup(sized, wcfg, canonLocal, mm, mm)
+      if (at && inBand(at.sizeMM, loMM, hiMM)) rows.push({ rung: { at, revealMM: mm, roles: ['optimal'] }, id: 'whole' })
+    }
+    const best = orderCanonOffers(rows, priority)[0].rung
+    const same = Math.abs(best.at.sizeMM - whole.at.sizeMM) < 0.005
+    return finish({ offers: same ? [{ ...whole, roles: ['optimal', 'canon'] }] : [{ ...best, roles: ['optimal'] }, blind], bestSeated: null, trace })
   }
 
   const settleCanon = (seed: ReadonlyArray<Pt>, first: BandRung): BandRung => {
@@ -131,8 +144,23 @@ export function solveCanonExperiment(
     // would undo the very seats the priorities chose to give up. The blind row keeps its settle.
     const priorityLawful = orderCanonOffers([...priorityCandidates.values()].flatMap((candidate) => {
       const rung = attemptCanon(candidate.points)
-      return rung ? [{ rung, id: candidate.id, candidate }] : []
-    }))
+      if (!rung) return []
+      const rows = [{ rung, id: candidate.id, candidate }]
+      // SLIM CENTRING (Gate 3). A one- or two-line frame has no partner seats to balance it, so
+      // symmetry cannot centre it; size can. The unchanged Wrap unit is asked for the lawful
+      // placement at each exact size above the tight one — origin nearest the governed centre —
+      // up to the point where growth can no longer pay for itself (key = centring + size, so no
+      // size beyond tight + centring(tight) can win). Judge then picks.
+      if (priority.slim) {
+        const ceiling = Math.min(hiMM, rung.at.sizeMM + centringMM(rung.at, priority.centreAxis))
+        for (let mm = rung.at.sizeMM + SNAP_STEP_MM; mm <= ceiling + 1e-9; mm += SNAP_STEP_MM) {
+          trace.wraps++
+          const at = wrapGroup(sized, wcfg, candidate.points, mm, mm)
+          if (at && inBand(at.sizeMM, loMM, hiMM)) rows.push({ rung: { at, revealMM: mm, roles: ['optimal'] }, id: candidate.id, candidate })
+        }
+      }
+      return rows
+    }), priority)
     const blind: BandRung | null = lawful.length ? { ...lawful[0].rung, roles: ['canon'] } : null
     const optimal: BandRung | null = priorityLawful.length ? { ...priorityLawful[0].rung, roles: ['optimal'] } : null
     if (blind || optimal) {

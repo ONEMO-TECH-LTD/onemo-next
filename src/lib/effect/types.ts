@@ -148,6 +148,11 @@ export interface CanonPriority {
   interiorRowIds: number[][]
   mirrorOf: number[]
   slim: boolean
+  /** The axis a slim frame is centred on — its minor axis (0 = x for a tall strip, 1 = y for a
+   *  banner). "slim vertical and horizontal rectangles and even banners can be centered in the
+   *  shape closer to the center point vertical or horizontal axis in preference to wrapped tight
+   *  size" (Dan, 2026-09-01). Meaningful only when `slim`. */
+  centreAxis: 0 | 1
 }
 
 export interface CanonExperimentTrace {

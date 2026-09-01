@@ -1137,6 +1137,7 @@ describe('9 — priority hold points are classifier data', () => {
     expect(p.interiorRowIds).toEqual([])
     expect(p.mirrorOf[id(2,3,0,1)]).toBe(id(2,3,1,1))
     expect(p.slim).toBe(true)
+    expect(p.centreAxis, 'a tall strip centres on x').toBe(0)
   })
   it('landscape 3x2 reads by gravity too: corners are the ends of its two rows, mirrors left-right', () => {
     const p = canonPriorityOf(frame(3, 2))!
@@ -1147,6 +1148,7 @@ describe('9 — priority hold points are classifier data', () => {
     expect(p.mirrorOf[id(3,2,0,0)]).toBe(id(3,2,2,0))
     expect(p.mirrorOf[id(3,2,1,0)]).toBe(-1)
     expect(p.slim).toBe(true)
+    expect(p.centreAxis, 'a banner centres on y').toBe(1)
   })
   it('square 3x3 needs no axis ruling: same groups, centre column self-mirrored, not slim', () => {
     const p = canonPriorityOf(frame(3, 3))!
@@ -1290,6 +1292,24 @@ describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside
     for (const c of both.priorityCandidates)
       expect(priorityTupleOf(c.id.split(',').map(Number), priority).slice(0, 4)).toEqual([1, 1, 1, 0])
     expect(blind.priorityCandidates).toEqual([])
+  }, 120_000)
+
+  it('bot-b2 (slim 1x2): optimal grows only as far as centring pays for it, on the same two seats (Gate 3)', async () => {
+    const { fx, colRow, nodesOf, withPriority } = await solveFixture('bot-b2')
+    const optimal = withPriority.offers.find((o) => o.roles.includes('optimal'))!
+    const canon = withPriority.offers.find((o) => o.roles.includes('canon'))!
+    expect(sortedPairs(nodesOf(optimal).map((i) => colRow[i]))).toEqual(sortedPairs(fx.deliveredCanonNodes))
+    expect(canon.at.sizeMM).toBeCloseTo(87.46, 2)
+    expect(optimal.at.sizeMM).toBeGreaterThan(canon.at.sizeMM)
+    const dx = (o: typeof optimal) => Math.abs(o.at.originMM[0] - o.at.anchorMM[0])
+    expect(dx(optimal), 'relevantAxisCentreOffMM < canon (frozen comparator)').toBeLessThan(dx(canon))
+    // mm for mm: the growth must have bought at least as much centring
+    expect(optimal.at.sizeMM - canon.at.sizeMM).toBeLessThanOrEqual(dx(canon) - dx(optimal) + 1e-6)
+  }, 120_000)
+
+  it('duck-b3 is not slim, so Gate 3 leaves its Gate 2 answer untouched', async () => {
+    const { withPriority } = await solveFixture('duck-b3')
+    expect(withPriority.offers.find((o) => o.roles.includes('optimal'))!.at.sizeMM).toBeCloseTo(146.11, 2)
   }, 120_000)
 
   it('the worker lands on optimal, never on the canon comparison row', async () => {
