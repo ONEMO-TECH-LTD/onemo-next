@@ -1307,9 +1307,12 @@ describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside
     expect(optimal.at.sizeMM - canon.at.sizeMM).toBeLessThanOrEqual(dx(canon) - dx(optimal) + 1e-6)
   }, 120_000)
 
-  it('duck-b3 is not slim, so Gate 3 leaves its Gate 2 answer untouched', async () => {
-    const { withPriority } = await solveFixture('duck-b3')
-    expect(withPriority.offers.find((o) => o.roles.includes('optimal'))!.at.sizeMM).toBeCloseTo(146.11, 2)
+  it('duck-b3 is slim (2x3) and already centred: the ladder runs and nothing beats the tight row', async () => {
+    const { priority, withPriority } = await solveFixture('duck-b3')
+    expect(priority.slim).toBe(true)
+    const optimal = withPriority.offers.find((o) => o.roles.includes('optimal'))!
+    expect(optimal.at.sizeMM).toBeCloseTo(146.11, 2)
+    expect(Math.abs(optimal.at.originMM[0] - optimal.at.anchorMM[0])).toBeLessThan(3)
   }, 120_000)
 
   it('the worker lands on optimal, never on the canon comparison row', async () => {
