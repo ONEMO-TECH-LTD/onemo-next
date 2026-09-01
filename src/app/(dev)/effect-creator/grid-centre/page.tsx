@@ -97,6 +97,7 @@ export default function GridLab() {
     universal: false, balance: false, perimeter: false,
     extremes: false, ends: false, top: false,
   })
+  const [protectionPadding, setProtectionPadding] = useState(45)
   /** Legal-area islands, coloured + boxed + centre-marked. */
   const [showSegs, setShowSegs] = useState(true)
   /** Coloured fills of the inner (legal) area — off leaves outlines only. */
@@ -336,7 +337,7 @@ export default function GridLab() {
     if (!w) return
     if (!solveEnabled) { setModel(null); return }
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
-    const cfg = { pitchMM: pitch, paddingMM: pad, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle', classifierRuler: ruler, holdingRules }
+    const cfg = { pitchMM: pitch, paddingMM: pad, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle', classifierRuler: ruler, holdingRules, protectionPaddingMM: protectionPadding }
     // Manual in a band (forced registration OR manual band scale): the walk is meaningless —
     // solve that size directly, exactly like free mode, band chip stays active.
     const manualBand = manual !== null || bandScale !== null   // manual scale/pan: solved directly at the requested size
@@ -353,7 +354,7 @@ export default function GridLab() {
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler, holdingRules, solveEnabled])
+  }, [base, src, preset, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler, holdingRules, protectionPadding, solveEnabled])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -655,6 +656,8 @@ export default function GridLab() {
             </div>}
           </Fold>
           <Fold title="Holding filters">
+            <Slider label="Protection padding · from magnet edge" unit="mm"
+              v={protectionPadding} set={setProtectionPadding} min={0} max={96} />
             {model?.unprotected && <div className="gl-field"><span>Unsupported material</span>
               <div className="gl-snap">{Math.round(model.unprotected.areaMM2)} mm² ·{' '}
                 {Math.round(model.unprotected.boundaryMM)} mm edge</div></div>}

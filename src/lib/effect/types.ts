@@ -162,6 +162,8 @@ export interface GridConfig {
   classifierRuler?: 'legal' | 'outer'
   /** Temporary comparison switches over candidate scoring. All false preserves base ordering. */
   holdingRules?: HoldingRules
+  /** Unsupported-material reach measured outward from each physical magnet edge. */
+  protectionPaddingMM?: number
   pitchMM?: number
   paddingMM?: number
   /** Manual calibration: force this registration (mm phase) instead of searching. */
