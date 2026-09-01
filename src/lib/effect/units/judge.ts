@@ -392,15 +392,19 @@ export function rankByHolding<T>(
 /** Remove Canon seats greedily while preserving whole-shape extremes and semantic span ends. */
 export function sparseExtremeHold(contour: Contour, points: ReadonlyArray<Pt>, anchorMM: Pt): Pt[] {
   let kept = [...points]
-  const baseline = holdingFactsOf(contour, kept, anchorMM)
+  // Sparse Min is existing solver behavior, not a live protection control. Keep its historical
+  // 48mm centre reach (3mm physical radius + 45mm) so the dashboard detector cannot delete Min.
+  const sparseFacts = (candidate: ReadonlyArray<Pt>) =>
+    holdingFactsOf(contour, candidate, anchorMM, 0, 48, 45, candidate.map(() => 3))
+  const baseline = sparseFacts(kept)
   for (;;) {
     const options = kept.map((_, index) => kept.filter((__, i) => i !== index)).filter((candidate) => {
-      const facts = holdingFactsOf(contour, candidate, anchorMM)
+      const facts = sparseFacts(candidate)
       return facts.holdsExtremes === baseline.holdsExtremes && facts.ends >= baseline.ends
     })
     if (!options.length) return kept
     options.sort((a, b) => {
-      const fa = holdingFactsOf(contour, a, anchorMM), fb = holdingFactsOf(contour, b, anchorMM)
+      const fa = sparseFacts(a), fb = sparseFacts(b)
       return fa.unprotectedMM - fb.unprotectedMM || fa.imbalance - fb.imbalance
     })
     kept = options[0]
