@@ -15,7 +15,7 @@ import { DEFAULT_PITCH_MM, MAGNET_DIA_SMALL_MM, MAGNET_DIA_LARGE_MM, PADDING_FLO
 import { computeGrid } from './grid-magnet'
 import { bbox } from './foundation/geometry'
 import { contourCentroidOf } from './units/centring'
-import { spotRadiusOf } from './units/layout'
+import { latticeAt, makeCircleSeatPredicate, makeContourSeatPredicate, spotRadiusOf } from './units/layout'
 import { safeSegments } from './units/segment'
 import { centeringAnchors, governMass } from './units/centring'
 import { CENTRE_MODE, GOVERNOR } from './grid-magnet-spec'
@@ -140,6 +140,28 @@ export function wrapBandLadder(
     if (!inBand(at.sizeMM, loMM, hiMM)) return null   // judge: another band owns it
     return { at, revealMM, roles: [] }
   }
+  /** Free populations are observed before their final wrap. Recheck the SAME lattice phase at the
+   *  wrapped size, add seats that became legal there, and rewrap until membership stops growing. */
+  const settleFree = (first: BandRung): BandRung => {
+    let rung = first
+    for (;;) {
+      const contour = sized(rung.at.sizeMM)
+      const bb = bbox(contour.outer.pts)
+      const radius = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
+      const fits = cfg.circle
+        ? makeCircleSeatPredicate((bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2,
+          Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY) / 2, radius)
+        : makeContourSeatPredicate(contour, radius)
+      if (!fits) return rung
+      const seed = rung.at.points[0]
+      const mod = (v: number) => ((v % pitch) + pitch) % pitch
+      const expanded = latticeAt(bb, pitch, mod(seed[0] - bb.minX), mod(seed[1] - bb.minY)).filter(fits)
+      if (expanded.length <= rung.at.count) return rung
+      const next = attempt(expanded, rung.revealMM)
+      if (!next) return rung
+      rung = next
+    }
+  }
 
   // THE SUGGESTED LAYOUT IS THE SEARCH'S STARTING POINT — not a second search. Dan, 2026-08-30:
   // "make canon just an anchor that plugs in the free search that fine tunes", and "if we provide
@@ -194,7 +216,7 @@ export function wrapBandLadder(
   // them, restored 2026-08-30 — they had been renamed to fewest/most, which he never asked for.
   const byCount = [...rungs].sort((a, b) => a.at.count - b.at.count || a.at.sizeMM - b.at.sizeMM)
   const min = byCount[0] ?? null
-  const max = byCount[byCount.length - 1] ?? null
+  const max = byCount.length ? settleFree(byCount[byCount.length - 1]) : null
 
   // COINCIDENT RESULTS COLLAPSE — the same answer is one row, whatever reached it first. Identity
   // is what SHIPS: the wrapped size and the magnet positions, never which probe proposed it.
