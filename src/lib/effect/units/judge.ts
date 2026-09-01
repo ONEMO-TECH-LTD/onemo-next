@@ -22,7 +22,10 @@ export interface HoldingFacts {
   ends: number
   topUnprotectedMM: number
   unprotectedMM: number
+  unprotectedAreaMM2: number
   imbalance: number
+  centreOffMM: number
+  ringsMM: Pt[][]
 }
 
 type BoundaryGap = { a: Pt; b: Pt; length: number }
@@ -75,6 +78,30 @@ const nearBoundary = (contour: Contour, p: Pt): boolean => {
   return best <= HOLD_REACH_MM
 }
 
+const pathOf = (points: ReadonlyArray<Pt>) => Clipper.makePath(points.flatMap(([x, y]) =>
+  [Math.round(x * HOLD_SCALE), Math.round(y * HOLD_SCALE)]))
+
+function unprotectedMaterial(contour: Contour, magnets: ReadonlyArray<Pt>): Paths64 {
+  let material: Paths64 = [pathOf(contour.outer.pts)]
+  if (contour.holes.length) material = Clipper.difference(
+    material, contour.holes.map((hole) => pathOf(hole.pts)), FillRule.NonZero)
+  if (!magnets.length) return material
+  const sides = 72, radius = HOLD_REACH_MM / Math.cos(Math.PI / sides)
+  const discs = magnets.map(([mx, my]) => Clipper.makePath(Array.from({ length: sides }, (_, index) => {
+    const angle = index * Math.PI * 2 / sides
+    return [Math.round((mx + Math.cos(angle) * radius) * HOLD_SCALE),
+      Math.round((my + Math.sin(angle) * radius) * HOLD_SCALE)]
+  }).flat()))
+  const held = Clipper.union(discs, FillRule.NonZero)
+  return held.length ? Clipper.difference(material, held, FillRule.NonZero) : material
+}
+
+const pathsAreaMM2 = (paths: Paths64): number =>
+  Math.abs(Number(Clipper.areaPaths(paths))) / (HOLD_SCALE * HOLD_SCALE)
+
+const ringsOf = (paths: Paths64): Pt[][] => paths.map((path) =>
+  path.map((point) => [Number(point.x) / HOLD_SCALE, Number(point.y) / HOLD_SCALE] as Pt))
+
 /** Semantic corner analogue: end holds on the local top/bottom or left/right material spans. */
 function spanEndHolds(contour: Contour, magnets: ReadonlyArray<Pt>): number {
   const box = bbox(contour.outer.pts), w = box.maxX - box.minX, h = box.maxY - box.minY
@@ -111,7 +138,9 @@ function spanEndHolds(contour: Contour, magnets: ReadonlyArray<Pt>): number {
   return held
 }
 
-export function holdingFactsOf(contour: Contour, magnets: ReadonlyArray<Pt>, anchorMM: Pt): HoldingFacts {
+export function holdingFactsOf(
+  contour: Contour, magnets: ReadonlyArray<Pt>, anchorMM: Pt, centreOffMM = 0,
+): HoldingFacts {
   const box = bbox(contour.outer.pts), w = box.maxX - box.minX, h = box.maxY - box.minY
   const square = Math.abs(w - h) < 1e-6
   const held = (axis: 0 | 1, lo: number, hi: number) => magnets.length > 0
@@ -121,28 +150,33 @@ export function holdingFactsOf(contour: Contour, magnets: ReadonlyArray<Pt>, anc
     ? held(0, box.minX, box.maxX) && held(1, box.minY, box.maxY)
     : h > w ? held(1, box.minY, box.maxY) : held(0, box.minX, box.maxX)
   const gaps = boundaryGaps(contour, magnets)
-  let top = 0, one = 0, two = 0
-  const splitAt = (gap: BoundaryGap, axis: 0 | 1, cut: number): [number, number] => {
-    const av = gap.a[axis], bv = gap.b[axis]
-    if (av <= cut && bv <= cut) return [gap.length, 0]
-    if (av >= cut && bv >= cut) return [0, gap.length]
-    const t = Math.max(0, Math.min(1, (cut - av) / (bv - av)))
-    return av < cut ? [gap.length * t, gap.length * (1 - t)]
-      : [gap.length * (1 - t), gap.length * t]
+  const unsupported = unprotectedMaterial(contour, magnets)
+  const areaIn = (minX: number, minY: number, maxX: number, maxY: number) => {
+    if (!unsupported.length || maxX <= minX || maxY <= minY) return 0
+    const rect = Clipper.makePath([
+      Math.round(minX * HOLD_SCALE), Math.round(minY * HOLD_SCALE),
+      Math.round(maxX * HOLD_SCALE), Math.round(minY * HOLD_SCALE),
+      Math.round(maxX * HOLD_SCALE), Math.round(maxY * HOLD_SCALE),
+      Math.round(minX * HOLD_SCALE), Math.round(maxY * HOLD_SCALE),
+    ])
+    return pathsAreaMM2(Clipper.intersect(unsupported, [rect], FillRule.NonZero))
   }
-  for (const gap of gaps) {
-    top += splitAt(gap, 1, box.maxY - HOLD_REACH_MM)[1]
-    const halves = h >= w ? splitAt(gap, 0, anchorMM[0]) : splitAt(gap, 1, anchorMM[1])
-    one += halves[0]; two += halves[1]
-  }
+  const portrait = h >= w
+  const one = portrait ? areaIn(box.minX, box.minY, anchorMM[0], box.maxY)
+    : areaIn(box.minX, box.minY, box.maxX, anchorMM[1])
+  const two = portrait ? areaIn(anchorMM[0], box.minY, box.maxX, box.maxY)
+    : areaIn(box.minX, anchorMM[1], box.maxX, box.maxY)
   const total = one + two
   return {
     perimeter: magnets.filter((p) => nearBoundary(contour, p)).length,
     holdsExtremes,
     ends: spanEndHolds(contour, magnets),
-    topUnprotectedMM: top,
+    topUnprotectedMM: areaIn(box.minX, box.maxY - HOLD_REACH_MM, box.maxX, box.maxY),
     unprotectedMM: gaps.reduce((sum, gap) => sum + gap.length, 0),
+    unprotectedAreaMM2: pathsAreaMM2(unsupported),
     imbalance: total ? Math.abs(one - two) / total : 0,
+    centreOffMM,
+    ringsMM: ringsOf(unsupported),
   }
 }
 
@@ -151,23 +185,23 @@ export function rankByHolding<T>(
   candidates: ReadonlyArray<T>, factsOf: (candidate: T) => HoldingFacts, rules?: HoldingRules,
 ): T[] {
   if (!rules || candidates.length < 2) return [...candidates]
-  const measures: Array<(facts: HoldingFacts) => number> = []
-  if (rules.perimeter) measures.push((f) => -f.perimeter)
-  if (rules.extremes) measures.push((f) => f.holdsExtremes ? 0 : 1)
-  if (rules.ends) measures.push((f) => -f.ends)
-  if (rules.top) measures.push((f) => f.topUnprotectedMM)
-  if (rules.universal) measures.push((f) => f.unprotectedMM)
-  if (rules.balance) measures.push((f) => f.imbalance)
-  if (!measures.length) return [...candidates]
+  const ruleset: Array<Array<(facts: HoldingFacts) => number>> = []
+  if (rules.perimeter) ruleset.push([(f) => -f.perimeter])
+  if (rules.extremes) ruleset.push([(f) => f.holdsExtremes ? 0 : 1])
+  if (rules.ends) ruleset.push([(f) => -f.ends])
+  if (rules.top) ruleset.push([(f) => f.topUnprotectedMM])
+  if (rules.universal) ruleset.push([(f) => f.unprotectedAreaMM2, (f) => f.unprotectedMM])
+  if (rules.balance) ruleset.push([(f) => f.centreOffMM, (f) => f.imbalance])
+  if (!ruleset.length) return [...candidates]
   const facts = new Map(candidates.map((candidate) => [candidate, factsOf(candidate)]))
   const totals = new Map(candidates.map((candidate) => [candidate, 0]))
-  for (const measure of measures) {
+  for (const measures of ruleset) for (const measure of measures) {
     const rows = candidates.map((candidate) => ({ candidate, value: measure(facts.get(candidate)!) }))
       .sort((a, b) => a.value - b.value)
     let rank = 0
     for (let i = 0; i < rows.length; i++) {
       if (i && Math.abs(rows[i].value - rows[i - 1].value) > 1e-9) rank = i
-      totals.set(rows[i].candidate, (totals.get(rows[i].candidate) ?? 0) + rank)
+      totals.set(rows[i].candidate, (totals.get(rows[i].candidate) ?? 0) + rank / measures.length)
     }
   }
   return [...candidates].sort((a, b) => (totals.get(a) ?? 0) - (totals.get(b) ?? 0))

@@ -116,7 +116,12 @@ export interface WrapAt {
 export type RungRole = 'optimal' | 'min' | 'max'
 
 /** One rung the band offers: a revealed layout at its exact contact size. */
-export interface BandRung { at: WrapAt; revealMM: number; roles: RungRole[] }
+export interface BandRung {
+  at: WrapAt
+  revealMM: number
+  roles: RungRole[]
+  unprotected?: { ringsMM: Pt[][]; areaMM2: number; boundaryMM: number }
+}
 
 /** What a band solve returns: the lawful offers judge allowed, and — only when there are none — a
  *  calibration witness layout selected from the SAME generated population. The witness is never an

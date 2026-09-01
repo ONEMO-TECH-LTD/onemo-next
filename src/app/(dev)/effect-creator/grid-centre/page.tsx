@@ -283,6 +283,7 @@ export default function GridLab() {
 
   // The solve runs in a worker so the page never freezes; the last result stays up while solving.
   type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: Array<BandSnapPoint & { roles?: string[] }>; idx: number; segments: SafeSegment[]; stops?: Array<{ press: number; reveal: number }>; offMM?: number; recog?: { family: string; cols: number; rows: number; segWmm: number; segHmm: number }
+    unprotected?: { ringsMM: Pt[][]; areaMM2: number; boundaryMM: number } | null
     /** STEP 1+2 — what the classifier read at this band's trial size, and the whole table. */
     /** the classifier's own row and the layout it recommended — carried for the readout, not
      *  rendered as a second panel (Dan: I did not ask for that) */
@@ -420,6 +421,7 @@ export default function GridLab() {
                     // 100% = the shape at half the board, so there is room around it (Dan).
                     viewport: { panMM: [0, 0] as Pt, zoom: camZoom * CAM_BASE },
                     segments: showSegs ? model!.segments : [], segFill: segFillN !== 0,
+                    unprotected: model!.unprotected ?? null,
                     onPan: (dx: number, dy: number) => setManual((m) => { const bx = m ? m.x : model!.grid.phaseMM[0], by = m ? m.y : model!.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } }),
                     onZoom: (f: number) => {
                       // Pinch = manual scaling WITHIN the band's range.
@@ -648,6 +650,9 @@ export default function GridLab() {
             </div>}
           </Fold>
           <Fold title="Holding filters">
+            {model?.unprotected && <div className="gl-field"><span>Unsupported material</span>
+              <div className="gl-snap">{Math.round(model.unprotected.areaMM2)} mm² ·{' '}
+                {Math.round(model.unprotected.boundaryMM)} mm edge</div></div>}
             <div className="gl-field"><span>Primary comparison</span><div className="gl-seg gl-wrap">
               {([['universal', 'Universal'], ['balance', 'Balance']] as const).map(([key, label]) =>
                 <button key={key} aria-pressed={holdingRules[key]}
@@ -674,8 +679,9 @@ function dim(c: Contour, axis: 0 | 1): number {
 /** Island tints — screen colours only, one hue per segment, smallest first. */
 const SEG_HUES = ['#e0762f', '#7a4ae0', '#2fa864', '#e04a8f', '#2f9fe0']
 
-function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, onReset, onPickNode, viewport }: {
+function Stage({ contour, grid, lattice, box, segments, segFill, unprotected, onPan, onZoom, onReset, onPickNode, viewport }: {
   contour: Contour; grid: GridResult; lattice: boolean; box: boolean; segments: SafeSegment[]; segFill: boolean
+  unprotected?: { ringsMM: Pt[][]; areaMM2: number; boundaryMM: number } | null
   onPan: (dxMM: number, dyMM: number) => void; onZoom: (f: number) => void; onReset: () => void
   /** Library authoring: a lattice spot was clicked (mm, engine y-up). Display layer only. */
   onPickNode?: (pMM: Pt) => void
@@ -922,6 +928,12 @@ function Stage({ contour, grid, lattice, box, segments, segFill, onPan, onZoom, 
           <text {...lbl} x={lX + fs * 0.6} y={my} textAnchor="middle" transform={`rotate(90 ${lX + fs * 0.6} ${my})`}>{hTxt}</text>
         </g>)
       })()}
+      {unprotected && unprotected.ringsMM.length > 0 && <g style={{ pointerEvents: 'none' }}>
+        {unprotected.ringsMM.map((ring, index) => <path key={'up' + index}
+          d={'M ' + ring.map(([x, y]) => `${x.toFixed(2)} ${(-y).toFixed(2)}`).join(' L ') + ' Z'}
+          fill="#e5484d" fillOpacity={0.16} stroke="#e5484d" strokeOpacity={0.55}
+          strokeWidth={1} vectorEffect="non-scaling-stroke" />)}
+      </g>}
       {/* Every spot the bridge handed over: faint where empty, accent where a magnet seats. */}
       <g transform={pend.x || pend.y ? `translate(${pend.x} ${-pend.y})` : undefined}>
       {spots.map((sp, i) => {

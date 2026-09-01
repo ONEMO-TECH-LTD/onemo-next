@@ -110,8 +110,19 @@ export function solveCanonExperiment(
     if (key && wrapCache.size > 512) wrapCache.delete(wrapCache.keys().next().value!)
     return rung
   }
-  const facts = ({ rung }: WrappedCandidate) =>
-    holdingFactsOf(sized(rung.at.sizeMM), rung.at.points, rung.at.anchorMM)
+  const factsCache = new Map<BandRung, ReturnType<typeof holdingFactsOf>>()
+  const facts = ({ rung }: WrappedCandidate) => {
+    let value = factsCache.get(rung)
+    if (!value) {
+      value = holdingFactsOf(
+        sized(rung.at.sizeMM), rung.at.points, rung.at.anchorMM, rung.at.centreOffMM)
+      factsCache.set(rung, value)
+      rung.unprotected = {
+        ringsMM: value.ringsMM, areaMM2: value.unprotectedAreaMM2, boundaryMM: value.unprotectedMM,
+      }
+    }
+    return value
+  }
   const stable = (rows: WrappedCandidate[]) => rows.sort((a, b) =>
     a.rung.at.sizeMM - b.rung.at.sizeMM || a.rung.at.centreOffMM - b.rung.at.centreOffMM
     || a.id.localeCompare(b.id))
@@ -182,6 +193,13 @@ export function solveCanonExperiment(
       trace.source = candidate.id.startsWith('s:') || rung.at.count < canonNodesMM.length
         ? 'canon-partial' : 'canon-full'
       trace.retained = rung.at.count; trace.winningPhaseMM = candidate.phaseMM; trace.winningWindow = candidate.window
+    }
+  }
+  for (const offer of offers) if (!offer.unprotected) {
+    const value = holdingFactsOf(
+      sized(offer.at.sizeMM), offer.at.points, offer.at.anchorMM, offer.at.centreOffMM)
+    offer.unprotected = {
+      ringsMM: value.ringsMM, areaMM2: value.unprotectedAreaMM2, boundaryMM: value.unprotectedMM,
     }
   }
   if (!fullRows.length && scoredMax[0]) {

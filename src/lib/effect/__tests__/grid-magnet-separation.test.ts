@@ -999,9 +999,9 @@ describe('8 — recovered phase search is wired through the production Canon sol
   it('enabled holding scores rank evenly and Canon min keeps extreme span holds', () => {
     const candidates = ['perimeter', 'protected', 'balanced'] as const
     const facts = {
-      perimeter: { perimeter: 3, holdsExtremes: false, ends: 1, topUnprotectedMM: 20, unprotectedMM: 20, imbalance: 1 },
-      protected: { perimeter: 1, holdsExtremes: true, ends: 2, topUnprotectedMM: 0, unprotectedMM: 0, imbalance: 0.5 },
-      balanced: { perimeter: 2, holdsExtremes: true, ends: 2, topUnprotectedMM: 10, unprotectedMM: 10, imbalance: 0 },
+      perimeter: { perimeter: 3, holdsExtremes: false, ends: 1, topUnprotectedMM: 20, unprotectedMM: 20, unprotectedAreaMM2: 20, imbalance: 1, centreOffMM: 10, ringsMM: [] },
+      protected: { perimeter: 1, holdsExtremes: true, ends: 2, topUnprotectedMM: 0, unprotectedMM: 0, unprotectedAreaMM2: 0, imbalance: 0.5, centreOffMM: 5, ringsMM: [] },
+      balanced: { perimeter: 2, holdsExtremes: true, ends: 2, topUnprotectedMM: 10, unprotectedMM: 10, unprotectedAreaMM2: 10, imbalance: 0, centreOffMM: 0, ringsMM: [] },
     }
     const ranked = rankByHolding(candidates, (candidate) => facts[candidate], {
       universal: true, balance: true, perimeter: false, extremes: false, ends: false, top: false,
@@ -1020,7 +1020,7 @@ describe('8 — recovered phase search is wired through the production Canon sol
     expect(holdingFactsOf(symmetric, [], [100, 100]).imbalance).toBeCloseTo(0, 10)
     const corners: Pt[] = [[0, 0], [200, 0], [200, 200], [0, 200]]
     expect(holdingFactsOf(symmetric, corners, [100, 100]).imbalance).toBeCloseTo(0, 10)
-    expect(holdingFactsOf(symmetric, [], [100, 100]).topUnprotectedMM).toBeCloseTo(296, 6)
+    expect(holdingFactsOf(symmetric, [], [100, 100]).topUnprotectedMM).toBeCloseTo(9600, 6)
     const midSides: Pt[] = [[100, 0], [200, 100], [100, 200], [0, 100]]
     expect(holdingFactsOf(symmetric, corners, [100, 100]).ends)
       .toBeGreaterThan(holdingFactsOf(symmetric, midSides, [100, 100]).ends)

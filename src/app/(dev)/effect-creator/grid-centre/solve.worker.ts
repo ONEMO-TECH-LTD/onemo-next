@@ -180,7 +180,7 @@ ctx.onmessage = (e: MessageEvent<SolveRequest>) => {
         ctx.postMessage({ id, model: {
           contour: drawn.contour, grid: { ...drawn.grid, anchors, segments },
           effSize: at.sizeMM, ladder, idx, segments, offMM: at.centreOffMM, recog,
-          bandClass, bandClasses, recommendation,
+          bandClass, bandClasses, recommendation, unprotected: rungs[idx].unprotected ?? null,
         } })
         return
       }
