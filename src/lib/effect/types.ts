@@ -126,20 +126,25 @@ export interface BandSolve {
   bestSeated: { revealMM: number; points: Pt[] } | null
 }
 
-/** PRIORITY HOLD POINTS on a Canon frame (Dan, 2026-09-01) — which frame nodes matter, as explicit
- *  node-id groups so every orientation reads the same way. Classifier data; layout and judge consume.
- *  - topIds: the frame's highest line — "top is always number 1 priority … cause we have gravity".
- *  - longExtremeIds: the two extreme lines of the shape's LONG axis (portrait: bottom/top rows,
- *    landscape: left/right columns). "extremes are the utmost priority".
- *  - interiorLineIds: one id-list per interior long-axis line, present only when that axis carries
- *    four or more lines — "with 3 rows … it is unnecessary we can skip mid".
- *  - mirrorOf: partner across the long axis, -1 when the node is its own — the orphan test.
+/** PRIORITY HOLD POINTS on a Canon frame (Dan, 2026-09-01: "top/corners are priorities of the
+ *  canon … symmetry is more side to side"). Gravity is the only orientation — the same groups read
+ *  the same way on portrait, landscape and square frames, so there is no long-axis choice to make.
+ *  Classifier data; layout and judge consume.
+ *  - topIds: the frame's highest row — "top is always number 1 priority … cause we have gravity".
+ *    Held means at least one lawful seat on it; how it is held is symmetry's business.
+ *  - topCornerIds / bottomCornerIds: the frame's corner nodes (deduped on a one-column frame).
+ *    The bottom corners are the base — "extremes are the utmost priority".
+ *  - interiorRowIds: one id-list per interior row, present only when the frame has four or more
+ *    rows — "4 rows … one magnet row in the mid section also nice; 3 rows … skip mid".
+ *  - mirrorOf: left↔right partner in the same row, -1 when the node is its own — the orphan test.
+ *    Rows may differ from each other (1 over 2 is a triangle, and a triangle holds).
  *  - slim: the classifier's existing slim rule (minor axis ≤ 2 lines); slim frames may centre
  *    before they tighten. */
 export interface CanonPriority {
   topIds: number[]
-  longExtremeIds: [number[], number[]]
-  interiorLineIds: number[][]
+  topCornerIds: number[]
+  bottomCornerIds: number[]
+  interiorRowIds: number[][]
   mirrorOf: number[]
   slim: boolean
 }

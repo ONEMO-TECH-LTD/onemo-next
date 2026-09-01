@@ -1117,6 +1117,9 @@ describe('8 — recovered phase search is wired through the production Canon sol
 
 describe('9 — priority hold points are classifier data', () => {
   // Gate 1 (2026-09-01): source + unit only. Nothing consumes this yet; no runtime claim is made.
+  // Dan's rulings recorded here: top = at least one lawful top seat (A3); priorities are top +
+  // corners, symmetry is side-to-side and separate; gravity is the only orientation, so a square
+  // needs no long-axis ruling (A4 dissolved).
   const frame = (cols: number, rows: number): Pt[] => {
     const out: Pt[] = []
     for (let ix = 0; ix < cols; ix++) for (let iy = 0; iy < rows; iy++)
@@ -1126,46 +1129,54 @@ describe('9 — priority hold points are classifier data', () => {
   const id = (cols: number, rows: number, ix: number, iy: number) => ix * rows + iy
   const sorted = (xs: number[]) => [...xs].sort((a, b) => a - b)
 
-  it('portrait 2x3: top row first, bottom row the other extreme, no interior, mirrored across x', () => {
-    const p = canonPriorityOf(frame(2, 3), 100, 200)!
+  it('portrait 2x3: top row, top and bottom corners, no interior, left-right mirrors', () => {
+    const p = canonPriorityOf(frame(2, 3))!
     expect(sorted(p.topIds)).toEqual([id(2,3,0,2), id(2,3,1,2)])
-    expect(p.longExtremeIds.map(sorted)).toEqual([[id(2,3,0,0), id(2,3,1,0)], [id(2,3,0,2), id(2,3,1,2)]])
-    expect(p.interiorLineIds).toEqual([])
+    expect(sorted(p.topCornerIds)).toEqual([id(2,3,0,2), id(2,3,1,2)])
+    expect(sorted(p.bottomCornerIds)).toEqual([id(2,3,0,0), id(2,3,1,0)])
+    expect(p.interiorRowIds).toEqual([])
     expect(p.mirrorOf[id(2,3,0,1)]).toBe(id(2,3,1,1))
     expect(p.slim).toBe(true)
   })
-  it('landscape 3x2: top row is still first; extremes are the left and right columns', () => {
-    const p = canonPriorityOf(frame(3, 2), 200, 100)!
+  it('landscape 3x2 reads by gravity too: corners are the ends of its two rows, mirrors left-right', () => {
+    const p = canonPriorityOf(frame(3, 2))!
     expect(sorted(p.topIds)).toEqual([id(3,2,0,1), id(3,2,1,1), id(3,2,2,1)])
-    expect(p.longExtremeIds.map(sorted)).toEqual([[id(3,2,0,0), id(3,2,0,1)], [id(3,2,2,0), id(3,2,2,1)]])
-    expect(p.interiorLineIds).toEqual([])
-    expect(p.mirrorOf[id(3,2,1,0)]).toBe(id(3,2,1,1))   // mirrored across the long (x) axis: rows swap
+    expect(sorted(p.topCornerIds)).toEqual([id(3,2,0,1), id(3,2,2,1)])
+    expect(sorted(p.bottomCornerIds)).toEqual([id(3,2,0,0), id(3,2,2,0)])
+    expect(p.interiorRowIds).toEqual([])
+    expect(p.mirrorOf[id(3,2,0,0)]).toBe(id(3,2,2,0))
+    expect(p.mirrorOf[id(3,2,1,0)]).toBe(-1)
     expect(p.slim).toBe(true)
   })
-  it('square 3x3 reads as portrait; the centre node is its own mirror; not slim', () => {
-    const p = canonPriorityOf(frame(3, 3), 150, 150)!
+  it('square 3x3 needs no axis ruling: same groups, centre column self-mirrored, not slim', () => {
+    const p = canonPriorityOf(frame(3, 3))!
     expect(sorted(p.topIds)).toEqual([id(3,3,0,2), id(3,3,1,2), id(3,3,2,2)])
-    expect(p.longExtremeIds.map(sorted)).toEqual([[id(3,3,0,0), id(3,3,1,0), id(3,3,2,0)], [id(3,3,0,2), id(3,3,1,2), id(3,3,2,2)]])
-    expect(p.interiorLineIds).toEqual([])
+    expect(sorted(p.topCornerIds)).toEqual([id(3,3,0,2), id(3,3,2,2)])
+    expect(sorted(p.bottomCornerIds)).toEqual([id(3,3,0,0), id(3,3,2,0)])
+    expect(p.interiorRowIds).toEqual([])
     expect(p.mirrorOf[id(3,3,1,1)]).toBe(-1)
     expect(p.mirrorOf[id(3,3,0,1)]).toBe(id(3,3,2,1))
     expect(p.slim).toBe(false)
   })
-  it('3-line strip 1x3 needs no interior; 4-line 3x4 offers each interior row separately', () => {
-    const three = canonPriorityOf(frame(1, 3), 50, 150)!
-    expect(three.interiorLineIds).toEqual([])
+  it('one-column 1x3: a corner is one node, nothing mirrors, no interior; 3x4 offers each interior row', () => {
+    const three = canonPriorityOf(frame(1, 3))!
+    expect(three.topCornerIds).toEqual([id(1,3,0,2)])
+    expect(three.bottomCornerIds).toEqual([id(1,3,0,0)])
+    expect(three.interiorRowIds).toEqual([])
     expect(three.mirrorOf.every((m) => m === -1)).toBe(true)
-    const four = canonPriorityOf(frame(3, 4), 150, 200)!
-    expect(four.interiorLineIds.map(sorted)).toEqual([
-      [id(3,4,0,1), id(3,4,1,1), id(3,4,2,1)], [id(3,4,0,2), id(3,4,1,2), id(3,4,2,2)]])
+    const four = canonPriorityOf(frame(3, 4))!
+    expect(sorted(four.bottomCornerIds)).toEqual([id(3,4,0,0), id(3,4,2,0)])
     expect(sorted(four.topIds)).toEqual([id(3,4,0,3), id(3,4,1,3), id(3,4,2,3)])
+    expect(four.interiorRowIds.map(sorted)).toEqual([
+      [id(3,4,0,1), id(3,4,1,1), id(3,4,2,1)], [id(3,4,0,2), id(3,4,1,2), id(3,4,2,2)]])
     expect(four.slim).toBe(false)
   })
-  it('each derivation is load-bearing: swapping the shape box flips the long axis, not the top', () => {
-    const asPortrait = canonPriorityOf(frame(3, 2), 100, 200)!   // same frame, shape now tall
-    const asLandscape = canonPriorityOf(frame(3, 2), 200, 100)!
-    expect(sorted(asPortrait.topIds)).toEqual(sorted(asLandscape.topIds))
-    expect(asPortrait.longExtremeIds.map(sorted)).not.toEqual(asLandscape.longExtremeIds.map(sorted))
-    expect(canonPriorityOf([], 1, 1)).toBeNull()
+  it('each derivation is load-bearing: corners exclude middles, pitch drives the line index, empty is null', () => {
+    const p = canonPriorityOf(frame(3, 4))!
+    expect(p.bottomCornerIds).not.toContain(id(3,4,1,0))
+    expect(p.topCornerIds).not.toContain(id(3,4,1,3))
+    // a wrong pitch collapses every node onto line 0 → top row becomes the whole frame
+    expect(canonPriorityOf(frame(2, 3), 4800)!.topIds).toHaveLength(6)
+    expect(canonPriorityOf([])).toBeNull()
   })
 })
