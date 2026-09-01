@@ -919,6 +919,29 @@ describe('8 — recovered phase search is wired through the production Canon sol
     expect(top.roles).toContain('optimal')
   }, 20_000)
 
+  it('lower reveal preserves a lawful higher-count Canon around a scaling hole', () => {
+    const sized = (mm: number): Contour => ({
+      outer: { pts: [[0, 0], [mm, 0], [mm, mm], [0, mm]] },
+      holes: [{ pts: [
+        [mm * 0.42, mm * 0.18], [mm * 0.90, mm * 0.18],
+        [mm * 0.90, mm * 0.82], [mm * 0.42, mm * 0.82],
+      ] }],
+    })
+    const cfg: GridConfig = { pitchMM: 48, paddingMM: 12, perimeterOnly: false }
+    const anchorAt = (mm: number): Pt => [mm / 2, mm / 2]
+    const canon = canonLayoutForFrame(48, 4, 4)!.nodesMM.map(([x, y]) => [x, y] as Pt)
+    const lower = enumerateCanonPhaseWindows(sized(176), cfg, canon, anchorAt(176), 176)
+    const ceiling = enumerateCanonPhaseWindows(sized(215), cfg, canon, anchorAt(215), 215)
+    const lower12 = lower.candidates.find((candidate) => candidate.points.length === 12)!
+    expect(lower12).toBeDefined()
+    expect(Math.max(...ceiling.candidates.map((candidate) => candidate.points.length))).toBe(10)
+    const wrapped = wrapGroup(sized,
+      { pitchMM: 48, paddingMM: 12, anchorAtMM: anchorAt, frameMidMM: [0, 0] }, lower12.points, 24, 176)
+    expect(wrapped?.sizeMM).toBeCloseTo(171.56, 1)
+    const result = solveCanonExperiment(sized, cfg, 168, 215, 24, anchorAt, canon)
+    expect(result.offers.find((offer) => offer.roles.includes('optimal'))?.at.count).toBe(12)
+  }, 30_000)
+
   it('production Canon solve uses full-phase free maximum only as fallback', async () => {
     const square = (mm: number): Contour => ({
       outer: { pts: [[0, 0], [mm, 0], [mm, mm], [0, mm]] as Pt[] }, holes: [],

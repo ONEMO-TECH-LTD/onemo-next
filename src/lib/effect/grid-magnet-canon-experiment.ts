@@ -45,10 +45,11 @@ export function solveCanonExperiment(
   const free = new Map<string, FreePhaseCandidate>()
   const witnesses: Array<{ revealMM: number; points: Pt[] }> = []
 
-  // Full phase search at the largest reveal contains every maximum-count population available
-  // below it; exact wrap then shrinks the selected fixed population to contact size. No sampled
-  // reveal stride and no second size approximation.
-  const revealSizes = [fallbackRevealSizes(loMM, hiMM).at(-1) ?? hiMM]
+  const allRevealSizes = fallbackRevealSizes(loMM, hiMM)
+  // Scaling holes can swallow a lower-reveal population, so supplied-hole contours require every
+  // 1mm event. Current traced cutouts are outer-only: their full-phase maximum is discovered at
+  // the ceiling and exact wrap performs the size solve.
+  const revealSizes = sized(hiMM).holes.length ? allRevealSizes : [allRevealSizes.at(-1) ?? hiMM]
   for (const mm of revealSizes) {
     if (canonLocal.length) {
       const search = enumerateCanonPhaseWindows(
@@ -74,11 +75,11 @@ export function solveCanonExperiment(
   }
   trace.populations = canon.size + free.size
 
-  const wrap = (points: ReadonlyArray<Pt>, frameMidMM?: Pt): BandRung | null => {
+  const wrap = (points: ReadonlyArray<Pt>, revealMM: number, frameMidMM?: Pt): BandRung | null => {
     trace.wraps++
     const wcfg: WrapConfig = { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM, anchorAtMM, frameMidMM }
-    const at = wrapGroup(sized, wcfg, points, minMM, hiMM)
-    return at && inBand(at.sizeMM, loMM, hiMM) ? { at, revealMM: hiMM, roles: [] } : null
+    const at = wrapGroup(sized, wcfg, points, minMM, revealMM)
+    return at && inBand(at.sizeMM, loMM, hiMM) ? { at, revealMM, roles: [] } : null
   }
   const facts = ({ rung }: WrappedCandidate) =>
     holdingFactsOf(sized(rung.at.sizeMM), rung.at.points, rung.at.anchorMM)
@@ -86,19 +87,19 @@ export function solveCanonExperiment(
     a.rung.at.sizeMM - b.rung.at.sizeMM || a.rung.at.centreOffMM - b.rung.at.centreOffMM
     || a.id.localeCompare(b.id))
 
-  const maxCanonCount = Math.max(0, ...[...canon.values()].map((candidate) => candidate.points.length))
   const fullRows: WrappedCandidate[] = []
-  for (const candidate of canon.values()) if (candidate.points.length === maxCanonCount) {
-    const rung = wrap(candidate.points, [0, 0])
+  for (const candidate of canon.values()) {
+    const rung = wrap(candidate.points, candidate.revealMM, [0, 0])
     if (rung) fullRows.push({ rung, id: candidate.id, phaseMM: candidate.phaseMM, window: candidate.window })
   }
   stable(fullRows)
+  fullRows.sort((a, b) => b.rung.at.count - a.rung.at.count)
 
   const sparseRows: WrappedCandidate[] = []
   for (const parent of fullRows) {
     const sparse = sparseExtremeHold(
       sized(parent.rung.at.sizeMM), parent.rung.at.points, parent.rung.at.anchorMM)
-    const rung = sparse.length ? wrap(localise(sparse)) : null
+    const rung = sparse.length ? wrap(localise(sparse), parent.rung.revealMM) : null
     if (rung) sparseRows.push({ ...parent, rung, id: `s:${parent.id}` })
   }
   stable(sparseRows)
@@ -116,18 +117,20 @@ export function solveCanonExperiment(
       const seed = rung.at.points[0], mod = (v: number) => ((v % pitch) + pitch) % pitch
       const expanded = latticeAt(box, pitch, mod(seed[0] - box.minX), mod(seed[1] - box.minY)).filter(fits)
       if (expanded.length <= rung.at.count) return rung
-      const next = wrap(localise(expanded))
+      const next = wrap(localise(expanded), rung.revealMM)
       if (!next) return rung
       trace.readded += expanded.length - rung.at.count
       rung = next
     }
   }
-  const maxFreeCount = Math.max(0, ...[...free.values()].map((candidate) => candidate.points.length))
   const maxRows: WrappedCandidate[] = []
-  for (const [id, candidate] of free) if (candidate.points.length === maxFreeCount) {
-    const rung = wrap(localise(candidate.points))
+  for (const [id, candidate] of free) {
+    const rung = wrap(localise(candidate.points), candidate.revealMM)
     if (rung) maxRows.push({ rung: settleFree(rung), id, phaseMM: candidate.phaseMM })
   }
+  const maxFreeCount = Math.max(0, ...maxRows.map((candidate) => candidate.rung.at.count))
+  for (let index = maxRows.length - 1; index >= 0; index--)
+    if (maxRows[index].rung.at.count < maxFreeCount) maxRows.splice(index, 1)
   stable(maxRows)
 
   const scoredFull = rankByHolding([...fullRows, ...sparseRows], facts, cfg.holdingRules)
