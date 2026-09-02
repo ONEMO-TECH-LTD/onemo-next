@@ -17,7 +17,7 @@ import { defaultLanding } from '@/lib/effect/units/judge'
 import { canonPriorityOf, positionsAcross } from '@/lib/effect/units/classifier'
 import { DEFAULT_PITCH_MM, PADDING_FLOOR_MM } from '@/lib/effect/grid-magnet-spec'
 import { contourCacheKey, makeSizer, sizeRange } from '@/lib/effect/grid-magnet-bridge'
-import type { Contour, Pt } from '@/lib/effect/types'
+import type { Pt } from '@/lib/effect/types'
 import type { GridRequest, GridSolve } from './types'
 
 // Computed once = computed. Per-shape bakes and per-band solves are keyed by shape + config and
