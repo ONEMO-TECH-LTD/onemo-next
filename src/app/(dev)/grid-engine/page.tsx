@@ -276,9 +276,13 @@ export default function GridEnginePage() {
    * and the candidate set is a different set — index 601 of a 29-candidate answer is not a
    * candidate, and leaving it selected also left the lattice locked with no control to release it.
    */
-  useEffect(() => {
+  // Reset during render when the answer changes (React's documented adjust-on-prop-change form), so
+  // the stale index never reaches a frame — no effect, no extra render.
+  const [selectedField, setSelectedField] = useState(field)
+  if (field !== selectedField) {
+    setSelectedField(field)
     setSelected(null)
-  }, [field])
+  }
 
   // Guards the frame between a new answer and that reset, so a stale index can never be rendered.
   const liveSelected = selected !== null && selected < candidates.length ? selected : null

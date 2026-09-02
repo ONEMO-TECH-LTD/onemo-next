@@ -444,9 +444,9 @@ describe('module directions — one-way traffic between the semantic modules', (
     const files = authored()
     expect(files.length, 'no authored unit files found — this guard would pass vacuously').toBeGreaterThan(0)
     for (const { file, text } of files) {
-      const module = moduleOf(file)
-      if (module === null) continue
-      const allowed = ALLOWED[module]!
+      const owner = moduleOf(file)
+      if (owner === null) continue
+      const allowed = ALLOWED[owner]!
       const violations = importSpecifiers(text)
         .map((s) => ({ s, target: targetModule(file, s) }))
         .filter((h) => !allowed.includes(h.target))

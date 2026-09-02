@@ -61,6 +61,9 @@ function usePersisted(key: string, initial: number): [number, (n: number) => voi
   const [v, setV] = useState(initial)
   useEffect(() => {
     const raw = localStorage.getItem('grid-centre.' + key)
+    // Hydration read: the stored value may only be applied after mount, or the server-rendered
+    // dial and the client's first paint disagree. One set, once per key — not a cascade.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (raw !== null && Number.isFinite(+raw)) setV(+raw)
   }, [key])
   const set = (n: number) => { setV(n); try { localStorage.setItem('grid-centre.' + key, String(n)) } catch { } }
@@ -743,6 +746,7 @@ function Stage({ contour, grid, lattice, box, segments, segFill, unprotected, on
   // px→mm uses the RENDERED size, so gestures stay true when the canvas shrinks on a phone.
   const svgRef = useRef<SVGSVGElement>(null)
   const dragAt = useRef<{ x: number; y: number } | null>(null)
+  const [dragging, setDragging] = useState(false)
   // Touch pinch: wheel+ctrlKey is the TRACKPAD pinch convention and iOS never sends it, so a
   // phone needs the two-pointer distance itself. Every live pointer is tracked; with two down
   // the frame-to-frame distance ratio drives the same onZoom the trackpad uses.
@@ -750,7 +754,7 @@ function Stage({ contour, grid, lattice, box, segments, segFill, unprotected, on
   const pinchDist = useRef(0)
   const [pend, setPend] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
   const pendRef = useRef(pend)
-  pendRef.current = pend
+  useEffect(() => { pendRef.current = pend }, [pend])
   const wheelTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const commit = () => {
     const p = pendRef.current
@@ -808,7 +812,7 @@ function Stage({ contour, grid, lattice, box, segments, segFill, unprotected, on
   return (
     <svg ref={svgRef} width={VP} height={VP} viewBox={`${vx} ${vy} ${spanMM} ${spanMM}`}
       preserveAspectRatio={viewport ? 'xMidYMid slice' : undefined}
-      style={{ cursor: dragAt.current ? 'grabbing' : 'grab', touchAction: 'none', userSelect: 'none' }}
+      style={{ cursor: dragging ? 'grabbing' : 'grab', touchAction: 'none', userSelect: 'none' }}
       onPointerDown={(e) => {
         pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
         e.currentTarget.setPointerCapture?.(e.pointerId)
@@ -817,9 +821,11 @@ function Stage({ contour, grid, lattice, box, segments, segFill, unprotected, on
           const [a, b] = [...pointers.current.values()]
           pinchDist.current = Math.hypot(a.x - b.x, a.y - b.y)
           dragAt.current = null
+          setDragging(false)
           commit()
         } else if (pointers.current.size === 1) {
           dragAt.current = { x: e.clientX, y: e.clientY }
+          setDragging(true)
         }
       }}
       onPointerMove={(e) => {
@@ -845,12 +851,13 @@ function Stage({ contour, grid, lattice, box, segments, segFill, unprotected, on
         dragAt.current = pointers.current.size === 1
           ? { ...[...pointers.current.values()][0] }
           : null
+        setDragging(dragAt.current !== null)
         if (pointers.current.size === 0) commit()
       }}
       onPointerCancel={(e) => {
         pointers.current.delete(e.pointerId)
         if (pointers.current.size < 2) pinchDist.current = 0
-        if (pointers.current.size === 0) { dragAt.current = null; commit() }
+        if (pointers.current.size === 0) { dragAt.current = null; setDragging(false); commit() }
       }}
       onDoubleClick={() => { setPend({ x: 0, y: 0 }); onReset() }}>
       {/* The ground: two-level mm rule anchored on the lattice, so intersections are the centres. */}
