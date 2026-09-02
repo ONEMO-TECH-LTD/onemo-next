@@ -19,7 +19,10 @@ import { solveCanonExperiment } from '../grid-magnet-canon-experiment'
 import { anchorFnFor, solveGrid } from '../pipeline/solve'
 import { canonPriorityOf, frameOfMasses, positionsAcross } from '../units/classifier'
 import type { BBox, SafeMass, SafeSegment } from '../types'
-import { BANDS, BAND_STEP_MM, PHASE_STEP_MM, PROTECTION_PADDING_MM } from '../grid-magnet-spec'
+import { BANDS, BAND_STEP_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_MM, PROTECTION_PADDING_MM, RELEASED_PADDING_MM } from '../grid-magnet-spec'
+import { bandRangeForControl } from '../adapters/gridViewModel'
+import { librarySegments } from '../adapters/libraryViewModel'
+import { spotRadiusOf } from '../grid-magnet'
 import { scaleContour } from '../grid-magnet-compute'
 import { applyCoverage, enumerateCanonPhaseWindows, enumerateFreePhaseMax, fallbackRevealSizes, makeCircleSeatPredicate, makeContourSeatPredicate, priorityTupleOf, symmetricCores } from '../units/layout'
 import { wrapGroup } from '../units/wrap'
@@ -197,10 +200,13 @@ describe('2 — traffic is one-way', () => {
     }
   })
 
-  it('the page reaches the module only through the engine door, the spec and the ui-bridge', () => {
+  it('the page reaches the engine only through adapters, the spec and the bridges — never the barrel (T2)', () => {
     const reaches = importsOf(pageText()).filter((i) => /grid-magnet/.test(i))
-    const bad = reaches.filter((i) => !/grid-magnet(-spec|-bridge|-library-bridge)?$/.test(i))
-    expect(bad, `page reaches into the module's internals: ${bad.join(', ')}`).toEqual([])
+    const bad = reaches.filter((i) => !/grid-magnet(-spec|-bridge|-library-bridge)$/.test(i))
+    expect(bad, `page imports the engine barrel or an internal: ${bad.join(', ')}`).toEqual([])
+    // and no engine measurement is called from the shell, under any import path
+    for (const name of ['safeSegments', 'spotRadiusOf', 'bandOuterMM', 'computeGrid', 'classifyBands', 'measureProtection', 'solveGrid'])
+      expect(pageText(), `page calls ${name}`).not.toMatch(new RegExp('\\b' + name + '\\('))
   })
 
   it('the module never imports from the app', () => {
@@ -392,14 +398,41 @@ describe('2e — the pipeline is the one sequencer the shells reach; adapters on
     expect(edges).toEqual(['@/lib/effect/units/centring', '@/lib/effect/units/classifier', '@/lib/effect/units/judge', '@/lib/effect/units/protection'])
   })
 
-  it('the adapter is projection only: type imports, no engine call', () => {
-    const text = readFileSync(ADAPTER, 'utf8')
-    const runtimeImports: string[] = []
+  const runtimeImportsOf = (text: string) => {
+    const out: Array<{ from: string; names: string[] }> = []
     walkAst(text, (n) => {
-      if (ts.isImportDeclaration(n) && !(n.importClause?.isTypeOnly)) runtimeImports.push(n.moduleSpecifier.getText())
+      if (!ts.isImportDeclaration(n) || n.importClause?.isTypeOnly) return
+      const b = n.importClause?.namedBindings
+      const names = b && ts.isNamedImports(b) ? b.elements.filter((e) => !e.isTypeOnly).map((e) => e.name.text).sort() : []
+      out.push({ from: n.moduleSpecifier.getText().slice(1, -1), names })
     })
-    expect(runtimeImports, 'adapter imports runtime code: ' + runtimeImports.join(' · ')).toEqual([])
-    expect(text, 'adapter must never re-run a decision').not.toMatch(/defaultLanding|classFrameNodes|shapeFamilyOf|solveGrid|computeGrid/)
+    return out
+  }
+
+  it('gridViewModel projects only: its sole runtime edge is the door\'s band-range conversion (T2)', () => {
+    const text = readFileSync(ADAPTER, 'utf8')
+    expect(runtimeImportsOf(text)).toEqual([{ from: '../grid-magnet', names: ['bandOuterMM'] }])
+    expect(text, 'adapter must never re-run a decision').not.toMatch(/defaultLanding|classFrameNodes|shapeFamilyOf|solveGrid|computeGrid|safeSegments/)
+  })
+
+  it('libraryViewModel asks the engine for one measurement: runtime edges are the door and the spec (T2)', () => {
+    const text = readFileSync(join(LIB, 'adapters/libraryViewModel.ts'), 'utf8')
+    expect(runtimeImportsOf(text)).toEqual([
+      { from: '../grid-magnet', names: ['safeSegments', 'spotRadiusOf'] },
+      { from: '../grid-magnet-spec', names: ['RELEASED_PADDING_MM'] },
+    ])
+    for (const f of ['adapters/gridViewModel.ts', 'adapters/libraryViewModel.ts']) {
+      // gridViewModel's GridSolve type import from pipeline/types is the projection's input — type-only, by design
+      const refs = moduleRefsOf(readFileSync(join(LIB, f), 'utf8')).filter((i) => /\/units\/|\/foundation\/|^@\/app\//.test(i))
+      expect(refs, `${f} reaches ${refs.join(' · ')}`).toEqual([])
+    }
+  })
+
+  it('the moved measurements answer exactly what the page computed before (T2)', () => {
+    const sq: Contour = { outer: { pts: [[0, 0], [120, 0], [120, 120], [0, 120]] as Pt[] }, holes: [] }
+    expect(librarySegments({ contour: sq })).toEqual(safeSegments(sq, spotRadiusOf(RELEASED_PADDING_MM), 'full'))
+    for (const band of BANDS) for (const pad of [PADDING_FLOOR_MM, RELEASED_PADDING_MM, PADDING_CEIL_MM])
+      expect(bandRangeForControl(band, pad)).toEqual(bandOuterMM(band, pad))
   })
 
   it('the worker imports only the pipeline and the adapter; the page never imports the pipeline directly', () => {
@@ -1027,15 +1060,6 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
     // The shell used to re-run computeGrid without the baked centre, so the population labelled
     // "calibration witness" was a solve nobody made. Pre-fix this band drew 2 magnets at a
     // different phase while layout had selected 4.
-    const star: Contour = (() => {
-      const pts: Pt[] = []
-      for (let i = 0; i < 10; i++) {
-        const t = (i / 10) * Math.PI * 2 - Math.PI / 2
-        const r = (i % 2 === 0 ? 0.5 : 0.22) * (i === 4 ? 0.78 : 1)
-        pts.push([0.5 + r * Math.cos(t), 0.5 + r * Math.sin(t)] as Pt)
-      }
-      return { outer: { pts }, holes: [] }
-    })()
     const cfg: GridConfig = { paddingMM: 12, pitchMM: 48, centreMode: 2, governor: 0 }
     type Posted = { model: {
       contour: Contour; effSize: number; idx: number
@@ -1049,7 +1073,7 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
     const prev = g.self
     g.self = stub
     try {
-      const worker = await import('@/app/(dev)/effect-creator/grid-centre/solve.worker')
+      await import('@/app/(dev)/effect-creator/grid-centre/solve.worker')
       const squircle = normBaseContour(getShape('squircle', 1024, 1024), 1024)!
       stub.onmessage!({ data: { id: 1, base: squircle, offsetMM: 0,
         cfg: { ...cfg, perimeterOnly: false }, mode: 4, sizeMM: 0, stepSel: null, settings: { protectionPaddingMM: PROTECTION_PADDING_MM } } })
