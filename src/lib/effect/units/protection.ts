@@ -1,29 +1,9 @@
 // units/protection.ts — diagnostic clone from 80eb3cd0. Measurement only; never imported by the solver.
 
-import type { Contour, Pt } from '../types'
+import type { Contour, Pt, UnprotectedEvidence, UnsupportedBoundaryInterval, UnsupportedPatch } from '../types'
+export type { UnprotectedEvidence, UnsupportedBoundaryInterval, UnsupportedPatch } from '../types'
 import { pointInContour } from '../foundation/geometry'
 import { Clipper, FillRule, PointInPolygonResult, type Path64, type Paths64 } from '@countertype/clipper2-ts'
-
-export interface UnsupportedPatch {
-  areaMM2: number
-  witnessMM: Pt | null
-}
-export interface UnsupportedBoundaryInterval {
-  a: Pt
-  b: Pt
-  lengthMM: number
-}
-
-export interface UnprotectedEvidence {
-  ringsMM: Pt[][]
-  materialAreaMM2: number
-  areaMM2: number
-  percent: number
-  patches: UnsupportedPatch[]
-  outerBoundary: UnsupportedBoundaryInterval[]
-  boundaryMM: number
-  repairTargetMM: Pt | null
-}
 
 const HOLD_SCALE = 1000
 const MAX_SUPPORT_SPAN_MM = 96

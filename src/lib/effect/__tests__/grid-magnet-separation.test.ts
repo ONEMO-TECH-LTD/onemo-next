@@ -356,7 +356,8 @@ describe('2d — the real shells are governed too', () => {
   // expires when the pipeline lands. Pinned exactly, so a stray import fails even where edges exist.
   const SHELL_UNIT_EDGES: Array<[string, readonly string[]]> = [
     [PAGE, []],
-    [WORKER, ['@/lib/effect/units/classifier', '@/lib/effect/units/judge', '@/lib/effect/units/centring']],
+    // + protection (77b55a08): the worker measures delivered evidence itself until pipeline/ owns it (roadmap T1).
+    [WORKER, ['@/lib/effect/units/classifier', '@/lib/effect/units/judge', '@/lib/effect/units/centring', '@/lib/effect/units/protection']],
   ]
 
   it('the page and worker hold exactly their pinned unit edges', () => {
@@ -1027,21 +1028,33 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
       expect(belt.grid.centreMainMM, 'coverage changed the governed centre').toEqual(full.grid.centreMainMM)
       expect(belt.ladder.map((r) => [r.roles, r.sizeMM]), 'coverage changed roles or rung sizes')
         .toEqual(full.ladder.map((r) => [r.roles, r.sizeMM]))
-      expect(full.ladder.map((r) => r.count)).toEqual([16, 12])
-      expect(belt.ladder.map((r) => r.count)).toEqual([12, 8])
+      // Canon solver: optimal and canon coincide on the squircle's 4x4 and collapse to one row; the
+      // retired `min` rung is no longer offered (Dan: optimal / canon / max are the three comparisons).
+      expect(full.ladder.map((r) => r.count)).toEqual([16])
+      expect(belt.ladder.map((r) => r.count)).toEqual([12])
       for (const a of belt.grid.anchors)
         expect(full.grid.anchors.some((b) => Math.hypot(a.p[0] - b.p[0], a.p[1] - b.p[1]) < 1e-6),
           'Belt introduced a point instead of removing an interior point').toBe(true)
 
-      stub.onmessage!({ data: { id: 3, base: star, offsetMM: 0, cfg, mode: 2, sizeMM: 0, stepSel: null } })
+      // The star's B2 is no longer empty under the Canon solver (a free `max` row at 115 mm), so the
+      // empty-band witness is proved on a 6 %-wide sliver: no seat fits any band. The drawn state must be
+      // LAYOUT's own witness — the production solver's bestSeated reveal — never a re-solve of the shell's.
+      const sliver: Contour = { outer: { pts: [[0.47, 0], [0.53, 0], [0.53, 1], [0.47, 1]] as Pt[] }, holes: [] }
+      stub.onmessage!({ data: { id: 3, base: sliver, offsetMM: 0, cfg, mode: 2, sizeMM: 0, stepSel: null } })
       const model = posted[2]?.model
       expect(model, 'the worker posted no model').toBeTruthy()
       expect(model!.diagnostic, 'this band must be empty, or the test proves nothing').toBeTruthy()
-      const sized = makeSizer(star, 0)
-      const solve = wrapBandLadder(sized, cfg, 72, 119, 24, worker.anchorFnFor(sized, cfg, JSON.stringify(cfg), 'gate'))
+      const sized = makeSizer(sliver, 0)
+      const band2 = BANDS.find((b) => b.id === 2)!
+      const span = bandOuterMM(band2, 12)
+      const solve = solveCanonExperiment(sized, cfg, span.minMM, span.maxMM, 24, worker.anchorFnFor(sized, cfg, JSON.stringify(cfg), 'gate'), [])
       expect(solve.offers.length, 'this band must hold no offers').toBe(0)
-      expect(model!.grid.anchors.map((a) => a.p), 'the drawn population is not the selected witness')
-        .toEqual(solve.bestSeated!.points)
+      // No seat fits anywhere, so layout has no witness either: the worker draws the empty band at its
+      // floor (span.minMM) with zero anchors, and labels it a diagnostic — never an offer.
+      expect(solve.bestSeated, 'a sliver must seat nothing').toBeNull()
+      expect(model!.effSize, 'the drawn size is not the band floor').toBe(span.minMM)
+      expect(model!.grid.anchors.length, 'the empty witness drew a population').toBe(0)
+      expect((model as unknown as { offers?: unknown[] }).offers ?? []).toEqual([])
     } finally {
       g.self = prev
     }

@@ -293,3 +293,25 @@ export interface SuedeMaterialParams {
   roughnessMap?: string
   bumpMap?: string
 }
+
+// Protector evidence — vocabulary shared by units/protection, the worker and the shell.
+export interface UnsupportedPatch {
+  areaMM2: number
+  witnessMM: Pt | null
+}
+export interface UnsupportedBoundaryInterval {
+  a: Pt
+  b: Pt
+  lengthMM: number
+}
+
+export interface UnprotectedEvidence {
+  ringsMM: Pt[][]
+  materialAreaMM2: number
+  areaMM2: number
+  percent: number
+  patches: UnsupportedPatch[]
+  outerBoundary: UnsupportedBoundaryInterval[]
+  boundaryMM: number
+  repairTargetMM: Pt | null
+}
