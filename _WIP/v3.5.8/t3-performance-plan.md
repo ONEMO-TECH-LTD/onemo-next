@@ -85,3 +85,12 @@ the measurement and the one lawful speed-up.
 No unnecessary elements: deletion of the two zero-hit maps and their now-dead trace plumbing, justified by
 a measured 0 % hit rate and a measured −23 %; the second candidate is rejected by its own measurement. Delivers T3's brief in full: measured
 first, fixed only where measured, offers unchanged, and the run-where decision handed to Dan with numbers.
+
+## 7 · Execution record (2026-09-02, branch session62-task/v3.5.8-t3-perf)
+
+Head `97206655` — I1 built exactly as §2: both memos deleted, `cacheHits` gone from both search result
+types, their empty returns, `CanonExperimentTrace`, its initializer and both accumulations; `fitsCalls`
+kept. Proofs: offers byte-identical vs the pre-change baseline on 4 cutouts × bands 1–5 (20/20) · full suite
+836 pass / 10 skipped (serial) · tsc · strict lint on the three files · `cacheHits` has no production
+reference · live 4065 bench unchanged (see addendum for the I2/I2′ retractions). Timing: −23 % quiet
+(59.1 → 45.3 s), −7 to −13 % measured under concurrent load.

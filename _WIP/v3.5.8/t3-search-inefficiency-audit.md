@@ -48,3 +48,20 @@ an equality gate over the corpus and a deliberate counterexample hunt before QA 
    biggest win, and adaptive means it degrades to today's behaviour on a shape that needs more reveals.
 3. I2 lazy free sets.
 4. I5 break-rule cap, I4 encoding — only if the numbers after 2–3 still warrant them.
+
+## Corrections after the full read of `units/layout.ts` and two more probes (same day)
+
+- **I2 as written is retracted.** Lazy free sets need an ordering bound that is cheaper than the seat tests.
+  The only cheap bound is "lattice points inside the box at this phase", which varies by ±1 per axis
+  (e.g. 16 / 20 / 25) and is always ≥ the held maximum (e.g. 12), so it never lets a phase be skipped.
+  The stop rule needs the exact free count, and computing it IS the seat test. No exact saving there.
+- **I2′ (cross-reveal blind floor, mirroring the existing priority floor) measured: no gain** (+2 %, noise;
+  offers identical 20/20). The priority accumulator keeps a phase open whenever its best tuple is not yet
+  full-priority, so closing the blind side alone skips no window loop. Rejected by measurement.
+- **I3 stays parked**: not provable for every concave cutout; identical on 20/20 only.
+- **I5**: no cheap exact fix exists; dropped.
+
+**Net: after the full read, the only result-preserving optimisation available without changing the
+search is I1 (built: `97206655`).** Offers byte-identical on 20/20; cold total −23 % on a quiet machine
+(59.1 → 45.3 s), −7 to −13 % under load (machine variance, not the change). Everything larger is either
+unprovable (I3) or an algorithm change, which is a product decision, not an optimisation.
