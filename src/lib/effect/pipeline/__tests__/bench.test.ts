@@ -39,7 +39,9 @@ describe.skipIf(!process.env.GRID_BENCH)('grid solve — headless performance ca
       }
     }
     const basePath = process.env.GRID_BENCH_BASE
-    const base: Row[] | null = basePath && existsSync(basePath) ? JSON.parse(readFileSync(basePath, 'utf8')).rows : null
+    if (basePath && !existsSync(basePath)) throw new Error(`GRID_BENCH_BASE not found: ${basePath}`)
+    const base: Row[] | null = basePath ? JSON.parse(readFileSync(basePath, 'utf8')).rows : null
+    if (base) expect(base.map((r) => `${r.shape}/B${r.band}`).sort(), 'baseline must contain exactly this benchmark matrix').toEqual(rows.map((r) => `${r.shape}/B${r.band}`).sort())
     const lines = [`grid solve · head ${head}${base ? ' · vs ' + basePath : ''}`, 'shape      band   ms' + (base ? '   base   delta' : '')]
     let total = 0, baseTotal = 0
     for (const r of rows) {
