@@ -1,4 +1,4 @@
-# T1 — Headless data-only solve: migration plan (v1, for QA then Dan's lock)
+# T1 — Headless data-only solve: migration plan (v2, for QA then Dan's lock)
 
 Roadmap v3 task 1. Baseline: staging `8ba9bb9f` (PR #214). Method: **surgical swap** (Dan 08-29) —
 bodies MOVE verbatim, the worker keeps working through every step, one commit per step.
@@ -39,20 +39,23 @@ adapter) and the worker's shrink.
 GridRequest  = { base: Contour; offsetMM: number; cfg: GridConfig; mode: number;
                  manualBand?: boolean; sizeMM: number; stepSel: number | null;
                  settings: { protectionPaddingMM: number }; activeBandIds?: number[] }
-GridSolve    = today's `model` fields, all data: contour, grid, effSize, ladder, idx, segments,
-                 offMM?, recog?, bandClass, bandClasses, recommendation, unprotected?, offers?, diagnostic?
+GridSolve    = domain facts only: contour, grid, effSize, segments, offMM?, bandClass, bandClasses,
+                 recommendation, unprotected?, offers?, diagnostic? (+ the rung list with roles/sizes as data)
 solveGrid(req: GridRequest): GridSolve      // pure; throws on invalid request (worker catches → error post)
 ```
-`anchorAtMM` (a function) never crosses this boundary — it is built inside `solveGrid` from the bake,
-exactly as the worker builds it today. `GridConfig` today permits a `Map` cache field: the request test
-asserts the request the page sends is JSON-clean; the `Map` field is not used by the page.
+`GridSolve` contains the domain facts the worker currently computes and posts, but not page projection
+fields: no `idx`, no ladder display rows and no `recog` readout. `toPageModel(GridSolve)` owns those
+current bench fields and preserves their values on day one. The exact field list is copied from the
+worker's pre-postMessage local result when S1 moves it; no field is invented in this plan. `GridRequest`
+and `GridSolve` are JSON-round-tripped as they are actually constructed. `anchorAtMM` (a function) never
+crosses this boundary — it is built inside `solveGrid` from the bake, exactly as the worker does today.
 
 ## 3 · Steps — one commit each, worker working at every step
 
 | # | step | proof before next |
 |---|---|---|
 | S1 | create `pipeline/solve.ts` + `pipeline/types.ts`; **cut/paste** the worker body into `solveGrid`; worker becomes `onmessage → solveGrid → postMessage` | worker test (zone 7/8/10 worker cases) green unchanged · bench identical (live) |
-| S2 | `adapters/gridViewModel.ts`: `toPageModel` identity projection; worker posts `toPageModel(solveGrid(req))`; page's `Model` type imports from the adapter | serialised page model equal before/after on the four fixtures (excluding declared timing fields) |
+| S2 | `adapters/gridViewModel.ts`: `toPageModel` identity projection; worker posts `toPageModel(solveGrid(req))`; page's `Model` type imports from the adapter | serialised adapter page model equal before/after on the four fixtures (excluding declared timing fields) |
 | S3 | `protectionPaddingMM` → `settings` via Spec default; page sends it in `settings` | Spec → request → evidence test: a literal or an out-of-band field fails |
 | S4 | Node proof: `pipeline/__tests__/headless.test.ts` imports `solveGrid` with no `self`/`Worker`/DOM, JSON-round-trips request + result, compares offers to the worker path on the four fixtures | green · separation gate: `pipeline/` pinned as the shell's one sequencer; worker unit edges → `[]`; `grid-magnet.ts` allow-list unchanged |
 
