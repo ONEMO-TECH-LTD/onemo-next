@@ -8,6 +8,11 @@ export default defineConfig({
     },
   },
   test: {
+    // Timeouts are not performance gates (T3 measures perf explicitly). The default 5 s is tuned for
+    // a quiet laptop; on a loaded CI runner two unrelated suites (composite pixel oracle, Session 59
+    // grid ladder) crossed it by fractions of a second and produced false reds on #215 / #216.
+    testTimeout: 60_000,
+    hookTimeout: 60_000,
     exclude: [
       "node_modules/**",
       "_WIP/**", // vendored GPT Pro delivery packages carry their own runners' suites
