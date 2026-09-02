@@ -82,8 +82,9 @@ export function anchorFnFor(
 const FITS_CAP = 12
 
 export function solveGrid(req: GridRequest): GridSolve {
-  const { base, offsetMM, cfg, mode, manualBand, sizeMM, stepSel, protectionPaddingMM = 24,
+  const { base, offsetMM, cfg, mode, manualBand, sizeMM, stepSel, settings,
     activeBandIds = BANDS.map((band) => band.id) } = req
+  const { protectionPaddingMM } = settings
   {
     const sized = makeSizer(base, offsetMM)
     // Cache identity is the shape itself — every ring, exactly. A rolling hash of ring counts

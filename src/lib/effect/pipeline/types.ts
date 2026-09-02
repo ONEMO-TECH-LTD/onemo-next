@@ -10,8 +10,8 @@ export interface GridRequest {
   manualBand?: boolean
   sizeMM: number
   stepSel: number | null
-  /** Display-only protector input. It deliberately lives outside GridConfig. */
-  protectionPaddingMM?: number
+  /** Spec-owned settings that shape the answer's evidence but not its search or cache identity. */
+  settings: { protectionPaddingMM: number }
   /** Admin compute scope. Band definitions remain complete; only enabled rows are measured. */
   activeBandIds?: number[]
 }

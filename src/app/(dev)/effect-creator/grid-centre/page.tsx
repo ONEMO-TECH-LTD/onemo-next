@@ -24,7 +24,7 @@ import type { Contour, Pt, UnprotectedEvidence } from '@/lib/effect/types'
 import { DEFAULT_PITCH_MM, type GridResult, type MagnetPlan, type SafeSegment } from '@/lib/effect/grid-magnet'
 import type { GridPageModel } from '@/lib/effect/adapters/gridViewModel'
 import { bandOuterMM, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet'
-import { BANDS, CENTRE_MODE, GOVERNOR, PADDING_CEIL_MM, PADDING_FLOOR_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-magnet-spec'
+import { BANDS, CENTRE_MODE, GOVERNOR, PADDING_CEIL_MM, PADDING_FLOOR_MM, PROTECTION_PADDING_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-magnet-spec'
 import { fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-magnet-bridge'
 
 /** Bench test libraries — static assets, listed by a committed manifest. */
@@ -97,7 +97,7 @@ export default function GridLab() {
   // WHICH RULER the classifier reads. A test instrument so both can be tried on the same shape
   // (Dan, 2026-08-30: "i prefer testing both"); 'legal' is the released behaviour.
   const [ruler, setRuler] = useState<'legal' | 'outer'>('legal')
-  const [protectionPadding, setProtectionPadding] = useState(24)
+  const [protectionPadding, setProtectionPadding] = useState(PROTECTION_PADDING_MM)
   const [showUnheld, setShowUnheld] = useState(true)
   /** Legal-area islands, coloured + boxed + centre-marked. */
   const [showSegs, setShowSegs] = useState(true)
@@ -363,7 +363,7 @@ export default function GridLab() {
       manualBand,
       sizeMM: manualBand ? (bandScale ?? effSizeRef.current ?? bandOuterMM(BANDS[0], pad).minMM) : 0,
       stepSel,
-      protectionPaddingMM: protectionPadding,
+      settings: { protectionPaddingMM: protectionPadding },
       activeBandIds,
     }
     if (busyRef.current) { queuedRef.current = msg; setSolving(true); return }

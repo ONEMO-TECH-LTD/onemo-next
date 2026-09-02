@@ -20,6 +20,10 @@ export const RELEASED_PADDING_MM = 12
 /** Smallest effect — one 24mm cell. */
 export const MIN_EFFECT_MM = 24
 
+/** Protector padding — how far from a magnet's edge material still counts as held (mm). The
+ *  admin dial's default; was a literal in the page and the worker until T1 S3 (2026-09-02). */
+export const PROTECTION_PADDING_MM = 24
+
 /** THE BOARD — 9 columns by 11 rows (Dan, 2026-08-29: "the max grid is rectangular 9 columns and
  *  10-11 rows" / "next step in 96mm grid is 9x11 — so this can be max size for now"). It is the
  *  ONLY cap: "we don't have to limit the grid engine at all, it calculates and spits out anything".
