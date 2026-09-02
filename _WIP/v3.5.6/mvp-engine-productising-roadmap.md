@@ -1,4 +1,4 @@
-# MVP engine productising — roadmap (v1, for Dan's lock)
+# MVP engine productising — roadmap (v2, for Dan's lock)
 
 **Directive (Dan, 2026-09-02):** "preserve what we have, make it liftable and integratable into the
 studio and address the performance and potentially later spec export … no overkill and rocket science."
@@ -14,20 +14,20 @@ Perf reference, cold per band: Duck B3 1.37 s · BOT B4 2.87 s · Batwoman B4 3.
 
 ## Tasks — in order, one commit each, QA before build (design) and after (head)
 
+*v2 — QA's four findings applied verbatim (2026-09-02): T1/T2 merged, adapter owns the page model, V8 closed through Spec, no future test counts or README task.*
+
 | # | task | what moves / changes | proof (Done means) |
 |---|---|---|---|
-| **T1** | **Re-room the solve into the engine** | The solving body of `solve.worker.ts` (bake, anchor, classify → lookup → priority → solve → landing → belt → wrapGrid → sizes → protection; both caches) moves **verbatim** to `src/lib/effect/pipeline/solve.ts` as `solveGrid(request): SolveResult`. Worker keeps decode / call / postMessage / catch (~25 lines). No rule, threshold or ordering changes. | Node test calls `solveGrid` with no browser, same offers as the worker for the four fixtures · bench pixel-identical on 4065 · worker has zero engine imports beyond the pipeline · separation gate pins `pipeline/` as the one sequencer for the shell |
-| **T2** | **Data-only public boundary** | Request = `{ contour, cfg(spec values), band, activeBandIds, sizeMM/manual, protectionPaddingMM }`; result = today's `model` fields (contour, grid, offers/ladder with roles, idx, segments, recog, bandClass(es), recommendation, evidence). Anchor function stays internal (derived inside the pipeline from the bake, as today). | JSON round-trip of request and result in the Node test; `typeof` sweep finds no function on either |
-| **T3** | **Seal the shell** | Page: library legal-box overlay stops calling `safeSegments`; the pipeline/adapter supplies it. Type import of `UnprotectedEvidence` via the door. Worker pin set corrected, stale `[16,12]` pin fixed. Gate: page may import only adapters/spec/types; computational barrel exports forbidden. | Suite green (79/79) · page imports contain no engine compute · bench identical |
-| **T4** | **Perf probe → targeted fixes** | Stage timers on `solveGrid` (classify, enumeration windows/seat tests, wraps, protection) over the four cutouts × bands, headless. Then fix only the measured top cost, laws untouched, offers byte-identical. Candidates *if measured*: per-shape precompute shared across bands, wrap cache by free-set key, reveal/phase bounds proven by lattice geometry. | Before/after table per shape·band · offers identical (oracle) · no invented ms target; Dan sees the numbers and rules the run-where (browser / server / incremental) |
-| **T5** | **Package seam** | `src/lib/effect/pipeline/index.ts` exports `solveGrid` + types only; a lift check runs the Node test against `lib/effect` with `app/` excluded from the tsconfig include. | Lift check green · README stanza: how Studio calls it, what it returns |
+| **T1** | **Headless data-only solve** | The non-browser body of `solve.worker.ts` moves **verbatim** into `pipeline/solve.ts`. Same change defines `GridRequest` (contour, Spec-owned settings, manual/band envelope) and `GridSolve` (domain attempts: layout/wrap facts, roles, landed band, evidence — never page state) as plain data; the pipeline derives the anchor internally. `adapters/gridViewModel.ts` maps `GridSolve` to today's page model (`idx`, ladder rows, `recog` stay there) so the bench is unchanged. The existing protection-padding control's value moves into Grid Spec / request settings before the pipeline reads it — no new control (closes V8). Worker = decode → call → cache → post. | Node test imports the call with no browser globals, JSON-round-trips both shapes, returns the same domain attempts as the current worker on the four fixtures · bench pixel-identical on 4065 · Spec → request → evidence test fails if the pipeline reads a literal or an out-of-band worker field |
+| **T2** | **Seal the page leak and import matrix** | `libraryStageModel` returns the library segments the shell renders (page stops calling `safeSegments`). Evidence type via the door. Worker pins corrected, stale `[16,12]` pin fixed. | The page has no direct imports of engine units, foundation, computational barrels or worker-only types; it may import UI shape sources plus public adapters, Spec and shared data types. The full relevant suite is green with no skipped gate. Bench identical. |
+| **T3** | **Measure headless performance, then fix only the measured bottleneck** | Stage timers on the pure call (classify, enumeration windows/seat tests, wraps, protection) over the four cutouts × bands. Optimise only the top measured cost; laws untouched; attempts byte-identical. | Before/after table per shape·band · attempts identical (oracle) · no invented ms target; Dan rules browser / server / incremental on the numbers |
+| **T4** | **Package seam** | `pipeline/index.ts` exports the data-only call and types only; lift check runs the Node test with `src/app/` excluded. | Lift check green |
 
-**Later, not in this roadmap (recorded so they are not lost):** spec export (SVG cutting spec = the
-bench's drawing through an export adapter; Studio-side) · retiring the three old sequencer seats and
-legacy shims (internal structure, packages fine as is) · `recog` readout deletion (product-visible, Dan's
-call) · protector ranking (awaits Dan's order ruling) · stale codex worktrees ≈12 GB (deletion, Dan's call).
+**Later, out of scope (recorded so they are not lost):** Studio selection / save / manufacturing SVG ·
+retiring the three old sequencer seats and legacy shims · `recog` deletion (product-visible, Dan's call) ·
+protector ranking order (Dan's ruling) · stale codex worktrees ≈12 GB (deletion, Dan's call).
 
 ## Necessity / sufficiency
 No unnecessary elements: no new solver, no scoring, no framework, no persistence, no cutover, no
-structure-for-its-own-sake. Delivers in full: liftable (T1, T5), integratable (T2), shell-clean (T3),
-performance addressed by measurement (T4); spec export named as later per directive.
+structure-for-its-own-sake. Delivers in full: liftable + integratable (T1, T4), shell-clean (T2),
+performance addressed by measurement (T3); spec export named as later per directive.
