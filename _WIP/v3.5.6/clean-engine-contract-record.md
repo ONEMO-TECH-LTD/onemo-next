@@ -58,3 +58,11 @@ contract) stays S10 — after the engine answers correctly (Dan 08-29).
 - **V9 — public boundary not serialisable.** `WrapConfig.anchorAtMM` is a function; `SolveRequest`/response are worker-local shapes. A backend call needs data-only request/result (JSON round-trip test = the browser-independence proof).
 - **V10 — manufacturing save has no seam.** `persistence.ts` (`makeSavedEffect`/`toDesignRow`) is pure and dormant; its locked payload carries no magnetic layout. Saving is a product action after a user picks an offer, never the solver's; the record = contour identity + engine version/config hash + catalogue entry/view + phase/origin + nodes/diameters + omissions + exact wrapped size + actual band + evidence.
 - **Precise band size** for users/backends = each offer's actual wrapped `sizeMM` and landed band, never the requested band or page arithmetic.
+
+## 6 · Productisation boundary (Dan, 2026-09-02 14:42–14:44, via s62-qa; verified in the vault)
+
+> "what i mean by productisation the state when the engine is clean and kept all functionality / optimised where possible and wrapped as api package" · "backend product flow can be added in the studio repo — engine just needs to be clean optimised and api callable headless for computation the UI shell is admin layer"
+
+- **Engine package owes:** clean separation per §1–2 · every current function kept · measured optimisation where needed · one headless, data-only (JSON) call in / result out.
+- **Studio owns:** persistence, user selection, manufacturing save, product flow, auth, schema. **None of it is engine work.** V10 above is therefore a *Studio* item; it stays listed only so the engine result carries every field Studio will need (exact wrapped size, landed band, nodes/diameters, omissions, evidence).
+- **The UI shell is the admin layer** — it renders and forwards; it remains a bench, not a product surface.
