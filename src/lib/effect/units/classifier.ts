@@ -233,8 +233,10 @@ export function canonPriorityOf(
   }
   const colOf = lineIdx(0), rowOf = lineIdx(1)
   const cols = Math.max(...colOf) + 1, rows = Math.max(...rowOf) + 1
-  // Slim is the classifier's existing rule (FrameKind): a minor axis of one or two lines.
-  const slim = Math.min(cols, rows) <= 2
+  // SLIM = a single line of seats — a strip or a banner (Dan: "slim vertical and horizontal
+  // rectangles and even banners"). A 2x2 is a square, not a strip: its triangle answers must stay
+  // snug (Batwoman B2, 2026-09-02). Deliberately narrower than FrameKind's "slim" (minor <= 2).
+  const slim = Math.min(cols, rows) === 1
   const centreAxis: 0 | 1 = cols <= rows ? 0 : 1
   return { colOf, rowOf, topRow: rows - 1, rows, slim, centreAxis }
 }

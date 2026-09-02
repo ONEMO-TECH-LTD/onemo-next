@@ -141,8 +141,8 @@ export interface BandSolve {
  *    Held means at least one lawful seat on it.
  *  - rows: frame row count; interior rows count only when >= 4 — "4 rows … one magnet row in the mid
  *    section also nice; 3 rows … skip mid".
- *  - slim / centreAxis: the classifier's existing slim rule (minor axis <= 2 lines) and the axis a
- *    slim frame centres on (its minor axis). */
+ *  - slim / centreAxis: a single-line frame (strip or banner — minor axis of exactly one line) and
+ *    the axis it centres on (its minor axis). Squares and 2xN ladders are not slim. */
 export interface CanonPriority {
   colOf: number[]
   rowOf: number[]

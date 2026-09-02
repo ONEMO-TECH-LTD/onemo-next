@@ -1133,13 +1133,13 @@ describe('9 — priority hold points are classifier data', () => {
     const p = canonPriorityOf(frame(2, 3))!
     expect(p.colOf[id(2,3,1,2)]).toBe(1); expect(p.rowOf[id(2,3,1,2)]).toBe(2)
     expect(p.topRow).toBe(2); expect(p.rows).toBe(3)
-    expect(p.slim).toBe(true); expect(p.centreAxis, 'a tall strip centres on x').toBe(0)
+    expect(p.slim, 'a 2x3 ladder is not a strip').toBe(false); expect(p.centreAxis).toBe(0)
     // full frame: top, both base ends, no interior asked, zero orphans, 6 seats
     expect(priorityTupleOf(frame(2, 3).map((_, i) => i), p)).toEqual([1, 1, 1, 0, 6])
   })
   it('landscape 3x2 reads by gravity too: top row is row 1, banner centres on y', () => {
     const p = canonPriorityOf(frame(3, 2))!
-    expect(p.topRow).toBe(1); expect(p.slim).toBe(true); expect(p.centreAxis).toBe(1)
+    expect(p.topRow).toBe(1); expect(p.slim, 'a 3x2 ladder is not a banner').toBe(false); expect(p.centreAxis).toBe(1)
     // held: full bottom row + only the centre top seat → top held, both base ends, zero orphans
     expect(priorityTupleOf([id(3,2,0,0), id(3,2,1,0), id(3,2,2,0), id(3,2,1,1)], p)).toEqual([1, 1, 1, 0, 4])
   })
@@ -1151,6 +1151,9 @@ describe('9 — priority hold points are classifier data', () => {
   })
   it('one-column 1x3 has no partners to miss; 3x4 asks for an interior row', () => {
     const three = canonPriorityOf(frame(1, 3))!
+    expect(three.slim, 'a one-column strip is slim').toBe(true)
+    expect(canonPriorityOf(frame(3, 1))!.slim, 'a one-row banner is slim').toBe(true)
+    expect(canonPriorityOf(frame(2, 2))!.slim, 'a 2x2 is a square, not slim').toBe(false)
     expect(priorityTupleOf([id(1,3,0,0), id(1,3,0,2)], three)).toEqual([1, 1, 1, 0, 2])
     const four = canonPriorityOf(frame(3, 4))!
     expect(four.rows).toBe(4)
@@ -1316,9 +1319,9 @@ describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside
     expect(dx(optimal)).toBeLessThanOrEqual(3)
   }, 120_000)
 
-  it('duck-b3 is slim (2x3) and already centred: the ladder runs and nothing beats the tight row', async () => {
+  it('duck-b3 (2x3) is a ladder, not a strip: no size ladder runs and the tight row stands', async () => {
     const { priority, withPriority } = await solveFixture('duck-b3')
-    expect(priority.slim).toBe(true)
+    expect(priority.slim).toBe(false)
     const optimal = withPriority.offers.find((o) => o.roles.includes('optimal'))!
     expect(optimal.at.sizeMM).toBeCloseTo(146.11, 2)
     expect(Math.abs(optimal.at.originMM[0] - optimal.at.anchorMM[0])).toBeLessThan(3)
@@ -1380,6 +1383,29 @@ describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside
     expect(results.all8.sizeMM).toBeCloseTo(155.89, 2); expect(results.all8.dx).toBeLessThanOrEqual(4)
     expect(results.corners8.sizeMM).toBeCloseTo(156.89, 2); expect(results.corners8.dx).toBeLessThanOrEqual(3)
   }, 300_000)
+
+  it('a one-column placement is not a base: the triangle keeps its two corners (Batwoman B2, Deepest)', async () => {
+    // Dan, 2026-09-02: canon = head + two base corners at 97 mm (6.7 % unheld) was right; the priority
+    // rule preferred a single column of two because one seat counted as "both corners".
+    const sized = makeSizer(cutout('public/grid-engine/cutouts/BAT-WOMAN.png'), 0)
+    const cfgDeep: GridConfig = { pitchMM: 48, paddingMM: 12, perimeterOnly: false, centreMode: 2, governor: 1 }
+    const anchorAt = await workerAnchor(sized, cfgDeep, 'gate2-batwoman-b2-deepest')
+    const band = BANDS.find((b) => b.id === 2)!
+    const span = bandOuterMM(band, 12)
+    const row = classifyBands(sized, cfgDeep, anchorAt, [band]).find((r) => r.bandId === 2)!
+    const canon = canonLayoutForFrame(48, positionsAcross(row.rulerWidthMM, 48), positionsAcross(row.rulerHeightMM, 48))!
+    const nodes = canon.nodesMM.map(([x, y]) => [x, y] as Pt)
+    const xs = nodes.map((p) => p[0]), ys = nodes.map((p) => p[1])
+    const local = nodes.map(([x, y]) => [x - (Math.min(...xs) + Math.max(...xs)) / 2, y - (Math.min(...ys) + Math.max(...ys)) / 2] as Pt)
+    const priority = canonPriorityOf(local, 48)!
+    expect(canon.frameCols).toBe(2)
+    // the rule itself: a single column inside a two-column frame does not hold both corners
+    expect(priorityTupleOf([0, 1], priority)[1], 'one column, one base seat').toBe(0)
+    const solve = solveCanonExperiment(sized, cfgDeep, span.minMM, span.maxMM, 24, anchorAt, nodes, priority)
+    const optimal = solve.offers.find((o) => o.roles.includes('optimal'))!
+    expect(optimal.at.count).toBe(3)
+    expect(optimal.at.sizeMM).toBeCloseTo(97.01, 1)
+  }, 120_000)
 
   it('the worker lands on optimal, never on the canon comparison row', async () => {
     type Posted = { model: { idx: number; ladder: Array<{ roles: string[]; sizeMM: number }> } | null }

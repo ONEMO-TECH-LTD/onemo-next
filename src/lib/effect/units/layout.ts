@@ -219,7 +219,12 @@ export function priorityTupleOf(heldIds: ReadonlyArray<number>, priority: CanonP
     if (priority.rowOf[i] === 0) { if (priority.colOf[i] === loCol) baseLo = 1; if (priority.colOf[i] === hiCol) baseHi = 1 }
     if (partnerOf(i, heldIds, held, loCol, hiCol, priority) === -2) orphans++
   }
-  return [top, baseLo && baseHi ? 1 : 0, interior, 0 - orphans, heldIds.length]
+  // "Both bottom corners" are TWO seats. A one-column placement inside a wider frame has one base
+  // seat, not a base — it must not outrank a triangle that actually holds both ends (Batwoman B2,
+  // 2026-09-02). Only a frame that IS one column wide can hold its base with one seat.
+  const frameCols = Math.max(...priority.colOf) + 1
+  const corners = baseLo && baseHi && (loCol < hiCol || frameCols === 1) ? 1 : 0
+  return [top, corners, interior, 0 - orphans, heldIds.length]
 }
 
 /** Every terminal symmetric core of a held set, judged on the placement's own span. An orphan on
