@@ -16,9 +16,10 @@ import { describe, expect, it, vi } from 'vitest'
 import { bandOuterMM, classifyBands, computeGrid } from '../grid-magnet'
 import { canonLayoutForFrame, optimalLayoutForBox } from '../grid-magnet-library-catalogue'
 import { solveCanonExperiment } from '../grid-magnet-canon-experiment'
+import { anchorFnFor, solveGrid } from '../pipeline/solve'
 import { canonPriorityOf, frameOfMasses, positionsAcross } from '../units/classifier'
 import type { BBox, SafeMass, SafeSegment } from '../types'
-import { BANDS, BAND_STEP_MM, PHASE_STEP_MM } from '../grid-magnet-spec'
+import { BANDS, BAND_STEP_MM, PHASE_STEP_MM, PROTECTION_PADDING_MM } from '../grid-magnet-spec'
 import { scaleContour } from '../grid-magnet-compute'
 import { applyCoverage, enumerateCanonPhaseWindows, enumerateFreePhaseMax, fallbackRevealSizes, makeCircleSeatPredicate, makeContourSeatPredicate, priorityTupleOf, symmetricCores } from '../units/layout'
 import { wrapGroup } from '../units/wrap'
@@ -352,12 +353,11 @@ describe('2c — the foundation holds primitives only', () => {
 describe('2d — the real shells are governed too', () => {
   const PAGE = join(process.cwd(), 'src/app/(dev)/effect-creator/grid-centre/page.tsx')
   const WORKER = join(process.cwd(), 'src/app/(dev)/effect-creator/grid-centre/solve.worker.ts')
-  // The page reaches NO unit. The worker holds one temporary edge — judge's default landing — which
-  // expires when the pipeline lands. Pinned exactly, so a stray import fails even where edges exist.
+  // Neither shell reaches a unit. Pinned exactly, so a stray import fails.
   const SHELL_UNIT_EDGES: Array<[string, readonly string[]]> = [
     [PAGE, []],
-    // + protection (77b55a08): the worker measures delivered evidence itself until pipeline/ owns it (roadmap T1).
-    [WORKER, ['@/lib/effect/units/classifier', '@/lib/effect/units/judge', '@/lib/effect/units/centring', '@/lib/effect/units/protection']],
+    // T1 S1: the worker is transport — it reaches the engine only through pipeline/ and holds no unit edge.
+    [WORKER, []],
   ]
 
   it('the page and worker hold exactly their pinned unit edges', () => {
@@ -373,6 +373,41 @@ describe('2d — the real shells are governed too', () => {
       const bad = refs.filter((i) => !pinned.includes(i))
       expect(bad, `${file.split('/').pop()} reaches ${bad.join(' · ')}`).toEqual([])
     }
+  })
+})
+
+describe('2e — the pipeline is the one sequencer the shells reach; adapters only project (T1)', () => {
+  const PIPELINE = join(LIB, 'pipeline/solve.ts')
+  const ADAPTER = join(LIB, 'adapters/gridViewModel.ts')
+  const WORKER = join(process.cwd(), 'src/app/(dev)/effect-creator/grid-centre/solve.worker.ts')
+
+  it('pipeline/solve.ts imports engine modules only — never the app, never a framework', () => {
+    const refs = moduleRefsOf(readFileSync(PIPELINE, 'utf8'))
+    const bad = refs.filter((i) => !/^@\/lib\/effect\/|^\.\/types$/.test(i))
+    expect(bad, 'pipeline reaches outside the engine: ' + bad.join(' · ')).toEqual([])
+  })
+
+  it('pipeline/solve.ts holds exactly the unit edges the worker body carried — pinned, so a new one is deliberate', () => {
+    const edges = [...new Set(moduleRefsOf(readFileSync(PIPELINE, 'utf8')).filter((i) => /\/units\//.test(i)))].sort()
+    expect(edges).toEqual(['@/lib/effect/units/centring', '@/lib/effect/units/classifier', '@/lib/effect/units/judge', '@/lib/effect/units/protection'])
+  })
+
+  it('the adapter is projection only: type imports, no engine call', () => {
+    const text = readFileSync(ADAPTER, 'utf8')
+    const runtimeImports: string[] = []
+    walkAst(text, (n) => {
+      if (ts.isImportDeclaration(n) && !(n.importClause?.isTypeOnly)) runtimeImports.push(n.moduleSpecifier.getText())
+    })
+    expect(runtimeImports, 'adapter imports runtime code: ' + runtimeImports.join(' · ')).toEqual([])
+    expect(text, 'adapter must never re-run a decision').not.toMatch(/defaultLanding|classFrameNodes|shapeFamilyOf|solveGrid|computeGrid/)
+  })
+
+  it('the worker imports only the pipeline and the adapter; the page never imports the pipeline directly', () => {
+    const workerRefs = moduleRefsOf(readFileSync(WORKER, 'utf8'))
+    const bad = workerRefs.filter((i) => !/^@\/lib\/effect\/(pipeline|adapters)\//.test(i))
+    expect(bad, 'worker reaches past the pipeline seam: ' + bad.join(' · ')).toEqual([])
+    const pageRefs = importsOf(pageText()).filter((i) => /\/pipeline\//.test(i))
+    expect(pageRefs, 'the page must reach the engine through the adapter, not the pipeline').toEqual([])
   })
 })
 
@@ -423,7 +458,7 @@ describe('4 — no surface restates a released value', () => {
     // the mass-depth family. Each must arrive as an import — restating one as a literal is how
     // a law and a control drift apart.
     for (const name of ['RELEASED_PADDING_MM', 'PADDING_FLOOR_MM', 'PADDING_CEIL_MM',
-      'RELEASED_PITCHES_MM', 'BANDS'])
+      'RELEASED_PITCHES_MM', 'BANDS', 'PROTECTION_PADDING_MM'])
       expect(imported.has(name), name + ' imported by the page').toBe(true)
     // and the retired controls stay dead: no revival under a spec import. Mass depth joined them
     // on 2026-08-30 — a probe 4mm past the legal area cost the classifier a whole magnet position
@@ -1017,9 +1052,9 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
       const worker = await import('@/app/(dev)/effect-creator/grid-centre/solve.worker')
       const squircle = normBaseContour(getShape('squircle', 1024, 1024), 1024)!
       stub.onmessage!({ data: { id: 1, base: squircle, offsetMM: 0,
-        cfg: { ...cfg, perimeterOnly: false }, mode: 4, sizeMM: 0, stepSel: null } })
+        cfg: { ...cfg, perimeterOnly: false }, mode: 4, sizeMM: 0, stepSel: null, settings: { protectionPaddingMM: PROTECTION_PADDING_MM } } })
       stub.onmessage!({ data: { id: 2, base: squircle, offsetMM: 0,
-        cfg: { ...cfg, perimeterOnly: true }, mode: 4, sizeMM: 0, stepSel: null } })
+        cfg: { ...cfg, perimeterOnly: true }, mode: 4, sizeMM: 0, stepSel: null, settings: { protectionPaddingMM: PROTECTION_PADDING_MM } } })
       const full = posted[0].model!, belt = posted[1].model!
       expect(belt.idx, 'coverage changed the raw default row').toBe(full.idx)
       expect(belt.effSize, 'coverage changed the selected wrapped size').toBe(full.effSize)
@@ -1040,14 +1075,14 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
       // empty-band witness is proved on a 6 %-wide sliver: no seat fits any band. The drawn state must be
       // LAYOUT's own witness — the production solver's bestSeated reveal — never a re-solve of the shell's.
       const sliver: Contour = { outer: { pts: [[0.47, 0], [0.53, 0], [0.53, 1], [0.47, 1]] as Pt[] }, holes: [] }
-      stub.onmessage!({ data: { id: 3, base: sliver, offsetMM: 0, cfg, mode: 2, sizeMM: 0, stepSel: null } })
+      stub.onmessage!({ data: { id: 3, base: sliver, offsetMM: 0, cfg, mode: 2, sizeMM: 0, stepSel: null, settings: { protectionPaddingMM: PROTECTION_PADDING_MM } } })
       const model = posted[2]?.model
       expect(model, 'the worker posted no model').toBeTruthy()
       expect(model!.diagnostic, 'this band must be empty, or the test proves nothing').toBeTruthy()
       const sized = makeSizer(sliver, 0)
       const band2 = BANDS.find((b) => b.id === 2)!
       const span = bandOuterMM(band2, 12)
-      const solve = solveCanonExperiment(sized, cfg, span.minMM, span.maxMM, 24, worker.anchorFnFor(sized, cfg, JSON.stringify(cfg), 'gate'), [])
+      const solve = solveCanonExperiment(sized, cfg, span.minMM, span.maxMM, 24, anchorFnFor(sized, cfg, JSON.stringify(cfg), 'gate'), [])
       expect(solve.offers.length, 'this band must hold no offers').toBe(0)
       // No seat fits anywhere, so layout has no witness either: the worker draws the empty band at its
       // floor (span.minMM) with zero anchors, and labels it a diagnostic — never an offer.
@@ -1071,15 +1106,7 @@ describe('8 — recovered phase search is wired through the production Canon sol
   const workerAnchorFor = async (
     sized: (mm: number) => Contour, cfg: GridConfig, sig: string,
   ): Promise<(mm: number) => Pt> => {
-    const g = globalThis as { self?: unknown }
-    const previous = g.self
-    if (!g.self) g.self = { postMessage: () => undefined, onmessage: null }
-    try {
-      const worker = await import('@/app/(dev)/effect-creator/grid-centre/solve.worker')
-      return worker.anchorFnFor(sized, cfg, JSON.stringify(cfg), sig)!
-    } finally {
-      g.self = previous
-    }
+    return anchorFnFor(sized, cfg, JSON.stringify(cfg), sig)!
   }
 
   it('production Canon solve finds and wraps Batwoman B4 raw9', async () => {
@@ -1221,13 +1248,7 @@ describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside
     return normMaskContour(mask, png.width, png.height)!
   }
   const workerAnchor = async (sized: (mm: number) => Contour, cfg: GridConfig, sig: string) => {
-    const g = globalThis as { self?: unknown }
-    const previous = g.self
-    if (!g.self) g.self = { postMessage: () => undefined, onmessage: null }
-    try {
-      const worker = await import('@/app/(dev)/effect-creator/grid-centre/solve.worker')
-      return worker.anchorFnFor(sized, cfg, JSON.stringify(cfg), sig)
-    } finally { g.self = previous }
+    return anchorFnFor(sized, cfg, JSON.stringify(cfg), sig)
   }
   const cfg: GridConfig = { pitchMM: 48, paddingMM: 12, perimeterOnly: false, centreMode: 2, governor: 0 }
   const solveFixture = async (id: string) => {
@@ -1454,10 +1475,31 @@ describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside
       vi.resetModules()   // the worker binds onmessage at import; an earlier import in this file bound another stub
       await import('@/app/(dev)/effect-creator/grid-centre/solve.worker')
       const duck = cutout(fixture('duck-b3').asset)
-      stub.onmessage!({ data: { id: 1, base: duck, offsetMM: 0, cfg, mode: 3, sizeMM: 0, stepSel: null } })
+      stub.onmessage!({ data: { id: 1, base: duck, offsetMM: 0, cfg, mode: 3, sizeMM: 0, stepSel: null, settings: { protectionPaddingMM: PROTECTION_PADDING_MM } } })
       const model = posted[0].model!
       expect(model.ladder.map((r) => r.roles)).toEqual([['optimal'], ['canon']])
       expect(model.idx, 'Rule 4 must not promote the comparison row').toBe(0)
     } finally { g.self = prev }
   }, 120_000)
+})
+
+describe('11 — the protector padding is Spec-owned and travels in the request settings (T1 S3)', () => {
+  it('the pipeline reads the setting from the request and nowhere else', () => {
+    const text = readFileSync(join(LIB, 'pipeline/solve.ts'), 'utf8')
+    // no literal default, no out-of-band field: the only source is `settings`
+    expect(text, 'pipeline defaults the protector padding from a literal').not.toMatch(/protectionPaddingMM\s*=\s*\d/)
+    expect(text, 'pipeline reads the padding off the request root').not.toMatch(/req\.protectionPaddingMM/)
+    expect(text).toMatch(/const \{ protectionPaddingMM \} = settings/)
+  })
+
+  it('the setting decides the evidence: Spec default and a doubled padding disagree on the same solve', () => {
+    const sq = (mm: number): Contour => ({ outer: { pts: [[0, 0], [mm, 0], [mm, mm], [0, mm]] as Pt[] }, holes: [] })
+    const base = sq(1)
+    const cfg: GridConfig = { pitchMM: 48, paddingMM: 12, centreMode: 2, governor: 0, perimeterOnly: false }
+    const at = (padding: number) => solveGrid({ base, offsetMM: 0, cfg, mode: 3, sizeMM: 0, stepSel: null, settings: { protectionPaddingMM: padding } })
+    const a = at(PROTECTION_PADDING_MM), b = at(PROTECTION_PADDING_MM * 2)
+    expect(a.effSize, 'the setting must not touch the search').toBe(b.effSize)
+    expect(a.rungs, 'the setting must not touch the offers').toEqual(b.rungs)
+    expect(a.unprotected!.percent, 'a wider hold must change the evidence').not.toBe(b.unprotected!.percent)
+  })
 })

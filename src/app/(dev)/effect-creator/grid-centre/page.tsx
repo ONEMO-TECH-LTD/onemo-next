@@ -21,9 +21,10 @@ import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt, UnprotectedEvidence } from '@/lib/effect/types'
-import { DEFAULT_PITCH_MM, type BandSnapPoint, type GridResult, type MagnetPlan, type SafeSegment } from '@/lib/effect/grid-magnet'
+import { DEFAULT_PITCH_MM, type GridResult, type MagnetPlan, type SafeSegment } from '@/lib/effect/grid-magnet'
+import type { GridPageModel } from '@/lib/effect/adapters/gridViewModel'
 import { bandOuterMM, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet'
-import { BANDS, CENTRE_MODE, GOVERNOR, PADDING_CEIL_MM, PADDING_FLOOR_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-magnet-spec'
+import { BANDS, CENTRE_MODE, GOVERNOR, PADDING_CEIL_MM, PADDING_FLOOR_MM, PROTECTION_PADDING_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-magnet-spec'
 import { fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-magnet-bridge'
 
 /** Bench test libraries — static assets, listed by a committed manifest. */
@@ -96,7 +97,7 @@ export default function GridLab() {
   // WHICH RULER the classifier reads. A test instrument so both can be tried on the same shape
   // (Dan, 2026-08-30: "i prefer testing both"); 'legal' is the released behaviour.
   const [ruler, setRuler] = useState<'legal' | 'outer'>('legal')
-  const [protectionPadding, setProtectionPadding] = useState(24)
+  const [protectionPadding, setProtectionPadding] = useState(PROTECTION_PADDING_MM)
   const [showUnheld, setShowUnheld] = useState(true)
   /** Legal-area islands, coloured + boxed + centre-marked. */
   const [showSegs, setShowSegs] = useState(true)
@@ -308,13 +309,7 @@ export default function GridLab() {
   }, [src, preset, gen, p1, p2, sides, points, magic, cutC])
 
   // The solve runs in a worker so the page never freezes; the last result stays up while solving.
-  type Model = { contour: Contour; grid: GridResult; effSize: number; ladder: Array<BandSnapPoint & { roles?: string[] }>; idx: number; segments: SafeSegment[]; stops?: Array<{ press: number; reveal: number }>; offMM?: number; recog?: { family: string; cols: number; rows: number; segWmm: number; segHmm: number }
-    unprotected?: UnprotectedEvidence | null
-    /** STEP 1+2 — what the classifier read at this band's trial size, and the whole table. */
-    /** the classifier's own row and the layout it recommended — carried for the readout, not
-     *  rendered as a second panel (Dan: I did not ask for that) */
-    bandClass?: { bandId: number; seedMM: number; legalWidthMM: number; legalHeightMM: number; rulerWidthMM: number; rulerHeightMM: number } | null
-    recommendation?: { cols: number; rows: number; count: number } | null }
+  type Model = GridPageModel
   const [model, setModel] = useState<Model | null>(null)
   const [solving, setSolving] = useState(false)
   // The overlay earns its place only on a REAL wait: it appears after a grace period, so the
@@ -368,7 +363,7 @@ export default function GridLab() {
       manualBand,
       sizeMM: manualBand ? (bandScale ?? effSizeRef.current ?? bandOuterMM(BANDS[0], pad).minMM) : 0,
       stepSel,
-      protectionPaddingMM: protectionPadding,
+      settings: { protectionPaddingMM: protectionPadding },
       activeBandIds,
     }
     if (busyRef.current) { queuedRef.current = msg; setSolving(true); return }
