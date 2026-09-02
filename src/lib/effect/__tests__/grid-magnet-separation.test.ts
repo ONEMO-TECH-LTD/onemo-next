@@ -376,6 +376,41 @@ describe('2d — the real shells are governed too', () => {
   })
 })
 
+describe('2e — the pipeline is the one sequencer the shells reach; adapters only project (T1)', () => {
+  const PIPELINE = join(LIB, 'pipeline/solve.ts')
+  const ADAPTER = join(LIB, 'adapters/gridViewModel.ts')
+  const WORKER = join(process.cwd(), 'src/app/(dev)/effect-creator/grid-centre/solve.worker.ts')
+
+  it('pipeline/solve.ts imports engine modules only — never the app, never a framework', () => {
+    const refs = moduleRefsOf(readFileSync(PIPELINE, 'utf8'))
+    const bad = refs.filter((i) => !/^@\/lib\/effect\/|^\.\/types$/.test(i))
+    expect(bad, 'pipeline reaches outside the engine: ' + bad.join(' · ')).toEqual([])
+  })
+
+  it('pipeline/solve.ts holds exactly the unit edges the worker body carried — pinned, so a new one is deliberate', () => {
+    const edges = [...new Set(moduleRefsOf(readFileSync(PIPELINE, 'utf8')).filter((i) => /\/units\//.test(i)))].sort()
+    expect(edges).toEqual(['@/lib/effect/units/centring', '@/lib/effect/units/classifier', '@/lib/effect/units/judge', '@/lib/effect/units/protection'])
+  })
+
+  it('the adapter is projection only: type imports, no engine call', () => {
+    const text = readFileSync(ADAPTER, 'utf8')
+    const runtimeImports: string[] = []
+    walkAst(text, (n) => {
+      if (ts.isImportDeclaration(n) && !(n.importClause?.isTypeOnly)) runtimeImports.push(n.moduleSpecifier.getText())
+    })
+    expect(runtimeImports, 'adapter imports runtime code: ' + runtimeImports.join(' · ')).toEqual([])
+    expect(text, 'adapter must never re-run a decision').not.toMatch(/defaultLanding|classFrameNodes|shapeFamilyOf|solveGrid|computeGrid/)
+  })
+
+  it('the worker imports only the pipeline and the adapter; the page never imports the pipeline directly', () => {
+    const workerRefs = moduleRefsOf(readFileSync(WORKER, 'utf8'))
+    const bad = workerRefs.filter((i) => !/^@\/lib\/effect\/(pipeline|adapters)\//.test(i))
+    expect(bad, 'worker reaches past the pipeline seam: ' + bad.join(' · ')).toEqual([])
+    const pageRefs = importsOf(pageText()).filter((i) => /\/pipeline\//.test(i))
+    expect(pageRefs, 'the page must reach the engine through the adapter, not the pipeline').toEqual([])
+  })
+})
+
 describe('3 — each sub holds only its own kind', () => {
   it('every 48mm is a new band — the table follows the repeat with no gap and no overlap', () => {
     // Dan, 2026-08-29: "every 48mm is new band if you didnt guess". Spec may not compute, so the
