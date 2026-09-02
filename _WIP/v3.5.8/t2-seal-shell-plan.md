@@ -56,7 +56,7 @@ Nothing else. Bridge untouched (library law). Engine untouched. No new control, 
 4. Existing library gates unchanged and green (`architecture-gates`, `grid-layout-library`).
 5. Live (4065, exact head): Library tab, square 3×3 — legal box drawn as today; Bench unchanged on the
    four cutouts; console 0. Screenshot cited.
-6. Full suite green (serial), tsc clean, strict changed-file lint clean.
+6. Full suite green (serial), tsc clean; strict lint is clean on every changed non-page source file, and page diagnostics equal staging: five inherited warnings, zero errors.
 
 ## 4 · Non-goals (recorded, not dropped)
 `recog` readout · policy re-rooming out
@@ -73,7 +73,7 @@ Head 9634ec25 — one commit, all four §1 items. Proofs observed: page has no g
 call (gate) · librarySegments == former safeSegments call on a square; bandRangeForControl == bandOuterMM on
 every band × {floor, released, ceil} padding · mutations M1 page+safeSegments, M2 page+bandOuterMM, M3
 libraryViewModel+unit, M4 gridViewModel+unit each fail · architecture-gates + grid-layout-library unchanged
-green · full suite 836/836 serial · tsc · strict lint on T2 files · live 4065: bench four cutouts identical,
+green · full suite 836/836 serial · tsc · strict lint clean on every changed non-page source file; page diagnostics equal staging (five inherited warnings, zero errors) · live 4065: bench four cutouts identical,
 Library tab 3×3 square draws the 96 mm legal box, console 0 (screenshot t2-library-tab.png).
 Observation, out of scope: page.tsx carries five pre-existing lint warnings (unused locals) present on
 staging; the page header string still reads "V3.5.7-1".
