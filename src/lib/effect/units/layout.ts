@@ -187,7 +187,6 @@ export interface CanonPhaseSearch {
   phasePairs: number
   windows: number
   fitsCalls: number
-  cacheHits: number
 }
 
 /** Left↔right partner of a held node across the PLACEMENT'S own column span: same row, column
@@ -268,7 +267,6 @@ export interface FreePhaseSearch {
   candidates: FreePhaseCandidate[]
   phasePairs: number
   fitsCalls: number
-  cacheHits: number
 }
 
 /** Historical Voting's proven count pass, without weights or policy: every phase, maxima only. */
@@ -283,23 +281,14 @@ export function enumerateFreePhaseMax(
   const fits = cfg.circle
     ? makeCircleSeatPredicate(cx, cy, Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY) / 2, pad)
     : makeContourSeatPredicate(contour, pad)
-  if (!fits) return { candidates: [], phasePairs: 0, fitsCalls: 0, cacheHits: 0 }
+  if (!fits) return { candidates: [], phasePairs: 0, fitsCalls: 0 }
   const phaseX: number[] = [], phaseY: number[] = []
   for (let k = 0; k < pitch; k += step) {
     phaseX.push(mod(anchorMM[0] - bb.minX + k, pitch))
     phaseY.push(mod(anchorMM[1] - bb.minY + k, pitch))
   }
-  const memo = new Map<string, boolean>()
-  let fitsCalls = 0, cacheHits = 0, maxCount = 0
-  const fitsM = (p: Pt) => {
-    const key = `${Math.round(p[0] * 1000)},${Math.round(p[1] * 1000)}`
-    const hit = memo.get(key)
-    if (hit !== undefined) { cacheHits++; return hit }
-    fitsCalls++
-    const value = fits(p)
-    memo.set(key, value)
-    return value
-  }
+  let fitsCalls = 0, maxCount = 0
+  const fitsM = (p: Pt) => { fitsCalls++; return fits(p) }
   const candidates: FreePhaseCandidate[] = []
   for (const px of phaseX) for (const py of phaseY) {
     const points = latticeAt(bb, pitch, px, py).filter(fitsM)
@@ -307,7 +296,7 @@ export function enumerateFreePhaseMax(
     if (points.length > maxCount) { maxCount = points.length; candidates.length = 0 }
     candidates.push({ points, phaseMM: [px, py], revealMM })
   }
-  return { candidates, phasePairs: phaseX.length * phaseY.length, fitsCalls, cacheHits }
+  return { candidates, phasePairs: phaseX.length * phaseY.length, fitsCalls }
 }
 
 /** Exhaustive finite-Canon placement over one pitch. Centre seeds phase order; it never limits it. */
@@ -318,7 +307,7 @@ export function enumerateCanonPhaseWindows(
    *  Lets the caller walk reveals largest-first and prune every later one as hard as counting. */
   priorityFloor?: ReadonlyArray<number>,
 ): CanonPhaseSearch {
-  const empty = { candidates: [], priorityCandidates: [], phasePairs: 0, windows: 0, fitsCalls: 0, cacheHits: 0 }
+  const empty = { candidates: [], priorityCandidates: [], phasePairs: 0, windows: 0, fitsCalls: 0 }
   if (!canonLocalMM.length) return empty
   const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
   const step = Math.max(1, stepMM)
@@ -340,17 +329,8 @@ export function enumerateCanonPhaseWindows(
     phaseX.push(mod(anchorMM[0] - bb.minX + k, pitch))
     phaseY.push(mod(anchorMM[1] - bb.minY + k, pitch))
   }
-  const memo = new Map<string, boolean>()
-  let fitsCalls = 0, cacheHits = 0, windows = 0
-  const fitsM = (p: Pt) => {
-    const key = `${Math.round(p[0] * 1000)},${Math.round(p[1] * 1000)}`
-    const hit = memo.get(key)
-    if (hit !== undefined) { cacheHits++; return hit }
-    fitsCalls++
-    const value = fits(p)
-    memo.set(key, value)
-    return value
-  }
+  let fitsCalls = 0, windows = 0
+  const fitsM = (p: Pt) => { fitsCalls++; return fits(p) }
   // Canon nodes sit ON the lattice, so a window's node is lawful iff its lattice index is in this
   // phase's free set. Integer index keys replace 16 string-keyed lookups per window — the same
   // answer, an order of magnitude cheaper, for both accumulators.
@@ -428,7 +408,7 @@ export function enumerateCanonPhaseWindows(
   return {
     candidates: [...unique.values()].map(strip),
     priorityCandidates: [...byPriority.values()].map(strip),
-    phasePairs: phaseX.length * phaseY.length, windows, fitsCalls, cacheHits,
+    phasePairs: phaseX.length * phaseY.length, windows, fitsCalls,
   }
 }
 
