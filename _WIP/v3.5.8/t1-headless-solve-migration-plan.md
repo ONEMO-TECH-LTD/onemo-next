@@ -82,3 +82,16 @@ owns the page model, V8 closed, worker = transport.
 **Known and stated:** after T1 the pipeline module *contains* policy that L3 says it must not (landing,
 Belt, sizes). That is the S2/T-later re-rooming; T1 is the move that makes it visible and testable, not
 the tidy. Claiming L3 compliance at T1 would be false.
+
+## 6 · Execution record (2026-09-02, branch session62-task/v3.5.8-t1-headless-solve)
+
+| step | head | proof observed |
+|---|---|---|
+| S1 | 15327464 | verbatim diff = plumbing lines only · 79/79 separation · live identical |
+| S2 | 88a96869 | adapter page model == S1 posted model byte-for-byte on the four fixtures · live identical |
+| S3 | 6ba8992b | gate 11 fails on a literal default (mutation) · evidence changes, offers/size do not · live readouts unchanged |
+| S4 | aae6a2ad | Node proof (no self/Worker/DOM, JSON round trip, direct == worker path) · zone 2e (mutation-proved) · 834 pass / 10 skipped · lint 0 |
+
+Live gate at every head on 4065 (worktree s62-v3.5.8): BOT B5 258.73·11 · Butterfly B1 66.69/58.69 ·
+Duck B3 146.11/143.84 · Batwoman B2 97.01·3 · drag grab→grabbing→grab · console 0.
+Known limitation stands (§5): the pipeline still contains landing/Belt/sizes policy — later re-rooming.
