@@ -7,7 +7,7 @@ import {
 } from './units/layout'
 import { bbox } from './foundation/geometry'
 import { wrapGroup } from './units/wrap'
-import { centringMM, inBand, orderCanonOffers } from './units/judge'
+import { inBand, orderCanonOffers } from './units/judge'
 
 const localise = (pts: ReadonlyArray<Pt>): Pt[] => {
   if (!pts.length) return []
@@ -62,8 +62,7 @@ export function solveCanonExperiment(
     const blind: BandRung = { ...whole, roles: ['canon'] }
     if (!priority.slim) return finish({ offers: [{ ...whole, roles: ['optimal', 'canon'] }], bestSeated: null, trace })
     const rows = [{ rung: whole, id: 'whole' }]
-    const ceiling = Math.min(hiMM, whole.at.sizeMM + centringMM(whole.at, priority.centreAxis))
-    for (let mm = whole.at.sizeMM + SNAP_STEP_MM; mm <= ceiling + 1e-9; mm += SNAP_STEP_MM) {
+    for (let mm = whole.at.sizeMM + SNAP_STEP_MM; mm <= hiMM + 1e-9; mm += SNAP_STEP_MM) {
       trace.wraps++
       const at = wrapGroup(sized, wcfg, canonLocal, mm, mm)
       if (at && inBand(at.sizeMM, loMM, hiMM)) rows.push({ rung: { at, revealMM: mm, roles: ['optimal'] }, id: 'whole' })
@@ -148,12 +147,11 @@ export function solveCanonExperiment(
       const rows = [{ rung, id: candidate.id, candidate }]
       // SLIM CENTRING (Gate 3). A one- or two-line frame has no partner seats to balance it, so
       // symmetry cannot centre it; size can. The unchanged Wrap unit is asked for the lawful
-      // placement at each exact size above the tight one — origin nearest the governed centre —
-      // up to the point where growth can no longer pay for itself (key = centring + size, so no
-      // size beyond tight + centring(tight) can win). Judge then picks.
+      // placement at every exact size above the tight one — origin nearest the governed centre —
+      // across the whole band (Dan: "if we have scale bandwidth"). Judge picks: centred first,
+      // tightest among centred.
       if (priority.slim) {
-        const ceiling = Math.min(hiMM, rung.at.sizeMM + centringMM(rung.at, priority.centreAxis))
-        for (let mm = rung.at.sizeMM + SNAP_STEP_MM; mm <= ceiling + 1e-9; mm += SNAP_STEP_MM) {
+        for (let mm = rung.at.sizeMM + SNAP_STEP_MM; mm <= hiMM + 1e-9; mm += SNAP_STEP_MM) {
           trace.wraps++
           const at = wrapGroup(sized, wcfg, candidate.points, mm, mm)
           if (at && inBand(at.sizeMM, loMM, hiMM)) rows.push({ rung: { at, revealMM: mm, roles: ['optimal'] }, id: candidate.id, candidate })

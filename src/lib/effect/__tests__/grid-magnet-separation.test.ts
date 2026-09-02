@@ -20,7 +20,7 @@ import { canonPriorityOf, frameOfMasses, positionsAcross } from '../units/classi
 import type { BBox, SafeMass, SafeSegment } from '../types'
 import { BANDS, BAND_STEP_MM, PHASE_STEP_MM } from '../grid-magnet-spec'
 import { scaleContour } from '../grid-magnet-compute'
-import { applyCoverage, enumerateCanonPhaseWindows, enumerateFreePhaseMax, fallbackRevealSizes, makeCircleSeatPredicate, makeContourSeatPredicate, priorityTupleOf, symmetricCore } from '../units/layout'
+import { applyCoverage, enumerateCanonPhaseWindows, enumerateFreePhaseMax, fallbackRevealSizes, makeCircleSeatPredicate, makeContourSeatPredicate, priorityTupleOf, symmetricCores } from '../units/layout'
 import { wrapGroup } from '../units/wrap'
 import { wrapBandLadder } from '../grid-magnet-wrap-compute'
 import { contourCentroidOf } from '../units/centring'
@@ -1161,11 +1161,26 @@ describe('9 — priority hold points are classifier data', () => {
     const threeCols = [1, 2, 3].flatMap((c) => [0, 1, 2, 3, 4].map((r) => id(4,5,c,r)))
     expect(priorityTupleOf(threeCols, p)).toEqual([1, 1, 1, 0, 15])
     // and the frame-relative reading this replaces would have called col 3 orphans and col 0 a missing corner
-    expect(symmetricCore(threeCols, p)).toEqual(threeCols)
-    // symmetric core drops a genuine orphan and re-judges on the narrowed span
-    const withOrphan = [id(4,5,1,0), id(4,5,3,0), id(4,5,2,4), id(4,5,0,2)]   // col 0 seat has no partner at col 4
-    expect(symmetricCore(withOrphan, p)).toEqual([id(4,5,1,0), id(4,5,3,0), id(4,5,2,4)])
+    expect(symmetricCores(threeCols, p)).toEqual([threeCols])
+    // a lone edge orphan is peeled and the body re-judged on the narrowed span
+    const withOrphan = [id(4,5,1,0), id(4,5,3,0), id(4,5,2,4), id(4,5,0,2)]
+    const cores = symmetricCores(withOrphan, p)
+    expect(cores).toContainEqual([id(4,5,1,0), id(4,5,3,0), id(4,5,2,4)])
+    expect(cores.every((c) => c.length > 0)).toBe(true)   // every branch's terminal core is offered; the tuple judges
     expect(canonPriorityOf([])).toBeNull()
+  })
+  it('QA 4x2 counterexample: both edges orphaned → both cores are offered and the tuple, not a side, decides', () => {
+    const p = canonPriorityOf(frame(4, 2))!
+    const held = [id(4,2,0,0), id(4,2,2,0), id(4,2,1,1), id(4,2,3,1)]   // ids 0,4,3,7
+    const cores = symmetricCores(held, p).map((c) => [...c].sort((a, b) => a - b))
+    expect(cores).toContainEqual([id(4,2,0,0), id(4,2,2,0), id(4,2,1,1)].sort((a, b) => a - b))   // keeps a base corner
+    expect(cores).toContainEqual([id(4,2,2,0), id(4,2,1,1), id(4,2,3,1)].sort((a, b) => a - b))
+    const scored = cores.map((c) => priorityTupleOf(c, p))
+    expect(scored.some((t) => t[1] === 1), 'a base-corner-satisfying core must survive').toBe(true)
+    // horizontal mirror of the held set yields the mirrored cores
+    const mirrored = held.map((i) => id(4,2,3 - p.colOf[i], p.rowOf[i]))
+    const mcores = symmetricCores(mirrored, p).map((c) => c.map((i) => id(4,2,3 - p.colOf[i], p.rowOf[i])).sort((a, b) => a - b))
+    expect(mcores.sort()).toEqual(cores.sort())
   })
 })
 
@@ -1217,7 +1232,7 @@ describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside
       .map(([x, y]) => local.findIndex(([a, b]) => Math.abs(a - (x - o.at.originMM[0])) < 1e-6 && Math.abs(b - (y - o.at.originMM[1])) < 1e-6))
     const withPriority = solveCanonExperiment(sized, cfg, span.minMM, span.maxMM, 24, anchorAt, nodes, priority)
     const blindOnly = solveCanonExperiment(sized, cfg, span.minMM, span.maxMM, 24, anchorAt, nodes)
-    return { fx, priority, colRow, nodesOf, withPriority, blindOnly }
+    return { fx, priority, colRow, nodesOf, withPriority, blindOnly, sizedOf: sized, cfgOf: cfg, spanOf: span, anchorOf: anchorAt, nodesOf2: nodes }
   }
   const sortedPairs = (xs: Array<[number, number]>) => xs.map((p) => p.join(',')).sort()
 
@@ -1239,16 +1254,19 @@ describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside
   }, 120_000)
 
   it('bot-b4: optimal holds top, both bottom corners, an interior row and no orphans; canon pinned; exact nodes OPEN', async () => {
-    const { priority, nodesOf, withPriority } = await solveFixture('bot-b4')
+    const { priority, nodesOf, withPriority, sizedOf, cfgOf, spanOf, anchorOf, nodesOf2 } = await solveFixture('bot-b4')
     const optimal = withPriority.offers.find((o) => o.roles.includes('optimal'))!
     const canon = withPriority.offers.find((o) => o.roles.includes('canon'))!
     expect(priorityTupleOf(nodesOf(optimal), priority).slice(0, 4)).toEqual([1, 1, 1, 0])
     expect(priorityTupleOf(nodesOf(canon), priority)[3], 'the blind row must still carry its orphans — that is the comparison').toBeLessThan(0)
     expect(canon.at.sizeMM).toBeCloseTo(204.99, 2); expect(canon.at.count).toBe(9)
-    // Non-slim invariant (QA): a 3x4 frame is not slim, so no size ladder runs — optimal is its own
-    // tight wrap, and the trace counts exactly the wraps the two winners and settle needed.
+    // Non-slim invariant (QA): a 3x4 frame is not slim, so no size ladder runs. Control: the same
+    // solve with slim forced on must do MORE wraps; the real solve must not. Mutating the production
+    // guard to run the ladder unconditionally makes the two traces equal and fails this.
     expect(priority.slim).toBe(false)
-    expect(withPriority.trace.wraps).toBeLessThanOrEqual(2 + (withPriority.trace.readded > 0 ? 2 : 0) + 6)
+    const forcedSlim = solveCanonExperiment(sizedOf, cfgOf, spanOf.minMM, spanOf.maxMM, 24, anchorOf, nodesOf2, { ...priority, slim: true })
+    expect(forcedSlim.trace.wraps).toBeGreaterThan(withPriority.trace.wraps)
+    expect(optimal.at.sizeMM).toBe(withPriority.offers.find((o) => o.roles.includes('optimal'))!.at.sizeMM)
     // OPEN — Dan has not ruled more-seats vs tightest when every priority ties; frozen array is 5 nodes.
   }, 180_000)
 
@@ -1293,8 +1311,8 @@ describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside
     expect(optimal.at.sizeMM).toBeGreaterThan(canon.at.sizeMM)
     const dx = (o: typeof optimal) => Math.abs(o.at.originMM[0] - o.at.anchorMM[0])
     expect(dx(optimal), 'relevantAxisCentreOffMM < canon (frozen comparator)').toBeLessThan(dx(canon))
-    // mm for mm: the growth must have bought at least as much centring
-    expect(optimal.at.sizeMM - canon.at.sizeMM).toBeLessThanOrEqual(dx(canon) - dx(optimal) + 1e-6)
+    // centred first: the column sits within one magnet radius of the axis, at the tightest such size
+    expect(dx(optimal)).toBeLessThanOrEqual(3)
   }, 120_000)
 
   it('duck-b3 is slim (2x3) and already centred: the ladder runs and nothing beats the tight row', async () => {

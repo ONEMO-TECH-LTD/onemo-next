@@ -222,23 +222,31 @@ export function priorityTupleOf(heldIds: ReadonlyArray<number>, priority: CanonP
   return [top, baseLo && baseHi ? 1 : 0, interior, 0 - orphans, heldIds.length]
 }
 
-/** The held ids with every unmatched seat removed, judged on the placement's own span. An orphan
- *  on an extreme column is peeled ONE SIDE AT A TIME — dropping it narrows the span and the body
- *  inside is re-judged about its own centre; when both edges carry orphans, the side whose removal
- *  keeps more seats wins (left on a tie). Interior orphans go last. */
-export function symmetricCore(heldIds: ReadonlyArray<number>, priority: CanonPriority): number[] {
-  const ids = [...heldIds]
-  const held = new Uint8Array(priority.colOf.length); for (const i of ids) held[i] = 1
-  let lo = Infinity, hi = -Infinity
-  for (const i of ids) { lo = Math.min(lo, priority.colOf[i]); hi = Math.max(hi, priority.colOf[i]) }
-  const orphan = (i: number) => partnerOf(i, ids, held, lo, hi, priority) === -2
-  const peel = (col: number) => symmetricCore(ids.filter((i) => !(priority.colOf[i] === col && orphan(i))), priority)
-  const loOrphan = ids.some((i) => priority.colOf[i] === lo && orphan(i))
-  const hiOrphan = lo !== hi && ids.some((i) => priority.colOf[i] === hi && orphan(i))
-  if (loOrphan && hiOrphan) { const a = peel(lo), b = peel(hi); return b.length > a.length ? b : a }
-  if (loOrphan) return peel(lo)
-  if (hiOrphan) return peel(hi)
-  return ids.filter((i) => !orphan(i))
+/** Every terminal symmetric core of a held set, judged on the placement's own span. An orphan on
+ *  an extreme column is peeled one side at a time — dropping it narrows the span and the body inside
+ *  is re-judged about its own centre. When BOTH edges carry orphans there are two lawful peels and
+ *  this helper returns both: choosing a side here would be policy (QA, 2026-09-02), and the priority
+ *  tuple downstream is the only judge. Interior orphans go last. Deduped by id. */
+export function symmetricCores(heldIds: ReadonlyArray<number>, priority: CanonPriority): number[][] {
+  const out = new Map<string, number[]>()
+  const walk = (ids: number[]) => {
+    if (!ids.length) return
+    const held = new Uint8Array(priority.colOf.length); for (const i of ids) held[i] = 1
+    let lo = Infinity, hi = -Infinity
+    for (const i of ids) { lo = Math.min(lo, priority.colOf[i]); hi = Math.max(hi, priority.colOf[i]) }
+    const orphan = (i: number) => partnerOf(i, ids, held, lo, hi, priority) === -2
+    const peel = (col: number) => walk(ids.filter((i) => !(priority.colOf[i] === col && orphan(i))))
+    const loOrphan = ids.some((i) => priority.colOf[i] === lo && orphan(i))
+    const hiOrphan = lo !== hi && ids.some((i) => priority.colOf[i] === hi && orphan(i))
+    if (loOrphan) peel(lo)
+    if (hiOrphan) peel(hi)
+    if (loOrphan || hiOrphan) return
+    const kept = ids.filter((i) => !orphan(i))
+    if (kept.length !== ids.length) return walk(kept)
+    out.set(ids.join(','), ids)
+  }
+  walk([...heldIds])
+  return [...out.values()]
 }
 
 const fullPriority = (t: ReadonlyArray<number> | null): t is number[] =>
@@ -396,8 +404,8 @@ export function enumerateCanonPhaseWindows(
         // same seats with unmatched ones dropped. Dan: "try full frame but sacrifice parts of it …
         // in favour of the priorities". A shape whose arm is 0.2 mm too thin for one mirror seat
         // should lose that seat's partner, not carry an orphan. One rule, every frame.
-        const core = symmetricCore(ids, priority!)
-        for (const cand of core.length === ids.length ? [ids] : [ids, core]) {
+        const cores = symmetricCores(ids, priority!).filter((c) => c.length !== ids.length)
+        for (const cand of [ids, ...cores]) {
           const tuple = priorityTupleOf(cand, priority!, scratch)
           const cmp = bestTuple ? tupleCmp(tuple, bestTuple) : 1
           if (cmp < 0) continue

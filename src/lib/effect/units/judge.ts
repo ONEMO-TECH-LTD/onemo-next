@@ -4,6 +4,7 @@
 // magnet, never wraps and never mutates a population.
 
 import type { BandRung, CanonPriority } from '../types'
+import { MAGNET_DIA_SMALL_MM } from '../grid-magnet-spec'
 
 /** BAND MEMBERSHIP (Dan, 08-24): a layout whose TRUE wrapped size falls outside the band does not
  *  exist in that band. No clamping to band floors — the size decides, not the request. */
@@ -38,16 +39,24 @@ export function centringMM(at: BandRung['at'], axis: 0 | 1): number {
   return Math.abs(at.originMM[axis] - at.anchorMM[axis])
 }
 
-/** THE OPTIMAL ORDER (Dan, 2026-09-01) among wrapped priority candidates. The priority tuple has
+/** THE OPTIMAL ORDER (Dan, 2026-09-01/02) among wrapped priority candidates. The priority tuple has
  *  already decided WHICH node sets are offered; among lawful wraps of those:
- *  - slim frames: centring + size, mm for mm — "if we have scale bandwidth we can afford to fit
- *    closer to center … still keeping it the tightest possible". A millimetre of growth must buy a
- *    millimetre of centring or the tighter placement stands. No weight, no tolerance.
+ *  - slim frames: CENTRED FIRST, TIGHTEST AMONG CENTRED — "if we have scale bandwidth we can afford to
+ *    fit closer to center". A placement is centred when its frame axis sits within one magnet radius
+ *    of the governed centre (the seat's own physical radius — the only non-invented threshold). If
+ *    any centred size exists in the band the tightest of them wins; otherwise the best-centred wins.
+ *    No exchange rate, no tolerance dial (Dan, 2026-09-02: "take whichever non invented execution").
  *  - every other frame: the tightest stands.
  *  Then the closest to the governed centre, then a stable id. Pure ordering — no geometry. */
 export function orderCanonOffers<T extends { rung: BandRung; id: string }>(rows: T[], priority?: CanonPriority): T[] {
-  const key = (r: T) => priority?.slim ? centringMM(r.rung.at, priority.centreAxis) + r.rung.at.sizeMM : r.rung.at.sizeMM
+  if (!priority?.slim) return [...rows].sort((a, b) => a.rung.at.sizeMM - b.rung.at.sizeMM
+    || a.rung.at.centreOffMM - b.rung.at.centreOffMM || a.id.localeCompare(b.id))
+  const onAxis = MAGNET_DIA_SMALL_MM / 2
+  const dx = (r: T) => centringMM(r.rung.at, priority.centreAxis)
+  const anyCentred = rows.some((r) => dx(r) <= onAxis)
+  const key = (r: T) => anyCentred ? (dx(r) <= onAxis ? r.rung.at.sizeMM : Infinity) : dx(r)
   return [...rows].sort((a, b) => key(a) - key(b)
+    || a.rung.at.sizeMM - b.rung.at.sizeMM
     || a.rung.at.centreOffMM - b.rung.at.centreOffMM
     || a.id.localeCompare(b.id))
 }
