@@ -24,12 +24,13 @@ import { applyCoverage, enumerateCanonPhaseWindows, enumerateFreePhaseMax, fallb
 import { wrapGroup } from '../units/wrap'
 import { wrapBandLadder } from '../grid-magnet-wrap-compute'
 import { contourCentroidOf } from '../units/centring'
+import { orderCanonOffers } from '../units/judge'
 import { safeSegments } from '../units/segment'
 import { measureProtection } from '../units/protection'
 import { edgeDistToContourMM, pointInContour } from '../foundation/geometry'
 import { contourCacheKey, makeSizer, normBaseContour, normMaskContour } from '../grid-magnet-bridge'
 import { getShape } from '@/lib/shape-library'
-import type { Contour, GridConfig, Pt } from '../types'
+import type { Contour, GridConfig, Pt, RungRole } from '../types'
 
 const LIB = join(process.cwd(), 'src/lib/effect')
 const PAGE = join(process.cwd(), 'src/app/(dev)/effect-creator/grid-centre/page.tsx')
@@ -1342,6 +1343,17 @@ describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside
     const ids = optimal.at.points.map(([x, y]) => local.findIndex(([a, b]) => Math.abs(a - (x - optimal.at.originMM[0])) < 1e-6 && Math.abs(b - (y - optimal.at.originMM[1])) < 1e-6))
     expect(priorityTupleOf(ids, priority).slice(0, 4)).toEqual([1, 1, 1, 0])
   }, 300_000)
+
+  it('slim "on the axis" is the active plan\'s smallest seat radius, never a constant (judge)', () => {
+    const row = (sizeMM: number, dx: number) => ({ id: String(sizeMM), rung: { revealMM: sizeMM, roles: ['optimal'] as RungRole[],
+      at: { count: 2, sizeMM, centreOffMM: dx, points: [], originMM: [dx, 0] as Pt, anchorMM: [0, 0] as Pt, gapsMM: [] } } })
+    const slim = { colOf: [0, 0], rowOf: [0, 1], topRow: 1, rows: 2, slim: true, centreAxis: 0 as const }
+    const rows = [row(90, 3.5), row(100, 2.5), row(110, 0)]
+    expect(orderCanonOffers(rows, slim, 3)[0].id, '6 mm seats: 3.5 is off-axis, 100 is the tightest centred').toBe('100')
+    expect(orderCanonOffers(rows, slim, 4)[0].id, '8 mm seats: 3.5 counts as on-axis, so 90 wins').toBe('90')
+    expect(orderCanonOffers(rows, slim, 0)[0].id, 'no threshold: best-centred wins').toBe('110')
+    expect(orderCanonOffers(rows, { ...slim, slim: false }, 3)[0].id, 'non-slim: tightest').toBe('90')
+  })
 
   it('the worker lands on optimal, never on the canon comparison row', async () => {
     type Posted = { model: { idx: number; ladder: Array<{ roles: string[]; sizeMM: number }> } | null }

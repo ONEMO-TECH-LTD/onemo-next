@@ -1,6 +1,6 @@
 // TEMPORARY dev-only Canon smart-search. The released Current route remains unchanged.
 import type { BandRung, BandSolve, CanonExperimentTrace, CanonPriority, Contour, GridConfig, Pt, WrapConfig } from './types'
-import { DEFAULT_PITCH_MM, PADDING_FLOOR_MM, PHASE_STEP_MM, SNAP_STEP_MM } from './grid-magnet-spec'
+import { DEFAULT_PITCH_MM, MAGNET_DIA_LARGE_MM, MAGNET_DIA_SMALL_MM, PADDING_FLOOR_MM, PHASE_STEP_MM, SNAP_STEP_MM } from './grid-magnet-spec'
 import {
   bestSeatedCandidate, enumerateCanonPhaseWindows, enumerateFreePhaseMax, fallbackRevealSizes,
   latticeAt, makeCircleSeatPredicate, makeContourSeatPredicate, priorityTupleOf, tupleCmp, type CanonPhaseCandidate,
@@ -47,6 +47,10 @@ export function solveCanonExperiment(
     trace.elapsedMs = Date.now() - started
     return result
   }
+  // "On the axis" for slim centring = within the physical radius of the smallest seat the active
+  // magnet plan places (Corners 8 mixes sizes; its interior seats are 6 mm). Read from the plan,
+  // never a constant.
+  const onAxisMM = (cfg.plan === 'all8' ? MAGNET_DIA_LARGE_MM : MAGNET_DIA_SMALL_MM) / 2
   const attemptCanon = (pts: ReadonlyArray<Pt>): BandRung | null => {
     trace.wraps++
     const at = wrapGroup(sized, wcfg, pts, minMM, hiMM)
@@ -67,7 +71,7 @@ export function solveCanonExperiment(
       const at = wrapGroup(sized, wcfg, canonLocal, mm, mm)
       if (at && inBand(at.sizeMM, loMM, hiMM)) rows.push({ rung: { at, revealMM: mm, roles: ['optimal'] }, id: 'whole' })
     }
-    const best = orderCanonOffers(rows, priority)[0].rung
+    const best = orderCanonOffers(rows, priority, onAxisMM)[0].rung
     const same = Math.abs(best.at.sizeMM - whole.at.sizeMM) < 0.005
     return finish({ offers: same ? [{ ...whole, roles: ['optimal', 'canon'] }] : [{ ...best, roles: ['optimal'] }, blind], bestSeated: null, trace })
   }
@@ -158,7 +162,7 @@ export function solveCanonExperiment(
         }
       }
       return rows
-    }), priority)
+    }), priority, onAxisMM)
     const blind: BandRung | null = lawful.length ? { ...lawful[0].rung, roles: ['canon'] } : null
     const optimal: BandRung | null = priorityLawful.length ? { ...priorityLawful[0].rung, roles: ['optimal'] } : null
     if (blind || optimal) {
