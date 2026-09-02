@@ -1,4 +1,4 @@
-# MVP engine productising — roadmap (v3, for Dan's lock)
+# MVP engine productising — roadmap (v3, QA-CLEAR 2026-09-02 · engine v3.5.7-2 → v3.5.8)
 
 **Directive (Dan, 2026-09-02):** "preserve what we have, make it liftable and integratable into the
 studio and address the performance and potentially later spec export … no overkill and rocket science."

@@ -1,4 +1,4 @@
-# T1 — Headless data-only solve: migration plan (v3, for QA then Dan's lock)
+# T1 — Headless data-only solve: migration plan (v3, QA-CLEAR 2026-09-02 · engine v3.5.7-2 → v3.5.8)
 
 Roadmap v3 task 1. Baseline: staging `8ba9bb9f` (PR #214). Method: **surgical swap** (Dan 08-29) —
 bodies MOVE verbatim, the worker keeps working through every step, one commit per step.
