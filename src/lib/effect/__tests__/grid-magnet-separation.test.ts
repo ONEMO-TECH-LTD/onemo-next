@@ -1355,6 +1355,32 @@ describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside
     expect(orderCanonOffers(rows, { ...slim, slim: false }, 3)[0].id, 'non-slim: tightest').toBe('90')
   })
 
+  it('the solver feeds the active plan\'s seat radius to slim centring (BOT B3 @ 96 mm, all plans)', async () => {
+    // QA 5103d6d7: the judge test proves the ranker honours a threshold; this proves the SOLVER supplies
+    // the plan's one. Forcing every plan to 3 mm must fail the All 8 assertion.
+    const sized = makeSizer(cutout('public/grid-engine/cutouts/BOT.png'), 0)
+    const results: Record<string, { sizeMM: number; dx: number }> = {}
+    for (const plan of ['all6', 'all8', 'corners8'] as const) {
+      const cfg96: GridConfig = { pitchMM: 96, paddingMM: 12, perimeterOnly: false, centreMode: 2, governor: 0, plan }
+      const anchorAt = await workerAnchor(sized, cfg96, 'gate3-plan-radius-' + plan)
+      const band = BANDS.find((b) => b.id === 3)!
+      const span = bandOuterMM(band, 12)
+      const row = classifyBands(sized, cfg96, anchorAt, [band]).find((r) => r.bandId === 3)!
+      const canon = canonLayoutForFrame(96, positionsAcross(row.rulerWidthMM, 96), positionsAcross(row.rulerHeightMM, 96))!
+      const nodes = canon.nodesMM.map(([x, y]) => [x, y] as Pt)
+      const xs = nodes.map((p) => p[0]), ys = nodes.map((p) => p[1])
+      const local = nodes.map(([x, y]) => [x - (Math.min(...xs) + Math.max(...xs)) / 2, y - (Math.min(...ys) + Math.max(...ys)) / 2] as Pt)
+      const priority = canonPriorityOf(local, 96)!
+      expect(priority.slim).toBe(true)
+      const solve = solveCanonExperiment(sized, cfg96, span.minMM, span.maxMM, 24, anchorAt, nodes, priority)
+      const optimal = solve.offers.find((o) => o.roles.includes('optimal'))!
+      results[plan] = { sizeMM: optimal.at.sizeMM, dx: Math.abs(optimal.at.originMM[0] - optimal.at.anchorMM[0]) }
+    }
+    expect(results.all6.sizeMM).toBeCloseTo(156.89, 2); expect(results.all6.dx).toBeLessThanOrEqual(3)
+    expect(results.all8.sizeMM).toBeCloseTo(155.89, 2); expect(results.all8.dx).toBeLessThanOrEqual(4)
+    expect(results.corners8.sizeMM).toBeCloseTo(156.89, 2); expect(results.corners8.dx).toBeLessThanOrEqual(3)
+  }, 300_000)
+
   it('the worker lands on optimal, never on the canon comparison row', async () => {
     type Posted = { model: { idx: number; ladder: Array<{ roles: string[]; sizeMM: number }> } | null }
     const posted: Posted[] = []
