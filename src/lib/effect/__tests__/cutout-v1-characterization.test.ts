@@ -1,28 +1,26 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-import { HistoryStack } from '@/app/(dev)/cutout-lab/history'
-import { settingsForVectorPreset, VECTOR_PRESETS } from '@/app/(dev)/cutout-lab/finish'
+import { settingsForVectorPreset, VECTOR_PRESETS } from '@/components/cutout-studio/finish'
+import { HistoryStack } from '@/lib/cutout-studio/history'
 import { runCutout as legacyRunCutout } from '@/app/(dev)/effect-creator/v5.3.1/core/primitives'
 import { maskArea, subtractMasks, unionMasks } from '@/lib/mask-tools'
 import { adapterIdFor, featherMask, segment, smoothMask } from '../mask'
 import { runCutout } from '../cutout'
 
-const cutoutDir = 'src/app/(dev)/cutout-lab'
 const read = (path: string) => readFileSync(path, 'utf8')
-const cutout = (file: string) => read(`${cutoutDir}/${file}`)
+const route = (file: string) => read(`src/app/(dev)/cutout-lab/${file}`)
+const owner = (file: string) => read(file)
 
 const owners = [
-  {
-    file: 'page.tsx', layer: 'test-shell-donor', destination: 'src/app/page.tsx', adoption: 'selective-donor',
-    excludes: ['eruda ?debug=1 diagnostics', '?admin=1 route-only calibration state and panel'],
-  },
-  { file: 'flow.ts', layer: 'react-studio', destination: 'src/app/studio/cutout/flow.ts', adoption: 'direct' },
-  { file: 'finish.ts', layer: 'browser-adapter', destination: 'src/app/studio/cutout/browser/finish.ts', adoption: 'direct' },
-  { file: 'EditorOverlay.tsx', layer: 'studio-shell', destination: 'src/app/studio/cutout/EditorOverlay.tsx', adoption: 'direct' },
-  { file: 'history.ts', layer: 'headless', destination: 'src/lib/image-pipeline/history.ts', adoption: 'direct' },
-  { file: 'ui-config.ts', layer: 'studio-shell', destination: 'src/app/studio/cutout/ui-config.ts', adoption: 'direct' },
-  { file: 'v531seg.ts', layer: 'browser-adapter', destination: 'src/app/studio/cutout/browser/segment.ts', adoption: 'direct' },
+  { file: 'src/components/cutout-studio/CutoutStudio.tsx', layer: 'studio-shell', destination: 'src/components/cutout-studio/CutoutStudio.tsx' },
+  { file: 'src/components/cutout-studio/flow.ts', layer: 'react-studio', destination: 'src/components/cutout-studio/flow.ts' },
+  { file: 'src/components/cutout-studio/finish.ts', layer: 'browser-adapter', destination: 'src/components/cutout-studio/finish.ts' },
+  { file: 'src/components/cutout-studio/EditorOverlay.tsx', layer: 'studio-shell', destination: 'src/components/cutout-studio/EditorOverlay.tsx' },
+  { file: 'src/lib/cutout-studio/history.ts', layer: 'headless', destination: 'src/lib/cutout-studio/history.ts' },
+  { file: 'src/lib/cutout-studio/result.ts', layer: 'headless', destination: 'src/lib/cutout-studio/result.ts' },
+  { file: 'src/components/cutout-studio/ui-config.ts', layer: 'studio-shell', destination: 'src/components/cutout-studio/ui-config.ts' },
+  { file: 'src/components/cutout-studio/v531seg.ts', layer: 'browser-adapter', destination: 'src/components/cutout-studio/v531seg.ts' },
 ] as const
 
 const preservationCitations = [
@@ -42,26 +40,28 @@ const preservationCitations = [
 ] as const
 
 const dependencies: Record<string, { layer: string; destination: string | null }> = {
-  './EditorOverlay': { layer: 'studio-shell', destination: 'src/app/studio/cutout/EditorOverlay.tsx' },
-  './finish': { layer: 'browser-adapter', destination: 'src/app/studio/cutout/browser/finish.ts' },
-  './flow': { layer: 'react-studio', destination: 'src/app/studio/cutout/flow.ts' },
-  './history': { layer: 'headless', destination: 'src/lib/image-pipeline/history.ts' },
-  './ui-config': { layer: 'studio-shell', destination: 'src/app/studio/cutout/ui-config.ts' },
-  './v531seg': { layer: 'browser-adapter', destination: 'src/app/studio/cutout/browser/segment.ts' },
-  '@/lib/cutout-grabcut': { layer: 'browser-adapter', destination: 'src/app/studio/cutout/browser/grabcut.ts' },
-  '@/lib/effect/composite': { layer: 'browser-adapter', destination: 'src/app/studio/cutout/browser/composite.ts' },
-  '@/lib/effect/cutout': { layer: 'browser-adapter', destination: 'src/app/studio/cutout/browser/cutout.ts' },
-  '@/lib/effect/mask': { layer: 'browser-adapter', destination: 'src/app/studio/cutout/browser/mask.ts' },
-  '@/lib/effect/prepare-effect': { layer: 'browser-adapter', destination: 'src/app/studio/cutout/browser/prepare-effect.ts' },
-  '@/lib/effect/segment-ml': { layer: 'browser-adapter', destination: 'src/app/studio/cutout/browser/segment-ml.ts' },
-  '@/lib/effect/trace-outline-controls': { layer: 'headless', destination: 'src/lib/image-pipeline/trace-outline-controls.ts' },
-  '@/lib/mask-tools': { layer: 'browser-adapter', destination: 'src/app/studio/cutout/browser/mask-tools.ts' },
-  '@/lib/mask-tools/types': { layer: 'headless', destination: 'src/lib/image-pipeline/mask-types.ts' },
-  '@/lib/vector-core': { layer: 'headless', destination: 'src/lib/image-pipeline/vector-core.ts' },
-  '@/lib/vector-edit': { layer: 'headless', destination: 'src/lib/image-pipeline/vector-edit.ts' },
-  eruda: { layer: 'route-diagnostic', destination: null },
-  react: { layer: 'react-studio', destination: 'src/app/studio/cutout' },
-  'thinking-orbs': { layer: 'studio-shell', destination: 'src/app/studio/cutout' },
+  './EditorOverlay': { layer: 'studio-shell', destination: 'src/components/cutout-studio/EditorOverlay.tsx' },
+  './finish': { layer: 'browser-adapter', destination: 'src/components/cutout-studio/finish.ts' },
+  './flow': { layer: 'react-studio', destination: 'src/components/cutout-studio/flow.ts' },
+  './ui-config': { layer: 'studio-shell', destination: 'src/components/cutout-studio/ui-config.ts' },
+  './v531seg': { layer: 'browser-adapter', destination: 'src/components/cutout-studio/v531seg.ts' },
+  '@/lib/cutout-studio/history': { layer: 'headless', destination: 'src/lib/cutout-studio/history.ts' },
+  '@/lib/cutout-studio/result': { layer: 'headless', destination: 'src/lib/cutout-studio/result.ts' },
+  '@/lib/cutout-grabcut': { layer: 'browser-adapter', destination: 'src/lib/cutout-grabcut/index.ts' },
+  '@/lib/effect/composite': { layer: 'browser-adapter', destination: 'src/lib/effect/composite.ts' },
+  '@/lib/effect/cutout': { layer: 'browser-adapter', destination: 'src/lib/effect/cutout.ts' },
+  '@/lib/effect/geometry-truth': { layer: 'headless', destination: 'src/lib/effect/geometry-truth.ts' },
+  '@/lib/effect/mask': { layer: 'browser-adapter', destination: 'src/lib/effect/mask.ts' },
+  '@/lib/effect/prepare-effect': { layer: 'browser-adapter', destination: 'src/lib/effect/prepare-effect.ts' },
+  '@/lib/effect/segment-ml': { layer: 'browser-adapter', destination: 'src/lib/effect/segment-ml.ts' },
+  '@/lib/effect/trace-outline-controls': { layer: 'headless', destination: 'src/lib/effect/trace-outline-controls.ts' },
+  '@/lib/effect/types': { layer: 'headless', destination: 'src/lib/effect/types.ts' },
+  '@/lib/mask-tools': { layer: 'browser-adapter', destination: 'src/lib/mask-tools/index.ts' },
+  '@/lib/mask-tools/types': { layer: 'headless', destination: 'src/lib/mask-tools/types.ts' },
+  '@/lib/vector-core': { layer: 'headless', destination: 'src/lib/vector-core/index.ts' },
+  '@/lib/vector-edit': { layer: 'headless', destination: 'src/lib/vector-edit/index.ts' },
+  react: { layer: 'react-studio', destination: 'src/components/cutout-studio' },
+  'thinking-orbs': { layer: 'studio-shell', destination: 'src/components/cutout-studio' },
 }
 
 function imports(source: string): string[] {
@@ -74,34 +74,29 @@ describe('KAI-10216 Cutout V1 adoption boundary', () => {
   })
 
   it('classifies every current owner and direct dependency exactly once', () => {
-    expect(new Set(owners.map(({ file }) => file)).size).toBe(7)
-    for (const { file } of owners) expect(() => cutout(file)).not.toThrow()
+    expect(new Set(owners.map(({ file }) => file)).size).toBe(8)
+    for (const { file } of owners) expect(() => owner(file)).not.toThrow()
     expect(owners.every(({ destination }) => Boolean(destination))).toBe(true)
 
-    const actualDependencies = new Set(owners.flatMap(({ file }) => imports(cutout(file))))
+    const actualDependencies = new Set(owners.flatMap(({ file }) => imports(owner(file))))
     expect([...actualDependencies].sort()).toEqual(Object.keys(dependencies).sort())
     expect(Object.values(dependencies).every(({ layer }) => Boolean(layer))).toBe(true)
-    expect(Object.entries(dependencies).filter(([, { destination }]) => destination === null).map(([specifier]) => specifier)).toEqual(['eruda'])
+    expect(Object.values(dependencies).every(({ destination }) => destination !== null)).toBe(true)
   })
 
-  it('classifies the current page as a selective test-shell donor and excludes route-only residue', () => {
-    const pageOwner = owners.find(({ file }) => file === 'page.tsx')!
-    expect(pageOwner).toEqual({
-      file: 'page.tsx', layer: 'test-shell-donor', destination: 'src/app/page.tsx', adoption: 'selective-donor',
-      excludes: ['eruda ?debug=1 diagnostics', '?admin=1 route-only calibration state and panel'],
-    })
-    const source = cutout('page.tsx')
-    expect(source).not.toMatch(/searchParams\.(?:has|get)\('seg'\)/)
-    expect(source).toContain("u.searchParams.get('debug') === '1'")
-    expect(source).toContain("u.searchParams.get('admin') === '1'")
-    expect(source).toContain('Cutout calibration (admin)')
+  it('keeps query diagnostics and calibration in the thin dev mount only', () => {
+    const product = owners.map(({ file }) => owner(file)).join('\n')
+    expect(product).not.toMatch(/import\('eruda'\)|Cutout calibration \(admin\)|searchParams\.get\('(debug|admin)'\)/)
+    expect(product).not.toContain("localStorage.setItem('lab-detect-stage'")
+    expect(route('page.tsx')).toContain("query.get('debug') === '1'")
+    expect(route('page.tsx')).toContain("query.get('admin') === '1'")
+    expect(route('CutoutLabMount.tsx')).toContain('Cutout calibration (admin)')
+    expect(route('CutoutLabMount.tsx')).toContain("localStorage.setItem('lab-detect-stage'")
   })
 
   it('keeps the adoption closure product-owned and the headless owners DOM-free', () => {
-    for (const file of ['flow.ts', 'finish.ts', 'EditorOverlay.tsx', 'history.ts', 'v531seg.ts']) {
-      expect(cutout(file)).not.toContain('/(dev)/')
-    }
-    const headlessFiles = [`${cutoutDir}/history.ts`]
+    for (const { file } of owners) expect(owner(file)).not.toContain('/(dev)/')
+    const headlessFiles = ['src/lib/cutout-studio/history.ts', 'src/lib/cutout-studio/result.ts']
     for (const [specifier, { layer }] of Object.entries(dependencies)) {
       if (layer !== 'headless' || !specifier.startsWith('@/')) continue
       const path = specifier.replace('@/', 'src/')
@@ -116,21 +111,20 @@ describe('KAI-10216 Cutout V1 adoption boundary', () => {
       expect(imports(source).some((path) => path.startsWith('next/'))).toBe(false)
       expect(runtime).not.toMatch(/\b(document|window|HTMLCanvasElement|ImageData|new Image)\b/)
     }
-    expect(() => read('src/lib/cutout-lab/index.ts')).toThrow()
   })
 
   it('preserves the existing UI-facing flow surface without adding a replacement interface', () => {
-    const source = cutout('flow.ts')
+    const source = owner('src/components/cutout-studio/flow.ts')
     expect(source).toContain('state: {')
     expect(source).toContain('actions: {')
     expect(source).toContain('view,')
     expect(source).toContain('measureNode,')
-    expect(cutout('page.tsx')).toContain('flow.measureNode(')
+    expect(owner('src/components/cutout-studio/CutoutStudio.tsx')).toContain('flow.measureNode(')
     expect(source).not.toContain('CutoutStudioContract')
   })
 
   it('contains no Cutout performance HUD edge or dead upload ref', () => {
-    const source = owners.map(({ file }) => cutout(file)).join('\n')
+    const source = owners.map(({ file }) => owner(file)).join('\n')
     expect(source).not.toMatch(/PerfHUD|perfGesture|lastFileRef/)
   })
 })
@@ -219,32 +213,32 @@ describe('KAI-10220 owner-named vector presets', () => {
 
 describe('later increment defect reproductions', () => {
   it('KAI-10217 removes the stale detector query while retaining current route diagnostics', () => {
-    expect(cutout('page.tsx')).not.toMatch(/searchParams\.(?:has|get)\('seg'\)/)
-    expect(cutout('page.tsx')).toContain("u.searchParams.get('debug') === '1'")
+    expect(route('page.tsx')).not.toMatch(/searchParams\.(?:has|get)\('seg'\)/)
+    expect(route('page.tsx')).toContain("query.get('debug') === '1'")
   })
 
   it('KAI-10218 publishes a replacement only after decode succeeds', () => {
-    const source = cutout('flow.ts')
+    const source = owner('src/components/cutout-studio/flow.ts')
     expect(source.indexOf('await img.decode()')).toBeLessThan(source.indexOf('maskRef.current = null'))
   })
 
   it('KAI-10218 replaces the one-slot tool queue with FIFO ownership', () => {
-    expect(cutout('flow.ts')).not.toContain('pendingToolRef')
+    expect(owner('src/components/cutout-studio/flow.ts')).not.toContain('pendingToolRef')
   })
 
   it('KAI-10218 renders one-point Paint and settles canvas pointer cancellation', () => {
-    const source = cutout('page.tsx')
+    const source = owner('src/components/cutout-studio/CutoutStudio.tsx')
     expect(source).toContain('if (st.length > 0)')
     expect(source).toContain('onPointerCancel={onUp}')
   })
 
   it('KAI-10219 removes Mirror and dormant Cutout output settings', () => {
-    const finish = cutout('finish.ts')
+    const finish = owner('src/components/cutout-studio/finish.ts')
     expect(finish).not.toMatch(/\bmirror\b/i)
     expect(finish).not.toContain('presetFilter')
     expect(finish).not.toMatch(/\b(?:vignette|tint|panX|panY)\b/)
-    expect(cutout('page.tsx')).not.toContain('FillChoice')
-    expect(cutout('ui-config.ts')).not.toMatch(/\b(?:vignette|panX|panY)\b/)
+    expect(owner('src/components/cutout-studio/CutoutStudio.tsx')).not.toContain('FillChoice')
+    expect(owner('src/components/cutout-studio/ui-config.ts')).not.toMatch(/\b(?:vignette|panX|panY)\b/)
   })
 
   it('KAI-10220 returns scratch+erase before loading OpenCV', () => {
@@ -259,12 +253,12 @@ describe('later increment defect reproductions', () => {
     expect(feathered.some((value) => value > 0 && value < 255)).toBe(true)
     expect([...smoothMask(raw, 9, 9, 3)]).toEqual([...feathered].map((value) => value >= 128 ? 1 : 0))
 
-    const finish = cutout('finish.ts')
+    const finish = owner('src/components/cutout-studio/finish.ts')
     expect(finish).toContain('function prepareCut(')
     expect(finish.match(/return prepareCut\(/g)).toHaveLength(2)
-    expect(cutout('flow.ts')).not.toContain('smoothMask(')
-    expect(cutout('page.tsx')).toContain('aria-label="shared edge finish"')
-    expect(cutout('finish.ts')).toContain('edgeFinishPx: 8')
-    expect(cutout('flow.ts')).not.toContain('wasOutgrownRef')
+    expect(owner('src/components/cutout-studio/flow.ts')).not.toContain('smoothMask(')
+    expect(route('CutoutLabMount.tsx')).toContain('aria-label="shared edge finish"')
+    expect(owner('src/components/cutout-studio/finish.ts')).toContain('edgeFinishPx: 12')
+    expect(owner('src/components/cutout-studio/flow.ts')).not.toContain('wasOutgrownRef')
   })
 })

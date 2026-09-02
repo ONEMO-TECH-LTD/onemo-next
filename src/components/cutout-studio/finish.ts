@@ -1,6 +1,5 @@
-// cutout-lab — finishing glue. PURE COMPOSITION of v5.3.1 engine calls (no own geometry math,
-// ARCHITECTURE.md law 1): AI mask → v5.3.1 mask hygiene → trace → outline-resolve → SVG path.
-// Plus the two canvas render helpers the shell draws with (kept out of the React component, law 3).
+// Product browser adapter. Composes the existing engine mask, trace, outline, and artwork owners;
+// it adds no parallel geometry or compositor implementation.
 
 import type { Mask } from '@/lib/mask-tools/types'
 import { effectiveTextureDim } from '@/lib/effect/mask'
@@ -54,22 +53,6 @@ export function settingsForVectorPreset(name: VectorPresetName): TraceOutlineSet
 
 const MM_BASE = 70 // proto scale anchor (v5.3.1 longestSideMM) — only scales the mm-true tool floors
 
-
-/** Green-kept / red-removed overlay pixels for the mask. */
-export function maskOverlay(mask: Mask, mode: 'add' | 'erase' = 'add'): ImageData {
-  // ONE color at a time (Dan device r7): ADD tints the SELECTION green (what's included);
-  // ERASE tints the OUTSIDE red (what's excluded/erasable) — the selection itself stays clean.
-  const { data, w, h } = mask
-  const ov = new ImageData(w, h)
-  const erase = mode === 'erase'
-  const [r, g, b] = erase ? [239, 68, 68] : [34, 197, 94]
-  for (let i = 0; i < w * h; i++) {
-    if (erase ? data[i] : !data[i]) continue // erase marks OUTSIDE the selection; add marks inside
-    const o = i * 4
-    ov.data[o] = r; ov.data[o + 1] = g; ov.data[o + 2] = b; ov.data[o + 3] = 110
-  }
-  return ov
-}
 
 // ── blend layer (the s59-decoupled v5.3.1 2D artwork operation, verified by its own test gates) ──
 
@@ -170,7 +153,7 @@ async function buildPreseg(url: string, mask: Mask): Promise<MLResult> {
  *  cfg API: paddingMM 0 (Dan 2026-08-06 value-reflection: knob Offset 0 must mean a trace with NO
  *  built-in offset — the 1.5mm product padding hid an outset the knob didn't show; expansion is the
  *  Offset knob's job, reflected truthfully). */
-const LAB_CFG = { ...EFFECT_BUILD_CONFIG, minFeatureMM: detailToFloorMm(100), paddingMM: 0, edgeFinishPx: 8 }
+const LAB_CFG = { ...EFFECT_BUILD_CONFIG, minFeatureMM: detailToFloorMm(100), paddingMM: 0, edgeFinishPx: 12 }
 export const EDGE_FINISH_DEFAULT = LAB_CFG.edgeFinishPx
 
 /** The engine's G4 progress states surfaced to the shell — a degraded cut must NEVER be silent:

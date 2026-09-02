@@ -80,7 +80,7 @@ try {
 
   // Three rapidly accepted Paint gestures settle once each in capture order.
   // Use a smaller brush than the standalone seed so the erase cannot legitimately empty it.
-  await page.locator('input[type=number]').fill('5')
+  await page.locator('input[type=number]').first().fill('5')
   await page.evaluate(() => {
     window.__cutoutStatuses = []
     const line = [...document.querySelectorAll('p')].find((node) => node.textContent?.includes('Status:'))
@@ -212,12 +212,38 @@ try {
   assert.equal(await undoButton.isDisabled(), true, 'replacement must receive no active or queued tool history')
   assert.match(await status.textContent(), /image ready/, 'stale tool completion must not overwrite replacement status')
 
+  // Paint Autotune corrects the captured centre-line before shape generation. The same jittered
+  // gesture must keep its raw complexity at 0 and publish a materially cleaner outline at 100.
+  const paintAutotuneNodes = async (strength, name) => {
+    await upload({ name, mimeType: 'image/png', buffer: fixture })
+    await page.getByRole('button', { name: /Paint shape/ }).click()
+    await page.getByLabel('Paint autotune').fill(String(strength))
+    await page.getByLabel('Paint mask smoothing').fill('0')
+    const paintBox = await canvas.boundingBox()
+    assert(paintBox, 'Paint Autotune canvas must be visible')
+    const stroke = Array.from({ length: 21 }, (_, index) => ({
+      x: paintBox.x + paintBox.width * (0.2 + index * 0.025),
+      y: paintBox.y + paintBox.height * (index % 2 ? 0.51 : 0.49),
+    }))
+    await page.mouse.move(stroke[0].x, stroke[0].y)
+    await page.mouse.down()
+    for (const point of stroke.slice(1)) await page.mouse.move(point.x, point.y)
+    await page.mouse.up()
+    await status.filter({ hasText: /painted shape created/ }).waitFor({ timeout: 60_000 })
+    await page.getByRole('button', { name: /Nodes/ }).click()
+    return page.locator('svg circle:not([fill="transparent"])').count()
+  }
+  const rawPaintNodes = await paintAutotuneNodes(0, 'paint-autotune-raw.png')
+  const tunedPaintNodes = await paintAutotuneNodes(100, 'paint-autotune-full.png')
+  assert(tunedPaintNodes < rawPaintNodes, `Paint Autotune must reduce jitter nodes (${rawPaintNodes} → ${tunedPaintNodes})`)
+
   assert.deepEqual(consoleProblems, [], 'flow/history/tool journey must have no console errors or warnings')
   if (process.env.CUTOUT_V1_EVIDENCE) await page.screenshot({ path: process.env.CUTOUT_V1_EVIDENCE, fullPage: true })
   console.log(JSON.stringify({
     viewport,
     corruptOutputSha256: sha256(afterCorrupt),
     burstOrder: terminals.slice(-3),
+    paintAutotuneNodes: { raw: rawPaintNodes, tuned: tunedPaintNodes },
   }))
 } finally {
   await context.close()

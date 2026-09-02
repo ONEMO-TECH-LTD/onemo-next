@@ -26,7 +26,7 @@ import { resampleClosedUniform } from '@/lib/outline-core'
 import { flattenPath, ringToVPath, scaleAnchorTension, shapeBBox, type VShape, type VPath } from '@/lib/vector-core'
 // The geometry kernels, imported directly (not via the vector-core barrel) so Paper/Clipper stay in the
 // create bundle only, never the v1/v2/shaped bundles.
-import { roundCornersPaper, smoothPaper, simplifyPaper } from '@/lib/vector-core/paper-kernel'
+import { roundCornersPaper, smoothPaper } from '@/lib/vector-core/paper-kernel'
 import { straightenPath, roundWholeShapePx } from '@/lib/vector-core/clipper-kernel'
 import type { Pt } from './types'
 

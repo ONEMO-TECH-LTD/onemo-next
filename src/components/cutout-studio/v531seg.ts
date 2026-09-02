@@ -14,18 +14,6 @@ async function cutSource(source: HTMLCanvasElement): Promise<string> {
   return URL.createObjectURL(blob)
 }
 
-// CRASH BREADCRUMB (Dan device 2026-08-07: Detect HARD-CRASHES iOS Safari → the tab reloads,
-// destroying the eruda console before it can show the error). Each Detect stage is stamped to
-// localStorage BEFORE it runs and cleared on success; after a crash-reload the mount reader
-// (flow.warmup) surfaces the last stage reached — so we learn WHICH allocation died (engine cut vs
-// lab prepare/bake) with no surviving console. Lab-layer, always-on, ~two localStorage ops per cut.
-export function crashStage(s: string | null): void {
-  try { if (s === null) localStorage.removeItem('lab-detect-stage'); else localStorage.setItem('lab-detect-stage', s) } catch { /* private mode / no storage */ }
-}
-export function lastCrashStage(): string | null {
-  try { return localStorage.getItem('lab-detect-stage') } catch { return null }
-}
-
 function fallbackCutout(source: HTMLCanvasElement): MLResult {
   const yUp = document.createElement('canvas'); yUp.width = source.width; yUp.height = source.height
   const ctx = yUp.getContext('2d', { willReadFrequently: true })!
@@ -52,20 +40,21 @@ export async function segmentV531(
   uiW: number,
   uiH: number,
   isCurrent: () => boolean,
+  setDiagnosticStage: (stage: string | null) => void = () => {},
 ): Promise<{ mask: Mask; adapter: string; preseg: MLResult }> {
-  crashStage('1·encode-source')                 // encode the flow's already-bounded working canvas once
+  setDiagnosticStage('1·encode-source')
   const cutUrl = await cutSource(source)
   let r: MLResult
   try {
     if (!isCurrent()) throw new SegmentMLCancelled()
-    crashStage('2·engine-cut')                   // the v5.3.1 cut worker (u2net/ORT) — engine perimeter
+    setDiagnosticStage('2·engine-cut')
     try { r = await runCutout(cutUrl) }
     catch (error) {
       if (error instanceof SegmentMLCancelled) throw error
       r = fallbackCutout(source)
     }
   } finally { URL.revokeObjectURL(cutUrl) }
-  crashStage('3·derive-ui-mask')                 // lab-layer canvas flip/scale
+  setDiagnosticStage('3·derive-ui-mask')
   // Derive the y-down UI mask AT THE LAB'S canvas dims (the bridge's mask dims are its own config
   // and may differ) — canvas flip+scale in one pass. UI overlay/brush state only.
   const src = document.createElement('canvas'); src.width = r.width; src.height = r.height

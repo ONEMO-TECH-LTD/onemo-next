@@ -52,7 +52,7 @@ const nextConfig: NextConfig = {
     // match, so the 'paper/dist/paper-core' specifier itself is untouched.
     config.resolve = config.resolve || {};
     config.resolve.alias = { ...(config.resolve.alias || {}), paper$: "paper/dist/paper-core" };
-    // opencv.js (cutout-wand v2) is an Emscripten UMD that probes node's fs/path/crypto at runtime;
+    // opencv.js (Cutout GrabCut) is an Emscripten UMD that probes node's fs/path/crypto at runtime;
     // in the browser bundle those must resolve to empty stubs (standard Emscripten-on-webpack shim).
     if (!isServer) {
       config.resolve.fallback = { ...(config.resolve.fallback || {}), fs: false, path: false, crypto: false };

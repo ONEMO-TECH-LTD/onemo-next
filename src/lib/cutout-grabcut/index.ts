@@ -24,9 +24,18 @@ function loadCv(): Promise<any> {
 // nearest-neighbour edge polish. 512 is Photoshop-refine territory and keeps edges faithful.
 const GC_MAX = 512        // work-resolution cap (grabcut is O(pixels·iters))
 const GC_ITERS = 3        // graph-cut iterations
-const HALO_MULT = 3       // standalone: probable-fg halo radius = HALO_MULT × brush (a colour model to grow from)
-const CORRIDOR_MULT = 2.5 // refine: the grabcut label only applies within CORRIDOR_MULT × brush of the stroke
+const HALO_MULT = 3       // standalone: probable-fg halo radius = HALO_MULT × seed radius
+const CORRIDOR_MULT = 2.5 // refine: the grabcut label only applies within CORRIDOR_MULT × seed radius
 const CORRIDOR_MIN_PX = 24 // floor for the refine corridor radius (full-res px)
+
+export function grabCutBrushGeometry(brushDiameterPx: number) {
+  const seedRadiusPx = Math.max(0.5, brushDiameterPx / 2)
+  return {
+    seedRadiusPx,
+    haloRadiusPx: seedRadiusPx * HALO_MULT,
+    corridorRadiusPx: Math.max(seedRadiusPx * CORRIDOR_MULT, CORRIDOR_MIN_PX),
+  }
+}
 
 /** GrabCut brush (Dan 2026-08-07: a SEPARATE tool that recognises a shape ON ITS OWN, and also
  *  refines the u2net cut). Two modes, chosen by whether a base selection exists:
@@ -34,9 +43,9 @@ const CORRIDOR_MIN_PX = 24 // floor for the refine corridor radius (full-res px)
  *     object's real edges and returns that whole shape (no corridor — there is nothing to protect).
  *   • REFINE (base exists): add/erase the stroke region, bounded to a corridor so the rest of the
  *     cut is preserved (erase can't destroy, add can't over-reach — meta R12-1).
- *  `stroke` points are FULL-RES image px; `brushPx` the swath radius. */
+ *  `stroke` points are FULL-RES image px; `brushDiameterPx` is the visible swath diameter. */
 export async function grabCutRefine(
-  image: HTMLCanvasElement, base: Mask | null, stroke: { x: number; y: number }[], brushPx: number, erase: boolean,
+  image: HTMLCanvasElement, base: Mask | null, stroke: { x: number; y: number }[], brushDiameterPx: number, erase: boolean,
 ): Promise<Mask> {
   const W = image.width, H = image.height
   let baseArea = 0
@@ -55,7 +64,9 @@ export async function grabCutRefine(
   const rgb = new cv.Mat(); cv.cvtColor(src, rgb, cv.COLOR_RGBA2RGB)
 
   const gc = new cv.Mat(h, w, cv.CV_8UC1)
-  const r = Math.max(1, brushPx * scale)
+  const brush = grabCutBrushGeometry(brushDiameterPx)
+  const r = Math.max(1, brush.seedRadiusPx * scale)
+  const haloR = Math.max(1, brush.haloRadiusPx * scale)
   const stamp = (cx: number, cy: number, rad: number, val: number) => {
     const x0 = Math.max(0, Math.floor(cx - rad)), x1 = Math.min(w - 1, Math.ceil(cx + rad))
     const y0 = Math.max(0, Math.floor(cy - rad)), y1 = Math.min(h - 1, Math.ceil(cy + rad))
@@ -70,7 +81,7 @@ export async function grabCutRefine(
     // STANDALONE: bg everywhere, a generous halo of PROBABLE fg around the stroke (a fg colour
     // model to grow from), the stroke swath itself DEFINITE fg. GrabCut expands to the object edge.
     gc.data.fill(cv.GC_PR_BGD)
-    for (const p of stroke) stamp(p.x * scale, p.y * scale, r * HALO_MULT, cv.GC_PR_FGD)
+    for (const p of stroke) stamp(p.x * scale, p.y * scale, haloR, cv.GC_PR_FGD)
     for (const p of stroke) { stamp(p.x * scale, p.y * scale, r, cv.GC_FGD); marked++ }
   } else {
     // REFINE: seed from the current selection, stamp the stroke as hard fg (add) / bg (erase)
@@ -97,7 +108,7 @@ export async function grabCutRefine(
       // a colour-uniform subject an erase stroke could flip the WHOLE object to background. Apply the
       // grabcut label only INSIDE a corridor around the stroke; everywhere else the base is preserved.
       // The snap stays local — erase can't destroy, add can't over-reach (erase-bounded-by-gesture).
-      const corridorR = Math.max(brushPx * CORRIDOR_MULT, CORRIDOR_MIN_PX)
+      const corridorR = brush.corridorRadiusPx
       const cr2 = corridorR * corridorR
       const seg = stroke.length ? stroke : [{ x: 0, y: 0 }]
       let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
