@@ -127,31 +127,28 @@ export interface BandSolve {
   bestSeated: { revealMM: number; points: Pt[] } | null
 }
 
-/** PRIORITY HOLD POINTS on a Canon frame (Dan, 2026-09-01: "top/corners are priorities of the
- *  canon … symmetry is more side to side"). Gravity is the only orientation — the same groups read
- *  the same way on portrait, landscape and square frames, so there is no long-axis choice to make.
- *  Classifier data; layout and judge consume.
- *  - topIds: the frame's highest row — "top is always number 1 priority … cause we have gravity".
- *    Held means at least one lawful seat on it; how it is held is symmetry's business.
- *  - topCornerIds / bottomCornerIds: the frame's corner nodes (deduped on a one-column frame).
- *    The bottom corners are the base — "extremes are the utmost priority".
- *  - interiorRowIds: one id-list per interior row, present only when the frame has four or more
- *    rows — "4 rows … one magnet row in the mid section also nice; 3 rows … skip mid".
- *  - mirrorOf: left↔right partner in the same row, -1 when the node is its own — the orphan test.
- *    Rows may differ from each other (1 over 2 is a triangle, and a triangle holds).
- *  - slim: the classifier's existing slim rule (minor axis ≤ 2 lines); slim frames may centre
- *    before they tighten. */
+/** PRIORITY HOLD POINTS on a Canon frame (Dan, 2026-09-01/02: "top/corners are priorities of the
+ *  canon … symmetry is more side to side"). Gravity is the only orientation. Classifier data;
+ *  layout and judge consume.
+ *
+ *  Corners and mirrors are judged on the PLACEMENT'S OWN EXTENT, never the frame's: a three-column
+ *  body inside a four-column frame has its own two base corners and its own centre column, and the
+ *  empty fourth column is not a missing corner nor a row of orphans (2026-09-02, BOT B5). So the
+ *  classifier hands out only what is fixed by the frame — each node's column and row, and which row
+ *  is the top — and the tuple derives corners and partners from the seats actually held.
+ *  - colOf / rowOf: node line indices on the frame (0 = left / bottom).
+ *  - topRow: the frame's highest row — "top is always number 1 priority … cause we have gravity".
+ *    Held means at least one lawful seat on it.
+ *  - rows: frame row count; interior rows count only when >= 4 — "4 rows … one magnet row in the mid
+ *    section also nice; 3 rows … skip mid".
+ *  - slim / centreAxis: the classifier's existing slim rule (minor axis <= 2 lines) and the axis a
+ *    slim frame centres on (its minor axis). */
 export interface CanonPriority {
-  topIds: number[]
-  topCornerIds: number[]
-  bottomCornerIds: number[]
-  interiorRowIds: number[][]
-  mirrorOf: number[]
+  colOf: number[]
+  rowOf: number[]
+  topRow: number
+  rows: number
   slim: boolean
-  /** The axis a slim frame is centred on — its minor axis (0 = x for a tall strip, 1 = y for a
-   *  banner). "slim vertical and horizontal rectangles and even banners can be centered in the
-   *  shape closer to the center point vertical or horizontal axis in preference to wrapped tight
-   *  size" (Dan, 2026-09-01). Meaningful only when `slim`. */
   centreAxis: 0 | 1
 }
 

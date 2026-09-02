@@ -1116,10 +1116,10 @@ describe('8 — recovered phase search is wired through the production Canon sol
 })
 
 describe('9 — priority hold points are classifier data', () => {
-  // Gate 1 (2026-09-01): source + unit only. Nothing consumes this yet; no runtime claim is made.
-  // Dan's rulings recorded here: top = at least one lawful top seat (A3); priorities are top +
-  // corners, symmetry is side-to-side and separate; gravity is the only orientation, so a square
-  // needs no long-axis ruling (A4 dissolved).
+  // Gate 1 (2026-09-01/02): source + unit only. Dan's rulings recorded here: top = at least one
+  // lawful top seat; priorities are top + corners, symmetry is side-to-side and separate; gravity is
+  // the only orientation (no long-axis ruling); corners and mirrors are judged on the PLACEMENT'S
+  // own extent, never the frame's (BOT B5: a three-column body in a four-column frame).
   const frame = (cols: number, rows: number): Pt[] => {
     const out: Pt[] = []
     for (let ix = 0; ix < cols; ix++) for (let iy = 0; iy < rows; iy++)
@@ -1127,58 +1127,44 @@ describe('9 — priority hold points are classifier data', () => {
     return out                                   // id = ix * rows + iy
   }
   const id = (cols: number, rows: number, ix: number, iy: number) => ix * rows + iy
-  const sorted = (xs: number[]) => [...xs].sort((a, b) => a - b)
 
-  it('portrait 2x3: top row, top and bottom corners, no interior, left-right mirrors', () => {
+  it('portrait 2x3: columns/rows, top row, no interior on three rows, slim on x', () => {
     const p = canonPriorityOf(frame(2, 3))!
-    expect(sorted(p.topIds)).toEqual([id(2,3,0,2), id(2,3,1,2)])
-    expect(sorted(p.topCornerIds)).toEqual([id(2,3,0,2), id(2,3,1,2)])
-    expect(sorted(p.bottomCornerIds)).toEqual([id(2,3,0,0), id(2,3,1,0)])
-    expect(p.interiorRowIds).toEqual([])
-    expect(p.mirrorOf[id(2,3,0,1)]).toBe(id(2,3,1,1))
-    expect(p.slim).toBe(true)
-    expect(p.centreAxis, 'a tall strip centres on x').toBe(0)
+    expect(p.colOf[id(2,3,1,2)]).toBe(1); expect(p.rowOf[id(2,3,1,2)]).toBe(2)
+    expect(p.topRow).toBe(2); expect(p.rows).toBe(3)
+    expect(p.slim).toBe(true); expect(p.centreAxis, 'a tall strip centres on x').toBe(0)
+    // full frame: top, both base ends, no interior asked, zero orphans, 6 seats
+    expect(priorityTupleOf(frame(2, 3).map((_, i) => i), p)).toEqual([1, 1, 1, 0, 6])
   })
-  it('landscape 3x2 reads by gravity too: corners are the ends of its two rows, mirrors left-right', () => {
+  it('landscape 3x2 reads by gravity too: top row is row 1, banner centres on y', () => {
     const p = canonPriorityOf(frame(3, 2))!
-    expect(sorted(p.topIds)).toEqual([id(3,2,0,1), id(3,2,1,1), id(3,2,2,1)])
-    expect(sorted(p.topCornerIds)).toEqual([id(3,2,0,1), id(3,2,2,1)])
-    expect(sorted(p.bottomCornerIds)).toEqual([id(3,2,0,0), id(3,2,2,0)])
-    expect(p.interiorRowIds).toEqual([])
-    expect(p.mirrorOf[id(3,2,0,0)]).toBe(id(3,2,2,0))
-    expect(p.mirrorOf[id(3,2,1,0)]).toBe(-1)
-    expect(p.slim).toBe(true)
-    expect(p.centreAxis, 'a banner centres on y').toBe(1)
+    expect(p.topRow).toBe(1); expect(p.slim).toBe(true); expect(p.centreAxis).toBe(1)
+    // held: full bottom row + only the centre top seat → top held, both base ends, zero orphans
+    expect(priorityTupleOf([id(3,2,0,0), id(3,2,1,0), id(3,2,2,0), id(3,2,1,1)], p)).toEqual([1, 1, 1, 0, 4])
   })
-  it('square 3x3 needs no axis ruling: same groups, centre column self-mirrored, not slim', () => {
+  it('square 3x3 needs no axis ruling; a lone off-centre top seat is an orphan; not slim', () => {
     const p = canonPriorityOf(frame(3, 3))!
-    expect(sorted(p.topIds)).toEqual([id(3,3,0,2), id(3,3,1,2), id(3,3,2,2)])
-    expect(sorted(p.topCornerIds)).toEqual([id(3,3,0,2), id(3,3,2,2)])
-    expect(sorted(p.bottomCornerIds)).toEqual([id(3,3,0,0), id(3,3,2,0)])
-    expect(p.interiorRowIds).toEqual([])
-    expect(p.mirrorOf[id(3,3,1,1)]).toBe(-1)
-    expect(p.mirrorOf[id(3,3,0,1)]).toBe(id(3,3,2,1))
     expect(p.slim).toBe(false)
+    expect(priorityTupleOf([id(3,3,0,0), id(3,3,2,0), id(3,3,1,2)], p)).toEqual([1, 1, 1, 0, 3])
+    expect(priorityTupleOf([id(3,3,0,0), id(3,3,2,0), id(3,3,0,2)], p)).toEqual([1, 1, 1, -1, 3])
   })
-  it('one-column 1x3: a corner is one node, nothing mirrors, no interior; 3x4 offers each interior row', () => {
+  it('one-column 1x3 has no partners to miss; 3x4 asks for an interior row', () => {
     const three = canonPriorityOf(frame(1, 3))!
-    expect(three.topCornerIds).toEqual([id(1,3,0,2)])
-    expect(three.bottomCornerIds).toEqual([id(1,3,0,0)])
-    expect(three.interiorRowIds).toEqual([])
-    expect(three.mirrorOf.every((m) => m === -1)).toBe(true)
+    expect(priorityTupleOf([id(1,3,0,0), id(1,3,0,2)], three)).toEqual([1, 1, 1, 0, 2])
     const four = canonPriorityOf(frame(3, 4))!
-    expect(sorted(four.bottomCornerIds)).toEqual([id(3,4,0,0), id(3,4,2,0)])
-    expect(sorted(four.topIds)).toEqual([id(3,4,0,3), id(3,4,1,3), id(3,4,2,3)])
-    expect(four.interiorRowIds.map(sorted)).toEqual([
-      [id(3,4,0,1), id(3,4,1,1), id(3,4,2,1)], [id(3,4,0,2), id(3,4,1,2), id(3,4,2,2)]])
-    expect(four.slim).toBe(false)
+    expect(four.rows).toBe(4)
+    expect(priorityTupleOf([id(3,4,0,0), id(3,4,2,0), id(3,4,1,3)], four), 'no interior row held').toEqual([1, 1, 0, 0, 3])
+    expect(priorityTupleOf([id(3,4,0,0), id(3,4,2,0), id(3,4,0,2), id(3,4,2,2), id(3,4,1,3)], four)).toEqual([1, 1, 1, 0, 5])
   })
-  it('each derivation is load-bearing: corners exclude middles, pitch drives the line index, empty is null', () => {
-    const p = canonPriorityOf(frame(3, 4))!
-    expect(p.bottomCornerIds).not.toContain(id(3,4,1,0))
-    expect(p.topCornerIds).not.toContain(id(3,4,1,3))
-    // a wrong pitch collapses every node onto line 0 → top row becomes the whole frame
-    expect(canonPriorityOf(frame(2, 3), 4800)!.topIds).toHaveLength(6)
+  it('THE B5 CASE: three columns of a four-column frame are symmetric about their own centre with their own base corners', () => {
+    const p = canonPriorityOf(frame(4, 5))!
+    const threeCols = [1, 2, 3].flatMap((c) => [0, 1, 2, 3, 4].map((r) => id(4,5,c,r)))
+    expect(priorityTupleOf(threeCols, p)).toEqual([1, 1, 1, 0, 15])
+    // and the frame-relative reading this replaces would have called col 3 orphans and col 0 a missing corner
+    expect(symmetricCore(threeCols, p)).toEqual(threeCols)
+    // symmetric core drops a genuine orphan and re-judges on the narrowed span
+    const withOrphan = [id(4,5,1,0), id(4,5,3,0), id(4,5,2,4), id(4,5,0,2)]   // col 0 seat has no partner at col 4
+    expect(symmetricCore(withOrphan, p)).toEqual([id(4,5,1,0), id(4,5,3,0), id(4,5,2,4)])
     expect(canonPriorityOf([])).toBeNull()
   })
 })
@@ -1337,9 +1323,6 @@ describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside
     const optimal = solve.offers.find((o) => o.roles.includes('optimal'))!
     const ids = optimal.at.points.map(([x, y]) => local.findIndex(([a, b]) => Math.abs(a - (x - optimal.at.originMM[0])) < 1e-6 && Math.abs(b - (y - optimal.at.originMM[1])) < 1e-6))
     expect(priorityTupleOf(ids, priority).slice(0, 4)).toEqual([1, 1, 1, 0])
-    // and the pure helper: dropping orphans keeps self-mirrored and paired seats only
-    expect(symmetricCore([0, 1, 2], { ...priority, mirrorOf: [-1, 2, 1] })).toEqual([0, 1, 2])
-    expect(symmetricCore([0, 1], { ...priority, mirrorOf: [-1, 2, 1] })).toEqual([0])
   }, 300_000)
 
   it('the worker lands on optimal, never on the canon comparison row', async () => {

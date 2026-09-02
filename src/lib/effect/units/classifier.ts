@@ -220,12 +220,9 @@ export function classFrameNodes(
 // with it. No catalogue field, no lookup, no shape names, and no long-axis choice: gravity is the
 // only orientation, so a square, a banner and a strip all read the same way.
 
-/** Which nodes of a Canon frame are priority holds.
- *
- *  Lines are read off the frame's own node coordinates (index = round((v − min) / pitch)). Rows are
- *  y-lines; the TOP row is the highest. Corners are the ends of the top and bottom rows, deduped so
- *  a one-column frame's corner is one node. Mirrors pair left↔right within a row only — rows are
- *  free to differ (1 over 2 is a triangle, and a triangle holds). */
+/** The frame facts the priority rule needs: each node's column and row, the top row, the row count
+ *  and the slim rule. Corners and mirror partners are NOT emitted — they belong to the placement,
+ *  not the frame, and the tuple derives them from the seats actually held. */
 export function canonPriorityOf(
   canonLocalMM: ReadonlyArray<Pt>, pitchMM: number = DEFAULT_PITCH_MM,
 ): CanonPriority | null {
@@ -234,25 +231,10 @@ export function canonPriorityOf(
     const vs = canonLocalMM.map((p) => p[axis]), min = Math.min(...vs)
     return vs.map((v) => Math.round((v - min) / pitchMM))
   }
-  const col = lineIdx(0), row = lineIdx(1)
-  const cols = Math.max(...col) + 1, rows = Math.max(...row) + 1
-  const ids = canonLocalMM.map((_, i) => i)
-  const onRow = (r: number) => ids.filter((i) => row[i] === r)
-  const cornersOf = (r: number) => [...new Set(ids.filter((i) => row[i] === r && (col[i] === 0 || col[i] === cols - 1)))]
-
-  const topIds = onRow(rows - 1)
-  const topCornerIds = cornersOf(rows - 1)
-  const bottomCornerIds = cornersOf(0)
-  const interiorRowIds: number[][] = []
-  if (rows >= 4) for (let r = 1; r < rows - 1; r++) interiorRowIds.push(onRow(r))
-  const at = new Map<string, number>()
-  ids.forEach((i) => at.set(row[i] + ':' + col[i], i))
-  const mirrorOf = ids.map((i) => {
-    const m = at.get(row[i] + ':' + (cols - 1 - col[i]))
-    return m === undefined || m === i ? -1 : m
-  })
+  const colOf = lineIdx(0), rowOf = lineIdx(1)
+  const cols = Math.max(...colOf) + 1, rows = Math.max(...rowOf) + 1
   // Slim is the classifier's existing rule (FrameKind): a minor axis of one or two lines.
   const slim = Math.min(cols, rows) <= 2
   const centreAxis: 0 | 1 = cols <= rows ? 0 : 1
-  return { topIds, topCornerIds, bottomCornerIds, interiorRowIds, mirrorOf, slim, centreAxis }
+  return { colOf, rowOf, topRow: rows - 1, rows, slim, centreAxis }
 }

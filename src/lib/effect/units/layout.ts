@@ -190,27 +190,55 @@ export interface CanonPhaseSearch {
   cacheHits: number
 }
 
-/** THE PRIORITY TUPLE (Dan, 2026-09-01), highest first: top row held · both bottom corners held ·
- *  an interior row held (1 when the frame has none to ask for) · fewest left↔right orphans · most
- *  seats. Computed from held node ids alone, so it costs the same per window as counting did. */
-export function priorityTupleOf(heldIds: ReadonlyArray<number>, priority: CanonPriority, scratch?: Uint8Array): number[] {
-  const held = scratch ?? new Uint8Array(priority.mirrorOf.length)
-  if (scratch) held.fill(0)
-  for (const i of heldIds) held[i] = 1
-  const any = (ids: ReadonlyArray<number>) => ids.some((i) => held[i] === 1) ? 1 : 0
-  const both = priority.bottomCornerIds.every((i) => held[i] === 1) ? 1 : 0
-  const interior = priority.interiorRowIds.length === 0 ? 1
-    : priority.interiorRowIds.some((row) => row.some((i) => held[i] === 1)) ? 1 : 0
-  let orphans = 0
-  for (const i of heldIds) { const m = priority.mirrorOf[i]; if (m !== -1 && held[m] !== 1) orphans++ }
-  return [any(priority.topIds), both, interior, 0 - orphans, heldIds.length]
+/** Left↔right partner of a held node across the PLACEMENT'S own column span: same row, column
+ *  mirrored between the leftmost and rightmost held columns. -1 when the node is its own mirror. */
+function partnerOf(i: number, heldIds: ReadonlyArray<number>, held: Uint8Array, loCol: number, hiCol: number, priority: CanonPriority): number {
+  const want = loCol + hiCol - priority.colOf[i]
+  if (want === priority.colOf[i]) return -1
+  for (const j of heldIds) if (priority.rowOf[j] === priority.rowOf[i] && priority.colOf[j] === want) return held[j] ? j : -2
+  return -2                                            // partner position exists nowhere in the held set
 }
 
-/** The held ids with every unmatched seat removed — a seat whose mirror partner is absent goes,
- *  its partner (absent) is nothing to keep. Ids stay sorted as given. */
+/** THE PRIORITY TUPLE (Dan, 2026-09-01/02), highest first: top row held · both ends of the
+ *  placement's own base held · an interior row held (1 when the frame has none to ask for) · fewest
+ *  left↔right orphans across the placement's own span · most seats. Computed from held ids alone. */
+export function priorityTupleOf(heldIds: ReadonlyArray<number>, priority: CanonPriority, scratch?: Uint8Array): number[] {
+  const held = scratch ?? new Uint8Array(priority.colOf.length)
+  if (scratch) held.fill(0)
+  let loCol = Infinity, hiCol = -Infinity, top = 0, interior = priority.rows >= 4 ? 0 : 1
+  for (const i of heldIds) {
+    held[i] = 1
+    const c = priority.colOf[i], r = priority.rowOf[i]
+    if (c < loCol) loCol = c
+    if (c > hiCol) hiCol = c
+    if (r === priority.topRow) top = 1
+    if (r > 0 && r < priority.topRow) interior = 1
+  }
+  let baseLo = 0, baseHi = 0, orphans = 0
+  for (const i of heldIds) {
+    if (priority.rowOf[i] === 0) { if (priority.colOf[i] === loCol) baseLo = 1; if (priority.colOf[i] === hiCol) baseHi = 1 }
+    if (partnerOf(i, heldIds, held, loCol, hiCol, priority) === -2) orphans++
+  }
+  return [top, baseLo && baseHi ? 1 : 0, interior, 0 - orphans, heldIds.length]
+}
+
+/** The held ids with every unmatched seat removed, judged on the placement's own span. An orphan
+ *  on an extreme column is peeled ONE SIDE AT A TIME — dropping it narrows the span and the body
+ *  inside is re-judged about its own centre; when both edges carry orphans, the side whose removal
+ *  keeps more seats wins (left on a tie). Interior orphans go last. */
 export function symmetricCore(heldIds: ReadonlyArray<number>, priority: CanonPriority): number[] {
-  const held = new Set(heldIds)
-  return heldIds.filter((i) => { const m = priority.mirrorOf[i]; return m === -1 || held.has(m) })
+  const ids = [...heldIds]
+  const held = new Uint8Array(priority.colOf.length); for (const i of ids) held[i] = 1
+  let lo = Infinity, hi = -Infinity
+  for (const i of ids) { lo = Math.min(lo, priority.colOf[i]); hi = Math.max(hi, priority.colOf[i]) }
+  const orphan = (i: number) => partnerOf(i, ids, held, lo, hi, priority) === -2
+  const peel = (col: number) => symmetricCore(ids.filter((i) => !(priority.colOf[i] === col && orphan(i))), priority)
+  const loOrphan = ids.some((i) => priority.colOf[i] === lo && orphan(i))
+  const hiOrphan = lo !== hi && ids.some((i) => priority.colOf[i] === hi && orphan(i))
+  if (loOrphan && hiOrphan) { const a = peel(lo), b = peel(hi); return b.length > a.length ? b : a }
+  if (loOrphan) return peel(lo)
+  if (hiOrphan) return peel(hi)
+  return ids.filter((i) => !orphan(i))
 }
 
 const fullPriority = (t: ReadonlyArray<number> | null): t is number[] =>
