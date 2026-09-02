@@ -1,4 +1,4 @@
-# T2 — Seal the admin shell: plan (v1, for QA then Dan's lock · engine v3.5.7-2 → v3.5.8)
+# T2 — Seal the admin shell: plan (v2, for QA then Dan's lock · engine v3.5.7-2 → v3.5.8)
 
 Roadmap v3 task 2. Baseline: staging `0315aabe` (T1 merged). Directive test: "delete `src/app/` — the
 engine is whole; the page computes nothing." /o-build outcome · non-goals · files · proof below.
@@ -13,10 +13,9 @@ engine is whole; the page computes nothing." /o-build outcome · non-goals · fi
   or `./types`; `STEP 5` pins the page to call `libraryStageModel` exactly once. The bridge could not
   compute, so the page did. **The roadmap's wording "libraryStageModel returns the segments" is
   therefore not lawful as written** — corrected here, not worked around.
-- **Other door value imports on the page:** `DEFAULT_PITCH_MM`, `bandOuterMM` (band → outline span for
-  the manual-size control floor/range, 3 sites). `bandOuterMM` is a Spec-derived range, not a
-  measurement of a shape; it stays and is recorded as an observation (a later Spec/adapter home is
-  T-later, not T2 — no invented scope).
+- **Other live page compute:** `bandOuterMM` at page lines 364, 452 and 551. It is `units/layout.ts:90-92`
+  arithmetic, not a Spec value. `DEFAULT_PITCH_MM` and `GridResult`/`MagnetPlan`/`SafeSegment` are shared
+  values/types and can come directly from Spec/types; only the range calculation needs an adapter.
 - Shell pins today: page unit edges `[]` (T1) · worker `[]` · zone 2 "page reaches module only through
   door / spec / bridge / library-bridge" — which is what let a door **barrel** export carry compute in.
 
@@ -24,9 +23,10 @@ engine is whole; the page computes nothing." /o-build outcome · non-goals · fi
 
 | # | change | class |
 |---|---|---|
-| 1 | `src/lib/effect/adapters/libraryViewModel.ts` — `librarySegments(stage: { contour }): SafeSegment[]` = the two lines from the page, **moved**: `safeSegments(stage.contour, spotRadiusOf(RELEASED_PADDING_MM), 'full')`. Imports `safeSegments`, `spotRadiusOf` from the door and `RELEASED_PADDING_MM` from Spec. | MOVE (page → adapter) |
-| 2 | `page.tsx` — `librarySegments` memo calls the adapter; `safeSegments`, `spotRadiusOf` imports deleted (orphans of the move). | MOVE |
-| 3 | `grid-magnet-separation.test.ts` zone 2 — the page's door imports are pinned to an **exact allow-list**: values `DEFAULT_PITCH_MM`, `bandOuterMM`; types only otherwise. Any computational door export (`safeSegments`, `spotRadiusOf`, `computeGrid`, `classifyBands`, …) fails. Zone 2e — the new adapter is governed: its runtime edges are exactly `@/lib/effect/grid-magnet` (door) and `@/lib/effect/grid-magnet-spec`; it may not import units, pipeline, or the app. `gridViewModel.ts` stays type-only (unchanged rule). | GATE |
+| 1 | `src/lib/effect/adapters/libraryViewModel.ts` — `librarySegments(stage: { contour }): SafeSegment[]` is the two moved page lines: `safeSegments(stage.contour, spotRadiusOf(RELEASED_PADDING_MM), 'full')`. Runtime imports are the door and Spec; `SafeSegment` is type-only. | MOVE |
+| 2 | `src/lib/effect/adapters/gridViewModel.ts` — add `bandRangeForControl(band, paddingMM)`, a one-line delegate to `bandOuterMM`. `toPageModel` remains unchanged and projection-only. | MOVE |
+| 3 | `page.tsx` — call `librarySegments(libraryModel)` and `bandRangeForControl(...)`; delete `safeSegments`, `spotRadiusOf`, `bandOuterMM`, and every `grid-magnet` barrel import. Import `DEFAULT_PITCH_MM` from Spec and `GridResult`, `MagnetPlan`, `SafeSegment` from shared types. | MOVE |
+| 4 | `grid-magnet-separation.test.ts` — pin page runtime engine-barrel imports to `[]`; page type imports may only be shared types/adapters/Spec. Pin `libraryViewModel` runtime edges to door + Spec; pin `gridViewModel`'s sole runtime edge to the door's `bandOuterMM`, while `toPageModel` remains type-only/projection-only. | GATE |
 
 Nothing else. Bridge untouched (library law). Engine untouched. No new control, no behaviour change.
 
@@ -44,10 +44,12 @@ Nothing else. Bridge untouched (library law). Engine untouched. No new control, 
 
 ## 3 · Proof (Done means)
 
-1. Page source: no `safeSegments`, `spotRadiusOf`, `computeGrid`, `classifyBands`, `measureProtection`,
-   `solveGrid` anywhere; door imports equal the pinned allow-list; unit/foundation/pipeline edges `[]`.
-2. `librarySegments(stage)` equals `safeSegments(stage.contour, spotRadiusOf(RELEASED_PADDING_MM), 'full')`
-   for a canon record (structural equality) — the move changed nothing.
+1. Page source has no import from `@/lib/effect/grid-magnet` and no calls to `safeSegments`, `spotRadiusOf`,
+   `bandOuterMM`, `computeGrid`, `classifyBands`, `measureProtection` or `solveGrid`. Page runtime engine
+   input is adapters plus Spec only; shared types are type-only.
+2. For one canon record, `librarySegments(stage)` structurally equals the former
+   `safeSegments(stage.contour, spotRadiusOf(RELEASED_PADDING_MM), 'full')`. For every band and permitted
+   padding, `bandRangeForControl(band, padding)` equals the former `bandOuterMM(band, padding)`.
 3. Mutation: re-adding `import { safeSegments } from '@/lib/effect/grid-magnet'` to the page fails zone 2;
    a unit import in the adapter fails zone 2e.
 4. Existing library gates unchanged and green (`architecture-gates`, `grid-layout-library`).
@@ -56,7 +58,7 @@ Nothing else. Bridge untouched (library law). Engine untouched. No new control, 
 6. Full suite green (serial), tsc clean, strict changed-file lint clean.
 
 ## 4 · Non-goals (recorded, not dropped)
-`bandOuterMM` on the page (Spec-derived range for a control) · `recog` readout · policy re-rooming out
+`recog` readout · policy re-rooming out
 of the pipeline · anything in `library/**`.
 
 ## 5 · Necessity / sufficiency
