@@ -1,4 +1,4 @@
-# T2 — Seal the admin shell: plan (v2, for QA then Dan's lock · engine v3.5.7-2 → v3.5.8)
+# T2 — Seal the admin shell: plan (v3, for QA then Dan's lock · engine v3.5.7-2 → v3.5.8)
 
 Roadmap v3 task 2. Baseline: staging `0315aabe` (T1 merged). Directive test: "delete `src/app/` — the
 engine is whole; the page computes nothing." /o-build outcome · non-goals · files · proof below.
@@ -50,8 +50,9 @@ Nothing else. Bridge untouched (library law). Engine untouched. No new control, 
 2. For one canon record, `librarySegments(stage)` structurally equals the former
    `safeSegments(stage.contour, spotRadiusOf(RELEASED_PADDING_MM), 'full')`. For every band and permitted
    padding, `bandRangeForControl(band, padding)` equals the former `bandOuterMM(band, padding)`.
-3. Mutation: re-adding `import { safeSegments } from '@/lib/effect/grid-magnet'` to the page fails zone 2;
-   a unit import in the adapter fails zone 2e.
+3. Mutations: re-adding either `import { safeSegments } from "@/lib/effect/grid-magnet"` or
+   `import { bandOuterMM } from "@/lib/effect/grid-magnet"` to the page fails the page barrel gate; adding a
+   unit import to either `libraryViewModel.ts` or `gridViewModel.ts` fails the adapter gate.
 4. Existing library gates unchanged and green (`architecture-gates`, `grid-layout-library`).
 5. Live (4065, exact head): Library tab, square 3×3 — legal box drawn as today; Bench unchanged on the
    four cutouts; console 0. Screenshot cited.
