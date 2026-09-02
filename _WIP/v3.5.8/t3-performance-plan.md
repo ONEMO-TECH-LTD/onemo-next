@@ -1,4 +1,4 @@
-# T3 — Performance: measurement and the one fix it justifies (v2, for QA then Dan's lock)
+# T3 — Performance: measurement and the one fix it justifies (v3, for QA then Dan's lock)
 
 Roadmap v3 task 3. Baseline: staging `f093e673` (T1+T2 merged). Everything below is measured on the
 headless call `solveGrid` in Node (no browser), four cutouts × bands 1–5, pitch 48 mm, rim 12 mm,
@@ -82,6 +82,6 @@ the measurement and the one lawful speed-up.
 5. `rg -n "\bcacheHits\b" src/lib/effect --glob "!__tests__/**"` returns no production reference.
 
 ## 6 · Necessity / sufficiency
-No unnecessary elements: one deletion in two places, justified by a measured 0 % hit rate and a measured
-−23 %; the second candidate is rejected by its own measurement. Delivers T3's brief in full: measured
+No unnecessary elements: deletion of the two zero-hit maps and their now-dead trace plumbing, justified by
+a measured 0 % hit rate and a measured −23 %; the second candidate is rejected by its own measurement. Delivers T3's brief in full: measured
 first, fixed only where measured, offers unchanged, and the run-where decision handed to Dan with numbers.
