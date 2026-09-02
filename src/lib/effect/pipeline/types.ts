@@ -16,16 +16,18 @@ export interface GridRequest {
   activeBandIds?: number[]
 }
 
-/** S1: exactly what the worker posted as `model` — the projection split arrives in S2. */
+/** Domain facts and domain decisions, never page projection. Field list copied from the worker's
+ *  pre-postMessage result (T1 S1); `rungs` are the offered layouts as data, `selectedRungIndex` is the
+ *  Rule-4 / manual selection the engine made, `classificationDiagnostics` the classifier's readout. */
 export interface GridSolve {
   contour: Contour
   grid: GridResult
   effSize: number
-  ladder: Array<{ sizeMM: number; count: number; offMM: number; roles: string[] }>
-  idx: number
+  rungs: Array<{ sizeMM: number; count: number; offMM: number; roles: string[] }>
+  selectedRungIndex: number
   segments: SafeSegment[]
   offMM?: number
-  recog?: { family: string; cols: number; rows: number; segWmm: number; segHmm: number }
+  classificationDiagnostics?: { family: string; cols: number; rows: number; segWmm: number; segHmm: number }
   bandClass?: unknown
   bandClasses?: unknown
   recommendation?: unknown

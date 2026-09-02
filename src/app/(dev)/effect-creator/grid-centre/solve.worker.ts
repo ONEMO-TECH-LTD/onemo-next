@@ -3,13 +3,14 @@
 
 import { solveGrid } from '@/lib/effect/pipeline/solve'
 import type { GridRequest } from '@/lib/effect/pipeline/types'
+import { toPageModel } from '@/lib/effect/adapters/gridViewModel'
 
 const ctx = self as unknown as Worker
 
 ctx.onmessage = (e: MessageEvent<GridRequest & { id: number }>) => {
   const { id, ...req } = e.data
   try {
-    ctx.postMessage({ id, model: solveGrid(req) })
+    ctx.postMessage({ id, model: toPageModel(solveGrid(req)) })
   } catch (err) {
     ctx.postMessage({ id, model: null, error: String((err as Error)?.message ?? err) })
   }
