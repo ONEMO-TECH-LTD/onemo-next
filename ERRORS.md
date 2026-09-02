@@ -198,3 +198,21 @@
 - Remember: use `npm audit` as evidence, not as a bulk updater or a score to game. Never force a
   transitive dependency across its caller's declared major; the real gate is audit classification plus
   the affected tool running successfully.
+
+## 2026-08-09 — changed Cutout output needed per-browser golden refresh
+
+- Failed: the shared edge-finish oracle retained the pre-feather Chromium and WebKit PNG dimensions
+  and hashes, so its first two runs stopped once each browser exposed the intentional new output.
+- Worked: capture each browser's exact fixed-viewport output after the admin value changed from 3px
+  to 5px, freeze both goldens, then rerun the complete two-browser oracle.
+- Remember: when a product-approved pixel change intentionally alters a golden, collect Chromium and
+  WebKit witnesses separately before declaring the updated oracle deterministic.
+
+## 2026-08-09 — current-code GrabCut oracle hit the timing gate during golden refresh
+
+- Failed: two immediate reruns stopped at the existing 10-second real-route timing assertion before
+  reaching the intentional PURE-default output witnesses.
+- Worked: temporarily widen only the local capture pass, collect the new deterministic pixel goldens,
+  restore the 10-second acceptance threshold, then rerun the final oracle on an idle server.
+- Remember: a transient timing failure must not be hidden by permanently weakening the shipped gate;
+  separate golden collection from the final performance verdict.

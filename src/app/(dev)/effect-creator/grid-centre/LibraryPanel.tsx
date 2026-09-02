@@ -1,0 +1,125 @@
+'use client'
+
+// LibraryPanel — the layout-library AUTHORING panel (admin). A PURE VIEW: it renders the
+// options the library hands it and holds no class logic — no "is this a diamond", no box maths,
+// no sub-type test, no layout filtering, no draft matching. Options in, chips out.
+// Dan, 08-26: "no logic in UI shell and poage".
+
+import type { ReactElement, ReactNode } from 'react'
+import type { BrowseOption, LibraryBrowse, LibraryEdit, LibrarySelection, PanelOption, PanelOptions } from '@/lib/effect/library'
+
+type FoldComponent = (p: { title: ReactNode; children: ReactNode }) => ReactElement
+
+export default function LibraryPanel({
+  setSel, setBrowse, Fold, options, boxMM, bandId, showBox, setShowBox, editError,
+  edit, setEdit, saveEdit, deleteEdit, startAdd, startEdit, isDraft,
+}: {
+  setSel: (next: LibrarySelection) => void
+  /** How the listing is being browsed — which band, which way round. A filter, not a selection. */
+  setBrowse: (next: LibraryBrowse) => void
+  Fold: FoldComponent
+  options: PanelOptions
+  boxMM: { w: number; h: number }
+  /** The band this layout sits in at its own size; null past the last band. */
+  bandId: number
+  showBox: boolean
+  setShowBox: (v: boolean) => void
+  edit: LibraryEdit | null
+  setEdit: (d: LibraryEdit | null) => void
+  editError: string | null
+  /** The selection names a saved layout of the admin's own. */
+  isDraft: boolean
+  saveEdit: () => void
+  deleteEdit: () => void
+  startAdd: () => void
+  startEdit: () => void
+}) {
+  const opts = options
+  // the only state the view adds is whether the editor is open; everything else is an option
+  const go = (o: PanelOption) => { setEdit(null); setSel(o.next) }
+  // a band or orientation chip filters AND lands on the first record it leaves visible, so the
+  // canvas never sits on a record the list no longer shows (Dan, 2026-08-30)
+  const browseTo = (o: BrowseOption) => { setEdit(null); setBrowse(o.next); if (o.select) setSel(o.select) }
+  const pressed = (o: PanelOption) => !edit && o.active
+  return (
+    <>
+      <div className="gl-card gl-libsize">
+        <b>{Math.round(boxMM.w)}×{Math.round(boxMM.h)}</b><span>mm</span>
+        <span className="gl-libband">
+          {`B${bandId}`}
+        </span>
+        <button className="gl-libdim" aria-pressed={showBox} onClick={() => setShowBox(!showBox)}>dimensions</button>
+      </div>
+      <Fold title="Type">
+        <div className="gl-lib">
+          {opts.types.map((o) => (
+            <button key={o.id} aria-pressed={o.active} disabled={o.disabled}
+              onClick={() => go(o)}><b>{o.label}</b></button>
+          ))}
+        </div>
+      </Fold>
+      {opts.orientations.length > 0 && (
+        <Fold title="Orientation">
+          <div className="gl-seg gl-liborient">
+            {opts.orientations.map((o) => (
+              <button key={o.id} aria-pressed={o.active} onClick={() => setSel(o.next)}>{o.label}</button>
+            ))}
+          </div>
+        </Fold>
+      )}
+      {opts.bands.length > 0 && (
+        <Fold title="Band">
+          <div className="gl-seg gl-bandrow">
+            {opts.bands.map((o: BrowseOption) => (
+              <button key={o.id} aria-pressed={o.active} onClick={() => browseTo(o)}>{o.label}</button>
+            ))}
+          </div>
+        </Fold>
+      )}
+      {opts.frameOrientations.length > 0 && (
+        <Fold title="Orientation">
+          <div className="gl-seg gl-wrap">
+            {opts.frameOrientations.map((o: BrowseOption) => (
+              <button key={o.id} aria-pressed={o.active} onClick={() => browseTo(o)}>{o.label}</button>
+            ))}
+          </div>
+        </Fold>
+      )}
+      <Fold title="Frame">
+        <div className="gl-lib">
+          {opts.frames.map((o) => (
+            <button key={o.id} aria-pressed={o.active} onClick={() => go(o)}
+              aria-label={o.accessibleLabel} title={o.accessibleLabel}><b>{o.label}</b></button>
+          ))}
+        </div>
+      </Fold>
+
+      <Fold title="Layouts">
+        <div className="gl-lib">
+          {opts.layouts.map((o) => (
+            <button key={o.id} aria-pressed={pressed(o)} onClick={() => go(o)}>
+              <b>{o.label}</b>{o.custom && <span>custom</span>}
+            </button>
+          ))}
+          <button className="gl-libadd" onClick={startAdd}><b>+</b></button>
+        </div>
+        <div className="gl-field" style={{ marginTop: 9 }}><span>Custom</span>
+          <div className="gl-seg">
+            <button aria-pressed={!!edit} onClick={startEdit}>custom</button>
+          </div>
+        </div>
+        {edit ? (
+          <div className="gl-libedit">
+            <input value={edit.name} placeholder="custom name" onChange={(e) => setEdit({ ...edit, name: e.target.value })} />
+            <button onClick={saveEdit} disabled={!edit.name.trim() || !edit.nodes.length || !!editError}>save</button>
+            <button onClick={() => setEdit(null)}>cancel</button>
+            {isDraft && <button onClick={deleteEdit}>delete</button>}
+            {editError && <em className="gl-liberr">{editError}</em>}
+          </div>
+        ) : isDraft ? (
+          <div className="gl-libedit"><button onClick={deleteEdit}>delete</button></div>
+        ) : null}
+      </Fold>
+    </>
+  )
+}

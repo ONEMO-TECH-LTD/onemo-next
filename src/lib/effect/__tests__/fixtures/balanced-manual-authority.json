@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "coordinateSystem": "Canon [column,row], zero at geometric left/bottom",
+  "fixtures": [
+    {
+      "id": "duck-b3",
+      "asset": "public/grid-engine/cutouts/DUCK.png",
+      "assetSha256": "520ca959873390561973e4c840fb6938c7325fecb0fa08cfa93598a1dba7c34a",
+      "screenshot": "Screenshot 2026-09-01 at 19.47.59.png",
+      "screenshotSha256": "d1b913270a284316823fc12614efc4d9bca74764d88ab41f62df00cc49eec4f3",
+      "band": 3,
+      "frame": [2, 3],
+      "manualSizeMM": 148,
+      "deliveredCanonNodes": [[0, 0], [1, 0], [0, 2], [1, 2]],
+      "priority": { "axis": "vertical", "extremes": "both", "interiorRequired": false },
+      "comparisons": [
+        { "metric": "relevantAxisCentreOffMM", "operator": "<=", "against": "optimal" },
+        { "metric": "opposingSeatImbalance", "operator": "<=", "against": "optimal" }
+      ]
+    },
+    {
+      "id": "bot-b2",
+      "asset": "public/grid-engine/cutouts/BOT.png",
+      "assetSha256": "6902c42c049c73ebd7a3ae86131d4a7efd768c261e0dcb69af9a6308e5582c0b",
+      "screenshot": "Screenshot 2026-09-01 at 20.03.07.png",
+      "screenshotSha256": "2a0423cdebfe04c81a1bdc885c46e571342b56353e2a2d2c498545a8e6f97875",
+      "band": 2,
+      "frame": [1, 2],
+      "manualSizeMM": 96,
+      "deliveredCanonNodes": [[0, 0], [0, 1]],
+      "priority": { "axis": "vertical", "extremes": "both", "interiorRequired": false },
+      "comparisons": [
+        { "metric": "relevantAxisCentreOffMM", "operator": "<", "against": "optimal" },
+        { "metric": "unsupportedAreaImbalance", "operator": "<", "against": "optimal" }
+      ]
+    },
+    {
+      "id": "bot-b4",
+      "asset": "public/grid-engine/cutouts/BOT.png",
+      "assetSha256": "6902c42c049c73ebd7a3ae86131d4a7efd768c261e0dcb69af9a6308e5582c0b",
+      "screenshot": "Screenshot 2026-09-01 at 20.00.11.png",
+      "screenshotSha256": "72c54dcc69caac46b21fd077dfe3980283234ada290613d89a130594158eb4eb",
+      "band": 4,
+      "frame": [3, 4],
+      "manualSizeMM": 194,
+      "deliveredCanonNodes": [[0, 0], [2, 0], [0, 2], [2, 2], [1, 3]],
+      "priority": { "axis": "vertical", "extremes": "both", "interiorRequired": true },
+      "comparisons": [
+        { "metric": "relevantAxisCentreOffMM", "operator": "<", "against": "optimal" },
+        { "metric": "opposingSeatImbalance", "operator": "<", "against": "optimal" }
+      ]
+    },
+    {
+      "id": "butterfly-b2",
+      "asset": "public/grid-engine/cutouts/BUTTERFLY.png",
+      "assetSha256": "f0e645751179e407caa9ce82640e6d5c699678df90a2b0bb0d326d86702cb377",
+      "screenshot": "Screenshot 2026-09-01 at 20.04.46.png",
+      "screenshotSha256": "5572b7233eabd997f485d0ceac04587a8ff7a5f32f9668c8aebd4be6a06d7777",
+      "band": 2,
+      "frame": [2, 2],
+      "manualSizeMM": 107,
+      "deliveredCanonNodes": [[0, 0], [1, 0]],
+      "priority": { "axis": "horizontal", "extremes": "both", "interiorRequired": false },
+      "comparisons": [
+        { "metric": "relevantAxisCentreOffMM", "operator": "<", "against": "optimal" },
+        { "metric": "unsupportedAreaImbalance", "operator": "<", "against": "optimal" }
+      ]
+    },
+    {
+      "id": "batwoman-b3",
+      "asset": "public/grid-engine/cutouts/BAT-WOMAN.png",
+      "assetSha256": "b03ab1f67a304dec31d5c43ea0441d5e76adec116b2fb1faa0b4ce2eaf7f9911",
+      "screenshot": "Transcript Vault 2026-09-01 Image #10 / Screenshot 2026-09-01 at 20.07.36.png",
+      "screenshotSha256": "a2d5792351706fb9adae38da51780d391f9d61c6ef5a89fc020fa843a18234d5",
+      "band": 3,
+      "frame": [3, 2],
+      "manualSizeMM": 143,
+      "deliveredCanonNodes": [[0, 0], [1, 0], [2, 0], [1, 1]],
+      "priority": { "axis": "vertical", "extremes": "both", "interiorRequired": false },
+      "comparisons": [
+        { "metric": "topSeatToGovernedCentreMM", "operator": "<", "against": "optimal" },
+        { "metric": "unsupportedAreaImbalance", "operator": "<", "against": "optimal" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,181 @@
+# Grid Lab MVP — Plan v1.3
+
+The one plan document. v1.0, v1.1 and v1.2 are deleted; git holds the history.
+
+## What the classifier is
+
+**A nudge, not a stage** (Dan, 2026-08-30). The band sweep already finds every layout the material
+supports, and it works. The classifier's only job is to tell that engine *this is a 3x4 portrait* so
+it fetches the canon layout and tries it FIRST, instead of searching endlessly and stumbling onto an
+answer.
+
+It therefore reads the frame at the sizes the sweep already visits. Those solves already segment the
+shape, so reading the ordered pair off the legal box costs one read, not a new solve.
+
+**No seed, no interval search, no growing.** Scaling and fitting belong to the sweep and the wrap,
+which already do them. Rebuilding that inside classification is double work.
+
+## What the finished engine does
+
+Any shape, any band, one path — the existing walk, with two steps added inside it:
+
+1. **Erode 12mm** from every edge and every hole. That is the legal area — where a magnet centre may
+   sit. One measurement; everything below reads from it.
+2. **Centre it** — the governed centre, baked once per shape and scaled. The six modes and the
+   governor remain; their governing population is the legal islands.
+3. **Read the frame** ← *new*. The legal box is measured once. Its longest extent selects the fixed
+   48mm product band; dividing each ordered axis by the ACTIVE PITCH gives the frame. At 48mm the
+   dominant frame count equals the band id. At 24mm and 96mm it need not. Never force equality.
+   Orientation falls out of the ordered pair — 3x4 is portrait, 4x3 is landscape.
+4. **Look up the canon** ← *new*. The library's square or rectangle for that frame and pitch. That is
+   the optimal: the frame dictates it, nothing ranks or chooses.
+5. **Place and seat** ← *new*. Centre that layout on the anchor, test every magnet against the real
+   material, drop what will not hold and record which.
+6. **Wrap** — hand the survivors in WHOLE to the existing solver; get the tightest size at which the
+   shape grips them.
+7. **Confirm the requested band** — remeasure the finished shape's legal extent. The attempt is
+   lawful only when its measured band equals the requested band. Always record the measured band; a
+   mismatch is failed evidence, never an answer.
+8. **Canon stands first.**
+9. **Next best** — the existing sweep's own discovery, unchanged. It is the answer only when canon
+   has no lawful attempt: no canon match, no seated magnets, wrap failure, or final-band mismatch.
+10. **Draw** — layout, lattice, ladder, manual controls, all as they are.
+
+**No coverage on the canon path.** The belt is not applied between 5 and 6. The canon for a 3x3 IS
+nine magnets; thinning it to a ring before wrapping means the answer returned is not the record that
+was looked up. The belt stays in the engine, stays on its control, and reaches the canon path only
+when Dan calls for it after the MVP.
+
+**5 goes straight to 6.** The survivors reach the wrap solver directly, never through
+`registerLayout` — that function does not accept a population, it BUILDS one by seating the lattice
+and keeping whichever of four parities holds most. Routing canon through it destroys the canon before
+wrap sees it, and re-introduces the max-count prefilter Dan forbids by name.
+
+## Where it stands
+
+- **Built and correct, untouched by this work:** 1, 6, 10.
+- **Built and retained, corrected only in its final membership:** 9.
+- **Centring mechanism retained; governing population is legal islands:** 2.
+- **Measurable, but nothing calls it:** 3.
+- **Missing entirely:** 4, 5, 7, 8.
+
+## Rules
+
+1. Bands are measured on the bounding extent of every 12mm-inset legal magnet-centre segment. Not
+   outer-outline boxes.
+2. Band and frame come from the same box but quantise it differently: the band by fixed 48mm product
+   ranges, the frame by the active pitch. Measured on the canon corpus, 0 of 99 records disagree at
+   48mm, 356 of 357 at 24mm, 29 of 30 at 96mm. Deleting the mass-depth dial merged the two geometry
+   BOXES; it did not merge the two MEANINGS. The matcher stays keyed by pitch plus ordered frame.
+3. Ordered frame owns orientation: 3x4 and 4x3 are different canon records.
+4. Square and rectangle are automatic canon. Diamond and triangle are explicit presets only.
+5. The governed centre anchors the canon layout. Wrap may shift it only as far as legality requires.
+6. No candidate magnet disappears without appearing in the recorded omissions.
+7. `wrapGroup` stays whole-population-in, tightest-size-out. Nothing mutates the population after.
+8. The released rim is 12mm. The 10mm floor is an admin bound, not a default.
+9. The classifier never chooses a size. Scaling is the sweep's; contact size is wrap's.
+10. Prove canon and discovery together before cutover. Completion has ONE automatic path:
+    `runPipeline` owns canon-first plus the retained discovery, and the worker's automatic branch is
+    transport to it. The worker's MANUAL branch and the display lattice remain unchanged.
+
+## The build
+
+### Task 0 — clear the debris from the mass-depth removal
+
+- `units/classifier.ts` still says the frame is "not the legal bbox" and that a thin arm's sliver
+  "seats nothing". Both are false at `cb2946e2`.
+- The dead-limb counterexample hands the arm `masses: []` by hand. It never runs `safeSegments`, so
+  it proves only that the reader ignores a segment you told it was empty. It passed before and after
+  a change that inverted the behaviour it claims to guard.
+- The deleted depth model is still alive as duplicate data. Every `SafeSegment` is now copied into
+  one identical `SafeMass`, which consumers immediately flatten back. Live residue: the `SafeMass`
+  type and `SafeSegment.masses`; the duplicate allocation in `segment.ts`; the
+  `masses.length ? masses : [seg]` fallbacks in the classifier, centring, the wrap sequencer and the
+  door; a duplicate overlay drawing the same region twice on the page; and stale comments about
+  "depth masses", "the region surviving the depth probe" and "limbs and slivers die shallow".
+
+**Done when:** `SafeMass` and `SafeSegment.masses` are deleted; `safeSegments` returns legal islands
+once; the classifier unions `SafeSegment.bbox`; centring and the governor consume segments directly;
+the page draws the region once; the mass wrapper is renamed to legal-segment vocabulary or deleted;
+the comment describes what the code does; and the counterexample drives real `safeSegments`. It will
+then assert the OPPOSITE of what it says today — a 30mm arm's positions COUNT, because a magnet
+centre genuinely sits in its 6mm band with full clearance either side.
+
+**Behaviour must not move relative to `cb2946e2`:** run the 92-case direct probe and the baked-anchor
+probe before and after, and require equality. That preserves the post-removal behaviour; it does not
+restore the deleted two-core model.
+
+### Task 1 — the lookup
+
+Export the canon roster through the library door; it is not exported today, so nothing outside the
+library can reach it. Then: pitch and ordered frame in, the one canon record out. No caller yet.
+
+**Done when:** 3x4 returns portrait only, 4x3 landscape only, equal axes the square, never a diamond
+or triangle, and a frame the board cannot hold returns nothing.
+
+### Task 2 — the placer
+
+Layout, shape and governed centre in; attempted, seated and omitted magnets out. No caller yet.
+
+**Done when:** odd frames put a magnet on the centre and even frames put the gap there, outer edges
+and holes reject seats, and every omission is visible in the result.
+
+### Task 3 — the nudge
+
+Inside the existing walk, at each size it already visits: read the ordered frame from the legal box,
+fetch the canon for that frame and pitch, place and seat it, and hand it to `wrapGroup` BEFORE the
+size's own discovered pattern. The walk, its range and its discovery are otherwise untouched.
+
+- Band membership after wrap: remeasure legal extent and require its band to EQUAL the requested
+  band, for canon and for discovery alike.
+- The rim resolved once at the entry point, then passed explicitly.
+- One headless `runPipeline` holds canon-first and the retained discovery.
+- Exercise both sources side by side in tests BEFORE any deletion.
+- Route only the worker's AUTOMATIC branch through it; its manual branch and the display model are
+  preserved explicitly and by name.
+- Then delete the worker's old automatic orchestration, in this same task. Do not leave two
+  production automatic paths — a second dormant path is how the catalogue and the matcher sat unused
+  for weeks.
+
+The 29-August failure was not caused by cutting over. It was caused by a replacement written from a
+blank sheet that omitted manual pan, the belt and the lattice. The remedy is to name and preserve
+those callers, not to keep duplicate automation alive.
+
+**Done when:** a no-browser call returns the ordered frame, the anchor, the canon identity, the
+omissions and the wrapped size; canon is attempted first; discovery still produces next-best; manual
+pan, the coverage control and the lattice are unchanged and proven so; and ONE automatic runtime path
+remains.
+
+### Task 4 — prove it
+
+Square, portrait rectangle, landscape rectangle, limbed shape, holed shape, and one pointed shape.
+Every fix defended by a test that dies when the fix is reverted. Mutations that must fail: outer bbox
+replacing legal extent; a preset entering automatic match; the governed anchor ignored; omission
+evidence deleted; wrap bypassed; coverage applied to the canon population; canon routed through
+`registerLayout`; final band accepted when it differs from the requested band.
+
+Full suite, typecheck, scoped lint. Then the running bench: pick a band, see the canon answer first
+with its size and what it dropped, next-best beneath it, lattice and manual controls untouched.
+
+## Open, recorded rather than engineered around
+
+A pointed shape's material lags its outline: measured, a star's legal extent reaches band 3 only at
+179-226mm of outline, while the walk scans 120-167mm for that band. With strict band equality it may
+therefore return nothing for a band its outline suggests. **This is an observation to check on the
+bench, not a thing to build around** (Dan, 2026-08-30: the star is an outlier; segment it to
+understand it). No calibrated interval, no scan-range change, no growing is in this plan.
+
+## Not in this
+
+No scoring beyond canon-first. No garment 96mm lattice. No presets or D4 in automatic matching. No
+new geometry, segmentation, centring or wrap. No new judge. Nothing deleted from manual controls,
+lattice, coverage or the discovery walk.
+
+## Verdicts
+
+**Necessity:** no unnecessary elements. Existing units are reused, the stale mass-depth aliases are
+deleted, and additions are limited to the missing connections — a lookup, a placer, and the seam that
+tries canon first.
+
+**Sufficiency:** the plan covers the authorised MVP in full. Delivery is established only after
+Tasks 0-4 and their gates pass.

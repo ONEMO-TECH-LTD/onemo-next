@@ -6,6 +6,12 @@ const nextConfig: NextConfig = {
   // LAN IPs are allowed too so mobile devices on the same Wi-Fi can hydrate the dev probes.
   allowedDevOrigins: ["127.0.0.1", "localhost", "192.168.*", "10.*"],
   outputFileTracingRoot: process.cwd(),
+  // The agent-vendor dirs carry symlinks into the brain repo; Vercel rejects broken symlinks.
+  // `.next` is build output, never a dependency — tracing it dragged in a transient `.next/lock`
+  // that no longer existed at deploy time and failed every deployment.
+  outputFileTracingExcludes: {
+    "*": [".claude/**", ".codex/**", ".cursor/**", ".gemini/**", ".grok/**", ".agents/**", ".next/**"],
+  },
   // Effect-creator G5: cross-origin isolation so onnxruntime-web's wasm fallback can run
   // MULTI-THREADED (SharedArrayBuffer needs COOP+COEP). Without these headers a device without
   // WebGPU falls back to SINGLE-threaded wasm — historically a 30–60 s page freeze per Magic run.

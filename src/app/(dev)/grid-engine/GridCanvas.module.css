@@ -1,0 +1,36 @@
+.frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #ffffff;
+
+  /* The notepad's ink, on the element that draws it. Law 7.6 — 5% visibility, two levels. */
+  --rule-fine: rgba(0, 0, 0, 0.05);
+  --rule-pitch: rgba(0, 0, 0, 0.10);
+
+  /* The 24mm spot: a mild wash with an edge, so it reads as a position rather than an object and
+     the shape laid over it stays legible. Dan: "make fill colour milder with stroke". */
+  --magnet-fill: rgba(0, 0, 0, 0.05);
+  --magnet-stroke: rgba(0, 0, 0, 0.22);
+}
+
+/* Law 7.4: theme follows the system. The field is the largest surface on screen — left white it is
+   the thing that glares in the evening, and it sits ABOVE the page's own dark surface, so it has to
+   be themed here rather than on the container. */
+@media (prefers-color-scheme: dark) {
+  .frame {
+    background: #111c2e;
+    --rule-fine: rgba(255, 255, 255, 0.06);
+    --rule-pitch: rgba(255, 255, 255, 0.12);
+    --magnet-fill: rgba(255, 255, 255, 0.06);
+    --magnet-stroke: rgba(255, 255, 255, 0.28);
+  }
+}
+
+.svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
