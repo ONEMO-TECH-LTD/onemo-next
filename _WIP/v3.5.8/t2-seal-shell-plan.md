@@ -46,7 +46,7 @@ Nothing else. Bridge untouched (library law). Engine untouched. No new control, 
 
 1. Page source has no import from `@/lib/effect/grid-magnet` and no calls to `safeSegments`, `spotRadiusOf`,
    `bandOuterMM`, `computeGrid`, `classifyBands`, `measureProtection` or `solveGrid`. Page runtime engine
-   input is adapters plus Spec only; shared types are type-only.
+   input is bounded adapters, Spec, and the pre-existing public bridges only; shared types are type-only.
 2. For one canon record, `librarySegments(stage)` structurally equals the former
    `safeSegments(stage.contour, spotRadiusOf(RELEASED_PADDING_MM), 'full')`. For every band and permitted
    padding, `bandRangeForControl(band, padding)` equals the former `bandOuterMM(band, padding)`.
