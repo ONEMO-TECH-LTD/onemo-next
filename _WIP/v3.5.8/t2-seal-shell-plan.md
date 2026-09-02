@@ -66,3 +66,14 @@ of the pipeline · anything in `library/**`.
 No unnecessary elements: one moved measurement, one one-line delegate in the existing grid view adapter,
 one new library view adapter, one gate tightening. Delivers T2 in full: the page computes nothing, and the gate now forbids the barrel path
 that let it.
+
+## 6 · Execution record (2026-09-02, branch session62-task/v3.5.8-t2-seal-shell)
+
+Head 9634ec25 — one commit, all four §1 items. Proofs observed: page has no grid-magnet import and no engine
+call (gate) · librarySegments == former safeSegments call on a square; bandRangeForControl == bandOuterMM on
+every band × {floor, released, ceil} padding · mutations M1 page+safeSegments, M2 page+bandOuterMM, M3
+libraryViewModel+unit, M4 gridViewModel+unit each fail · architecture-gates + grid-layout-library unchanged
+green · full suite 836/836 serial · tsc · strict lint on T2 files · live 4065: bench four cutouts identical,
+Library tab 3×3 square draws the 96 mm legal box, console 0 (screenshot t2-library-tab.png).
+Observation, out of scope: page.tsx carries five pre-existing lint warnings (unused locals) present on
+staging; the page header string still reads "V3.5.7-1".
