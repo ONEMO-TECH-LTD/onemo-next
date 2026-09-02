@@ -16,6 +16,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { bandOuterMM, classifyBands, computeGrid } from '../grid-magnet'
 import { canonLayoutForFrame, optimalLayoutForBox } from '../grid-magnet-library-catalogue'
 import { solveCanonExperiment } from '../grid-magnet-canon-experiment'
+import { anchorFnFor } from '../pipeline/solve'
 import { canonPriorityOf, frameOfMasses, positionsAcross } from '../units/classifier'
 import type { BBox, SafeMass, SafeSegment } from '../types'
 import { BANDS, BAND_STEP_MM, PHASE_STEP_MM } from '../grid-magnet-spec'
@@ -352,12 +353,11 @@ describe('2c — the foundation holds primitives only', () => {
 describe('2d — the real shells are governed too', () => {
   const PAGE = join(process.cwd(), 'src/app/(dev)/effect-creator/grid-centre/page.tsx')
   const WORKER = join(process.cwd(), 'src/app/(dev)/effect-creator/grid-centre/solve.worker.ts')
-  // The page reaches NO unit. The worker holds one temporary edge — judge's default landing — which
-  // expires when the pipeline lands. Pinned exactly, so a stray import fails even where edges exist.
+  // Neither shell reaches a unit. Pinned exactly, so a stray import fails.
   const SHELL_UNIT_EDGES: Array<[string, readonly string[]]> = [
     [PAGE, []],
-    // + protection (77b55a08): the worker measures delivered evidence itself until pipeline/ owns it (roadmap T1).
-    [WORKER, ['@/lib/effect/units/classifier', '@/lib/effect/units/judge', '@/lib/effect/units/centring', '@/lib/effect/units/protection']],
+    // T1 S1: the worker is transport — it reaches the engine only through pipeline/ and holds no unit edge.
+    [WORKER, []],
   ]
 
   it('the page and worker hold exactly their pinned unit edges', () => {
@@ -1047,7 +1047,7 @@ describe('7 — an empty band returns no lawful offer, never a fit', () => {
       const sized = makeSizer(sliver, 0)
       const band2 = BANDS.find((b) => b.id === 2)!
       const span = bandOuterMM(band2, 12)
-      const solve = solveCanonExperiment(sized, cfg, span.minMM, span.maxMM, 24, worker.anchorFnFor(sized, cfg, JSON.stringify(cfg), 'gate'), [])
+      const solve = solveCanonExperiment(sized, cfg, span.minMM, span.maxMM, 24, anchorFnFor(sized, cfg, JSON.stringify(cfg), 'gate'), [])
       expect(solve.offers.length, 'this band must hold no offers').toBe(0)
       // No seat fits anywhere, so layout has no witness either: the worker draws the empty band at its
       // floor (span.minMM) with zero anchors, and labels it a diagnostic — never an offer.
@@ -1071,15 +1071,7 @@ describe('8 — recovered phase search is wired through the production Canon sol
   const workerAnchorFor = async (
     sized: (mm: number) => Contour, cfg: GridConfig, sig: string,
   ): Promise<(mm: number) => Pt> => {
-    const g = globalThis as { self?: unknown }
-    const previous = g.self
-    if (!g.self) g.self = { postMessage: () => undefined, onmessage: null }
-    try {
-      const worker = await import('@/app/(dev)/effect-creator/grid-centre/solve.worker')
-      return worker.anchorFnFor(sized, cfg, JSON.stringify(cfg), sig)!
-    } finally {
-      g.self = previous
-    }
+    return anchorFnFor(sized, cfg, JSON.stringify(cfg), sig)!
   }
 
   it('production Canon solve finds and wraps Batwoman B4 raw9', async () => {
@@ -1221,13 +1213,7 @@ describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside
     return normMaskContour(mask, png.width, png.height)!
   }
   const workerAnchor = async (sized: (mm: number) => Contour, cfg: GridConfig, sig: string) => {
-    const g = globalThis as { self?: unknown }
-    const previous = g.self
-    if (!g.self) g.self = { postMessage: () => undefined, onmessage: null }
-    try {
-      const worker = await import('@/app/(dev)/effect-creator/grid-centre/solve.worker')
-      return worker.anchorFnFor(sized, cfg, JSON.stringify(cfg), sig)
-    } finally { g.self = previous }
+    return anchorFnFor(sized, cfg, JSON.stringify(cfg), sig)
   }
   const cfg: GridConfig = { pitchMM: 48, paddingMM: 12, perimeterOnly: false, centreMode: 2, governor: 0 }
   const solveFixture = async (id: string) => {
