@@ -1,4 +1,4 @@
-# T1 — Headless data-only solve: migration plan (v2, for QA then Dan's lock)
+# T1 — Headless data-only solve: migration plan (v3, for QA then Dan's lock)
 
 Roadmap v3 task 1. Baseline: staging `8ba9bb9f` (PR #214). Method: **surgical swap** (Dan 08-29) —
 bodies MOVE verbatim, the worker keeps working through every step, one commit per step.
@@ -26,7 +26,7 @@ The page reads from `model`: `contour · grid · effSize · ladder · idx · seg
 | — band branch (classify → lookup → priority → `solveCanonExperiment` → landing → coverage → `wrapGrid` → `assignSizes` → protection → `recog`) | `solveGrid` | VERBATIM | |
 | — no-lawful-offer branch | `solveGrid` | VERBATIM | |
 | `ctx.postMessage({ id, model })` / `catch` | **worker** (adapter) | VERBATIM | worker = `onmessage → solveGrid → postMessage`; error path unchanged |
-| the posted `model` shape | `adapters/gridViewModel.ts :: toPageModel(solve)` | NEW (T1-authorised) | pure projection `GridSolve → Model`; `idx`, `ladder` rows, `recog` live here. Identity mapping on day one — the point is ownership, not change |
+| the posted `model` shape | `adapters/gridViewModel.ts :: toPageModel(solve)` | NEW (T1-authorised) | pure projection `GridSolve → Model`: `selectedRungIndex → idx`, rungs → ladder rows, `classificationDiagnostics → recog`; never calls judge or classifier. Identity mapping on day one — the point is ownership, not change |
 
 Nothing else moves. `grid-magnet.ts`, `grid-magnet-canon-experiment.ts`, `grid-magnet-wrap-compute.ts`,
 units, catalogue, page rendering: **zero diff** except the page's import of the model type (from the
@@ -40,14 +40,18 @@ GridRequest  = { base: Contour; offsetMM: number; cfg: GridConfig; mode: number;
                  manualBand?: boolean; sizeMM: number; stepSel: number | null;
                  settings: { protectionPaddingMM: number }; activeBandIds?: number[] }
 GridSolve    = domain facts only: contour, grid, effSize, segments, offMM?, bandClass, bandClasses,
-                 recommendation, unprotected?, offers?, diagnostic? (+ the rung list with roles/sizes as data)
+                 recommendation, unprotected?, offers?, diagnostic?, rungs (roles/sizes as data),
+                 selectedRungIndex, classificationDiagnostics
 solveGrid(req: GridRequest): GridSolve      // pure; throws on invalid request (worker catches → error post)
 ```
-`GridSolve` contains the domain facts the worker currently computes and posts, but not page projection
-fields: no `idx`, no ladder display rows and no `recog` readout. `toPageModel(GridSolve)` owns those
-current bench fields and preserves their values on day one. The exact field list is copied from the
-worker's pre-postMessage local result when S1 moves it; no field is invented in this plan. `GridRequest`
-and `GridSolve` are JSON-round-tripped as they are actually constructed. `anchorAtMM` (a function) never
+`GridSolve` contains domain facts and domain decisions, not page projection: it carries the raw rungs plus
+`selectedRungIndex` (the current worker's Rule-4/manual selection fact) and `classificationDiagnostics`
+(the current `recog` fact). It contains no `ladder` display rows and no page `idx`. `toPageModel(GridSolve)`
+maps `selectedRungIndex` to its current `idx`, turns rungs into ladder rows, and renders
+`classificationDiagnostics`; it never calls judge or classifier. The exact field list is copied from the
+worker's pre-postMessage local result when S1 moves it; no field is invented in this plan. `GridRequest` and
+`GridSolve` are JSON-round-tripped as they are actually constructed.
+`anchorAtMM` (a function) never
 crosses this boundary — it is built inside `solveGrid` from the bake, exactly as the worker does today.
 
 ## 3 · Steps — one commit each, worker working at every step
