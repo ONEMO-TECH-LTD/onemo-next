@@ -1,4 +1,4 @@
-# T2 — Seal the admin shell: plan (v3, for QA then Dan's lock · engine v3.5.7-2 → v3.5.8)
+# T2 — Seal the admin shell: plan (v4, for QA then Dan's lock · engine v3.5.7-2 → v3.5.8)
 
 Roadmap v3 task 2. Baseline: staging `0315aabe` (T1 merged). Directive test: "delete `src/app/` — the
 engine is whole; the page computes nothing." /o-build outcome · non-goals · files · proof below.
@@ -63,6 +63,6 @@ Nothing else. Bridge untouched (library law). Engine untouched. No new control, 
 of the pipeline · anything in `library/**`.
 
 ## 5 · Necessity / sufficiency
-No unnecessary elements: one moved function, one adapter file (the law leaves no other home), one gate
-tightening. Delivers T2 in full: the page computes nothing, and the gate now forbids the barrel path
+No unnecessary elements: one moved measurement, one one-line delegate in the existing grid view adapter,
+one new library view adapter, one gate tightening. Delivers T2 in full: the page computes nothing, and the gate now forbids the barrel path
 that let it.
