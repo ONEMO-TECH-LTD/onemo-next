@@ -1,4 +1,4 @@
-# T3 — Performance: measurement and the one fix it justifies (v1, for QA then Dan's lock)
+# T3 — Performance: measurement and the one fix it justifies (v2, for QA then Dan's lock)
 
 Roadmap v3 task 3. Baseline: staging `f093e673` (T1+T2 merged). Everything below is measured on the
 headless call `solveGrid` in Node (no browser), four cutouts × bands 1–5, pitch 48 mm, rim 12 mm,
@@ -54,9 +54,10 @@ string and a Map write to each of ~2.6 M calls and returns nothing.
 So the second idea is **rejected by measurement**: counting held seats before building the window's arrays
 costs more than the allocation it avoids. T3 takes the first change only.
 
-**Scope:** delete the memo in both enumerators (`enumerateCanonPhaseWindows`, `enumerateFreePhaseMax` —
-same code, same zero-hit reason), keep `fitsCalls`, and keep `cacheHits` in the trace as a constant 0 or
-remove it with its three writers — QA to rule which, since the field is public trace vocabulary.
+**Scope:** delete the memo in both enumerators (`enumerateCanonPhaseWindows`, `enumerateFreePhaseMax`) and
+delete `cacheHits` with it — from both search result types, their empty/default returns,
+`CanonExperimentTrace`, its initializer, and both trace accumulations. Keep `fitsCalls`. Proof includes no
+production `cacheHits` reference after the move; no timing threshold is invented.
 
 ## 3 · What is NOT fixed here, stated
 
@@ -78,6 +79,7 @@ the measurement and the one lawful speed-up.
 2. Timing table re-run after the change and recorded here.
 3. Full suite green (serial), tsc clean, strict lint on changed files.
 4. Live 4065: the four bench cases unchanged, console 0.
+5. `rg -n "\bcacheHits\b" src/lib/effect --glob "!__tests__/**"` returns no production reference.
 
 ## 6 · Necessity / sufficiency
 No unnecessary elements: one deletion in two places, justified by a measured 0 % hit rate and a measured
