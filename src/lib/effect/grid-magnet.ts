@@ -6,6 +6,7 @@
 
 import type { Contour, GridConfig, GridResult, Pt } from './types'
 export type { GridConfig, GridResult } from './types'
+import { bandOuterMM } from './grid-magnet-logic'
 import { registerLayout } from './units/layout'
 import { classificationSeedMM, legalRegionBoxMM } from './units/classifier'
 import { safeSegments } from './units/segment'
@@ -79,7 +80,15 @@ export function classifyBands(
     // No board skip. A trial size past the board is not an error and guards nothing — the previous
     // skip was invented, and it silently deleted B9-B11 because the size ceiling still reads the
     // COLUMN count for both axes and so believes the board is square.
-    const seedMM = classificationSeedMM(band, pad)
+    //
+    // THE MIDPOINT PROBE CAN MISS (Butterfly B1, 2026-09-02): a shape too thin to seat anything at
+    // the band's middle can still seat a frame at its ceiling, and one empty probe was disqualifying
+    // the whole band into the free-grid fallback. When the middle holds no legal region, the band's
+    // ceiling is probed before the band is called empty. Shapes that classify at the middle are
+    // untouched.
+    const midMM = classificationSeedMM(band, pad)
+    const ceilMM = bandOuterMM(band, pad).maxMM
+    const seedMM = legalRegionBoxMM(sized(midMM), r) ? midMM : ceilMM
     const contour = sized(seedMM)
     // THE EXACT LEGAL BOX, from the same Clipper2 inward offset that seating and wrap use — not
     // from the 2mm segmentation mesh. QA proved the mesh box is not transform-invariant: a 7-point

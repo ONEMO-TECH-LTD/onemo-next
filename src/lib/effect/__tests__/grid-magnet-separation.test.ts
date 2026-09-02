@@ -1407,6 +1407,29 @@ describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside
     expect(optimal.at.sizeMM).toBeCloseTo(97.01, 1)
   }, 120_000)
 
+  it('an empty midpoint probe does not disqualify the band: Butterfly B1 classifies at the ceiling and centres (1x1)', async () => {
+    // Dan, 2026-09-02: B1 showed free `max` at 58.69, off-centre. At B1's midpoint (48 mm) the shape
+    // has no legal region; at its ceiling (71 mm) it seats a frame. The classifier must not call the
+    // band empty on one probe.
+    const sized = makeSizer(cutout('public/grid-engine/cutouts/BUTTERFLY.png'), 0)
+    const cfgCore: GridConfig = { pitchMM: 48, paddingMM: 12, perimeterOnly: false, centreMode: 1 }
+    const anchorAt = await workerAnchor(sized, cfgCore, 'gate-butterfly-b1')
+    const band = BANDS.find((b) => b.id === 1)!
+    const span = bandOuterMM(band, 12)
+    const row = classifyBands(sized, cfgCore, anchorAt, [band]).find((r) => r.bandId === 1)
+    expect(row, 'B1 must classify').toBeTruthy()
+    const canon = canonLayoutForFrame(48, positionsAcross(row!.rulerWidthMM, 48), positionsAcross(row!.rulerHeightMM, 48))
+    expect(canon?.frameCols).toBe(1); expect(canon?.frameRows).toBe(1)
+    const nodes = canon!.nodesMM.map(([x, y]) => [x, y] as Pt)
+    const priority = canonPriorityOf([[0, 0]], 48)!
+    expect(priority.slim).toBe(true)
+    const solve = solveCanonExperiment(sized, cfgCore, span.minMM, span.maxMM, 24, anchorAt, nodes, priority)
+    expect(solve.trace.source).not.toBe('free-fallback')
+    const optimal = solve.offers.find((o) => o.roles.includes('optimal'))!
+    expect(optimal.at.count).toBe(1)
+    expect(Math.abs(optimal.at.originMM[0] - optimal.at.anchorMM[0]), 'a single seat must sit on the axis').toBeLessThanOrEqual(3)
+  }, 120_000)
+
   it('the worker lands on optimal, never on the canon comparison row', async () => {
     type Posted = { model: { idx: number; ladder: Array<{ roles: string[]; sizeMM: number }> } | null }
     const posted: Posted[] = []
