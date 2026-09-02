@@ -21,10 +21,10 @@ import { type VShape } from '@/lib/vector-core'
 import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt, UnprotectedEvidence } from '@/lib/effect/types'
-import { DEFAULT_PITCH_MM, type GridResult, type MagnetPlan, type SafeSegment } from '@/lib/effect/grid-magnet'
-import type { GridPageModel } from '@/lib/effect/adapters/gridViewModel'
-import { bandOuterMM, safeSegments, spotRadiusOf } from '@/lib/effect/grid-magnet'
-import { BANDS, CENTRE_MODE, GOVERNOR, PADDING_CEIL_MM, PADDING_FLOOR_MM, PROTECTION_PADDING_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-magnet-spec'
+import type { GridResult, MagnetPlan, SafeSegment } from '@/lib/effect/types'
+import { bandRangeForControl, type GridPageModel } from '@/lib/effect/adapters/gridViewModel'
+import { librarySegments as librarySegmentsOf } from '@/lib/effect/adapters/libraryViewModel'
+import { BANDS, CENTRE_MODE, DEFAULT_PITCH_MM, GOVERNOR, PADDING_CEIL_MM, PADDING_FLOOR_MM, PROTECTION_PADDING_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-magnet-spec'
 import { fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-magnet-bridge'
 
 /** Bench test libraries — static assets, listed by a committed manifest. */
@@ -145,12 +145,9 @@ export default function GridLab() {
   // (rows-1) pitches. Drawing it makes that identity checkable by eye instead of taken on trust,
   // and it is the same box the classifier compares a real shape against.
   //
-  // Measured HERE and not in the bridge: the bridge is a pure type adapter with a pinned
-  // allow-list and may not compute (architecture gate, STEP 5). The bench's own segments come
-  // from the worker for the same reason — the shell is where the two meet.
-  const librarySegments = useMemo(() => libraryModel
-    ? safeSegments(libraryModel.contour, spotRadiusOf(RELEASED_PADDING_MM), 'full') : [],
-  [libraryModel])
+  // Measured by the engine through the library view adapter — the bridge is a pure type adapter
+  // (library law, STEP 5) and the page computes nothing (T2).
+  const librarySegments = useMemo(() => libraryModel ? librarySegmentsOf(libraryModel) : [], [libraryModel])
   /** Selected step on the band's ladder; null = the band's own pick (smallest size at max count). */
   const [stepSel, setStepSel] = useState<number | null>(null)
   /** Manual scale inside the band's range; null = the ladder rules. */
@@ -361,7 +358,7 @@ export default function GridLab() {
       id, base, offsetMM: 0, cfg,
       mode,
       manualBand,
-      sizeMM: manualBand ? (bandScale ?? effSizeRef.current ?? bandOuterMM(BANDS[0], pad).minMM) : 0,
+      sizeMM: manualBand ? (bandScale ?? effSizeRef.current ?? bandRangeForControl(BANDS[0], pad).minMM) : 0,
       stepSel,
       settings: { protectionPaddingMM: protectionPadding },
       activeBandIds,
@@ -449,7 +446,7 @@ export default function GridLab() {
                     onPan: (dx: number, dy: number) => setManual((m) => { const bx = m ? m.x : model!.grid.phaseMM[0], by = m ? m.y : model!.grid.phaseMM[1]; return { x: bx + dx, y: by + dy } }),
                     onZoom: (f: number) => {
                       // Pinch = manual scaling WITHIN the band's range.
-                      const b = bandOuterMM(BANDS.find((x) => x.id === mode)!, pad)
+                      const b = bandRangeForControl(BANDS.find((x) => x.id === mode)!, pad)
                       setBandScale((s) => Math.min(b.maxMM, Math.max(b.minMM, (s ?? effSizeRef.current ?? b.minMM) * f)))
                     },
                     onReset: () => setManual(null) }
@@ -548,7 +545,7 @@ export default function GridLab() {
                   </button>)}
               </div>}
               {(() => {
-                const b = bandOuterMM(BANDS.find((x) => x.id === mode)!, pad)
+                const b = bandRangeForControl(BANDS.find((x) => x.id === mode)!, pad)
                 return <Slider label={`Band scale · manual within B${mode}`} unit="mm"
                   v={Math.round(bandScale ?? (effSizeRef.current || b.minMM))}
                   set={(n) => setBandScale(Math.min(b.maxMM, Math.max(b.minMM, n)))}

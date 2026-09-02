@@ -5,6 +5,8 @@
 
 import type { Contour, GridResult, SafeSegment, UnprotectedEvidence } from '../types'
 import type { GridSolve } from '../pipeline/types'
+import type { Band } from '../grid-magnet-spec'
+import { bandOuterMM } from '../grid-magnet'
 
 /** The bench model exactly as the page consumes it. */
 export interface GridPageModel {
@@ -32,4 +34,10 @@ export function toPageModel(solve: GridSolve): GridPageModel {
     idx: selectedRungIndex,
     ...(classificationDiagnostics !== undefined ? { recog: classificationDiagnostics } : {}),
   }
+}
+
+/** The outline range a band spans for the shell's manual-size controls — a delegate to the engine's
+ *  own conversion (units/layout), so the page holds no engine arithmetic (T2). */
+export function bandRangeForControl(band: Band, paddingMM: number): { minMM: number; maxMM: number } {
+  return bandOuterMM(band, paddingMM)
 }
