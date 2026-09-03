@@ -334,10 +334,10 @@ export default function GridLab() {
   const busyRef = useRef(false)
   const queuedRef = useRef<object | null>(null)
   const effSizeRef = useRef(0)
-  /** The current shape and band, for the performance log — refs because the worker callback is
-   *  bound once and must not re-subscribe on every control change. */
-  const shapeLabelRef = useRef('')
-  const modeRef = useRef(1)
+  /** What each in-flight request was for, keyed by its id. A row must carry the shape and band the
+   *  SOLVE was made for: stamping the log at arrival labelled an in-flight BOT answer as BUTTERFLY
+   *  when the shape changed mid-solve (Dan's screenshots, 2026-09-03). */
+  const askedRef = useRef(new Map<number, { shape: string; band: number }>())
   const shapeLabel = src === 'preset' ? preset : src === 'gen' ? gen : src === 'cut' ? (cutSel || 'cutout') : src
   useEffect(() => {
     const w = new Worker(new URL('./solve.worker.ts', import.meta.url))
@@ -358,11 +358,13 @@ export default function GridLab() {
       setPerf((x) => ({ ...x, solveMs, genMs: genMsRef.current }))
       if (e.data.model) effSizeRef.current = e.data.model.effSize
       setModel(e.data.model)
-      if (e.data.model) {
-        const key = shapeLabelRef.current + '·B' + modeRef.current
+      const asked = askedRef.current.get(e.data.id)
+      askedRef.current.delete(e.data.id)
+      if (e.data.model && asked) {
+        const key = asked.shape + '·B' + asked.band
         const cold = !seenSolves.current.has(key)
         seenSolves.current.add(key)
-        const row: PerfRow = { key, shape: shapeLabelRef.current, band: modeRef.current, ms: solveMs,
+        const row: PerfRow = { key, shape: asked.shape, band: asked.band, ms: solveMs,
           sizeMM: e.data.model.effSize, count: e.data.model.grid?.anchors?.length, cold }
         setPerfLog((rows) => [row, ...rows].slice(0, 12))
       }
@@ -377,9 +379,8 @@ export default function GridLab() {
     // Manual in a band (forced registration OR manual band scale): the walk is meaningless —
     // solve that size directly, exactly like free mode, band chip stays active.
     const manualBand = manual !== null || bandScale !== null   // manual scale/pan: solved directly at the requested size
-    shapeLabelRef.current = shapeLabel
-    modeRef.current = mode
     const id = ++seqRef.current
+    askedRef.current.set(id, { shape: shapeLabel, band: mode })
     const msg = {
       id, base, offsetMM: 0, cfg,
       mode,
