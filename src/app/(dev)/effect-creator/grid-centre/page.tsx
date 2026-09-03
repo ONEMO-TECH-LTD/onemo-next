@@ -1153,6 +1153,8 @@ const CSS = `
      dropped for those tabs. The tabs used to subtract 70, a number matching no real element, so the
      page overflowed by 80px and the sticky bar covered the zoom card the moment anything scrolled. */
   --gl-chrome:54px;
+  /* the phone's top bar is two rows (mode, then source) */
+  --gl-mobile-chrome:96px;
   background:var(--bg);color:var(--ink);font-family:var(--sans);min-height:100vh;padding:26px 20px 70px;-webkit-font-smoothing:antialiased}
 @media (prefers-color-scheme:dark){.gl:not([data-theme]){--bg:#0f141b;--panel:#161c25;--panel-2:#12171f;--line:#232c3a;--ink:#e6edf3;--ink-2:#9aa6b6;--ink-3:#66717f;--accent:#4d84ff;--accent-soft:#4d84ff20;--grid:#3d4a60;--suede:#9aa6ba;--suede-edge:#c9d4e2;--magnet:#0b0e12;--magnet-hi:#4a515c;--shadow:0 1px 2px #0005,0 12px 30px #0006}}
 .gl *{box-sizing:border-box}
@@ -1365,5 +1367,13 @@ const CSS = `
   .gl-tabbar button[aria-pressed="true"]{color:var(--accent);box-shadow:inset 0 2px 0 var(--accent)}
   .gl-tabbar .gl-tabbar-close{flex:0 0 54px;color:var(--ink-3);font-size:15px}
   .gl-benchtab .gl-stage-head{inset:8px 8px auto}
+  /* TOP BAR — Bench/Library on the first line, the source selector on its own line beneath, each
+     button sharing the width. It used to be one row that ran off the screen (Dan, 2026-09-03). */
+  .gl-libbar{flex-wrap:wrap;gap:6px;padding:6px 8px}
+  .gl-libbar-mode{flex:1 1 100%}
+  .gl-libbar-tabs{flex:1 1 100%}
+  .gl-libbar .gl-seg button{padding:7px 6px;font-size:11.5px;white-space:normal;line-height:1.1}
+  .gl{padding:0 0 8px}
+  .gl-benchtab{height:calc(100dvh - var(--gl-mobile-chrome) - 54px)}
 }
 `
