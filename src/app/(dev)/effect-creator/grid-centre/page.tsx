@@ -213,6 +213,10 @@ export default function GridLab() {
   type PerfRow = { key: string; shape: string; band: number; ms: number; sizeMM?: number; count?: number; cold: boolean }
   const [perfLog, setPerfLog] = useState<PerfRow[]>([])
   const seenSolves = useRef(new Set<string>())
+  /** Which build this screen is — read after mount: the server render has no port, and reading it
+   *  during render is a hydration mismatch (it broke the page, 2026-09-03). */
+  const [buildPort, setBuildPort] = useState('')
+  useEffect(() => { setBuildPort(window.location.port) }, [])
   const genMsRef = useRef<number | undefined>(undefined)
   const solveSentAt = useRef(0)
   useEffect(() => {
@@ -709,7 +713,7 @@ export default function GridLab() {
               </div>
             </div>}
           </Fold>
-          <Fold title={<>Performance <small style={{ color: 'var(--ink-3)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>· this build{typeof window !== 'undefined' ? ' · :' + window.location.port : ''}</small></>}>
+          <Fold title={<>Performance <small style={{ color: 'var(--ink-3)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>· this build{buildPort ? ' · :' + buildPort : ''}</small></>}>
             <div className="gl-field"><span>Latest</span>
               <div className="gl-snap">load <Sec ms={perf.loadMs} /> · gen <Sec ms={perf.genMs} /> · solve <Sec ms={perf.solveMs} /></div>
             </div>
