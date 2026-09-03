@@ -24,6 +24,7 @@ import type { Contour, Pt, UnprotectedEvidence } from '@/lib/effect/types'
 import type { GridResult, MagnetPlan, SafeSegment } from '@/lib/effect/types'
 import { bandRangeForControl, type GridPageModel } from '@/lib/effect/adapters/gridViewModel'
 import { librarySegments as librarySegmentsOf } from '@/lib/effect/adapters/libraryViewModel'
+import { createPerfLog, type PerfRow } from './perf-log'
 import { BANDS, CENTRE_MODE, DEFAULT_PITCH_MM, GOVERNOR, PADDING_CEIL_MM, PADDING_FLOOR_MM, PROTECTION_PADDING_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-magnet-spec'
 import { fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-magnet-bridge'
 
@@ -210,9 +211,8 @@ export default function GridLab() {
   /** PERFORMANCE LOG — the last solves this screen made, so two builds can be compared side by side
    *  (Dan, 2026-09-03). Display only: every field comes from the request the page already sent and
    *  the result the engine already returned. Nothing is measured or computed here. */
-  type PerfRow = { key: string; shape: string; band: number; ms: number; sizeMM?: number; count?: number; cold: boolean }
   const [perfLog, setPerfLog] = useState<PerfRow[]>([])
-  const seenSolves = useRef(new Set<string>())
+  const perfRef = useRef(createPerfLog())
   /** Which build this screen is — read after mount: the server render has no port, and reading it
    *  during render is a hydration mismatch (it broke the page, 2026-09-03). */
   /** PHONE LAYOUT — one panel at a time as a bottom sheet, so the canvas is never covered
@@ -337,15 +337,14 @@ export default function GridLab() {
   const busyRef = useRef(false)
   const queuedRef = useRef<object | null>(null)
   const effSizeRef = useRef(0)
-  /** What each in-flight request was for, keyed by its id. A row must carry the shape and band the
-   *  SOLVE was made for: stamping the log at arrival labelled an in-flight BOT answer as BUTTERFLY
-   *  when the shape changed mid-solve (Dan's screenshots, 2026-09-03). */
-  const askedRef = useRef(new Map<number, { shape: string; band: number }>())
   const shapeLabel = src === 'preset' ? preset : src === 'gen' ? gen : src === 'cut' ? (cutSel || 'cutout') : src
   useEffect(() => {
     const w = new Worker(new URL('./solve.worker.ts', import.meta.url))
     workerRef.current = w
     w.onmessage = (e) => {
+      // Release this request's record FIRST: a superseded response returns below, and leaving its
+      // entry behind would leak one per abandoned solve (QA F1, 2026-09-03).
+      const row = perfRef.current.arrived(e.data.id, e.data.model, performance.now() - solveSentAt.current)
       if (queuedRef.current) {
         const next = queuedRef.current
         queuedRef.current = null
@@ -361,16 +360,7 @@ export default function GridLab() {
       setPerf((x) => ({ ...x, solveMs, genMs: genMsRef.current }))
       if (e.data.model) effSizeRef.current = e.data.model.effSize
       setModel(e.data.model)
-      const asked = askedRef.current.get(e.data.id)
-      askedRef.current.delete(e.data.id)
-      if (e.data.model && asked) {
-        const key = asked.shape + '·B' + asked.band
-        const cold = !seenSolves.current.has(key)
-        seenSolves.current.add(key)
-        const row: PerfRow = { key, shape: asked.shape, band: asked.band, ms: solveMs,
-          sizeMM: e.data.model.effSize, count: e.data.model.grid?.anchors?.length, cold }
-        setPerfLog((rows) => [row, ...rows].slice(0, 12))
-      }
+      if (row) setPerfLog((rows) => [row, ...rows].slice(0, 12))
     }
     return () => { workerRef.current = null; w.terminate() }
   }, [])
@@ -383,7 +373,7 @@ export default function GridLab() {
     // solve that size directly, exactly like free mode, band chip stays active.
     const manualBand = manual !== null || bandScale !== null   // manual scale/pan: solved directly at the requested size
     const id = ++seqRef.current
-    askedRef.current.set(id, { shape: shapeLabel, band: mode })
+    perfRef.current.asked(id, shapeLabel, mode)
     const msg = {
       id, base, offsetMM: 0, cfg,
       mode,
