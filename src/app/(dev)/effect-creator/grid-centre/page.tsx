@@ -24,6 +24,7 @@ import type { Contour, Pt, UnprotectedEvidence } from '@/lib/effect/types'
 import type { GridResult, MagnetPlan, SafeSegment } from '@/lib/effect/types'
 import { bandRangeForControl, type GridPageModel } from '@/lib/effect/adapters/gridViewModel'
 import { librarySegments as librarySegmentsOf } from '@/lib/effect/adapters/libraryViewModel'
+import { createPerfLog, type PerfRow } from './perf-log'
 import { BANDS, CENTRE_MODE, DEFAULT_PITCH_MM, GOVERNOR, PADDING_CEIL_MM, PADDING_FLOOR_MM, PROTECTION_PADDING_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-magnet-spec'
 import { fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-magnet-bridge'
 
@@ -207,6 +208,18 @@ export default function GridLab() {
 
   /** Perf dash — screen instrumentation only: page load, shape generation, AI cut, solve. */
   const [perf, setPerf] = useState<{ loadMs?: number; genMs?: number; cutMs?: number; solveMs?: number }>({})
+  /** PERFORMANCE LOG — the last solves this screen made, so two builds can be compared side by side
+   *  (Dan, 2026-09-03). Display only: every field comes from the request the page already sent and
+   *  the result the engine already returned. Nothing is measured or computed here. */
+  const [perfLog, setPerfLog] = useState<PerfRow[]>([])
+  const perfRef = useRef(createPerfLog())
+  /** Which build this screen is — read after mount: the server render has no port, and reading it
+   *  during render is a hydration mismatch (it broke the page, 2026-09-03). */
+  /** PHONE LAYOUT — one panel at a time as a bottom sheet, so the canvas is never covered
+   *  (Dan, 2026-09-03). Desktop ignores this: the same panels stay pinned as today. */
+  const [sheet, setSheet] = useState<string | null>(null)
+  const [buildPort, setBuildPort] = useState('')
+  useEffect(() => { setBuildPort(window.location.port) }, [])
   const genMsRef = useRef<number | undefined>(undefined)
   const solveSentAt = useRef(0)
   useEffect(() => {
@@ -324,10 +337,14 @@ export default function GridLab() {
   const busyRef = useRef(false)
   const queuedRef = useRef<object | null>(null)
   const effSizeRef = useRef(0)
+  const shapeLabel = src === 'preset' ? preset : src === 'gen' ? gen : src === 'cut' ? (cutSel || 'cutout') : src
   useEffect(() => {
     const w = new Worker(new URL('./solve.worker.ts', import.meta.url))
     workerRef.current = w
     w.onmessage = (e) => {
+      // Release this request's record FIRST: a superseded response returns below, and leaving its
+      // entry behind would leak one per abandoned solve (QA F1, 2026-09-03).
+      const row = perfRef.current.arrived(e.data.id, e.data.model, performance.now() - solveSentAt.current)
       if (queuedRef.current) {
         const next = queuedRef.current
         queuedRef.current = null
@@ -339,9 +356,11 @@ export default function GridLab() {
       }
       if (e.data.id !== seqRef.current) return
       if (e.data.error) console.error('[grid-lab] solve failed', e.data.error)
-      setPerf((x) => ({ ...x, solveMs: performance.now() - solveSentAt.current, genMs: genMsRef.current }))
+      const solveMs = performance.now() - solveSentAt.current
+      setPerf((x) => ({ ...x, solveMs, genMs: genMsRef.current }))
       if (e.data.model) effSizeRef.current = e.data.model.effSize
       setModel(e.data.model)
+      if (row) setPerfLog((rows) => [row, ...rows].slice(0, 12))
     }
     return () => { workerRef.current = null; w.terminate() }
   }, [])
@@ -354,6 +373,7 @@ export default function GridLab() {
     // solve that size directly, exactly like free mode, band chip stays active.
     const manualBand = manual !== null || bandScale !== null   // manual scale/pan: solved directly at the requested size
     const id = ++seqRef.current
+    perfRef.current.asked(id, shapeLabel, mode)
     const msg = {
       id, base, offsetMM: 0, cfg,
       mode,
@@ -368,7 +388,7 @@ export default function GridLab() {
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler, protectionPadding, activeBandIds, bandScopeReady])
+  }, [base, src, preset, shapeLabel, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler, protectionPadding, activeBandIds, bandScopeReady])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -407,7 +427,7 @@ export default function GridLab() {
         </div>
       )}
 
-      <div className={tab === 'library' ? 'gl-body gl-libtab' : 'gl-body gl-benchtab'}>
+      <div className={tab === 'library' ? 'gl-body gl-libtab' : 'gl-body gl-benchtab'} data-sheet={sheet ?? ''}>
         <section className="gl-card gl-stage">
           <div className="gl-stage-head">
             <span className="gl-eye gl-perf" style={tab === 'library' ? { display: 'none' } : undefined}>
@@ -497,7 +517,7 @@ export default function GridLab() {
               setEdit(null)
               setLibrarySel(r.sel)
             }} /> : null}</> : <>
-          <Fold title="Grid settings">
+          <Fold title="Grid settings" panel="grid">
             <div className="gl-field gl-bandfield">
               <div className="gl-fieldhead"><span>Band · available</span>
                 <button className="gl-edit" onClick={() => setBandScopeDraft((draft) => draft ? null : [...activeBandIds])}>Edit</button>
@@ -610,7 +630,7 @@ export default function GridLab() {
               <button aria-label="zoom in" onClick={() => setCamZoom((z) => camStep(z, +1))}>+</button>
             </div>
           </div>
-          <Fold title="Shape">
+          <Fold title="Shape" panel="shape">
             {src === 'preset' && <>
               <div className="gl-lib">
                 {PRESETS.map((k) => (
@@ -673,7 +693,7 @@ export default function GridLab() {
           </Fold>
 
 
-          <Fold title="Centering">
+          <Fold title="Centering" panel="centre">
             <div className="gl-field"><span>Centre mode</span>
               <div className="gl-seg gl-wrap">
                 {([[0, 'Box'], [1, 'Core'], [2, 'Masses'], [3, 'Weight'], [4, 'Deep'], [5, 'Top']] as [number, string][]).map(([m, l]) =>
@@ -687,7 +707,23 @@ export default function GridLab() {
               </div>
             </div>}
           </Fold>
-          <Fold title="Protection">
+          <Fold title={<>Performance <small style={{ color: 'var(--ink-3)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>· this build{buildPort ? ' · :' + buildPort : ''}</small></>} panel="perf">
+            <div className="gl-field"><span>Latest</span>
+              <div className="gl-snap">load <Sec ms={perf.loadMs} /> · gen <Sec ms={perf.genMs} /> · solve <Sec ms={perf.solveMs} /></div>
+            </div>
+            {perfLog.length > 0 && <div className="gl-field"><span>Solves · newest first · cold = first of that shape and band</span>
+              <div className="gl-perflog">
+                {perfLog.map((r, i) => (
+                  <div key={r.key + i} className="gl-perfrow">
+                    <span>{r.shape} · B{r.band}{r.cold ? ' · cold' : ''}</span>
+                    <span>{r.sizeMM != null ? r.sizeMM.toFixed(2) + ' mm' : '—'}{r.count != null ? ' · ' + r.count + '⌾' : ''}</span>
+                    <b className={r.ms > 2000 ? 'gl-slow' : ''}>{(r.ms * 0.001).toFixed(2)}s</b>
+                  </div>
+                ))}
+              </div>
+            </div>}
+          </Fold>
+          <Fold title="Protection" panel="protect">
             <Slider label="Protection padding · from magnet edge" unit="mm"
               v={protectionPadding} set={setProtectionPadding} min={0} max={96} />
             {model?.unprotected && <div className="gl-field"><span>Unsupported material</span>
@@ -699,6 +735,14 @@ export default function GridLab() {
             </label>
           </Fold>
         </aside>
+        {tab !== 'library' && (
+          <nav className="gl-tabbar" aria-label="Panels">
+            {[['shape', 'Shape'], ['centre', 'Centre'], ['grid', 'Grid'], ['protect', 'Protect'], ['perf', 'Perf']].map(([id, label]) => (
+              <button key={id} aria-pressed={sheet === id} onClick={() => setSheet((x) => (x === id ? null : id))}>{label}</button>
+            ))}
+            {sheet && <button className="gl-tabbar-close" onClick={() => setSheet(null)} aria-label="Close panel">✕</button>}
+          </nav>
+        )}
       </div>
     </div>
   )
@@ -1081,9 +1125,9 @@ function Sec({ ms }: { ms?: number }) {
   return <b className={ms > 2000 ? 'gl-slow' : ''}>{(ms * 0.001).toFixed(2)}s</b>
 }
 /** Collapsible card — native details, open by default; collapse the unneeded on a phone. */
-function Fold({ title, children }: { title: React.ReactNode; children: React.ReactNode }) {
+function Fold({ title, children, panel }: { title: React.ReactNode; children: React.ReactNode; panel?: string }) {
   return (
-    <details className="gl-card gl-fold" open>
+    <details className="gl-card gl-fold" data-panel={panel} open>
       <summary>{title}</summary>
       <div className="gl-fold-body">{children}</div>
     </details>
@@ -1099,6 +1143,8 @@ const CSS = `
      dropped for those tabs. The tabs used to subtract 70, a number matching no real element, so the
      page overflowed by 80px and the sticky bar covered the zoom card the moment anything scrolled. */
   --gl-chrome:54px;
+  /* the phone's top bar is two rows (mode, then source) */
+  --gl-mobile-chrome:96px;
   background:var(--bg);color:var(--ink);font-family:var(--sans);min-height:100vh;padding:26px 20px 70px;-webkit-font-smoothing:antialiased}
 @media (prefers-color-scheme:dark){.gl:not([data-theme]){--bg:#0f141b;--panel:#161c25;--panel-2:#12171f;--line:#232c3a;--ink:#e6edf3;--ink-2:#9aa6b6;--ink-3:#66717f;--accent:#4d84ff;--accent-soft:#4d84ff20;--grid:#3d4a60;--suede:#9aa6ba;--suede-edge:#c9d4e2;--magnet:#0b0e12;--magnet-hi:#4a515c;--shadow:0 1px 2px #0005,0 12px 30px #0006}}
 .gl *{box-sizing:border-box}
@@ -1178,6 +1224,11 @@ const CSS = `
 .gl-toggle{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--ink-2);cursor:pointer}
 .gl-toggle input{width:17px;height:17px;accent-color:var(--accent)}
 .gl-perf b{color:var(--pass);font-weight:700}
+.gl-perflog{display:flex;flex-direction:column;gap:2px;font:600 11px var(--mono);color:var(--ink-2);
+  background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:7px 9px;max-height:210px;overflow:auto}
+.gl-perfrow{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:baseline}
+.gl-perfrow b{color:var(--pass);font-weight:700;min-width:44px;text-align:right}
+.gl-perfrow b.gl-slow{color:var(--fail)}
 .gl-perf b.gl-slow{color:var(--fail)}
 .gl-legend{display:flex;flex-direction:column;gap:7px;font:11.5px var(--sans);color:var(--ink-2);line-height:1.45}
 .gl-legend div{display:flex;align-items:flex-start;gap:8px}
@@ -1275,4 +1326,44 @@ const CSS = `
   overflow:auto;display:flex;flex-direction:column;gap:10px;z-index:3}
 .gl-benchtab .gl-controls>*,.gl-benchtab .gl-centercol>*{backdrop-filter:blur(8px);
   background:color-mix(in srgb,var(--panel) 92%,transparent)}
+/* THE PHONE BENCH. The canvas owns the screen; the panels are one sheet at a time under a bottom
+   bar. Desktop keeps the pinned overlays above — every rule here is inside the query. */
+.gl-tabbar{display:none}
+@media (max-width:840px){
+  /* the bar owns the bottom 54px: the bench simply ends above it, so nothing overlaps it */
+  .gl-benchtab{height:calc(100dvh - var(--gl-chrome) - 54px)}
+  .gl-benchtab .gl-vp{height:100%}
+  .gl-benchtab .gl-controls,.gl-benchtab .gl-centercol{position:fixed;inset:auto 0 54px 0;width:auto;
+    max-height:min(58dvh,520px);overflow:auto;padding:8px 10px 12px;gap:10px;z-index:6;
+    background:color-mix(in srgb,var(--panel) 96%,transparent);border-top:1px solid var(--line);
+    box-shadow:0 -10px 30px #18202e1f;display:none}
+  .gl-benchtab[data-sheet=""] .gl-controls,.gl-benchtab[data-sheet=""] .gl-centercol{display:none}
+  .gl-benchtab[data-sheet="grid"] .gl-controls,
+  .gl-benchtab[data-sheet="shape"] .gl-centercol,
+  .gl-benchtab[data-sheet="centre"] .gl-centercol,
+  .gl-benchtab[data-sheet="protect"] .gl-centercol,
+  .gl-benchtab[data-sheet="perf"] .gl-centercol{display:flex;flex-direction:column}
+  .gl-benchtab .gl-fold[data-panel]{display:none}
+  .gl-benchtab[data-sheet="grid"] .gl-fold[data-panel="grid"],
+  .gl-benchtab[data-sheet="shape"] .gl-fold[data-panel="shape"],
+  .gl-benchtab[data-sheet="centre"] .gl-fold[data-panel="centre"],
+  .gl-benchtab[data-sheet="protect"] .gl-fold[data-panel="protect"],
+  .gl-benchtab[data-sheet="perf"] .gl-fold[data-panel="perf"]{display:block}
+  .gl-tabbar{display:flex;position:fixed;inset:auto 0 0 0;z-index:7;height:54px;align-items:stretch;
+    background:color-mix(in srgb,var(--panel) 96%,transparent);border-top:1px solid var(--line);
+    backdrop-filter:blur(8px);padding-bottom:env(safe-area-inset-bottom)}
+  .gl-tabbar button{flex:1;border:0;background:none;font:600 11px var(--mono);letter-spacing:.06em;
+    text-transform:uppercase;color:var(--ink-2)}
+  .gl-tabbar button[aria-pressed="true"]{color:var(--accent);box-shadow:inset 0 2px 0 var(--accent)}
+  .gl-tabbar .gl-tabbar-close{flex:0 0 54px;color:var(--ink-3);font-size:15px}
+  .gl-benchtab .gl-stage-head{inset:8px 8px auto}
+  /* TOP BAR — Bench/Library on the first line, the source selector on its own line beneath, each
+     button sharing the width. It used to be one row that ran off the screen (Dan, 2026-09-03). */
+  .gl-libbar{flex-wrap:wrap;gap:6px;padding:6px 8px}
+  .gl-libbar-mode{flex:1 1 100%}
+  .gl-libbar-tabs{flex:1 1 100%}
+  .gl-libbar .gl-seg button{padding:7px 6px;font-size:11.5px;white-space:normal;line-height:1.1}
+  .gl{padding:0 0 8px}
+  .gl-benchtab{height:calc(100dvh - var(--gl-mobile-chrome) - 54px)}
+}
 `

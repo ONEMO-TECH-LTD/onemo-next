@@ -40,7 +40,7 @@ export function solveCanonExperiment(
     anchorAtMM, frameMidMM: [0, 0] }
   const trace: CanonExperimentTrace = {
     source: 'none', canonSeats: canonNodesMM.length, populations: 0, wraps: 0,
-    retained: 0, readded: 0, phasePairs: 0, windows: 0, fitsCalls: 0, cacheHits: 0,
+    retained: 0, readded: 0, phasePairs: 0, windows: 0, fitsCalls: 0,
     elapsedMs: 0,
   }
   const finish = <T extends BandSolve & { trace: CanonExperimentTrace }>(result: T): T => {
@@ -109,7 +109,6 @@ export function solveCanonExperiment(
     trace.phasePairs += search.phasePairs
     trace.windows += search.windows
     trace.fitsCalls += search.fitsCalls
-    trace.cacheHits += search.cacheHits
     for (const candidate of search.candidates) if (!candidates.has(candidate.id)) candidates.set(candidate.id, candidate)
     if (priority) for (const candidate of search.priorityCandidates) {
       const tuple = priorityTupleOf(candidate.id.split(',').map(Number), priority)
@@ -185,7 +184,6 @@ export function solveCanonExperiment(
       anchorAtMM(mm), mm, PHASE_STEP_MM)
     trace.phasePairs += search.phasePairs
     trace.fitsCalls += search.fitsCalls
-    trace.cacheHits += search.cacheHits
     for (const candidate of search.candidates) {
       witnesses.push({ revealMM: mm, points: candidate.points })
       const id = freeIdentity(candidate.points, pitch)
