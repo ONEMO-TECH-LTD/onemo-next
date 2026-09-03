@@ -207,6 +207,12 @@ export default function GridLab() {
 
   /** Perf dash — screen instrumentation only: page load, shape generation, AI cut, solve. */
   const [perf, setPerf] = useState<{ loadMs?: number; genMs?: number; cutMs?: number; solveMs?: number }>({})
+  /** PERFORMANCE LOG — the last solves this screen made, so two builds can be compared side by side
+   *  (Dan, 2026-09-03). Display only: every field comes from the request the page already sent and
+   *  the result the engine already returned. Nothing is measured or computed here. */
+  type PerfRow = { key: string; shape: string; band: number; ms: number; sizeMM?: number; count?: number; cold: boolean }
+  const [perfLog, setPerfLog] = useState<PerfRow[]>([])
+  const seenSolves = useRef(new Set<string>())
   const genMsRef = useRef<number | undefined>(undefined)
   const solveSentAt = useRef(0)
   useEffect(() => {
@@ -324,6 +330,11 @@ export default function GridLab() {
   const busyRef = useRef(false)
   const queuedRef = useRef<object | null>(null)
   const effSizeRef = useRef(0)
+  /** The current shape and band, for the performance log — refs because the worker callback is
+   *  bound once and must not re-subscribe on every control change. */
+  const shapeLabelRef = useRef('')
+  const modeRef = useRef(1)
+  const shapeLabel = src === 'preset' ? preset : src === 'gen' ? gen : src === 'cut' ? (cutSel || 'cutout') : src
   useEffect(() => {
     const w = new Worker(new URL('./solve.worker.ts', import.meta.url))
     workerRef.current = w
@@ -339,9 +350,18 @@ export default function GridLab() {
       }
       if (e.data.id !== seqRef.current) return
       if (e.data.error) console.error('[grid-lab] solve failed', e.data.error)
-      setPerf((x) => ({ ...x, solveMs: performance.now() - solveSentAt.current, genMs: genMsRef.current }))
+      const solveMs = performance.now() - solveSentAt.current
+      setPerf((x) => ({ ...x, solveMs, genMs: genMsRef.current }))
       if (e.data.model) effSizeRef.current = e.data.model.effSize
       setModel(e.data.model)
+      if (e.data.model) {
+        const key = shapeLabelRef.current + '·B' + modeRef.current
+        const cold = !seenSolves.current.has(key)
+        seenSolves.current.add(key)
+        const row: PerfRow = { key, shape: shapeLabelRef.current, band: modeRef.current, ms: solveMs,
+          sizeMM: e.data.model.effSize, count: e.data.model.grid?.anchors?.length, cold }
+        setPerfLog((rows) => [row, ...rows].slice(0, 12))
+      }
     }
     return () => { workerRef.current = null; w.terminate() }
   }, [])
@@ -353,6 +373,8 @@ export default function GridLab() {
     // Manual in a band (forced registration OR manual band scale): the walk is meaningless —
     // solve that size directly, exactly like free mode, band chip stays active.
     const manualBand = manual !== null || bandScale !== null   // manual scale/pan: solved directly at the requested size
+    shapeLabelRef.current = shapeLabel
+    modeRef.current = mode
     const id = ++seqRef.current
     const msg = {
       id, base, offsetMM: 0, cfg,
@@ -368,7 +390,7 @@ export default function GridLab() {
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler, protectionPadding, activeBandIds, bandScopeReady])
+  }, [base, src, preset, shapeLabel, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler, protectionPadding, activeBandIds, bandScopeReady])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
@@ -684,6 +706,22 @@ export default function GridLab() {
               <div className="gl-seg gl-wrap">
                 {([[0, 'Smallest'], [1, 'Deepest'], [2, 'Top'], [3, 'Top-small']] as [number, string][]).map(([g, l]) =>
                   <button key={g} aria-pressed={governor === g} onClick={() => setGovernor(g)}>{l}</button>)}
+              </div>
+            </div>}
+          </Fold>
+          <Fold title={<>Performance <small style={{ color: 'var(--ink-3)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>· this build{typeof window !== 'undefined' ? ' · :' + window.location.port : ''}</small></>}>
+            <div className="gl-field"><span>Latest</span>
+              <div className="gl-snap">load <Sec ms={perf.loadMs} /> · gen <Sec ms={perf.genMs} /> · solve <Sec ms={perf.solveMs} /></div>
+            </div>
+            {perfLog.length > 0 && <div className="gl-field"><span>Solves · newest first · cold = first of that shape and band</span>
+              <div className="gl-perflog">
+                {perfLog.map((r, i) => (
+                  <div key={r.key + i} className="gl-perfrow">
+                    <span>{r.shape} · B{r.band}{r.cold ? ' · cold' : ''}</span>
+                    <span>{r.sizeMM != null ? r.sizeMM.toFixed(2) + ' mm' : '—'}{r.count != null ? ' · ' + r.count + '⌾' : ''}</span>
+                    <b className={r.ms > 2000 ? 'gl-slow' : ''}>{(r.ms * 0.001).toFixed(2)}s</b>
+                  </div>
+                ))}
               </div>
             </div>}
           </Fold>
@@ -1178,6 +1216,11 @@ const CSS = `
 .gl-toggle{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--ink-2);cursor:pointer}
 .gl-toggle input{width:17px;height:17px;accent-color:var(--accent)}
 .gl-perf b{color:var(--pass);font-weight:700}
+.gl-perflog{display:flex;flex-direction:column;gap:2px;font:600 11px var(--mono);color:var(--ink-2);
+  background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:7px 9px;max-height:210px;overflow:auto}
+.gl-perfrow{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:baseline}
+.gl-perfrow b{color:var(--pass);font-weight:700;min-width:44px;text-align:right}
+.gl-perfrow b.gl-slow{color:var(--fail)}
 .gl-perf b.gl-slow{color:var(--fail)}
 .gl-legend{display:flex;flex-direction:column;gap:7px;font:11.5px var(--sans);color:var(--ink-2);line-height:1.45}
 .gl-legend div{display:flex;align-items:flex-start;gap:8px}
