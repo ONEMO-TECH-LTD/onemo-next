@@ -437,7 +437,8 @@ describe('2e — the pipeline is the one sequencer the shells reach; adapters on
 
   it('the worker imports only the pipeline and the adapter; the page never imports the pipeline directly', () => {
     const workerRefs = moduleRefsOf(readFileSync(WORKER, 'utf8'))
-    const bad = workerRefs.filter((i) => !/^@\/lib\/effect\/(pipeline|adapters)\//.test(i))
+    // T4: the pipeline is now reached through its own door (`@/lib/effect/pipeline`), not by file path.
+    const bad = workerRefs.filter((i) => !/^@\/lib\/effect\/(pipeline$|pipeline\/|adapters\/)/.test(i))
     expect(bad, 'worker reaches past the pipeline seam: ' + bad.join(' · ')).toEqual([])
     const pageRefs = importsOf(pageText()).filter((i) => /\/pipeline\//.test(i))
     expect(pageRefs, 'the page must reach the engine through the adapter, not the pipeline').toEqual([])

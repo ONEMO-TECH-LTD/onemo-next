@@ -53,6 +53,9 @@
     "src/lib/grid-engine/compute/enumerator/scripts",
     "src/lib/grid-engine/logic/magnetic-grid-product-logic/src",
     "src/lib/grid-engine/logic/magnetic-grid-product-logic/test",
-    "src/lib/grid-engine/logic/magnetic-grid-product-logic/scripts"
+    "src/lib/grid-engine/logic/magnetic-grid-product-logic/scripts",
+    "src/lib/effect/engine-package/dist",
+    "src/lib/effect/engine-package/scripts",
+    "src/lib/effect/engine-package/test"
   ]
 }

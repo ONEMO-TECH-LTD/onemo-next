@@ -1,8 +1,7 @@
 // solve.worker.ts — transport only: decode the request, call the headless solve, post the result.
 // The solve body moved verbatim to src/lib/effect/pipeline/solve.ts (T1 S1, 2026-09-02).
 
-import { solveGrid } from '@/lib/effect/pipeline/solve'
-import type { GridRequest } from '@/lib/effect/pipeline/types'
+import { solveGrid, type GridRequest } from '@/lib/effect/pipeline'
 import { toPageModel } from '@/lib/effect/adapters/gridViewModel'
 
 const ctx = self as unknown as Worker

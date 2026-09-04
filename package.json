@@ -15,6 +15,7 @@
     "test:cutout-v1-output": "node scripts/verify-cutout-v1-output.mjs",
     "test:cutout-v1-grabcut": "node scripts/verify-cutout-v1-grabcut.mjs",
     "cutout:closure": "node scripts/generate-cutout-studio-closure.mjs",
+    "test:engine-package": "npm --prefix src/lib/effect/engine-package test",
     "grid:catalogue:generate": "vite-node --script scripts/generate-grid-static-catalogue.ts",
     "grid:profile": "vite-node --script scripts/profile-grid-baseline.ts",
     "perf:devices": "node scripts/device-performance/run.mjs",

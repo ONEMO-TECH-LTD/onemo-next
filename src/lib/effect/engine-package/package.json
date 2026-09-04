@@ -1,0 +1,23 @@
+{
+  "name": "onemo-grid-engine",
+  "version": "4.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Headless magnetic-grid solve: a cutout and its settings in, every lawful layout with its evidence out. No browser, no framework, no app.",
+  "exports": {
+    ".": {
+      "types": "./dist/lib/effect/pipeline/index.d.ts",
+      "import": "./dist/lib/effect/pipeline/index.js"
+    }
+  },
+  "types": "./dist/lib/effect/pipeline/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "clean": "node scripts/clean.mjs",
+    "build": "npm run clean && node scripts/build.mjs",
+    "test": "npm run build && node --test test/consumer.test.mjs"
+  },
+  "dependencies": {
+    "@countertype/clipper2-ts": "^1.5.4"
+  }
+}
