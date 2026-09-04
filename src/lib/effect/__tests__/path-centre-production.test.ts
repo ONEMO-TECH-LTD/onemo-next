@@ -11,7 +11,7 @@ import { transformShape } from '@/lib/vector-core'
 import { contourFromShape } from '../geometry-truth'
 import { contourAreaCentroidMM } from '../foundation/geometry'
 import { computeGrid } from '../grid-magnet'
-import { makeSizer, normBaseContour } from '../grid-magnet-bridge'
+import { contourCacheKey, makeSizer, normBaseContour } from '../grid-magnet-bridge'
 import { anchorFnFor, solveGrid } from '../pipeline/solve'
 import type { Contour, GridConfig, Pt } from '../types'
 
@@ -90,5 +90,35 @@ describe('the Weight centre is the exact path centroid', () => {
     const solvedView = viewCentroid(solve.contour)
     expect(Math.hypot(used[0] - solvedExact[0], used[1] - solvedExact[1])).toBeLessThan(1e-9)
     expect(Math.hypot(used[0] - solvedView[0], used[1] - solvedView[1])).toBeGreaterThan(1e-6)
+  })
+})
+
+describe('the solve cache keys on the path, not the view', () => {
+  // QA @ef57810a F9: two shapes with the same flattened points but different curves shared a bake and
+  // could reuse each other's rungs and centre. The key is the whole ring, path included.
+  const pts: Pt[] = [[0, 0], [100, 0], [100, 100], [0, 100]]
+  const withCubic = (c1: Pt): Contour => ({
+    outer: { pts, path: { start: [0, 0], segs: [{ kind: 'cubic', to: [100, 0], c1, c2: [70, 10] }, { kind: 'line', to: [100, 100] }, { kind: 'line', to: [0, 100] }, { kind: 'line', to: [0, 0] }] } },
+    holes: [],
+  })
+  const withArc = (ccw: boolean): Contour => ({
+    outer: { pts, path: { start: [0, 0], segs: [{ kind: 'arc', to: [100, 0], centre: [50, 0], ccw }, { kind: 'line', to: [100, 100] }, { kind: 'line', to: [0, 100] }, { kind: 'line', to: [0, 0] }] } },
+    holes: [],
+  })
+
+  it('a different cubic handle, same points, is a different key', () => {
+    expect(contourCacheKey(withCubic([30, 10]), 0)).not.toBe(contourCacheKey(withCubic([30, -10]), 0))
+  })
+  it('a different arc direction, same points, is a different key', () => {
+    expect(contourCacheKey(withArc(true), 0)).not.toBe(contourCacheKey(withArc(false), 0))
+  })
+  it('an identical path, deep-copied, is the same key — the key is the data, not the object', () => {
+    const a = withCubic([30, 10])
+    const b = JSON.parse(JSON.stringify(a)) as Contour
+    expect(contourCacheKey(a, 0)).toBe(contourCacheKey(b, 0))
+  })
+  it('mutation: a key built from points alone cannot tell the two curves apart', () => {
+    const pointsOnly = (c: Contour) => JSON.stringify([0, c.outer.pts, c.holes.map((h) => h.pts)])
+    expect(pointsOnly(withCubic([30, 10]))).toBe(pointsOnly(withCubic([30, -10])))
   })
 })

@@ -65,10 +65,13 @@ export function makeSizer(base: Contour, offsetMM: number): (mm: number) => Cont
  *  A hash of ring counts collides — two different hole positions keyed the same and returned the
  *  wrong cached sizer. */
 export function contourCacheKey(base: Contour, offsetMM: number): string {
+  // The whole ring, PATH included: two shapes with the same flattened view but different curves
+  // must not share a bake or a rung. Keying on points alone was safe only before the path was the
+  // truth (QA @ef57810a F9). Ring and path are plain serialisable data, so the key is the data.
   return JSON.stringify([
     offsetMM,
-    base.outer.pts,
-    base.holes.map((hole) => hole.pts),
+    base.outer,
+    base.holes,
   ])
 }
 
