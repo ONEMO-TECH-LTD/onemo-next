@@ -16,6 +16,7 @@ import {
 import {
   BANDS, DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS, PADDING_FLOOR_MM, PHASE_STEP_MM, SNAP_STEP_MM,
 } from '../grid-magnet-spec'
+import { MANUFACTURING_OFFSET_ARC_TOLERANCE_MM } from '../offset'
 
 /** Split seated nodes into perimeter belt and fully-surrounded interior. */
 function splitPerimeter(seated: ReadonlyArray<Pt>, step: number): { belt: Pt[]; interior: Pt[] } {
@@ -95,6 +96,55 @@ export function bandOuterMM(band: Band, padMM: number): { minMM: number; maxMM: 
 /** Integer-micron resolution shared by polygon and analytic-circle seating. */
 const SEAT_QUANTUM_MM = 0.001
 
+/** THE WIDEST TURN A FLATTENED ARC CAN TAKE, derived rather than chosen: an offset holds its chords
+ *  within the arc tolerance of the true curve, which for a radius r caps the turn per chord at
+ *  2·acos(1/(1+tol/r)). The smallest radius any of these outlines carries is the rim itself, so this
+ *  is the loosest that bound ever gets — about 8 degrees. A real corner turns far harder and gets no
+ *  allowance at all, which is what keeps a straight edge exact. */
+const FLATTEN_TURN_MAX = 2 * Math.acos(1 / (1 + MANUFACTURING_OFFSET_ARC_TOLERANCE_MM / PADDING_FLOOR_MM))
+
+/** HOW FAR EACH CHORD MAY STAND INSIDE THE EDGE IT REPRESENTS — zero unless the outline actually
+ *  bends there. For a chord of length L spanning a turn of θ, the true arc bulges out by (L/2)·tan(θ/4);
+ *  the offset that drew it kept that under the arc tolerance, so the tolerance caps it. A vertex that
+ *  turns harder than a flattening ever does is a real corner: both its edges get nothing.
+ *
+ *  Plus one micron on a bending edge, because the arc's vertices are themselves stored on the micron
+ *  grid and round inward: measured on a 24mm round offset, the chords stand 25.27 microns in where the
+ *  sagitta alone accounts for 24.89. A straight edge gets neither term — its chord IS the edge. */
+function chordAllowances(outer: ReadonlyArray<Pt>): number[] {
+  const n = outer.length
+  if (n < 3) return new Array<number>(Math.max(0, n)).fill(0)
+  const turn = outer.map((_, i) => {
+    const [ax, ay] = outer[(i - 1 + n) % n], [bx, by] = outer[i], [cx, cy] = outer[(i + 1) % n]
+    const a = Math.atan2(by - ay, bx - ax), b = Math.atan2(cy - by, cx - bx)
+    return Math.abs(Math.atan2(Math.sin(b - a), Math.cos(b - a)))
+  })
+  return outer.map((p, i) => {
+    const q = outer[(i + 1) % n]
+    if (turn[i] > FLATTEN_TURN_MAX || turn[(i + 1) % n] > FLATTEN_TURN_MAX) return 0
+    const theta = (turn[i] + turn[(i + 1) % n]) / 2
+    if (theta <= 0) return 0
+    const bulge = (Math.hypot(q[0] - p[0], q[1] - p[1]) / 2) * Math.tan(theta / 4)
+    return Math.min(bulge, MANUFACTURING_OFFSET_ARC_TOLERANCE_MM) + SEAT_QUANTUM_MM
+  })
+}
+
+/** Does the magnet clear the edge each chord stands in for? Same rule as the chord test, with every
+ *  chord allowed its own bulge and no other. */
+function clearsTrueEdge(
+  outer: ReadonlyArray<Pt>, allow: readonly number[], pt: Pt, spotRadiusMM: number,
+): boolean {
+  if (!pointInOuter(pt, outer)) return false
+  const n = outer.length
+  for (let i = 0; i < n; i++) {
+    const [ax, ay] = outer[i], [bx, by] = outer[(i + 1) % n]
+    const vx = bx - ax, vy = by - ay, len2 = vx * vx + vy * vy
+    const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((pt[0] - ax) * vx + (pt[1] - ay) * vy) / len2))
+    if (Math.hypot(pt[0] - (ax + t * vx), pt[1] - (ay + t * vy)) < spotRadiusMM - allow[i]) return false
+  }
+  return true
+}
+
 // Placement eligibility is LAYOUT'S: a seat predicate says where a magnet MAY go, which is policy,
 // not measurement. It composes foundation's public primitives; the edge index stays private there.
 // QA F3 is right — keeping a private shortcut is no reason to hold policy in foundation.
@@ -105,15 +155,16 @@ const SEAT_QUANTUM_MM = 0.001
  * threshold fall through to the integer test — the answer never changes, only the cost.
  * Null for a degenerate outline.
  *
- * A KNOWN GAP, deliberately not papered over here (2026-09-04). The exact test measures against the
- * outline's CHORDS, and a chord of an INSCRIBED flattened arc sits up to the arc tolerance inside the
- * true edge — so a magnet touching the real curve exactly measures short and is refused. That is the
- * zero-margin case the analytic circle predicate below was written for, and that predicate only
- * covers a shape which IS a circle; every other curved outline takes this path. Allowing the arc
- * tolerance here uniformly was tried and is WRONG: on a straight edge there is no approximation to
- * correct, and 5b caught it refusing to refuse a magnet one micron inside the rim. The correction
- * has to be per-edge, from each edge's own turn, and it is its own task. Outlines the library builds
- * are emitted so their chords lie OUTSIDE the true curve instead, which needs nothing from here.
+ * A CHORD IS NOT THE EDGE. The exact test measures against the outline's chords, and a chord of a
+ * flattened arc sits inside the true curve, so a magnet that touches the real edge exactly measures
+ * short and is refused — the zero-margin case the analytic circle predicate below was written for,
+ * which only covers a shape that IS a circle. Every other curved outline takes this path, freeform
+ * cutouts included, and quietly lost its tangent seats (Dan, 2026-09-04: "we need to fix that defect
+ * cause it will make some free shapes to have no optimal layout").
+ *
+ * The correction is PER EDGE and comes from that edge's own turn, not from a blanket allowance:
+ * allowing the arc tolerance everywhere was tried and 5b caught it, because on a straight edge there
+ * is no approximation to correct. See `chordAllowances`.
  */
 export function makeSeatPredicate(
   outer: ReadonlyArray<Pt>,
@@ -123,6 +174,8 @@ export function makeSeatPredicate(
   let prep: ReturnType<typeof prepare>
   try { prep = prepare(outer, SEAT_QUANTUM_MM) } catch { return null }
   const rQ = Math.round(spotRadiusMM / SEAT_QUANTUM_MM)
+  const allow = chordAllowances(outer)
+  const curved = allow.some((a) => a > 0)
   return (pt: Pt) => {
     // The ring-field lower bound is gone with the move: it read foundation's private edge index,
     // and a private shortcut is not a reason to hold policy in foundation (QA F3). edgeDistMM is
@@ -130,8 +183,11 @@ export function makeSeatPredicate(
     // the identical answer — the float guard and the exact `holds` fallback are untouched.
     const d = edgeDistMM(outer, pt)
     if (d > spotRadiusMM + GUARD) return pointInOuter(pt, outer)
-    if (d < spotRadiusMM - GUARD) return false
-    return holds(prep, [Math.round(pt[0] / SEAT_QUANTUM_MM), Math.round(pt[1] / SEAT_QUANTUM_MM)], rQ)
+    if (d < spotRadiusMM - GUARD - MANUFACTURING_OFFSET_ARC_TOLERANCE_MM) return false
+    if (holds(prep, [Math.round(pt[0] / SEAT_QUANTUM_MM), Math.round(pt[1] / SEAT_QUANTUM_MM)], rQ)) return true
+    // Refused against the chords. On an outline with no curvature that is the final answer; where the
+    // outline bends, ask again against the edge each chord stands in for.
+    return curved && clearsTrueEdge(outer, allow, pt, spotRadiusMM)
   }
 }
 
