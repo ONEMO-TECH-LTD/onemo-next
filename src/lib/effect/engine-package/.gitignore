@@ -1,0 +1,4 @@
+# The engine package builds FROM the repository sources, so a committed dist would be a second copy
+# of the engine that goes stale the moment the engine changes. The three vendored grid-engine packages
+# commit theirs because their sources live inside them; this one's do not. Build it: npm run build.
+dist/

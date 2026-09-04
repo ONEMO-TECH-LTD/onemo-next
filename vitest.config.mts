@@ -28,6 +28,9 @@ export default defineConfig({
       "src/lib/grid-engine/compute/magnetic-grid-measurement-kernel/test/**",
       "src/lib/grid-engine/compute/enumerator/test/**",
       "src/lib/grid-engine/logic/magnetic-grid-product-logic/test/**",
+      // The engine package ships its own consumer smoke under node:test (npm test inside the package),
+      // and its dist is build output — neither belongs to the app suite.
+      "src/lib/effect/engine-package/**",
     ],
   },
 });
