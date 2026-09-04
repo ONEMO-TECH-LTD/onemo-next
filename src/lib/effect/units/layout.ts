@@ -13,6 +13,7 @@ import { MIN_ANCHORS } from '../grid-magnet-spec'
 import {
   bbox, edgeDistMM, edgeDistToContourMM, pointInOuter,
 } from '../foundation/geometry'
+import { distanceToPathMM, pointInPath } from '../foundation/path'
 import {
   BANDS, DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS, PADDING_FLOOR_MM, PHASE_STEP_MM, SNAP_STEP_MM,
 } from '../grid-magnet-spec'
@@ -154,11 +155,18 @@ export function makeCircleSeatPredicate(
 }
 
 /** Seat predicate over a whole CONTOUR: a centre must clear the outline and every hole by the spot
- *  radius. The outer-ring predicate above cannot see a hole at all. */
+ *  radius. The outer-ring predicate above cannot see a hole at all.
+ *
+ *  Where the ring carries its PATH, the outer test is exact against that path — closed form to a
+ *  line, an arc or a cubic, no chord anywhere (Dan, 2026-09-04: "no polygons on canon and
+ *  anywhere"). The point list is only consulted for a ring that has no path yet. */
 export function makeContourSeatPredicate(
   contour: Contour, spotRadiusMM: number,
 ): ((pt: Pt) => boolean) | null {
-  const outerFits = makeSeatPredicate(contour.outer.pts, spotRadiusMM)
+  const path = contour.outer.path
+  const outerFits = path
+    ? (pt: Pt) => pointInPath(path, pt) && distanceToPathMM(path, pt) + SEAT_QUANTUM_MM / 2 >= spotRadiusMM
+    : makeSeatPredicate(contour.outer.pts, spotRadiusMM)
   if (!outerFits) return null
   if (!contour.holes.length) return outerFits
   return (pt: Pt) => outerFits(pt)

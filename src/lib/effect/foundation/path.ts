@@ -344,9 +344,9 @@ function signedArea(ring: readonly Pt[]): number {
 
 /** A POINT VIEW of the path, for the two things that genuinely cannot hold a curve: Clipper's integer
  *  booleans, and drawing. Never for measurement — that is what `distanceToPathMM` is for, and taking
- *  this as truth is the defect the path exists to end. Arcs are sampled so no chord stands further
- *  than `tolMM` from the curve, on the OUTSIDE, so a flattened copy never reports a shape smaller
- *  than it is. */
+ *  this as truth is the defect the path exists to end. Vertices lie ON the curve, no chord stands
+ *  further than `tolMM` from it, and every arc's axis extremes are vertices, so the view's bounding
+ *  box is the path's exactly. */
 export function flattenPath(path: OutlinePath, tolMM: number): Pt[] {
   const out: Pt[] = [path.start]
   const flattenCubic = (c: Cubic, depth: number): void => {
@@ -364,13 +364,28 @@ export function flattenPath(path: OutlinePath, tolMM: number): Pt[] {
     if (seg.kind === 'cubic') { flattenCubic(cubicOf(from, seg), 0); return }
     const r = radiusOf(seg.centre, from)
     const sweep = sweepOf(seg.centre, from, seg.to, seg.ccw)
-    const widest = 2 * Math.acos(Math.max(-1, Math.min(1, 1 / (1 + tolMM / r))))
-    const steps = Math.max(1, Math.ceil(sweep / Math.max(widest, 1e-9)))
-    const reach = r / Math.cos(sweep / steps / 2)
     const a0 = angleOf(seg.centre, from)
-    for (let i = 0; i < steps; i++) {
-      const t = a0 + (seg.ccw ? 1 : -1) * (i + 0.5) * (sweep / steps)
-      out.push([seg.centre[0] + reach * Math.cos(t), seg.centre[1] + reach * Math.sin(t)])
+    const dir = seg.ccw ? 1 : -1
+    // Vertices ON the curve, at a spacing that keeps every chord within tolMM of it — and always at
+    // the arc's axis extremes, so the view's bounding box is the path's exactly. A view that bulged
+    // 25 microns past the true cap laid the engine's lattice 25 microns off and lost a whole row.
+    const widest = 2 * Math.acos(Math.max(-1, Math.min(1, 1 - tolMM / r)))
+    const steps = Math.max(1, Math.ceil(sweep / Math.max(widest, 1e-9)))
+    // the axis directions that fall inside this sweep, as offsets along it
+    const axes: number[] = []
+    for (let k = -4; k <= 4; k++) {
+      const wrapped = ((dir * ((k * Math.PI) / 2 - a0)) % TAU + TAU) % TAU
+      if (wrapped > 1e-9 && wrapped < sweep - 1e-9) axes.push(wrapped)
+    }
+    const emit = (rel: number) => {
+      const t = a0 + dir * rel
+      out.push([seg.centre[0] + r * Math.cos(t), seg.centre[1] + r * Math.sin(t)])
+    }
+    // walk the regular subdivision in order, dropping each axis extreme into the gap it falls in
+    for (let i = 1; i <= steps; i++) {
+      const lo = ((i - 1) * sweep) / steps, hi = (i * sweep) / steps
+      for (const a of axes) if (a > lo + 1e-9 && a < hi - 1e-9) emit(a)
+      if (i < steps) emit(hi)
     }
     out.push(seg.to)
   })
@@ -401,4 +416,17 @@ export function pathFromAnchors(
     segs.push({ kind: 'cubic', to, c1: map(A.hOut ?? A.p), c2: map(B.hIn ?? B.p) })
   }
   return { start: map(anchors[0].p), segs }
+}
+
+/** A uniform scale about the origin — exact on every segment kind: a line's ends scale, an arc's
+ *  centre and ends scale (so its radius does), a cubic's control points scale. This is how a path
+ *  survives normalisation and sizing, where a point list used to be all that came through. */
+export function scalePath(path: OutlinePath, k: number): OutlinePath {
+  const s = (p: Pt): Pt => [p[0] * k, p[1] * k]
+  return {
+    start: s(path.start),
+    segs: path.segs.map((seg) => seg.kind === 'line' ? { kind: 'line', to: s(seg.to) }
+      : seg.kind === 'arc' ? { kind: 'arc', to: s(seg.to), centre: s(seg.centre), ccw: seg.ccw }
+      : { kind: 'cubic', to: s(seg.to), c1: s(seg.c1), c2: s(seg.c2) }),
+  }
 }

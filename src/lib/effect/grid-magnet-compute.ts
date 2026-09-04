@@ -2,6 +2,7 @@
 
 import type { Contour, Pt } from './types'
 import { edgeDistMM } from './foundation/geometry'
+import { scalePath } from './foundation/path'
 
 // Moved to foundation/geometry.ts (S2 step 1). Re-exported so no consumer changes in the move.
 export { bbox } from './foundation/geometry'
@@ -43,9 +44,14 @@ export function contactPointsMM(
   return out
 }
 
-/** Scale a normalized contour (longest side = 1mm) to a real longest side in mm. */
+/** Scale a normalized contour (longest side = 1mm) to a real longest side in mm. The path scales with
+ *  it — a uniform scale is exact on lines, arcs and cubics — so the exact outline reaches the solver
+ *  at every trial size, where it used to be dropped here and only the point view went on. */
 export function scaleContour(base: Contour, longestMM: number): Contour {
   const scale = (pts: ReadonlyArray<Pt>): Pt[] => pts.map(([x, y]) => [x * longestMM, y * longestMM] as Pt)
   // Every supplied ring scales. Returning holes: [] here silently deleted a donut's hole.
-  return { outer: { pts: scale(base.outer.pts) }, holes: base.holes.map((h) => ({ pts: scale(h.pts) })) }
+  return {
+    outer: { pts: scale(base.outer.pts), path: base.outer.path ? scalePath(base.outer.path, longestMM) : undefined },
+    holes: base.holes.map((h) => ({ pts: scale(h.pts), path: h.path ? scalePath(h.path, longestMM) : undefined })),
+  }
 }

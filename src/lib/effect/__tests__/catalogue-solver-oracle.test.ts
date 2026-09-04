@@ -19,6 +19,7 @@ import { computeGrid } from '../grid-magnet'
 import { RELEASED_PADDING_MM } from '../grid-magnet-spec'
 import { MANUFACTURING_TOLERANCE_MM } from '../geometry-truth'
 import type { Pt } from '../types'
+import { pathBoundsMM } from '../foundation/path'
 
 /** Agreement is judged at the MANUFACTURING tolerance, not the nearest millimetre. Rounding to
  *  whole mm let a solver anchor sit 0.4mm off and still read as a match — the same class of
@@ -42,9 +43,12 @@ const caseId = (id: string, pitchMM: number) => id + '@' + pitchMM
  *  a diamond's corner sits at 12*sqrt2 = 16.971mm, and rounding it to 17 moves two disks out. */
 const seatedAt = (entry: CatalogueEntry, pitchMM: number, paddingMM = RELEASED_PADDING_MM) => {
   const pts = entry.outlineMM.map(([x, y]) => [x, y] as Pt)
-  const minX = Math.min(...pts.map((p) => p[0])), minY = Math.min(...pts.map((p) => p[1]))
+  // the registration is measured from the outline's true corner — the path's where it has one
+  const box = entry.outlinePath ? pathBoundsMM(entry.outlinePath) : null
+  const minX = box ? box.minX : Math.min(...pts.map((p) => p[0]))
+  const minY = box ? box.minY : Math.min(...pts.map((p) => p[1]))
   const phase = (v: number) => ((v % pitchMM) + pitchMM) % pitchMM
-  const grid = computeGrid({ outer: { pts }, holes: [] }, {
+  const grid = computeGrid({ outer: { pts, path: entry.outlinePath ?? undefined }, holes: [] }, {
     pitchMM, paddingMM, perimeterOnly: false,
     forcePhaseMM: [phase(entry.nodesMM[0][0] - minX), phase(entry.nodesMM[0][1] - minY)] as Pt,
   })

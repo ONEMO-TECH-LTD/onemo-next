@@ -5,6 +5,7 @@ import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 import { CLASS_SPECS, LIBRARY_FAMILIES, specOf } from '../library/class-registry'
 import { outlineFromLayout } from '../library/outline'
+import type { OutlinePath } from '../foundation/path'
 import { CATALOGUE_FORMAT_VERSION, catalogue, type CatalogueEntry } from '../library/catalogue'
 import { canonLayoutForFrame } from '../grid-magnet-library-catalogue'
 import { selectVariant } from '../library/selection'
@@ -155,7 +156,7 @@ const importViolations = (overrides: Record<string, string> = {}): ImportViolati
       const toZones = edge.to.startsWith(LIBRARY + '/') ? zonesOf(edge.to) : []
       if (toZones.length === 0) {
         const approved = fromZone === 2
-          && ['grid-magnet-spec.ts', 'offset.ts'].includes(basename(edge.to))
+          && ['grid-magnet-spec.ts', 'offset.ts', 'path.ts'].includes(basename(edge.to))
         if (!approved) out.push({ ...edge, fromZone, reason: 'external edge is not allowlisted' })
         continue
       }
@@ -700,11 +701,11 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     // The outline is the disks' own hull, offset. Dan, 08-28: a T or an L is a canonical class
     // with disks taken out, not a shape of its own — so there is no stated-boundary path and
     // nothing concave to draw.
-    const round = outlineFromLayout([[0, 0]], { corners: 'round' })
-    const square = outlineFromLayout([[0, 0]], { corners: 'sharp', pointRotationDeg: 0 })
-    const diamond = outlineFromLayout([[0, 0]], { corners: 'sharp', pointRotationDeg: 45 })
-    const pill = outlineFromLayout([[0, 0], [48, 0]], { corners: 'round' })
-    const convex = outlineFromLayout([[0, 0], [48, 0], [0, 48]], { corners: 'sharp' })
+    const round = outlineFromLayout([[0, 0]], { corners: 'round' }).pts
+    const square = outlineFromLayout([[0, 0]], { corners: 'sharp', pointRotationDeg: 0 }).pts
+    const diamond = outlineFromLayout([[0, 0]], { corners: 'sharp', pointRotationDeg: 45 }).pts
+    const pill = outlineFromLayout([[0, 0], [48, 0]], { corners: 'round' }).pts
+    const convex = outlineFromLayout([[0, 0], [48, 0], [0, 48]], { corners: 'sharp' }).pts
     expect(round.length).toBeGreaterThan(3)
     expect(square).not.toEqual(diamond)
     expect(pill.length).toBeGreaterThan(2)
@@ -713,9 +714,9 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     // L is a triangle-class piece with disks taken out — which is why the library already carries
     // it as Wedge 159x79 (●·· / ●●●). An H keeps its corners, so an H stays square.
     const l = [[0, 0], [0, 48], [0, 96], [48, 96], [96, 96]] as const
-    expect(outlineFromLayout(l, { corners: 'sharp' })).toHaveLength(3)
+    expect(outlineFromLayout(l, { corners: 'sharp' }).pts).toHaveLength(3)
     const h = [[0, 0], [0, 48], [0, 96], [48, 48], [96, 0], [96, 48], [96, 96]] as const
-    expect(outlineFromLayout(h, { corners: 'sharp' })).toHaveLength(4)
+    expect(outlineFromLayout(h, { corners: 'sharp' }).pts).toHaveLength(4)
   })
   it('STEP 3: one outline and hull implementation own production', () => {
     const declarations: Record<string, string[]> = { outlineFromLayout: [], convexHull: [] }
@@ -806,6 +807,7 @@ describe('Shape-Layout Library Law — activation schedule', () => {
       classId: string; catalogueRole: 'canon' | 'preset'
       typeId: string; id: string; label: string; pitchMM: number; corners: 'sharp' | 'bevel' | 'round' | 'stadium'
       nodesMM: readonly (readonly [number, number])[]; outlineMM: readonly (readonly [number, number])[]
+      outlinePath: OutlinePath | null
       widthMM: number; heightMM: number; frameCols: number; frameRows: number
       bandId: number; legalWidthMM: number; legalHeightMM: number
     }>
@@ -813,7 +815,7 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     const exact: Equal<CatalogueEntry, Exact> = true
     expect(exact).toBe(true)
     expect(CATALOGUE_FORMAT_VERSION).toBe(4)
-    const keys = ['classId', 'catalogueRole', 'typeId', 'id', 'label', 'pitchMM', 'corners', 'nodesMM', 'outlineMM', 'widthMM', 'heightMM', 'frameCols', 'frameRows', 'bandId', 'legalWidthMM', 'legalHeightMM'].sort()
+    const keys = ['classId', 'catalogueRole', 'typeId', 'id', 'label', 'pitchMM', 'corners', 'nodesMM', 'outlineMM', 'outlinePath', 'widthMM', 'heightMM', 'frameCols', 'frameRows', 'bandId', 'legalWidthMM', 'legalHeightMM'].sort()
     for (const pitchMM of [24, 48, 96]) for (const entry of catalogue(pitchMM)) {
       expect(Object.keys(entry).sort()).toEqual(keys)
       assertDataOnly(entry)

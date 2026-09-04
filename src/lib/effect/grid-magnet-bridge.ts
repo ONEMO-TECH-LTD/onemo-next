@@ -1,11 +1,11 @@
 // grid-magnet-bridge.ts — UI bridge: shape preparation and display lists for the bench shell.
 // Wiring only — values from spec, geometry from compute, answers from the engine.
 
-import { contourFromShape } from './geometry-truth'
+import { contourFromShape, shapeLongestPx } from './geometry-truth'
 import { traceContourRaw } from './contour'
 import { insetRingMM } from './offset'
 import { scaleContour } from './grid-magnet-compute'
-import { flattenShape, type VShape } from '@/lib/vector-core'
+import type { VShape } from '@/lib/vector-core'
 import type { Contour, Pt } from './types'
 import {
   fieldSpanMM,
@@ -25,19 +25,26 @@ function bboxOf(pts: ReadonlyArray<{ x: number; y: number }>) {
   return { w: c - a, h: d - b }
 }
 
-/** VShape → mm contour normalized so its longest side = 1mm, flattened at manufacturing scale. */
+/** VShape → mm contour normalized so its longest side = 1mm. The longest side is read from the shape's
+ *  EXACT path bounds — an arc or a cubic reaches its extreme exactly — where it used to be read from a
+ *  1mm flattening, which mis-set the scale of every free shape by up to that much. The path itself is
+ *  normalised alongside the point view and carried on. */
 export function normBaseContour(vs: VShape, maskHeightPx: number): Contour | null {
-  const rings = flattenShape(vs, 1)
-  const bb = bboxOf(rings[0] ?? [])
-  const L = Math.max(bb.w, bb.h, 1)
+  const L = shapeLongestPx(vs)
+  if (L === null) return null
   const c = contourFromShape(vs, { mmPerPx: FLATTEN_REF_MM / L, maskHeightPx })
   if (!c) return null
-  const norm = (pts: ReadonlyArray<Pt>): Pt[] => pts.map(([x, y]) => [x / FLATTEN_REF_MM, y / FLATTEN_REF_MM] as Pt)
-  // Every ring normalises. Dropping holes here deleted them before the engine ever saw them.
-  return { outer: { pts: norm(c.outer.pts) }, holes: c.holes.map((h) => ({ pts: norm(h.pts) })) }
+  // Every ring normalises, path included. Dropping holes here deleted them before the engine ever saw them.
+  return scaleContour(c, 1 / FLATTEN_REF_MM)
 }
 
-/** Sizer for one base contour: real-mm contour at any longest side, outline offset applied. */
+/** Sizer for one base contour: real-mm contour at any longest side, outline offset applied.
+ *
+ *  With no offset the exact path rides through untouched. WITH an offset the outline is grown by
+ *  Clipper on the point view and the path is dropped — honestly: an exact offset of a general cubic
+ *  path is not yet built, and carrying a path that no longer matches the outline would be worse than
+ *  carrying none. That is the one place a free shape still solves against points, and it is stated
+ *  here rather than hidden. */
 export function makeSizer(base: Contour, offsetMM: number): (mm: number) => Contour {
   return (mm: number): Contour => {
     const c = scaleContour(base, mm)

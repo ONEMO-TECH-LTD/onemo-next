@@ -3,6 +3,7 @@
 // This lane builds the Draft + preview only (no server canonical / checkout / manufacturing).
 
 import type { VShape } from '@/lib/vector-core'
+import type { OutlinePath } from './foundation/path'
 
 export type Pt = [number, number] // [x, y]
 
@@ -226,7 +227,15 @@ export type Governor = 0 | 1 | 2 | 3
 
 
 export interface Ring {
-  pts: Pt[] // closed ring, no duplicated last point
+  /** A POINT VIEW of the ring, for the two things that cannot hold a curve — Clipper's integer
+   *  booleans and drawing. Where `path` is present this is derived from it and is never the truth:
+   *  nothing measures against it (Dan, 2026-09-04: "no polygons on canon and anywhere"). Closed,
+   *  no duplicated last point. */
+  pts: Pt[]
+  /** THE OUTLINE — lines, circular arcs and cubic Béziers, exact. Every measurement that decides a
+   *  seat, a size or a band reads this when it is present. Absent only on rings born as points (a
+   *  raw trace), and those are the ones still to be given a path. */
+  path?: OutlinePath
 }
 
 export interface Contour {

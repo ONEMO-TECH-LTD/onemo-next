@@ -6,8 +6,8 @@
 // Dan, 08-26: "separation of UI clean shell and logic and spec must be followed as in the
 // fucking bench". This is the producer side of that seam.
 
-import { outlineFromLayout } from './outline'
-import { boundsMM, placeMM } from './geometry'
+import { outlineFromLayout, type LibraryOutline, type OutlinePath } from './outline'
+import { placeMM } from './geometry'
 import { bandOfFrame } from './rules'
 import { resolveSelection, type ResolvedSelection } from './selection'
 import { frameKeyOf } from './transforms'
@@ -29,7 +29,12 @@ export interface MaterializedLibrary {
    *  the chip between bands. Non-null: a published frame with no band is a producer bug. */
   bandId: number
   nodesMM: readonly PointMM[]
+  /** The outline as points — a VIEW for Clipper and drawing. Where `outlinePath` exists it is
+   *  flattened from that path and is never the truth. */
   outlineMM: readonly PointMM[]
+  /** THE OUTLINE, exact — lines and arcs of the rim radius — wherever it bends. Absent for a sharp or
+   *  bevelled finish, whose offset polygon is already exact as points. */
+  outlinePath: OutlinePath | null
   /** Exact legal box of the authored magnet population. The library outline is derived from these
    *  nodes plus the released rim, so this is the classifier-equivalent ruler without re-eroding
    *  the outline in the UI shell. */
@@ -62,15 +67,18 @@ export function materializeResolved(
     return { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) }
   }
   /** The one record. Only the outline it wraps, its layout name, why it is not a shape yet and
-   *  where to look when nothing is drawn ever differ between the three cases. */
+   *  where to look when nothing is drawn ever differ between the three cases. Width and height are
+   *  read from the exact path where there is one — an arc reaches its extreme exactly, a point view
+   *  only approaches it. */
   const record = (
-    outlineMM: readonly PointMM[], layoutId: string, error: string | null, seedMM: PointMM | null,
+    outline: LibraryOutline, layoutId: string, error: string | null, seedMM: PointMM | null,
   ): MaterializedLibrary => ({
     classId,
     sourceFrameKey: frameKeyOf(frame), frameKey: p.cols + 'x' + p.rows,
     frameCols: p.cols, frameRows: p.rows, layoutId, bandId,
-    nodesMM: p.nodesMM, outlineMM, legalBoxMM: legalBoxOf(p.nodesMM),
-    ...boundsMM(outlineMM), error, seedMM,
+    nodesMM: p.nodesMM, outlineMM: outline.pts, outlinePath: outline.path ?? null,
+    legalBoxMM: legalBoxOf(p.nodesMM),
+    widthMM: outline.widthMM, heightMM: outline.heightMM, error, seedMM,
   })
 
   if (!nodes) return record(outlineOf(p.nodesMM), layout.name, null, p.nodesMM[0] ?? null)

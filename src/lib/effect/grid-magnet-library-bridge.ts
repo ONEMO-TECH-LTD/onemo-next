@@ -25,7 +25,7 @@ const pts = (ps: MaterializedLibrary['nodesMM']): Pt[] => ps.map((p) => [p[0], p
  *  nothing is drawn, so an empty canvas still has somewhere to click. */
 export function libraryStageModel(materialized: MaterializedLibrary, pitchMM: number): LibraryStageModel {
   const nodesMM = pts(materialized.nodesMM)
-  const contour: Contour = { outer: { pts: pts(materialized.outlineMM) } , holes: [] }
+  const contour: Contour = { outer: { pts: pts(materialized.outlineMM), path: materialized.outlinePath ?? undefined }, holes: [] }
   const grid: GridResult = {
     anchors: nodesMM.map((p) => ({ p, dia: MAGNET_DIA_SMALL_MM })),
     pitchCentreMM: pitchMM,

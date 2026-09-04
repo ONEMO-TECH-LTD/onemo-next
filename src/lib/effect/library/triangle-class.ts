@@ -23,7 +23,7 @@ const sizeOf = (triangle: TriangleLayout, pitchMM: number) => {
   const bounds = boundsOf([...triangle.vertices])
   const placed = placeMM({ cols: bounds.cols, rows: bounds.rows },
     { name: 'corners', nodes: [...triangle.vertices] }, uprightView(triangle), pitchMM)
-  const { widthMM, heightMM } = boundsMM(outlineFromLayout(placed.nodesMM, OUTLINE))
+  const { widthMM, heightMM } = boundsMM(outlineFromLayout(placed.nodesMM, OUTLINE).pts)
   return Math.round(widthMM) + '×' + Math.round(heightMM)
 }
 
