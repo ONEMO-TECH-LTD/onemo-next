@@ -1,4 +1,5 @@
 import type { Contour, Pt } from './types'
+import { distanceToPathMM, pointInPath } from './foundation/path'
 
 export interface GridBBox {
   minX: number
@@ -271,10 +272,19 @@ export function pointInPreparedRing(p: Pt, ring: ExactSegmentRing): boolean {
   return inside
 }
 
+/** A ring that carries its PATH is asked exactly — arc or cubic, never the chords standing in for it
+ *  (Dan, 2026-09-04: "no polygons on canon and anywhere"). The prepared segment index answers only for
+ *  a ring born as points. This and `distanceToPreparedContour` are grid-core's whole view of the
+ *  boundary, so honouring the path here honours it for every decision grid-core makes. */
 export function pointInPreparedContour(p: Pt, prepared: PreparedContour): boolean {
-  if (!pointInPreparedRing(p, prepared.segmentRings[0])) return false
+  const rings = [prepared.contour.outer, ...prepared.contour.holes]
+  const inRing = (index: number) => {
+    const path = rings[index]?.path
+    return path ? pointInPath(path, p) : pointInPreparedRing(p, prepared.segmentRings[index])
+  }
+  if (!inRing(0)) return false
   for (let index = 1; index < prepared.segmentRings.length; index += 1) {
-    if (pointInPreparedRing(p, prepared.segmentRings[index])) return false
+    if (inRing(index)) return false
   }
   return true
 }
@@ -347,7 +357,17 @@ export function nearestPreparedSegment(
 }
 
 export function distanceToPreparedContour(p: Pt, prepared: PreparedContour): number {
-  return nearestPreparedSegment(p, prepared).distance
+  const rings = [prepared.contour.outer, ...prepared.contour.holes]
+  // exact against every ring that has a path; the segment index only for rings born as points
+  if (!rings.some((ring) => ring.path)) return nearestPreparedSegment(p, prepared).distance
+  let best = Infinity
+  rings.forEach((ring, index) => {
+    const d = ring.path
+      ? distanceToPathMM(ring.path, p)
+      : Math.min(...prepared.segmentRings[index].segments.map((segment) => distanceToExactSegment(p, segment)))
+    if (d < best) best = d
+  })
+  return best
 }
 
 /**

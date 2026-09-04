@@ -40,15 +40,19 @@ export function normBaseContour(vs: VShape, maskHeightPx: number): Contour | nul
 
 /** Sizer for one base contour: real-mm contour at any longest side, outline offset applied.
  *
- *  With no offset the exact path rides through untouched. WITH an offset the outline is grown by
- *  Clipper on the point view and the path is dropped — honestly: an exact offset of a general cubic
- *  path is not yet built, and carrying a path that no longer matches the outline would be worse than
- *  carrying none. That is the one place a free shape still solves against points, and it is stated
- *  here rather than hidden. */
+ *  With no offset the exact path rides through untouched. WITH an offset, a shape that carries a
+ *  path FAILS LOUD: the only offset available grows the point view with Clipper, and a Clipper
+ *  polygon cannot be the manufacturing truth under the no-polygons ruling (Dan, 2026-09-04), while a
+ *  path that no longer matches its outline would be worse than none. Silently falling back was the
+ *  first version of this and QA refused it. An exact offset of lines, arcs and cubics is the next
+ *  scoped path task; until it lands the offset route is closed, not approximated. Today nothing
+ *  drives it — the page passes offsetMM 0 — so no live control is affected. */
 export function makeSizer(base: Contour, offsetMM: number): (mm: number) => Contour {
   return (mm: number): Contour => {
     const c = scaleContour(base, mm)
     if (!offsetMM) return c
+    if (c.outer.path || c.holes.some((h) => h.path))
+      throw new Error(`grid: outline offset ${offsetMM}mm is not supported on a path-bearing shape — exact path offset not yet implemented; a Clipper polygon cannot stand in for the cut path`)
     const o = insetRingMM(c.outer.pts, offsetMM, 'round')
     // A positive offset grows the outline and SHRINKS every hole by the same amount — a hole is a
     // boundary, so an inset moves it inward from the material's point of view.

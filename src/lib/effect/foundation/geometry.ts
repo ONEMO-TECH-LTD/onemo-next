@@ -8,7 +8,8 @@
 //
 // Nothing here holds policy: no threshold, no ranking, no choice. Measurement only.
 
-import type { BBox, Contour, Pt } from '../types'
+import type { BBox, Contour, Pt, Ring } from '../types'
+import { distanceToPathMM, pointInPath } from './path'
 
 export function bbox(pts: ReadonlyArray<Pt>): BBox {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
@@ -135,18 +136,23 @@ export function pointInOuter(pt: Pt, outer: ReadonlyArray<Pt>): boolean {
 
 /** Inside MATERIAL: inside the outer ring AND outside every supplied hole. The two facts every
  *  hole-aware path needs, held once — segment, layout and wrap all consume them, so they belong
- *  here rather than being rediscovered three times. */
+ *  here rather than being rediscovered three times.
+ *
+ *  A ring that carries its PATH is asked exactly — the arc or the cubic, not the chords standing in
+ *  for it (Dan, 2026-09-04: "no polygons on canon and anywhere"). Holes included: a hole's edge is as
+ *  real a boundary as the outline, and a hole with a path is measured the same way. Only a ring born
+ *  as points, with no path, is asked through its points. This is the one door wrap, segment, centring,
+ *  classifier and protection all come through, which is why the path is honoured here and not in each. */
 export function pointInContour(pt: Pt, contour: Contour): boolean {
-  return pointInOuter(pt, contour.outer.pts)
-    && !contour.holes.some((hole) => pointInOuter(pt, hole.pts))
+  const inside = (ring: Ring) => ring.path ? pointInPath(ring.path, pt) : pointInOuter(pt, ring.pts)
+  return inside(contour.outer) && !contour.holes.some((hole) => inside(hole))
 }
 
 /** Distance to the nearest MATERIAL boundary — the outer ring or any hole edge, whichever is
- *  closer. A hole edge is as real a boundary as the outline. */
+ *  closer. Exact against the path where a ring has one, for the same reason as above. */
 export function edgeDistToContourMM(contour: Contour, pt: Pt): number {
-  let distanceMM = edgeDistMM(contour.outer.pts, pt)
-  for (const hole of contour.holes) {
-    distanceMM = Math.min(distanceMM, edgeDistMM(hole.pts, pt))
-  }
+  const dist = (ring: Ring) => ring.path ? distanceToPathMM(ring.path, pt) : edgeDistMM(ring.pts, pt)
+  let distanceMM = dist(contour.outer)
+  for (const hole of contour.holes) distanceMM = Math.min(distanceMM, dist(hole))
   return distanceMM
 }

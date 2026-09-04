@@ -318,7 +318,9 @@ describe('2c — the foundation holds primitives only', () => {
   const FOUNDATION = join(LIB, 'foundation')
   const foundationFiles = (): string[] =>
     existsSync(FOUNDATION) ? readdirSync(FOUNDATION).filter((f) => f.endsWith('.ts')) : []
-  const FOUNDATION_ALLOWED = [/^\.\.\/types$/, /^\.\.\/grid-magnet-spec$/, /^@\/lib\/grid-engine\/compute\/geometry$/]
+  // a foundation primitive may stand on another foundation primitive (geometry reads the path
+  // for a ring that carries one); it still may not reach a unit or an aggregate
+  const FOUNDATION_ALLOWED = [/^\.\.\/types$/, /^\.\.\/grid-magnet-spec$/, /^@\/lib\/grid-engine\/compute\/geometry$/, /^\.\/path$/]
 
   it('imports nothing but shared types, spec and the repo-wide geometry kernel', () => {
     for (const f of foundationFiles()) {

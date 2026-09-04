@@ -3,10 +3,11 @@
 // Dan, 2026-09-04: "we must use not polygons on curves it must be pure vector curve not polygon that
 // chops in micro angles and straight lines" / "Fix it no polygons on canon and anywhere".
 //
-// Every curve in this geometry is the same thing: the rim offset of a polygon. Its exact form is
-// straight segments parallel to the source edges, joined by CIRCULAR ARCS of exactly the rim radius
-// centred on the source vertices. Nothing else — no beziers, no sampling, no tolerance. So the true
-// outline needs exactly two segment kinds, and every measurement against it is closed form.
+// Three segment kinds cover every outline this product makes. A LINE. A CIRCULAR ARC — what the rim
+// offset of a polygon produces at each vertex, and so every canon outline. A CUBIC BEZIER — what a
+// preset or a cutout is authored as in vector-core, carried through unchanged. Lines and arcs are
+// measured in closed form; a cubic's nearest point and ray crossings are roots of small polynomials,
+// found by certified isolation so none can be missed. No sampling, no tolerance, anywhere.
 //
 // What that removes, all of it compensation for chopping a curve into chords: the 25 micron shortfall
 // that refused magnets touching a real edge, a blanket rim allowance, an outward micron rounding in
@@ -25,8 +26,8 @@ import type { Pt } from '../types'
  *
  *  A cubic carries its two control points — the authored curve of a preset or a cutout, exactly as
  *  vector-core holds it (a line is a cubic with no handles, and stays a line here). Distance to a
- *  cubic is the minimum of a quintic, found by bracketing and Newton to machine precision: no chord
- *  ever stands in for it. */
+ *  cubic is the minimum of a quintic whose roots are all found by certified isolation: no chord ever
+ *  stands in for it, and no root goes unseen. */
 export type PathSeg =
   | { kind: 'line'; to: Pt }
   | { kind: 'arc'; to: Pt; centre: Pt; ccw: boolean }
@@ -100,71 +101,118 @@ const bezD = (a: number, c1: number, c2: number, b: number, t: number): number =
   const u = 1 - t
   return 3 * u * u * (c1 - a) + 6 * u * t * (c2 - c1) + 3 * t * t * (b - c2)
 }
-/** B''(t), one axis. */
-const bezDD = (a: number, c1: number, c2: number, b: number, t: number): number =>
-  6 * (1 - t) * (c2 - 2 * c1 + a) + 6 * t * (b - 2 * c2 + c1)
-
 const cubicAt = (c: Cubic, t: number): Pt =>
   [bez(c.a[0], c.c1[0], c.c2[0], c.b[0], t), bez(c.a[1], c.c1[1], c.c2[1], c.b[1], t)]
 
-/** Nearest distance from p to the cubic. d(t)² is a sextic whose derivative is a quintic; it is
- *  bracketed on a fixed grid of the parameter and polished with Newton in each bracket, then the
- *  endpoints are checked too. Converges to machine precision — there is no chord in this answer. */
+// ── certified root isolation ──────────────────────────────────────────────────────────────────────
+//
+// A fixed grid of brackets is not exact: two sign changes inside one interval cancel and neither is
+// seen. QA proved it with an S-bend whose true nearest point was missed by 0.635mm. The polynomials
+// here are held in BERNSTEIN form on the interval under test, where the count of sign changes in
+// the coefficients BOUNDS the number of roots (Descartes, variation-diminishing): zero changes means
+// zero roots, certainly. An interval with changes is split at its midpoint by de Casteljau, exactly,
+// until each root sits alone in an interval too small to hold another and is then bisected out.
+
+/** Power-basis coefficients (index = power) → Bernstein coefficients of the same degree. */
+function powerToBernstein(power: readonly number[]): number[] {
+  const n = power.length - 1
+  const binomial = (k: number, i: number) => { let r = 1; for (let j = 1; j <= i; j++) r = (r * (k - i + j)) / j; return r }
+  return Array.from({ length: n + 1 }, (_, i) => {
+    let s = 0
+    for (let k = 0; k <= i; k++) s += (binomial(i, k) / binomial(n, k)) * power[k]
+    return s
+  })
+}
+
+/** Every root of a polynomial in [0,1], given its Bernstein coefficients, to 1e-12 in t. */
+function bernsteinRoots(coeffs: readonly number[]): number[] {
+  const roots: number[] = []
+  const variations = (c: readonly number[]) => {
+    let v = 0, last = 0
+    for (const x of c) { if (x === 0) continue; if (last !== 0 && (x < 0) !== (last < 0)) v++; last = x }
+    return v
+  }
+  const split = (c: readonly number[]): [number[], number[]] => {
+    const left: number[] = [], right: number[] = []
+    let row = [...c]
+    left.push(row[0]); right.unshift(row[row.length - 1])
+    while (row.length > 1) {
+      const next: number[] = []
+      for (let i = 0; i < row.length - 1; i++) next.push((row[i] + row[i + 1]) / 2)
+      row = next
+      left.push(row[0]); right.unshift(row[row.length - 1])
+    }
+    return [left, right]
+  }
+  const evalAt = (c: readonly number[], t: number) => {
+    let row = [...c]
+    while (row.length > 1) {
+      const next: number[] = []
+      for (let i = 0; i < row.length - 1; i++) next.push(row[i] * (1 - t) + row[i + 1] * t)
+      row = next
+    }
+    return row[0]
+  }
+  const isolate = (c: readonly number[], lo: number, hi: number, depth: number): void => {
+    const v = variations(c)
+    if (v === 0) return
+    if (v === 1 || depth >= 60 || hi - lo < 1e-12) {
+      // exactly one root here (or an interval too small to split further): bisect it out on the
+      // polynomial's own values, which is exact up to floating arithmetic
+      let a = lo, b = hi, fa = evalAt(coeffs, a)
+      if (fa === 0) { roots.push(a); return }
+      for (let k = 0; k < 80 && b - a > 1e-13; k++) {
+        const m = (a + b) / 2, fm = evalAt(coeffs, m)
+        if (fm === 0) { a = b = m; break }
+        if ((fm < 0) === (fa < 0)) { a = m; fa = fm } else b = m
+      }
+      roots.push((a + b) / 2)
+      return
+    }
+    const [l, r] = split(c)
+    const mid = (lo + hi) / 2
+    isolate(l, lo, mid, depth + 1)
+    isolate(r, mid, hi, depth + 1)
+  }
+  isolate(coeffs, 0, 1, 0)
+  return roots
+}
+
+/** Power-basis coefficients of one axis of a cubic, c0 + c1 t + c2 t² + c3 t³. */
+const cubicPower = (a: number, c1: number, c2: number, b: number): [number, number, number, number] =>
+  [a, 3 * (c1 - a), 3 * (a - 2 * c1 + c2), -a + 3 * c1 - 3 * c2 + b]
+
+/** Multiply two power-basis polynomials. */
+function polyMul(p: readonly number[], q: readonly number[]): number[] {
+  const out = new Array<number>(p.length + q.length - 1).fill(0)
+  for (let i = 0; i < p.length; i++) for (let j = 0; j < q.length; j++) out[i + j] += p[i] * q[j]
+  return out
+}
+
+/** Nearest distance from p to the cubic. The stationary points of |B(t)-p|² are the roots of a
+ *  quintic, (B(t)-p)·B'(t); every one of them in [0,1] is found by certified isolation, and the
+ *  minimum over those and the two endpoints is the distance. There is no chord and no grid in this
+ *  answer, and no root can go unseen. */
 function distToCubic(p: Pt, c: Cubic): number {
-  const f = (t: number) => {                      // d/dt of |B(t) - p|² / 2
-    const x = bez(c.a[0], c.c1[0], c.c2[0], c.b[0], t) - p[0]
-    const y = bez(c.a[1], c.c1[1], c.c2[1], c.b[1], t) - p[1]
-    return x * bezD(c.a[0], c.c1[0], c.c2[0], c.b[0], t) + y * bezD(c.a[1], c.c1[1], c.c2[1], c.b[1], t)
-  }
-  const fD = (t: number) => {
-    const x = bez(c.a[0], c.c1[0], c.c2[0], c.b[0], t) - p[0]
-    const y = bez(c.a[1], c.c1[1], c.c2[1], c.b[1], t) - p[1]
-    const dx = bezD(c.a[0], c.c1[0], c.c2[0], c.b[0], t), dy = bezD(c.a[1], c.c1[1], c.c2[1], c.b[1], t)
-    return dx * dx + dy * dy + x * bezDD(c.a[0], c.c1[0], c.c2[0], c.b[0], t) + y * bezDD(c.a[1], c.c1[1], c.c2[1], c.b[1], t)
-  }
   const dist = (t: number) => { const q = cubicAt(c, t); return Math.hypot(q[0] - p[0], q[1] - p[1]) }
   let best = Math.min(dist(0), dist(1))
-  const N = 16
-  let prevT = 0, prevF = f(0)
-  for (let i = 1; i <= N; i++) {
-    const t = i / N, ft = f(t)
-    if ((prevF <= 0 && ft >= 0) || (prevF >= 0 && ft <= 0)) {
-      // a stationary point of the distance lies in [prevT, t]: Newton from the midpoint, bisect-guarded
-      let lo = prevT, hi = t, x = (lo + hi) / 2
-      for (let k = 0; k < 40; k++) {
-        const fx = f(x), dfx = fD(x)
-        let nx = dfx !== 0 ? x - fx / dfx : (lo + hi) / 2
-        if (!(nx > lo && nx < hi)) nx = (lo + hi) / 2
-        if ((f(lo) <= 0) === (fx <= 0)) lo = x; else hi = x
-        if (Math.abs(nx - x) < 1e-13) { x = nx; break }
-        x = nx
-      }
-      best = Math.min(best, dist(x))
-    }
-    prevT = t; prevF = ft
+  let quintic: number[] = [0, 0, 0, 0, 0, 0]
+  for (const axis of [0, 1] as const) {
+    const pos = cubicPower(c.a[axis], c.c1[axis], c.c2[axis], c.b[axis])
+    pos[0] -= p[axis]
+    const vel = [pos[1], 2 * pos[2], 3 * pos[3]]
+    const prod = polyMul(pos, vel)
+    quintic = quintic.map((v, i) => v + (prod[i] ?? 0))
   }
+  for (const t of bernsteinRoots(powerToBernstein(quintic))) best = Math.min(best, dist(t))
   return best
 }
 
-/** All t in [0,1] where B_y(t) = y, by subdivision on the cubic's y-polynomial then bisection —
- *  robust where a closed-form cubic solver loses digits. */
+/** All t in [0,1] where B_y(t) = y — the same certified isolation on the cubic's y-polynomial. */
 function cubicRootsY(c: Cubic, y: number): number[] {
-  const g = (t: number) => bez(c.a[1], c.c1[1], c.c2[1], c.b[1], t) - y
-  const roots: number[] = []
-  const N = 24
-  for (let i = 0; i < N; i++) {
-    let lo = i / N, hi = (i + 1) / N
-    let glo = g(lo), ghi = g(hi)
-    if (glo === 0) { roots.push(lo); continue }
-    if ((glo < 0) === (ghi < 0)) continue
-    for (let k = 0; k < 60; k++) {
-      const m = (lo + hi) / 2, gm = g(m)
-      if ((gm < 0) === (glo < 0)) { lo = m; glo = gm } else { hi = m; ghi = gm }
-    }
-    roots.push((lo + hi) / 2)
-  }
-  if (g(1) === 0) roots.push(1)
-  return roots
+  const power = cubicPower(c.a[1], c.c1[1], c.c2[1], c.b[1])
+  power[0] -= y
+  return bernsteinRoots(powerToBernstein(power))
 }
 
 /** Parameter values where one axis of the cubic is stationary — where its bounds can lie. */

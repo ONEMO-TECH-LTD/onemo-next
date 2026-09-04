@@ -169,8 +169,11 @@ export function makeContourSeatPredicate(
     : makeSeatPredicate(contour.outer.pts, spotRadiusMM)
   if (!outerFits) return null
   if (!contour.holes.length) return outerFits
-  return (pt: Pt) => outerFits(pt)
-    && !contour.holes.some((h) => pointInOuter(pt, h.pts) || edgeDistMM(h.pts, pt) < spotRadiusMM)
+  // a hole is a boundary like the outline, and a hole with a path is measured exactly like one
+  const holeBlocks = (h: Contour['holes'][number], pt: Pt) => h.path
+    ? pointInPath(h.path, pt) || distanceToPathMM(h.path, pt) < spotRadiusMM
+    : pointInOuter(pt, h.pts) || edgeDistMM(h.pts, pt) < spotRadiusMM
+  return (pt: Pt) => outerFits(pt) && !contour.holes.some((h) => holeBlocks(h, pt))
 }
 
 const mod = (v: number, m: number) => ((v % m) + m) % m
