@@ -9,7 +9,7 @@
 // Nothing here holds policy: no threshold, no ranking, no choice. Measurement only.
 
 import type { BBox, Contour, Pt, Ring } from '../types'
-import { distanceToPathMM, pointInPath } from './path'
+import { distanceToPathMM, pathAreaCentroidMM, pointInPath } from './path'
 
 export function bbox(pts: ReadonlyArray<Pt>): BBox {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
@@ -146,6 +146,35 @@ export function pointInOuter(pt: Pt, outer: ReadonlyArray<Pt>): boolean {
 export function pointInContour(pt: Pt, contour: Contour): boolean {
   const inside = (ring: Ring) => ring.path ? pointInPath(ring.path, pt) : pointInOuter(pt, ring.pts)
   return inside(contour.outer) && !contour.holes.some((hole) => inside(hole))
+}
+
+/** THE MATERIAL CENTROID — one home (QA @707b6fda F6: it had two). Each ring contributes its signed
+ *  area and first moments, exactly from its path where it has one and from its points where it does
+ *  not; holes subtract. Both engines — grid-core's prepared contour and the pipeline's Weight
+ *  centre — read this and nothing else, so a curved shape's centre cannot move with how finely its
+ *  point view happened to be chopped, and cannot differ between the two. */
+export function contourAreaCentroidMM(contour: Contour): { areaMM2: number; centroid: Pt } {
+  const ringAreaCentroid = (ring: Ring): { areaMM2: number; centroid: Pt } => {
+    if (ring.path) return pathAreaCentroidMM(ring.path)
+    const pts = ring.pts
+    let a = 0, cx = 0, cy = 0
+    for (let i = 0, n = pts.length; i < n; i++) {
+      const [x0, y0] = pts[i], [x1, y1] = pts[(i + 1) % n]
+      const w = x0 * y1 - x1 * y0
+      a += w; cx += (x0 + x1) * w; cy += (y0 + y1) * w
+    }
+    a /= 2
+    if (Math.abs(a) < 1e-9) { const b = bbox(pts); return { areaMM2: a, centroid: [(b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2] } }
+    return { areaMM2: a, centroid: [cx / (6 * a), cy / (6 * a)] }
+  }
+  const outer = ringAreaCentroid(contour.outer)
+  let area = Math.abs(outer.areaMM2), sx = outer.centroid[0] * area, sy = outer.centroid[1] * area
+  for (const hole of contour.holes) {
+    const h = ringAreaCentroid(hole), w = Math.abs(h.areaMM2)
+    area -= w; sx -= h.centroid[0] * w; sy -= h.centroid[1] * w
+  }
+  if (area <= 1e-6) return { areaMM2: area, centroid: outer.centroid }
+  return { areaMM2: area, centroid: [sx / area, sy / area] }
 }
 
 /** Distance to the nearest MATERIAL boundary — the outer ring or any hole edge, whichever is

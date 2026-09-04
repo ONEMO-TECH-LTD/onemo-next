@@ -421,7 +421,32 @@ export function flattenPath(path: OutlinePath, tolMM: number): Pt[] {
   }
   eachSeg(path, (from, seg) => {
     if (seg.kind === 'line') { out.push(seg.to); return }
-    if (seg.kind === 'cubic') { flattenCubic(cubicOf(from, seg), 0); return }
+    if (seg.kind === 'cubic') {
+      // A cubic's axis extremes lie between subdivision points, so a plain flatten's bounding box
+      // sits inside the true one — the pipeline scaled a centre against that box and landed 2.9um
+      // off the exact centroid. Split at every extremum first, exactly (de Casteljau), so each is a
+      // vertex; then flatten each piece. Same rule the arcs already follow.
+      const c = cubicOf(from, seg)
+      const cuts = [...cubicExtremaT(c.a[0], c.c1[0], c.c2[0], c.b[0]), ...cubicExtremaT(c.a[1], c.c1[1], c.c2[1], c.b[1])]
+        .filter((t) => t > 1e-9 && t < 1 - 1e-9)
+      let rest: Cubic = c, consumed = 0
+      // walk the cuts in increasing t without sorting (foundation holds no ordering): take the least remaining each time
+      const pending = [...cuts]
+      while (pending.length) {
+        let k = 0
+        for (let i = 1; i < pending.length; i++) if (pending[i] < pending[k]) k = i
+        const t = pending.splice(k, 1)[0]
+        const local = (t - consumed) / (1 - consumed)
+        const lerp = (p: Pt, q: Pt): Pt => [p[0] + (q[0] - p[0]) * local, p[1] + (q[1] - p[1]) * local]
+        const ab = lerp(rest.a, rest.c1), bc = lerp(rest.c1, rest.c2), cd = lerp(rest.c2, rest.b)
+        const abbc = lerp(ab, bc), bccd = lerp(bc, cd), m = lerp(abbc, bccd)
+        flattenCubic({ a: rest.a, c1: ab, c2: abbc, b: m }, 0)
+        rest = { a: m, c1: bccd, c2: cd, b: rest.b }
+        consumed = t
+      }
+      flattenCubic(rest, 0)
+      return
+    }
     const r = radiusOf(seg.centre, from)
     const sweep = sweepOf(seg.centre, from, seg.to, seg.ccw)
     const a0 = angleOf(seg.centre, from)

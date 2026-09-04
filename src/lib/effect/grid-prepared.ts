@@ -1,5 +1,6 @@
 import type { Contour, Pt } from './types'
-import { distanceToPathMM, pathAreaCentroidMM, pathBoundsMM, pointInPath } from './foundation/path'
+import { distanceToPathMM, pathBoundsMM, pointInPath } from './foundation/path'
+import { contourAreaCentroidMM } from './foundation/geometry'
 
 export interface GridBBox {
   minX: number
@@ -65,47 +66,6 @@ function ringBBox(pts: ReadonlyArray<Pt>): GridBBox {
     if (y > maxY) maxY = y
   }
   return { minX, minY, maxX, maxY }
-}
-
-/** Area centroid of a polygon ring. Falls back to bbox centre when degenerate. */
-function ringCentroid(ring: ReadonlyArray<Pt>): Pt {
-  let a = 0, cx = 0, cy = 0
-  for (let i = 0, n = ring.length; i < n; i++) {
-    const [x0, y0] = ring[i], [x1, y1] = ring[(i + 1) % n]
-    const cross = x0 * y1 - x1 * y0
-    a += cross
-    cx += (x0 + x1) * cross
-    cy += (y0 + y1) * cross
-  }
-  a *= 0.5
-  if (Math.abs(a) < 1e-6) {
-    const bbox = ringBBox(ring)
-    return [(bbox.minX + bbox.maxX) / 2, (bbox.minY + bbox.maxY) / 2]
-  }
-  return [cx / (6 * a), cy / (6 * a)]
-}
-
-function ringArea(ring: ReadonlyArray<Pt>): number {
-  let twice = 0
-  for (let i = 0; i < ring.length; i++) {
-    const [x0, y0] = ring[i], [x1, y1] = ring[(i + 1) % ring.length]
-    twice += x0 * y1 - x1 * y0
-  }
-  return Math.abs(twice / 2)
-}
-
-/** Material centroid: hole area is removed regardless of ring winding. */
-function contourCentroid(contour: Contour): Pt {
-  const outerC = ringCentroid(contour.outer.pts)
-  const outerA = ringArea(contour.outer.pts)
-  let area = outerA, x = outerC[0] * outerA, y = outerC[1] * outerA
-  for (const hole of contour.holes) {
-    const holeA = ringArea(hole.pts), holeC = ringCentroid(hole.pts)
-    area -= holeA
-    x -= holeC[0] * holeA
-    y -= holeC[1] * holeA
-  }
-  return area > 1e-6 ? [x / area, y / area] : outerC
 }
 
 function segmentBBox(a: Pt, b: Pt): GridBBox {
@@ -231,24 +191,10 @@ export function prepareExactContour(contour: Contour): PreparedContour {
     // extreme exactly and its area integrates exactly; the point view only approaches both, and a
     // curved shape's centre used to move with how finely it happened to be chopped (QA F4)
     bbox: contour.outer.path ? pathBoundsMM(contour.outer.path) : ringBBox(contour.outer.pts),
-    centroid: contourCentroidExact(contour),
+    // the ONE material-centroid door (foundation/geometry): exact from the path, holes subtracted
+    centroid: contourAreaCentroidMM(contour).centroid,
     distanceBvh: buildDistanceBvh(segments),
   }
-}
-
-/** Material centroid, exact wherever a ring carries its path and from points where it does not.
- *  Each ring contributes its own signed area and first moments; holes subtract. */
-function contourCentroidExact(contour: Contour): Pt {
-  const rings = [contour.outer, ...contour.holes]
-  if (!rings.some((ring) => ring.path)) return contourCentroid(contour)
-  let area = 0, x = 0, y = 0
-  rings.forEach((ring, index) => {
-    const a = ring.path ? pathAreaCentroidMM(ring.path) : { areaMM2: ringArea(ring.pts), centroid: ringCentroid(ring.pts) }
-    const w = Math.abs(a.areaMM2) * (index === 0 ? 1 : -1)
-    area += w; x += a.centroid[0] * w; y += a.centroid[1] * w
-  })
-  if (area <= 1e-6) return contourCentroid(contour)
-  return [x / area, y / area]
 }
 
 /** Exact half-open y-interval query: minY ≤ y < maxY, returned in original ray-cast order. */

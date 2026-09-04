@@ -257,7 +257,7 @@ describe('2b — the units are self-sufficient', () => {
           && n.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) names.push(n.name.text)
     })
     expect(names.sort(), 'the foundation export set is pinned: placement policy lives in its unit')
-      .toEqual(['bbox', 'edgeDistMM', 'edgeDistToContourMM', 'pointInContour', 'pointInOuter'])
+      .toEqual(['bbox', 'contourAreaCentroidMM', 'edgeDistMM', 'edgeDistToContourMM', 'pointInContour', 'pointInOuter'])
   })
 
   it('no unit imports another unit', () => {
