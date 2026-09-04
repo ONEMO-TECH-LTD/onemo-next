@@ -1,5 +1,6 @@
-import { rectangularFrames, rectangularTypeOf } from './canon'
+import { pillFrames, rectangularTypeOf } from './canon'
 import { registryClass } from './registry-class'
+import { bandOfFrame } from './rules'
 
 /** PILL — the rectangle's layout, wrapped by a stadium (Dan, 2026-09-04: "we need to wrap rectangle
  *  layouts with pill shapes", "circle + rectangle shape behaviour", "it is rounded corner rectangle
@@ -22,7 +23,9 @@ export const pillClass = registryClass({
   catalogueRole: 'preset',
   bothOrdersPublished: true,
   types: [{ id: 'frame', label: 'frame' }, { id: 'banner', label: 'banner' }, { id: 'slim', label: 'slim' }],
-  frames: (pitchMM) => rectangularFrames(pitchMM),
+  // A pill reaches further than the rectangle it wraps, so the longest frames run off the end of the
+  // released band ladder. Those are not published: a record the ladder cannot name is not a product.
+  frames: (pitchMM) => pillFrames(pitchMM).filter((frame) => bandOfFrame(frame, pitchMM) !== null),
   typeOfFrame: (frame) => rectangularTypeOf(frame.cols, frame.rows),
   label: (frame) => frame.cols + '×' + frame.rows,
   orientations: [],

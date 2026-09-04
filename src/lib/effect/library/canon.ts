@@ -37,6 +37,35 @@ export function diamondMask(cols: number, nodes: readonly Pt[]): Pt[] {
   return nodes.filter(([x, y]) => Math.abs(x - r) + Math.abs(y - r) <= r)
 }
 
+/** AN APPROVED SHAPE — the magnets a pill's rounded ends can hold BEYOND the rectangle it wraps.
+ *
+ *  A pill grows along its length by half its width so the corner magnets keep their rim, and that new
+ *  material is not empty: it is lattice like everything else. Dan, 2026-09-04: "frame can naturally
+ *  hold single top magnet". A three-wide frame gains one at the centre of each end; a four-wide gains
+ *  two; a banner or a slim gains none, because neither grew far enough to hold one.
+ *
+ *  Lattice arithmetic, pitch cancelled: the end cap is a circle of radius r + rim about the end of the
+ *  population's centre line, so a position is held exactly when it lies within r of that line. */
+export function pillCapNodes(cols: number, rows: number): Pt[] {
+  const spanX = cols - 1, spanY = rows - 1
+  const tall = spanX <= spanY
+  const r = Math.min(spanX, spanY) / 2
+  const reach = Math.ceil(r)
+  // the population's centre line: the axis the end caps are drawn about
+  const held = (across: number, along: number, alongSpan: number) =>
+    Math.hypot(across, Math.max(0, -along, along - alongSpan)) <= r + 1e-9
+  const out: Pt[] = []
+  const [wide, long] = tall ? [cols, rows] : [rows, cols]
+  const longSpan = tall ? spanY : spanX
+  for (let across = 0; across < wide; across++) for (let k = 1; k <= reach; k++) {
+    for (const along of [-k, long - 1 + k]) {
+      if (!held(Math.abs(across - (wide - 1) / 2), along, longSpan)) continue
+      out.push(tall ? [across, along] : [along, across])
+    }
+  }
+  return out
+}
+
 /** The name a population carries. One frame, one population — `single` is kept for a one-magnet
  *  frame because catalogue ids are built from it and it is the existing identity. */
 export const CANON_LAYOUT = 'full'
@@ -57,14 +86,36 @@ export function frameOf(cols: number, rows: number, mask?: (nodes: readonly Pt[]
  *
  *  Portrait and landscape are separate frames, published separately: a 9-wide board carries 3×10
  *  and cannot carry 10×3 (Dan, 2026-08-30). */
-export function rectangularFrames(pitchMM: number): readonly LibraryFrame[] {
+export function rectangularFrameSizes(pitchMM: number): ReadonlyArray<readonly [number, number]> {
   const { cols, rows } = boardPositions(pitchMM)
-  const out: LibraryFrame[] = []
+  const out: Array<readonly [number, number]> = []
   for (let c = 1; c <= cols; c++) for (let r = c + 1; r <= rows; r++) {
-    out.push(frameOf(c, r))
-    if (r <= cols) out.push(frameOf(r, c))
+    out.push([c, r])
+    if (r <= cols) out.push([r, c])
   }
   return out
+}
+
+export function rectangularFrames(pitchMM: number): readonly LibraryFrame[] {
+  return rectangularFrameSizes(pitchMM).map(([c, r]) => frameOf(c, r))
+}
+
+/** THE PILL'S FRAMES — the rectangle's population plus the magnets its rounded ends hold, published
+ *  at the extent that population actually occupies. A three-wide pill reaches one lattice row past the
+ *  rectangle at each end, so its frame is that much taller: nodes outside their own frame would break
+ *  transform closure, and the frame is the truthful extent either way. */
+export function pillFrames(pitchMM: number): readonly LibraryFrame[] {
+  const board = boardPositions(pitchMM)
+  return rectangularFrameSizes(pitchMM).map(([c, r]) => {
+    const nodes = [...fullNodes(c, r), ...pillCapNodes(c, r)]
+    const xs = nodes.map(([x]) => x), ys = nodes.map(([, y]) => y)
+    const [ox, oy] = [Math.min(...xs), Math.min(...ys)]
+    return {
+      cols: Math.max(...xs) - ox + 1, rows: Math.max(...ys) - oy + 1,
+      layouts: [{ name: CANON_LAYOUT, nodes: nodes.map(([x, y]) => [x - ox, y - oy] as Pt) }],
+    }
+  // grown out of the board is not a frame the board can carry
+  }).filter((frame) => frame.cols <= board.cols && frame.rows <= board.rows)
 }
 
 /** How narrow a rectangular frame is on its minor axis — independent of which way round it sits:

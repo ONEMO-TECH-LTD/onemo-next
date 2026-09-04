@@ -25,19 +25,21 @@ function stadiumOutline(nodesMM: readonly PointMM[]): PointMM[] {
   const tall = x1 - x0 <= y1 - y0
   const across = Math.min(x1 - x0, y1 - y0)
   const radiusMM = across / 2 + RELEASED_PADDING_MM
-  // ONE BAND, OR MORE WHERE THE WIDTH DEMANDS IT. A rounded end pushes in by the radius less the rim,
-  // which is half the width, so that much extra length is what keeps the end magnets at 12mm — 48mm
-  // for a two-wide frame at the 48 lattice, which is the band step Dan drew. A one-wide frame needs
-  // none by that measure, but its end magnet would then sit exactly at the centre of the cap with no
-  // material to spare, and the engine refuses it; the band step is therefore the floor, not the rule.
-  const along = [...new Set(tall ? ys : xs)].sort((a, b) => a - b)
-  const bandStep = along.slice(1).reduce((min, v, i) => Math.min(min, v - along[i]), Infinity)
-  const growBy = Math.max(across, Number.isFinite(bandStep) ? bandStep : 0) / 2
-  // the centre line of the narrow axis, carried past the population by that much: offsetting THAT by
-  // the radius both rounds the ends and lengthens the shape, in one step
-  const core: PointMM[] = tall
-    ? [[(x0 + x1) / 2, y1 + growBy - across / 2], [(x0 + x1) / 2, y0 - growBy + across / 2]]
-    : [[x1 + growBy - across / 2, (y0 + y1) / 2], [x0 - growBy + across / 2, (y0 + y1) / 2]]
+  // THE TIGHTEST CORE THAT STILL HOLDS EVERY MAGNET, which is what makes the pill grow only where its
+  // width demands it. A magnet off the centre line is already partway into the cap, so it needs less
+  // length than one sitting on it: at half the reach out, the end can come in by the rest. A one-wide
+  // frame therefore grows by nothing and keeps the rectangle's own size — "slim version is
+  // unnecessarily tall or wide, it can easily wrap the layouts with standard sizes of rectangles" —
+  // while a two-wide grows the 48mm band step Dan drew, and the magnets the caps then hold (canon's
+  // pillCapNodes) cost no further length, because they sit exactly where the cap already reaches.
+  const centre = tall ? (x0 + x1) / 2 : (y0 + y1) / 2
+  const alongOf = (p: PointMM) => (tall ? p[1] : p[0])
+  const spare = (p: PointMM) => Math.sqrt(Math.max(0, across * across / 4 - ((tall ? p[0] : p[1]) - centre) ** 2))
+  const nearEnd = Math.min(...nodesMM.map((p) => alongOf(p) + spare(p)))
+  const farEnd = Math.max(...nodesMM.map((p) => alongOf(p) - spare(p)))
+  const [lo, hi] = nearEnd <= farEnd
+    ? [nearEnd, farEnd] : [(nearEnd + farEnd) / 2, (nearEnd + farEnd) / 2]
+  const core: PointMM[] = tall ? [[centre, hi], [centre, lo]] : [[hi, centre], [lo, centre]]
   // A tangent polygon's vertex stands radius/cos(step/2) out, so the manufacturing arc tolerance
   // bounds the EXCESS here, where Clipper's identical tolerance bounds the shortfall.
   const widest = 2 * Math.acos(1 / (1 + MANUFACTURING_OFFSET_ARC_TOLERANCE_MM / radiusMM))
