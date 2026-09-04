@@ -5,6 +5,7 @@
 // so this unit imports no other unit.
 
 import type { AnchorBake, CentreMode, Contour, Governor, Pt, SafeSegment } from '../types'
+import { pathAreaCentroidMM } from '../foundation/path'
 
 // Moved out of foundation (F3): zero unit consumers there; the weight centre is centring's.
 /** Area centroid of a polygon (shoelace) — the material's weight centre. */
@@ -35,6 +36,17 @@ function ringAreaMM2(pts: ReadonlyArray<Pt>): number {
  *  the outer ring alone reports the box centre for an asymmetric holed shape, which is not where
  *  the material actually is — that is what the Weight centre reads. */
 export function contourCentroidOf(contour: Contour): Pt {
+  // exact wherever a ring carries its path: a curved shape's centre must not move with how finely its
+  // point view happened to be chopped (QA @a81dc93f F4). Holes subtract by their own exact area.
+  if ([contour.outer, ...contour.holes].some((ring) => ring.path)) {
+    let area = 0, sx = 0, sy = 0
+    ;[contour.outer, ...contour.holes].forEach((ring, index) => {
+      const a = ring.path ? pathAreaCentroidMM(ring.path) : { areaMM2: ringAreaMM2(ring.pts), centroid: centroidOf(ring.pts) }
+      const w = Math.abs(a.areaMM2) * (index === 0 ? 1 : -1)
+      area += w; sx += a.centroid[0] * w; sy += a.centroid[1] * w
+    })
+    if (area > 1e-6) return [sx / area, sy / area]
+  }
   const outerArea = ringAreaMM2(contour.outer.pts)
   const outerCentre = centroidOf(contour.outer.pts)
   let area = outerArea

@@ -1,5 +1,5 @@
 import type { Contour, Pt } from './types'
-import { distanceToPathMM, pointInPath } from './foundation/path'
+import { distanceToPathMM, pathAreaCentroidMM, pathBoundsMM, pointInPath } from './foundation/path'
 
 export interface GridBBox {
   minX: number
@@ -227,10 +227,28 @@ export function prepareExactContour(contour: Contour): PreparedContour {
     contour,
     segmentRings,
     segments,
-    bbox: ringBBox(contour.outer.pts),
-    centroid: contourCentroid(contour),
+    // bounds and the material centroid come from the PATH where a ring has one — an arc reaches its
+    // extreme exactly and its area integrates exactly; the point view only approaches both, and a
+    // curved shape's centre used to move with how finely it happened to be chopped (QA F4)
+    bbox: contour.outer.path ? pathBoundsMM(contour.outer.path) : ringBBox(contour.outer.pts),
+    centroid: contourCentroidExact(contour),
     distanceBvh: buildDistanceBvh(segments),
   }
+}
+
+/** Material centroid, exact wherever a ring carries its path and from points where it does not.
+ *  Each ring contributes its own signed area and first moments; holes subtract. */
+function contourCentroidExact(contour: Contour): Pt {
+  const rings = [contour.outer, ...contour.holes]
+  if (!rings.some((ring) => ring.path)) return contourCentroid(contour)
+  let area = 0, x = 0, y = 0
+  rings.forEach((ring, index) => {
+    const a = ring.path ? pathAreaCentroidMM(ring.path) : { areaMM2: ringArea(ring.pts), centroid: ringCentroid(ring.pts) }
+    const w = Math.abs(a.areaMM2) * (index === 0 ? 1 : -1)
+    area += w; x += a.centroid[0] * w; y += a.centroid[1] * w
+  })
+  if (area <= 1e-6) return contourCentroid(contour)
+  return [x / area, y / area]
 }
 
 /** Exact half-open y-interval query: minY ≤ y < maxY, returned in original ray-cast order. */

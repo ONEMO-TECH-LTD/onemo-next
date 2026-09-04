@@ -153,20 +153,32 @@ function bernsteinRoots(coeffs: readonly number[]): number[] {
     }
     return row[0]
   }
+  const record = (t: number) => { if (!roots.some((r) => Math.abs(r - t) < 1e-12)) roots.push(t) }
   const isolate = (c: readonly number[], lo: number, hi: number, depth: number): void => {
+    // A ZERO END COEFFICIENT IS A ROOT AT THAT END. Descartes counts sign changes among the non-zero
+    // coefficients, so a root that lands exactly on a subdivision point vanishes from the count:
+    // QA's cusp, 3(t-1/2)^5, split first at exactly 1/2 and both halves read as root-free. The
+    // Bernstein end coefficients ARE the polynomial's end values, so they are checked as such.
+    if (c[0] === 0) record(lo)
+    if (c[c.length - 1] === 0) record(hi)
     const v = variations(c)
     if (v === 0) return
-    if (v === 1 || depth >= 60 || hi - lo < 1e-12) {
-      // exactly one root here (or an interval too small to split further): bisect it out on the
-      // polynomial's own values, which is exact up to floating arithmetic
+    if (v === 1) {
+      // exactly one simple root here: bisect it out on the polynomial's own values
       let a = lo, b = hi, fa = evalAt(coeffs, a)
-      if (fa === 0) { roots.push(a); return }
+      if (fa === 0) { record(a); return }
       for (let k = 0; k < 80 && b - a > 1e-13; k++) {
         const m = (a + b) / 2, fm = evalAt(coeffs, m)
         if (fm === 0) { a = b = m; break }
         if ((fm < 0) === (fa < 0)) { a = m; fa = fm } else b = m
       }
-      roots.push((a + b) / 2)
+      record((a + b) / 2)
+      return
+    }
+    if (depth >= 60 || hi - lo < 1e-12) {
+      // still more than one variation in an interval too small to split: a MULTIPLE root, which
+      // never separates. There is no sign change to bisect on, so the interval itself is the answer.
+      record((lo + hi) / 2)
       return
     }
     const [l, r] = split(c)
@@ -477,4 +489,55 @@ export function scalePath(path: OutlinePath, k: number): OutlinePath {
       : seg.kind === 'arc' ? { kind: 'arc', to: s(seg.to), centre: s(seg.centre), ccw: seg.ccw }
       : { kind: 'cubic', to: s(seg.to), c1: s(seg.c1), c2: s(seg.c2) }),
   }
+}
+
+// ── exact area and centroid ───────────────────────────────────────────────────────────────────────
+//
+// Green's theorem over the path: A = ½∮(x dy − y dx), Cx = (1/2A)∮x² dy, Cy = −(1/2A)∮y² dx. A line's
+// terms are closed-form, an arc's are the standard trigonometric integrals, and a cubic's are exact
+// polynomial integrals in t — x·y' is degree five, x²·y' and y²·x' degree eight. The centring unit and
+// grid-core's prepared contour used to take the centroid of the flattened view, so a curved shape's
+// centre moved with how finely it happened to be chopped (QA @a81dc93f, F4).
+
+/** ∫₀¹ of a power-basis polynomial. */
+const integrate01 = (poly: readonly number[]) => poly.reduce((s, a, k) => s + a / (k + 1), 0)
+
+/** Signed area (positive for a counter-clockwise path) and the area centroid, exact. */
+export function pathAreaCentroidMM(path: OutlinePath): { areaMM2: number; centroid: Pt } {
+  let twiceA = 0, mx = 0, my = 0       // ∮(x dy − y dx), ∮x² dy, ∮y² dx
+  eachSeg(path, (from, seg) => {
+    if (seg.kind === 'line') {
+      const [ax, ay] = from, [bx, by] = seg.to
+      twiceA += ax * by - bx * ay
+      mx += (by - ay) * (ax * ax + ax * bx + bx * bx) / 3
+      my += (bx - ax) * (ay * ay + ay * by + by * by) / 3
+      return
+    }
+    if (seg.kind === 'cubic') {
+      const c = cubicOf(from, seg)
+      const x = cubicPower(c.a[0], c.c1[0], c.c2[0], c.b[0]), y = cubicPower(c.a[1], c.c1[1], c.c2[1], c.b[1])
+      const dx = [x[1], 2 * x[2], 3 * x[3]], dy = [y[1], 2 * y[2], 3 * y[3]]
+      twiceA += integrate01(polyMul(x, dy)) - integrate01(polyMul(y, dx))
+      mx += integrate01(polyMul(polyMul(x, x), dy))
+      my += integrate01(polyMul(polyMul(y, y), dx))
+      return
+    }
+    const { centre: [cx, cy], to, ccw } = seg
+    const r = radiusOf(seg.centre, from)
+    const t0 = angleOf(seg.centre, from)
+    const t1 = t0 + (ccw ? 1 : -1) * sweepOf(seg.centre, from, to, ccw)
+    const S = Math.sin, C = Math.cos
+    const d = (f: (t: number) => number) => f(t1) - f(t0)
+    twiceA += r * r * (t1 - t0) + cx * r * d(S) - cy * r * (d(C))
+    // ∫(cx + r cosθ)² r cosθ dθ
+    mx += cx * cx * r * d(S) + 2 * cx * r * r * d((t) => t / 2 + S(2 * t) / 4) + r * r * r * d((t) => S(t) - S(t) ** 3 / 3)
+    // ∫(cy + r sinθ)² (−r sinθ) dθ
+    my += -(cy * cy * r * d((t) => -C(t)) + 2 * cy * r * r * d((t) => t / 2 - S(2 * t) / 4) + r * r * r * d((t) => -C(t) + C(t) ** 3 / 3))
+  })
+  const areaMM2 = twiceA / 2
+  if (Math.abs(areaMM2) < 1e-9) {
+    const b = pathBoundsMM(path)
+    return { areaMM2, centroid: [(b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2] }
+  }
+  return { areaMM2, centroid: [mx / (2 * areaMM2), -my / (2 * areaMM2)] }
 }
