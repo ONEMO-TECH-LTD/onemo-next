@@ -25,17 +25,21 @@ const walk = (dir) => readdirSync(dir).flatMap((name) => {
 const emitted = walk(DIST).filter((f) => f.endsWith('.js') || f.endsWith('.d.ts'))
 
 for (const file of emitted) {
-  const isJs = file.endsWith('.js')
   const source = readFileSync(file, 'utf8')
-  const rewritten = source.replace(/(from\s+['"])([^'"]+)(['"])/g, (whole, head, spec, tail) => {
+  // Both forms carry a module specifier, and DECLARATIONS use the second one for inferred types:
+  //   import … from '…' / export … from '…'      and      import('…')
+  // Declarations need the `.js` extension too under NodeNext, so the rewrite is identical for both
+  // artifacts — an earlier version fixed only `from` in `.js` and left `import('@/…')` in the d.ts
+  // while reporting success (QA F1, 2026-09-03).
+  const rewritten = source.replace(/((?:from\s*|import\s*\()['"])([^'"]+)(['"])/g, (whole, head, spec, tail) => {
     let target = spec
     if (target.startsWith('@/')) {
-      let rel = relative(dirname(file), join(DIST, target.slice(2)))
+      const rel = relative(dirname(file), join(DIST, target.slice(2)))
       target = rel.startsWith('.') ? rel : './' + rel
     } else if (!target.startsWith('.')) {
       return whole                                   // a real package (clipper2) — leave it alone
     }
-    if (isJs && !/\.(js|mjs|cjs|json)$/.test(target)) {
+    if (!/\.(js|mjs|cjs|json)$/.test(target)) {
       const resolved = join(dirname(file), target)
       target += existsSync(resolved + '.js') ? '.js'
         : existsSync(join(resolved, 'index.js')) ? '/index.js' : '.js'
@@ -45,6 +49,16 @@ for (const file of emitted) {
   if (rewritten !== source) writeFileSync(file, rewritten)
 }
 
-const aliasesLeft = emitted.reduce((n, f) => n + (readFileSync(f, 'utf8').match(/from\s+['"]@\//g)?.length ?? 0), 0)
+// Fail loud on ANY surviving alias, in any syntax — the old scan looked for `from '@/` alone and so
+// reported zero while a declaration still carried `import('@/…')`.
+const aliasesLeft = emitted.reduce((n, f) => n + (readFileSync(f, 'utf8').match(/@\//g)?.length ?? 0), 0)
 if (aliasesLeft) throw new Error(`${aliasesLeft} unresolved @/ specifier(s) survived the build`)
-console.log(`engine package built · ${emitted.length} emitted files · 0 unresolved aliases`)
+
+// The public TypeScript contract must compile the way a consumer resolves it — NodeNext, no DOM.
+execFileSync(join(REPO, 'node_modules', '.bin', 'tsc'),
+  ['--noEmit', '--moduleResolution', 'NodeNext', '--module', 'NodeNext', '--target', 'ES2022',
+    '--lib', 'ES2022', '--types', 'node', '--skipLibCheck', 'false',
+    join(DIST, 'lib/effect/pipeline/index.d.ts')],
+  { stdio: 'inherit', cwd: PKG })
+
+console.log(`engine package built · ${emitted.length} emitted files · 0 unresolved aliases · declarations compile under NodeNext`)

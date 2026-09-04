@@ -1,14 +1,8 @@
-// An independent consumer: it knows the package export and nothing else — no source path, no Next,
-// no worker, no `src/app`. If this passes, the engine is callable outside this application.
+// An independent consumer: it knows the package NAME and nothing else — no source path, no manifest
+// reading, no Next, no worker, no `src/app`. If this resolves and runs, the engine is consumable.
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { createRequire } from 'node:module'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
-
-const PKG = dirname(dirname(fileURLToPath(import.meta.url)))
-const entry = createRequire(join(PKG, 'package.json'))('./package.json').exports['.'].import
-const { solveGrid } = await import(new URL(entry, `file://${join(PKG, '/')}`).href)
+import { solveGrid } from 'onemo-grid-engine'
 
 const square = (mm) => ({ outer: { pts: [[0, 0], [mm, 0], [mm, mm], [0, mm]] }, holes: [] })
 const request = {

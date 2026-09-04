@@ -83,8 +83,10 @@ describe('the engine is liftable', () => {
       const p = join(d, n)
       return statSync(p).isDirectory() ? walk(p) : [p]
     })
+    // ANY occurrence, not just `from '@/…'` — a declaration's `import('@/…')` slipped past the
+    // narrower scan while the build reported success (QA F1, 2026-09-03).
     const left = walk(dist).filter((f) => /\.(js|d\.ts)$/.test(f))
-      .reduce((n, f) => n + (readFileSync(f, 'utf8').match(/from\s+['"]@\//g)?.length ?? 0), 0)
+      .reduce((n, f) => n + (readFileSync(f, 'utf8').match(/@\//g)?.length ?? 0), 0)
     expect(left, 'unresolved @/ specifiers in dist').toBe(0)
   })
 })

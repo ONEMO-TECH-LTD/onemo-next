@@ -436,7 +436,7 @@ export default function GridLab() {
               {perf.cutMs != null ? <> · cut <Sec ms={perf.cutMs} /></> : null}
               {' · '}solve <Sec ms={perf.solveMs} />
             </span>
-            <span className="gl-eye">Grid Centre · v4</span>
+            <span className="gl-eye">Grid Lab · v4</span>
             <span className="gl-eye">
               {tab === 'library' ? 'LIBRARY DRAFT · CANDIDATE REVIEW'
                 : model ? `1mm = ${scale.toFixed(2)} px` : '—'}

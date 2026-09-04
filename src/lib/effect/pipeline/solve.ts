@@ -112,7 +112,7 @@ export function solveGrid(req: GridRequest): GridSolve {
       // band's range (centre-rules seating); each is solved WHOLE by wrapGroup to its exact
       // contact size. Composition only: the wrap engine is transferred untouched.
       const activeBands = BANDS.filter((band) => activeBandIds.includes(band.id))
-      if (!activeBands.length) throw new Error('Grid Centre requires at least one active band.')
+      if (!activeBands.length) throw new Error('Grid Lab requires at least one active band.')
       const band = activeBands.find((candidate) => candidate.id === mode) ?? activeBands[0]
       // The band is a LEGAL range; the ladder scans OUTLINE sizes, so it converts through this
       // shape's own rim. A diamond and a square in one band do not share an outline range.
