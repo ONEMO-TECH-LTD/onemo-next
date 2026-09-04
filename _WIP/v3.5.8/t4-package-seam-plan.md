@@ -73,7 +73,7 @@ Head `28c3f8a6` — all seven §1 items. Observed:
   fails the closure gate · a fourth export fails the door pin · a raw engine import in the worker fails
   the seam gate (updated for the door and re-proved).
 - Root suite 846 pass / 11 skipped (serial) · `tsc --noEmit` clean · repo lint 0 errors.
-- Live 4065: header reads **Grid Centre · v4**, bench solves, console clean.
+- Live 4065: header reads **Grid Lab · v4**, bench solves, console clean.
 
 Two deliberate choices, stated: `dist` is **not** committed (this package builds from live sources, so a
 checked-in copy would be a second engine going stale — unlike the three vendored grid-engine packages
