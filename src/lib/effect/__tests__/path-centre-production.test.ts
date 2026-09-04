@@ -80,17 +80,15 @@ describe('the Weight centre is the exact path centroid', () => {
     const exactAtEff = contourAreaCentroidMM(sized(solve.effSize)).centroid
     const fnAtEff = anchorAt(solve.effSize)
     expect(Math.hypot(fnAtEff[0] - exactAtEff[0], fnAtEff[1] - exactAtEff[1])).toBeLessThan(1e-9)
-    // The centre the solve COMMITTED to lies on the exact-centroid line of this shape — the base is
-    // normalised, so every size's exact centroid is the base centroid scaled, and the view centroid
-    // is off that line. This is the decision-level proof: the engine centred on the path, not the view.
+    // The centre the solve COMMITTED to is the exact centroid OF THE CONTOUR IT PUBLISHED — equality,
+    // not direction. It used to be 2.9um off: the ladder drew the contour at the rung's snapped size but
+    // carried the centre the search used at its exact contact size (QA @ca147429 F8). Now what is drawn
+    // takes the anchor for the size it is drawn at. Mutation: restore `anchorMM: at.anchorMM` in
+    // pipeline/solve.ts and this fails.
     const used = solve.grid.centresMM[0]
-    const cBase = contourAreaCentroidMM(base).centroid, vBase = viewCentroid(base)
-    const sUsed = used[0] / cBase[0]
-    expect(Math.abs(used[1] - cBase[1] * sUsed), 'committed centre is collinear with the exact centroid').toBeLessThan(1e-9)
-    expect(Math.abs(used[1] - vBase[1] * (used[0] / vBase[0])), 'and not with the view centroid').toBeGreaterThan(1e-6)
-    // PRE-EXISTING, named not hidden: the ladder returns the contour at the rung's SNAPPED size and the
-    // centre the search used at its exact contact size — a few microns apart, inside manufacturing
-    // tolerance, and nothing to do with the path. Bounded here so it cannot silently grow.
-    expect(Math.abs(sUsed - solve.effSize)).toBeLessThan(0.01)
+    const solvedExact = contourAreaCentroidMM(solve.contour).centroid
+    const solvedView = viewCentroid(solve.contour)
+    expect(Math.hypot(used[0] - solvedExact[0], used[1] - solvedExact[1])).toBeLessThan(1e-9)
+    expect(Math.hypot(used[0] - solvedView[0], used[1] - solvedView[1])).toBeGreaterThan(1e-6)
   })
 })

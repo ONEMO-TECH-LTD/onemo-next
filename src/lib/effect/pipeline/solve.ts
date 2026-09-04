@@ -169,8 +169,14 @@ export function solveGrid(req: GridRequest): GridSolve {
             gapsMM: rg.at.gapsMM.filter((_, i) => kept.has(rg.at.points[i])) } }
         })
         const at = rungs[idx].at
-        const wcfg: WrapConfig = { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM, magnetDiaMM: undefined, anchorAtMM: () => at.anchorMM }
-        const drawn = wrapGrid(sized, wcfg, at)
+        // THE EMITTED CENTRE BELONGS TO THE EMITTED CONTOUR. `at.anchorMM` is the centre the search
+        // used at the rung's exact contact size; the contour published is at the rung's SNAPPED size.
+        // A few microns of size apart, and the result's centre no longer sat on its own shape — 2.9um
+        // on a teardrop under Weight centring (QA @ca147429 F8). `at` keeps the search's facts for
+        // ordering and reported contact; only what is drawn takes the anchor for the size it is drawn at.
+        const drawnAt = { ...at, anchorMM: anchorAt(at.sizeMM) }
+        const wcfg: WrapConfig = { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM, magnetDiaMM: undefined, anchorAtMM: () => drawnAt.anchorMM }
+        const drawn = wrapGrid(sized, wcfg, drawnAt)
         const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
         const r = spotRadiusOf(pad)
         const segments = safeSegments(drawn.contour, r, 'full')
