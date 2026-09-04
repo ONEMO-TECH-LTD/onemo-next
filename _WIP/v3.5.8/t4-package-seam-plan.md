@@ -61,3 +61,21 @@ step), one consumer smoke, one closure gate, two config excludes, one string —
 directive "wrapped as api package" or by its proof. Delivers T4 in full: the door exists and is used, the
 package builds DOM-free from the existing sources with no repository aliases in the artifact, and an
 independent Node consumer calls it.
+
+## 5 · Execution record (2026-09-03, branch session62-task/v3.5.8-t4-package)
+
+Head `28c3f8a6` — all seven §1 items. Observed:
+- package build: tsc clean with `lib: ES2022` (no DOM), 122 emitted files, **0 unresolved `@/` specifiers**
+  (the build throws if any survive).
+- `npm run test:engine-package`: the independent Node consumer solves 120.01 mm · 8 magnets through the
+  package export, request and answer JSON round-trip.
+- Mutations: `document.title` in `pipeline/solve.ts` fails the **build** (TS2584) · an `@/app/…` import
+  fails the closure gate · a fourth export fails the door pin · a raw engine import in the worker fails
+  the seam gate (updated for the door and re-proved).
+- Root suite 846 pass / 11 skipped (serial) · `tsc --noEmit` clean · repo lint 0 errors.
+- Live 4065: header reads **Grid Centre · v4**, bench solves, console clean.
+
+Two deliberate choices, stated: `dist` is **not** committed (this package builds from live sources, so a
+checked-in copy would be a second engine going stale — unlike the three vendored grid-engine packages
+whose sources live inside them); and CI does not yet run the package's own consumer test — the root
+script `npm run test:engine-package` exists, adding it to the workflow is Dan's call.
