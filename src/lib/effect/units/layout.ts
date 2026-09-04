@@ -104,6 +104,16 @@ const SEAT_QUANTUM_MM = 0.001
  * A float prescreen answers the clear cases; only points within a guard band of the exact
  * threshold fall through to the integer test — the answer never changes, only the cost.
  * Null for a degenerate outline.
+ *
+ * A KNOWN GAP, deliberately not papered over here (2026-09-04). The exact test measures against the
+ * outline's CHORDS, and a chord of an INSCRIBED flattened arc sits up to the arc tolerance inside the
+ * true edge — so a magnet touching the real curve exactly measures short and is refused. That is the
+ * zero-margin case the analytic circle predicate below was written for, and that predicate only
+ * covers a shape which IS a circle; every other curved outline takes this path. Allowing the arc
+ * tolerance here uniformly was tried and is WRONG: on a straight edge there is no approximation to
+ * correct, and 5b caught it refusing to refuse a magnet one micron inside the rim. The correction
+ * has to be per-edge, from each edge's own turn, and it is its own task. Outlines the library builds
+ * are emitted so their chords lie OUTSIDE the true curve instead, which needs nothing from here.
  */
 export function makeSeatPredicate(
   outer: ReadonlyArray<Pt>,

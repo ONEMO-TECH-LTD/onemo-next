@@ -58,14 +58,21 @@ const seatedAt = (entry: CatalogueEntry, pitchMM: number, paddingMM = RELEASED_P
  *  fixture to shrink, so the gap can only ever be paid down, never grown.
  *
  *  Their disks and outlines are correct: the library's own caller-equality gate reproduces every
- *  record independently at 24/48/96. Two open ENGINE findings, neither a library defect:
+ *  record independently at 24/48/96. What disagrees is where the ENGINE lays its lattice for a
+ *  transformed view. Open engine finding, not a library defect.
  *
- *  1. Transformed views — where the engine lays its lattice for a y-flipped view.
- *  2. One-wide pills (2026-09-04) — the end magnets of a slim pill. The engine's own measurement
- *     calls them legal: `pointInPreparedContour` is true and `distanceToPreparedContour` is exactly
- *     12.000000000mm, the released rim. The solver seats them anyway only once the padding is asked
- *     for at 11.9 rather than 12, so the loss is in how a curved cap is planned, not in clearance —
- *     the same population inside a sharp rectangle of identical size seats 3 of 3. */
+ *  The pill briefly added 63 one-wide records here and that was wrong — QA called it correctly: a
+ *  record whose certified magnets the engine refuses is a false manufacturing record, not a catalogue
+ *  exception. The cause was that the seat test measures against the outline's CHORDS, and a chord of
+ *  a flattened arc sits inside the true edge, so a magnet touching the real curve exactly is refused.
+ *  The library now emits its curved outlines with the chords OUTSIDE the curve, on the same micron
+ *  grid the engine seats on, and all 63 seat at the released 12mm rim with no engine change.
+ *
+ *  The same defect is what these 51 transformed views hit, and relaxing the seat test by the arc
+ *  tolerance closes every one of them — but uniformly, which is wrong: on a straight edge there is no
+ *  approximation to correct, and grid-magnet-separation 5b proves it by refusing a magnet one micron
+ *  inside the rim. Closing them needs a per-edge correction from each edge's own turn. Its own task,
+ *  and until then this set stays exactly as measured. */
 const OPEN: readonly string[] = JSON.parse(
   readFileSync(join(__dirname, 'fixtures/solver-oracle-open.v1.json'), 'utf8')) as string[]
 const isOpen = (entry: CatalogueEntry, pitchMM: number) => OPEN.includes(caseId(entry.id, pitchMM))
@@ -73,7 +80,7 @@ const isOpen = (entry: CatalogueEntry, pitchMM: number) => OPEN.includes(caseId(
 describe('the certified catalogue is the oracle the generator answers to', () => {
   // TARGET INVARIANT: the engine accepts every certified disk at every supported pitch.
   // CURRENT CONFORMANCE: everywhere except the exact open pitch-cases below. The two are stated
-  // separately on purpose — a title that claims the target while the body skips 68 records is
+  // separately on purpose — a title that claims the target while the body skips records is
   // the overclaim this whole oracle exists to stop.
   it('the engine accepts every certified disk outside the exact open pitch-cases', () => {
     const rejected: string[] = []
@@ -93,14 +100,13 @@ describe('the certified catalogue is the oracle the generator answers to', () =>
       if (missingFrom(seatedAt(entry, pitchMM), entry.nodesMM).length)
         failing.push(caseId(entry.id, pitchMM))
     expect(failing.sort()).toEqual([...OPEN].sort())
-    // every open case is a real record at a supported pitch, and belongs to one of the two named
-    // findings — a y-flipped view, or a one-wide pill. Anything else has to be argued for, not added
+    // every open case is a real record at a supported pitch, and every one is a y-flipped view
     for (const open of OPEN) {
       const at = open.lastIndexOf('@')
       const id = open.slice(0, at), pitchMM = Number(open.slice(at + 1))
       expect([24, 48, 96]).toContain(pitchMM)
       expect(catalogue(pitchMM).some((e) => e.id === id), open).toBe(true)
-      expect(id.endsWith('y') || /^pill\/slim\//.test(id), open).toBe(true)
+      expect(id.endsWith('y'), open).toBe(true)
     }
   }, 120_000)
 

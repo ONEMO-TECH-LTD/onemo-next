@@ -4,6 +4,11 @@ import type { OutlineRecipe } from './class-contract'
 import { convexHull, rotateAround } from './geometry'
 import type { PointMM } from './types'
 
+/** The engine seats on integer microns; the library emits on the same grid so nothing is lost in the
+ *  handover. Declared here rather than imported: units/layout owns the seating copy, and the library
+ *  may not import a unit. */
+const SEAT_QUANTUM_MM = 0.001
+
 /** THE STADIUM — the rectangle carried out one band and rounded (Dan, 2026-09-04: "you expand
  *  rectangle to the next band by 48mm round corners and center it to the prior band", drawn as a
  *  720x1680 rectangle at corner radius 360 over a 2x3 layout).
@@ -53,12 +58,20 @@ function stadiumOutline(nodesMM: readonly PointMM[]): PointMM[] {
     [Math.min(head[0], tail[0]), Math.min(head[1], tail[1])],
     [Math.max(head[0], tail[0]), Math.min(head[1], tail[1])],
   ]
+  // The engine seats on an integer MICRON grid, and rounding a tangent vertex the wrong way by half
+  // a micron puts its chord inside the true curve — which is exactly what the seat test refuses. So
+  // every vertex rounds AWAY from its own arc centre. The four axis tangents are whole microns
+  // already, so the published size does not move: a 1x3 pill stays 24.000 x 120.000mm.
+  const outward = (v: number, centre: number) => {
+    const q = v / SEAT_QUANTUM_MM
+    return (v >= centre ? Math.ceil(q - 1e-6) : Math.floor(q + 1e-6)) * SEAT_QUANTUM_MM
+  }
   const out: PointMM[] = []
   for (let quadrant = 0; quadrant < 4; quadrant++) {
     const [cx, cy] = corners[quadrant]
     for (let i = 0; i < steps; i++) {
       const angle = quadrant * Math.PI / 2 + (i + 0.5) * step
-      out.push([cx + reach * Math.cos(angle), cy + reach * Math.sin(angle)])
+      out.push([outward(cx + reach * Math.cos(angle), cx), outward(cy + reach * Math.sin(angle), cy)])
     }
   }
   return out
