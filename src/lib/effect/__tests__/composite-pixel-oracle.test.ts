@@ -236,5 +236,9 @@ describe('composeEffectArtwork real-pixel oracle', () => {
     } finally {
       await browser.close()
     }
-  }, 30_000)
+  // No per-test cap: it inherits the 60 s default (vitest.config.mts, #217). This test drives a real
+  // Chrome — launch plus four compose passes — and finishes in ~2 s on an idle machine, but the old
+  // 30 s cap OVERRODE the raised default and reddened CI three times on work that never touched it
+  // (2026-09-02/03/04, on untouched staging as well). The cap was the arbitrary number, not the work.
+  })
 })
