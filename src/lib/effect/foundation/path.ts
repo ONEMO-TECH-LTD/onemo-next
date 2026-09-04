@@ -18,12 +18,19 @@
 
 import type { Pt } from '../types'
 
-/** A step along the path, from the previous point to `to`. An arc also names the centre it turns
- *  about and which way; its radius is the distance from that centre, and both ends are equidistant
- *  from it by construction. */
+/** A step along the path, from the previous point to `to`.
+ *
+ *  An arc names the centre it turns about and which way; its radius is the distance from that
+ *  centre, and both ends are equidistant from it by construction. This is what an offset produces.
+ *
+ *  A cubic carries its two control points — the authored curve of a preset or a cutout, exactly as
+ *  vector-core holds it (a line is a cubic with no handles, and stays a line here). Distance to a
+ *  cubic is the minimum of a quintic, found by bracketing and Newton to machine precision: no chord
+ *  ever stands in for it. */
 export type PathSeg =
   | { kind: 'line'; to: Pt }
   | { kind: 'arc'; to: Pt; centre: Pt; ccw: boolean }
+  | { kind: 'cubic'; to: Pt; c1: Pt; c2: Pt }
 
 /** A closed outline: where it starts, and the steps back round to that start. */
 export interface OutlinePath {
@@ -78,11 +85,110 @@ function distToArc(p: Pt, from: Pt, seg: Extract<PathSeg, { kind: 'arc' }>): num
   return Math.min(Math.hypot(p[0] - from[0], p[1] - from[1]), Math.hypot(p[0] - to[0], p[1] - to[1]))
 }
 
+// ── cubic Béziers, exactly ─────────────────────────────────────────────────────────────────────────
+
+type Cubic = { a: Pt; c1: Pt; c2: Pt; b: Pt }
+const cubicOf = (from: Pt, seg: Extract<PathSeg, { kind: 'cubic' }>): Cubic => ({ a: from, c1: seg.c1, c2: seg.c2, b: seg.to })
+
+/** B(t), one axis. */
+const bez = (a: number, c1: number, c2: number, b: number, t: number): number => {
+  const u = 1 - t
+  return u * u * u * a + 3 * u * u * t * c1 + 3 * u * t * t * c2 + t * t * t * b
+}
+/** B'(t), one axis. */
+const bezD = (a: number, c1: number, c2: number, b: number, t: number): number => {
+  const u = 1 - t
+  return 3 * u * u * (c1 - a) + 6 * u * t * (c2 - c1) + 3 * t * t * (b - c2)
+}
+/** B''(t), one axis. */
+const bezDD = (a: number, c1: number, c2: number, b: number, t: number): number =>
+  6 * (1 - t) * (c2 - 2 * c1 + a) + 6 * t * (b - 2 * c2 + c1)
+
+const cubicAt = (c: Cubic, t: number): Pt =>
+  [bez(c.a[0], c.c1[0], c.c2[0], c.b[0], t), bez(c.a[1], c.c1[1], c.c2[1], c.b[1], t)]
+
+/** Nearest distance from p to the cubic. d(t)² is a sextic whose derivative is a quintic; it is
+ *  bracketed on a fixed grid of the parameter and polished with Newton in each bracket, then the
+ *  endpoints are checked too. Converges to machine precision — there is no chord in this answer. */
+function distToCubic(p: Pt, c: Cubic): number {
+  const f = (t: number) => {                      // d/dt of |B(t) - p|² / 2
+    const x = bez(c.a[0], c.c1[0], c.c2[0], c.b[0], t) - p[0]
+    const y = bez(c.a[1], c.c1[1], c.c2[1], c.b[1], t) - p[1]
+    return x * bezD(c.a[0], c.c1[0], c.c2[0], c.b[0], t) + y * bezD(c.a[1], c.c1[1], c.c2[1], c.b[1], t)
+  }
+  const fD = (t: number) => {
+    const x = bez(c.a[0], c.c1[0], c.c2[0], c.b[0], t) - p[0]
+    const y = bez(c.a[1], c.c1[1], c.c2[1], c.b[1], t) - p[1]
+    const dx = bezD(c.a[0], c.c1[0], c.c2[0], c.b[0], t), dy = bezD(c.a[1], c.c1[1], c.c2[1], c.b[1], t)
+    return dx * dx + dy * dy + x * bezDD(c.a[0], c.c1[0], c.c2[0], c.b[0], t) + y * bezDD(c.a[1], c.c1[1], c.c2[1], c.b[1], t)
+  }
+  const dist = (t: number) => { const q = cubicAt(c, t); return Math.hypot(q[0] - p[0], q[1] - p[1]) }
+  let best = Math.min(dist(0), dist(1))
+  const N = 16
+  let prevT = 0, prevF = f(0)
+  for (let i = 1; i <= N; i++) {
+    const t = i / N, ft = f(t)
+    if ((prevF <= 0 && ft >= 0) || (prevF >= 0 && ft <= 0)) {
+      // a stationary point of the distance lies in [prevT, t]: Newton from the midpoint, bisect-guarded
+      let lo = prevT, hi = t, x = (lo + hi) / 2
+      for (let k = 0; k < 40; k++) {
+        const fx = f(x), dfx = fD(x)
+        let nx = dfx !== 0 ? x - fx / dfx : (lo + hi) / 2
+        if (!(nx > lo && nx < hi)) nx = (lo + hi) / 2
+        if ((f(lo) <= 0) === (fx <= 0)) lo = x; else hi = x
+        if (Math.abs(nx - x) < 1e-13) { x = nx; break }
+        x = nx
+      }
+      best = Math.min(best, dist(x))
+    }
+    prevT = t; prevF = ft
+  }
+  return best
+}
+
+/** All t in [0,1] where B_y(t) = y, by subdivision on the cubic's y-polynomial then bisection —
+ *  robust where a closed-form cubic solver loses digits. */
+function cubicRootsY(c: Cubic, y: number): number[] {
+  const g = (t: number) => bez(c.a[1], c.c1[1], c.c2[1], c.b[1], t) - y
+  const roots: number[] = []
+  const N = 24
+  for (let i = 0; i < N; i++) {
+    let lo = i / N, hi = (i + 1) / N
+    let glo = g(lo), ghi = g(hi)
+    if (glo === 0) { roots.push(lo); continue }
+    if ((glo < 0) === (ghi < 0)) continue
+    for (let k = 0; k < 60; k++) {
+      const m = (lo + hi) / 2, gm = g(m)
+      if ((gm < 0) === (glo < 0)) { lo = m; glo = gm } else { hi = m; ghi = gm }
+    }
+    roots.push((lo + hi) / 2)
+  }
+  if (g(1) === 0) roots.push(1)
+  return roots
+}
+
+/** Parameter values where one axis of the cubic is stationary — where its bounds can lie. */
+function cubicExtremaT(a: number, c1: number, c2: number, b: number): number[] {
+  // B'(t) = 3[(c1-a)(1-t)² + 2(c2-c1)(1-t)t + (b-c2)t²]  → quadratic in t
+  const A = (b - c2) - 2 * (c2 - c1) + (c1 - a)
+  const B = 2 * ((c2 - c1) - (c1 - a))
+  const C = c1 - a
+  const out: number[] = []
+  if (Math.abs(A) < 1e-12) { if (Math.abs(B) > 1e-12) out.push(-C / B) }
+  else {
+    const disc = B * B - 4 * A * C
+    if (disc >= 0) { const s = Math.sqrt(disc); out.push((-B + s) / (2 * A), (-B - s) / (2 * A)) }
+  }
+  return out.filter((t) => t > 0 && t < 1)
+}
+
 /** EXACT distance from a point to the outline. No tolerance, no sampling. */
 export function distanceToPathMM(path: OutlinePath, p: Pt): number {
   let best = Infinity
   eachSeg(path, (from, seg) => {
-    const d = seg.kind === 'line' ? distToSegment(p, from, seg.to) : distToArc(p, from, seg)
+    const d = seg.kind === 'line' ? distToSegment(p, from, seg.to)
+      : seg.kind === 'arc' ? distToArc(p, from, seg)
+      : distToCubic(p, cubicOf(from, seg))
     if (d < best) best = d
   })
   return best
@@ -107,6 +213,21 @@ export function pointInPath(path: OutlinePath, p: Pt): boolean {
       if ((ay > p[1]) !== (by > p[1])) {
         const x = ax + ((p[1] - ay) / (by - ay)) * (bx - ax)
         if (x > p[0]) crossings++
+      }
+      return
+    }
+    if (seg.kind === 'cubic') {
+      // the ray meets the curve where B_y(t) = p[1]; each root is a crossing if it is to the right,
+      // with the same half-open rule via the curve's direction there
+      const c = cubicOf(from, seg)
+      for (const t of cubicRootsY(c, p[1])) {
+        const x = bez(c.a[0], c.c1[0], c.c2[0], c.b[0], t)
+        if (x <= p[0]) continue
+        const rise = bezD(c.a[1], c.c1[1], c.c2[1], c.b[1], t)
+        if (Math.abs(rise) < NEAR) continue
+        if (t < NEAR) { if (rise > 0) crossings++; continue }
+        if (t > 1 - NEAR) { if (rise < 0) crossings++; continue }
+        crossings++
       }
       return
     }
@@ -143,6 +264,13 @@ export function pathBoundsMM(path: OutlinePath): { minX: number; minY: number; m
   take(path.start[0], path.start[1])
   eachSeg(path, (from, seg) => {
     take(seg.to[0], seg.to[1])
+    if (seg.kind === 'cubic') {
+      const c = cubicOf(from, seg)
+      for (const t of [...cubicExtremaT(c.a[0], c.c1[0], c.c2[0], c.b[0]), ...cubicExtremaT(c.a[1], c.c1[1], c.c2[1], c.b[1])]) {
+        const q = cubicAt(c, t); take(q[0], q[1])
+      }
+      return
+    }
     if (seg.kind !== 'arc') return
     const r = radiusOf(seg.centre, from)
     const axes: Array<[number, Pt]> = [
@@ -221,8 +349,19 @@ function signedArea(ring: readonly Pt[]): number {
  *  than it is. */
 export function flattenPath(path: OutlinePath, tolMM: number): Pt[] {
   const out: Pt[] = [path.start]
+  const flattenCubic = (c: Cubic, depth: number): void => {
+    // control-net distance from the chord bounds curve-to-chord distance — the standard flatness test
+    const dx = c.b[0] - c.a[0], dy = c.b[1] - c.a[1], len = Math.hypot(dx, dy) || 1e-12
+    const off = (q: Pt) => Math.abs((q[0] - c.a[0]) * dy - (q[1] - c.a[1]) * dx) / len
+    if (depth >= 18 || Math.max(off(c.c1), off(c.c2)) <= tolMM) { out.push(c.b); return }
+    const m = (p: Pt, q: Pt): Pt => [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2]
+    const ab = m(c.a, c.c1), bc = m(c.c1, c.c2), cd = m(c.c2, c.b), abbc = m(ab, bc), bccd = m(bc, cd), mid = m(abbc, bccd)
+    flattenCubic({ a: c.a, c1: ab, c2: abbc, b: mid }, depth + 1)
+    flattenCubic({ a: mid, c1: bccd, c2: cd, b: c.b }, depth + 1)
+  }
   eachSeg(path, (from, seg) => {
     if (seg.kind === 'line') { out.push(seg.to); return }
+    if (seg.kind === 'cubic') { flattenCubic(cubicOf(from, seg), 0); return }
     const r = radiusOf(seg.centre, from)
     const sweep = sweepOf(seg.centre, from, seg.to, seg.ccw)
     const widest = 2 * Math.acos(Math.max(-1, Math.min(1, 1 / (1 + tolMM / r))))
@@ -240,4 +379,26 @@ export function flattenPath(path: OutlinePath, tolMM: number): Pt[] {
     if (Math.hypot(fx - lx, fy - ly) < 1e-9) out.pop()
   }
   return out
+}
+
+/** THE DOOR FROM VECTOR TRUTH: a vector-core path becomes the engine's path with nothing lost. Lines
+ *  stay lines, cubics stay cubics, and `map` is the caller's px→mm affine (scale and y-flip), which is
+ *  exact on a Bézier when applied to its control points — the same fact transformShape relies on.
+ *  This replaces flattening at the door (geometry-truth's contourFromShape), which was the one place
+ *  the whole path-native product line was ever turned into chords. */
+export function pathFromAnchors(
+  anchors: ReadonlyArray<{ p: { x: number; y: number }; hIn?: { x: number; y: number } | null; hOut?: { x: number; y: number } | null }>,
+  map: (v: { x: number; y: number }) => Pt,
+): OutlinePath {
+  if (anchors.length < 2) throw new Error('path: a closed path needs at least two anchors')
+  const n = anchors.length
+  const segs: PathSeg[] = []
+  for (let i = 0; i < n; i++) {
+    const A = anchors[i], B = anchors[(i + 1) % n]
+    const to = map(B.p)
+    if (!A.hOut && !B.hIn) { segs.push({ kind: 'line', to }); continue }
+    // SVG semantics: a missing handle collapses onto its endpoint — exactly as vector-core's segmentAt
+    segs.push({ kind: 'cubic', to, c1: map(A.hOut ?? A.p), c2: map(B.hIn ?? B.p) })
+  }
+  return { start: map(anchors[0].p), segs }
 }
