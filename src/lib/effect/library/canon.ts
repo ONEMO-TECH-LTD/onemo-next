@@ -19,6 +19,7 @@
 // was mine on 2026-08-25 and it read "no generation AT SOLVE TIME", which is a different claim —
 // what was rejected then was a solve-time generator filtering patterns per family.
 
+import { boardPositions } from './geometry'
 import type { LibraryFrame } from './types'
 
 type Pt = readonly [number, number]
@@ -46,3 +47,27 @@ export function frameOf(cols: number, rows: number, mask?: (nodes: readonly Pt[]
   const nodes = mask ? mask(fullNodes(cols, rows)) : fullNodes(cols, rows)
   return { cols, rows, layouts: [{ name: nodes.length === 1 ? SINGLE_LAYOUT : CANON_LAYOUT, nodes }] }
 }
+
+/** THE RECTANGULAR FRAME SET — every ordered frame the board holds, both ways round.
+ *
+ *  It lives in the canon because more than one class publishes it: the rectangle (sharp) and the
+ *  pill (round ends) offer the SAME frames and differ only at the edge. A class may not import
+ *  another class, and two copies of this loop would be one edit away from disagreeing, so the
+ *  arithmetic has one home (2026-09-04).
+ *
+ *  Portrait and landscape are separate frames, published separately: a 9-wide board carries 3×10
+ *  and cannot carry 10×3 (Dan, 2026-08-30). */
+export function rectangularFrames(pitchMM: number): readonly LibraryFrame[] {
+  const { cols, rows } = boardPositions(pitchMM)
+  const out: LibraryFrame[] = []
+  for (let c = 1; c <= cols; c++) for (let r = c + 1; r <= rows; r++) {
+    out.push(frameOf(c, r))
+    if (r <= cols) out.push(frameOf(r, c))
+  }
+  return out
+}
+
+/** How narrow a rectangular frame is on its minor axis — independent of which way round it sits:
+ *  a 2×5 and a 5×2 are both banners. Shared for the same reason as the frame set. */
+export const rectangularTypeOf = (cols: number, rows: number): string =>
+  Math.min(cols, rows) <= 1 ? 'slim' : Math.min(cols, rows) === 2 ? 'banner' : 'frame'

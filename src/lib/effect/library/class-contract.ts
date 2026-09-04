@@ -1,6 +1,9 @@
 import type { LibraryFamily, LibraryFrame, LibrarySelection, LibraryTransform } from './types'
 
-export type CornerMode = 'sharp' | 'bevel' | 'round'
+/** How a population's outline finishes. The first three are offset joins on the population's own hull;
+ *  `stadium` is not a join at all — it is the frame's box carried out to the largest circular radius
+ *  the lattice allows, which is why it needs the frame rather than the surviving magnets. */
+export type CornerMode = 'sharp' | 'bevel' | 'round' | 'stadium'
 
 export interface OutlineRecipe {
   corners: CornerMode
@@ -48,6 +51,13 @@ export interface ClassSpec {
   classId: LibraryFamily
   /** May the engine offer this class automatically, or only on request? */
   catalogueRole: CatalogueRole
+  /** Are portrait and landscape PUBLISHED AS SEPARATE RECORDS? Then the page offers no turn: the
+   *  orientation is part of what the record IS, and a control that turned one into the other would
+   *  offer a transform over an identity the record already fixed (Dan, 2026-08-30 for canon, and
+   *  2026-09-04 for the pill: "you reintroduced rotation which is not needed with portrait/landscape
+   *  in place already"). Canon has always worked this way; this states it as a fact of the class
+   *  rather than a consequence of its role, so a preset that publishes both orders is locked too. */
+  bothOrdersPublished: boolean
   types: readonly ClassType[]
   variants(typeId: string, pitchMM: number): readonly ClassVariant[]
   variantOf(sel: LibrarySelection, pitchMM: number): ClassVariant

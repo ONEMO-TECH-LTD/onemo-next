@@ -2,6 +2,7 @@ import { squareClass } from './square-class'
 import { rectangleClass } from './rectangle-class'
 import { diamondClass } from './diamond-class'
 import { triangleClass } from './triangle-class'
+import { pillClass } from './pill-class'
 import type { LibraryClass } from './class-contract'
 import type { LibraryFamily } from './types'
 
@@ -10,6 +11,7 @@ export const CLASS_SPECS = {
   rectangle: rectangleClass,
   diamond: diamondClass,
   triangle: triangleClass,
+  pill: pillClass,
 } as const satisfies Record<string, LibraryClass>
 
 type RegisteredClassId = keyof typeof CLASS_SPECS

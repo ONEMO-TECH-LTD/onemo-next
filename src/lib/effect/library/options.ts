@@ -207,11 +207,11 @@ export function panelOptionsResolved(
         id: v.id, label: v.label, accessibleLabel: v.accessibleLabel,
         active: v.id === variantId, next: selectVariant(sel, v),
       })),
-    // a class with no named views of its own, and no turn that changes the picture, offers none
-    // CANON IS LOCKED: a square or rectangle record's orientation is part of what it is, so the
-    // page offers no turn (Dan, 2026-08-30). Presets keep the transform row — for them a turn
-    // genuinely is a view of one record.
-    orientations: spec.catalogueRole === 'canon' ? []
+    // a class with no named views of its own, and no turn that changes the picture, offers none.
+    // A CLASS THAT PUBLISHES BOTH ORDERS IS LOCKED: the record's orientation is part of what it is,
+    // so the page offers no turn (Dan, 2026-08-30 canon, 2026-09-04 pill). A preset whose layouts
+    // are node subsets of one frame keeps the row — there a turn genuinely is a view of one record.
+    orientations: spec.bothOrdersPublished ? []
       : spec.orientations.length || orientations.length > 1 ? orientations : [],
     layouts: [
       ...frame.layouts.map((l) => ({

@@ -6,6 +6,7 @@ import type { LibraryFamily, LibraryFrame, LibrarySelection, LibraryTransform } 
 interface RegistryClassConfig {
   classId: LibraryFamily
   catalogueRole: CatalogueRole
+  bothOrdersPublished: boolean
   types: readonly ClassType[]
   frames(pitchMM: number): readonly LibraryFrame[]
   typeOfFrame(frame: LibraryFrame): string
@@ -58,6 +59,7 @@ export function registryClass(config: RegistryClassConfig): LibraryClass {
   const spec: ClassSpec = {
     classId: config.classId,
     catalogueRole: config.catalogueRole,
+    bothOrdersPublished: config.bothOrdersPublished,
     types: config.types,
     variants: (typeId, pitchMM) => {
       assertTypeId(config.classId, config.types, typeId)
