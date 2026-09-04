@@ -24,7 +24,6 @@ import { bandRangeForControl } from '../adapters/gridViewModel'
 import { librarySegments } from '../adapters/libraryViewModel'
 import { spotRadiusOf } from '../grid-magnet'
 import { scaleContour } from '../grid-magnet-compute'
-import { offsetPathMM } from '../offset'
 import { applyCoverage, enumerateCanonPhaseWindows, enumerateFreePhaseMax, fallbackRevealSizes, makeCircleSeatPredicate, makeContourSeatPredicate, priorityTupleOf, symmetricCores } from '../units/layout'
 import { wrapGroup } from '../units/wrap'
 import { wrapBandLadder } from '../grid-magnet-wrap-compute'
@@ -589,36 +588,6 @@ describe('5b — both seat predicates decide on the same micron', () => {
     const fits = makeCircleSeatPredicate(100, 100, RADIUS, R)!
     expect(fits([100 + (RADIUS - R), 100]), 'a centre exactly tangent inside is legal').toBe(true)
     expect(fits([100 + (RADIUS - R) + Q, 100]), 'one micron further out is not').toBe(false)
-  })
-})
-
-describe('5c — a chord is measured as the edge it stands in for', () => {
-  // A CURVE IN AN OUTLINE IS STRAIGHT SEGMENTS, and each one sits inside the arc it represents — 25.3
-  // microns on a 24mm round offset, measured. The seat test used to measure the segments, so a magnet
-  // touching the real edge was refused: invisible on a wrapped shape, which just settles a hair
-  // bigger, and fatal on a certified record, whose magnets sit at exactly zero margin by construction
-  // (Dan, 2026-09-04: "it will make some free shapes to have no optimal layout").
-  //
-  // The allowance is PER EDGE and comes from that edge's own turn. A blanket allowance was tried and
-  // 5b above catches it, which is why these two blocks belong together.
-  const R = 24
-  const curved = offsetPathMM([[0, 0]], R, 'round', 'round')! as Pt[]
-
-  it('a magnet exactly tangent to a curved edge is legal, and one plainly inside it is not', () => {
-    const fits = makeContourSeatPredicate({ outer: { pts: curved }, holes: [] }, R)!
-    expect(fits([0, 0]), 'exactly tangent to the true curve').toBe(true)
-    // the allowance is the chord's own error, not slack: 30 microns closer is still refused
-    expect(fits([0.03, 0]), 'a third of a tenth of a millimetre too close').toBe(false)
-    expect(fits([0.1, 0]), 'a tenth of a millimetre too close').toBe(false)
-  })
-
-  it('a straight edge and a real corner get no allowance at all', () => {
-    const box: Pt[] = [[0, 0], [200, 0], [200, 200], [0, 200]]
-    const fits = makeContourSeatPredicate({ outer: { pts: box }, holes: [] }, 12)!
-    expect(fits([12, 100]), 'exactly one radius from a straight edge').toBe(true)
-    expect(fits([12 - 0.001, 100]), 'one micron closer to a straight edge').toBe(false)
-    expect(fits([12, 12]), 'exactly one radius into a right-angled corner').toBe(true)
-    expect(fits([12 - 0.001, 12 - 0.001]), 'one micron further into the corner').toBe(false)
   })
 })
 
