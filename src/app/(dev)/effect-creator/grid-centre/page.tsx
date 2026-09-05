@@ -18,15 +18,16 @@ import {
 } from '@/lib/effect/library'
 import { getShape, hasVectorDef, type VectorShapeKind } from '@/lib/shape-library'
 import { type VShape } from '@/lib/vector-core'
-import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
+import { type ShapeKind } from '../v5.3.1/user/shapes'
+import { vecFromGenerator } from '../v5.3.1/user/editor/producers'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt, UnprotectedEvidence } from '@/lib/effect/types'
 import type { GridResult, MagnetPlan, SafeSegment } from '@/lib/effect/types'
-import { bandRangeForControl, type GridPageModel } from '@/lib/effect/adapters/gridViewModel'
+import { bandRangeForControl, outlineSvgD, svgDOf, type GridPageModel } from '@/lib/effect/adapters/gridViewModel'
 import { librarySegments as librarySegmentsOf } from '@/lib/effect/adapters/libraryViewModel'
 import { createPerfLog, type PerfRow } from './perf-log'
 import { BANDS, CENTRE_MODE, DEFAULT_PITCH_MM, GOVERNOR, PADDING_CEIL_MM, PADDING_FLOOR_MM, PROTECTION_PADDING_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-magnet-spec'
-import { fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-magnet-bridge'
+import { fieldSpots, normBaseContour, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-magnet-bridge'
 
 /** Bench test libraries — static assets, listed by a committed manifest. */
 const LIB_MANIFEST = '/grid-engine/library.json'
@@ -308,12 +309,13 @@ export default function GridLab() {
       if (src === 'preset' && hasVectorDef(preset)) {
         return normBaseContour(getShape(preset, IMG, IMG, { sides, points }), IMG)
       }
-      const params = gen === 'blob' ? { kind: gen, waviness: p1, seed: p2 }
-        : gen === 'form' ? { kind: gen, pinch: p1, lobes: p2 }
-          : gen === 'daisy' ? { kind: gen, depth: p1, petals: p2 }
-            : { kind: gen, swirl: p1, blades: p2 }
-      const ring = generateShapeRing(params as Parameters<typeof generateShapeRing>[0], IMG, IMG)
-      return normGeneratedRing(ring, IMG)
+      const params = gen === 'blob' ? { waviness: p1, seed: p2 }
+        : gen === 'form' ? { pinch: p1, lobes: p2 }
+          : gen === 'daisy' ? { depth: p1, petals: p2 }
+            : { swirl: p1, blades: p2 }
+      // The Studio's own generator: its ring is fitted ONCE into a vector at generation, so a
+      // generated shape is a curve like every preset — the bench used to take the raw ring.
+      return normBaseContour(vecFromGenerator(gen, params, { widthPx: IMG, heightPx: IMG }), IMG)
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
     finally { genMsRef.current = performance.now() - t0 }
   }, [src, preset, gen, p1, p2, sides, points, magic, cutC])
@@ -771,7 +773,7 @@ function Stage({ contour, grid, lattice, box, segments, segFill, unprotected, on
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   for (const [x, y] of pts) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y }
   const w = maxX - minX, h = maxY - minY, S = (VP * FIT) / Math.max(w, h)
-  const d = 'M ' + pts.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(' L ') + ' Z'
+  const d = outlineSvgD(contour)
   const fy = (p: Pt): Pt => [p[0], -p[1]]
   const seat = new Set(grid.anchors.map(a => a.p[0].toFixed(2) + ',' + a.p[1].toFixed(2)))
 
@@ -935,18 +937,17 @@ function Stage({ contour, grid, lattice, box, segments, segFill, unprotected, on
         const hue = SEG_HUES[si % SEG_HUES.length]
         const fs = 11 * spanMM / VP
         return <g key={'sg' + si} style={{ pointerEvents: 'none' }}>
-          {sg.rings.map((ring, ri) => {
-            const d = 'M ' + ring.map(([x, y]) => `${x.toFixed(2)} ${(-y).toFixed(2)}`).join(' L ') + ' Z'
-            return <path key={ri} d={d} fill={hue} fillOpacity={segFill ? 0.12 : 0} stroke={hue} strokeOpacity={0.85}
+          {/* the island's outline as a curve — exact where the engine has a closed form, fitted through the exact edge otherwise */}
+          {sg.paths.map((path, ri) => (
+            <path key={ri} d={svgDOf(path)} fill={hue} fillOpacity={segFill ? 0.12 : 0} stroke={hue} strokeOpacity={0.85}
               strokeWidth={1.2} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-          })}
+          ))}
           {/* Depth masses: the regions surviving the mass-depth probe, each with its own centre. */}
           {sg.masses.map((m, mi) => <g key={'m' + mi}>
-            {m.rings.map((ring, ri) => {
-              const d = 'M ' + ring.map(([x, y]) => `${x.toFixed(2)} ${(-y).toFixed(2)}`).join(' L ') + ' Z'
-              return <path key={ri} d={d} fill={hue} fillOpacity={segFill ? 0.10 : 0} stroke={hue} strokeOpacity={0.6}
+            {m.paths.map((path, ri) => (
+              <path key={ri} d={svgDOf(path)} fill={hue} fillOpacity={segFill ? 0.10 : 0} stroke={hue} strokeOpacity={0.6}
                 strokeWidth={0.9} strokeDasharray="3 3" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-            })}
+            ))}
             <circle cx={m.centreMM[0]} cy={-m.centreMM[1]} r={fs * 0.35} fill={hue} />
           </g>)}
         </g>
@@ -1013,9 +1014,8 @@ function Stage({ contour, grid, lattice, box, segments, segFill, unprotected, on
           <text {...lbl} x={lX + fs * 0.6} y={my} textAnchor="middle" transform={`rotate(90 ${lX + fs * 0.6} ${my})`}>{hTxt}</text>
         </g>)
       })()}
-      {unprotected && unprotected.ringsMM.length > 0 && <path style={{ pointerEvents: 'none' }}
-        d={unprotected.ringsMM.map((ring) =>
-          'M ' + ring.map(([x, y]) => `${x.toFixed(2)} ${(-y).toFixed(2)}`).join(' L ') + ' Z').join(' ')}
+      {unprotected && unprotected.pathsMM.length > 0 && <path style={{ pointerEvents: 'none' }}
+        d={unprotected.pathsMM.map((path) => svgDOf(path)).join(' ')}
         fill="url(#gl-unheld)" stroke="var(--warn, #e0762f)" strokeOpacity={0.65}
         fillRule="evenodd" clipRule="evenodd" strokeWidth={1} vectorEffect="non-scaling-stroke" />}
       {unprotected?.patches.map((patch, index) => patch.witnessMM && <circle key={'patch' + index}

@@ -5,7 +5,8 @@ import { contourFromShape, shapeLongestPx } from './geometry-truth'
 import { traceContourRaw } from './contour'
 import { insetRingMM } from './offset'
 import { scaleContour } from './grid-magnet-compute'
-import type { VShape } from '@/lib/vector-core'
+import { flattenPath, ringToVPath, type VPath, type VShape } from '@/lib/vector-core'
+import { validateSelfIntersection, type Vec2Px } from '@/lib/outline-core/math'
 import type { Contour, Pt } from './types'
 import {
   fieldSpanMM,
@@ -18,12 +19,6 @@ import {
 /** Flatten reference: curves are flattened as if cut at this size, THEN normalized, so the 0.05mm
  *  manufacturing tolerance holds at every slider size. */
 const FLATTEN_REF_MM = 250
-
-function bboxOf(pts: ReadonlyArray<{ x: number; y: number }>) {
-  let a = Infinity, b = Infinity, c = -Infinity, d = -Infinity
-  for (const p of pts) { if (p.x < a) a = p.x; if (p.x > c) c = p.x; if (p.y < b) b = p.y; if (p.y > d) d = p.y }
-  return { w: c - a, h: d - b }
-}
 
 /** VShape → mm contour normalized so its longest side = 1mm. The longest side is read from the shape's
  *  EXACT path bounds — an arc or a cubic reaches its extreme exactly — where it used to be read from a
@@ -75,30 +70,44 @@ export function contourCacheKey(base: Contour, offsetMM: number): string {
   ])
 }
 
-/** Finished-cutout path: alpha mask (image px, y-down) → traced outline → base contour
- *  normalized to longest side = 1mm, y-up. No AI — the outline IS the mask's edge. */
+/** How far the fitted edge of a finished cutout may sit from its traced pixel edge, in image pixels —
+ *  the trace itself is a half-pixel staircase, so this is the staircase's own grain. */
+const CUTOUT_FIT_PX = 1.5
+/** The turn that makes a traced vertex a real corner, not a curve sample. A mask's silhouette has
+ *  genuine cusps — a duck's tuft, a bat's ear — and fitting a smooth cycle straight through one makes
+ *  the curve overshoot and cross itself. */
+const CUTOUT_CORNER_DEG = 60
+
+/** Finished-cutout path: alpha mask (image px, y-down) → traced edge → the repo's Bézier fit (the
+ *  Schneider fit the Studio's Simplify and its generators both use) → a vector shape through the same
+ *  door every preset takes. No AI — the outline IS the mask's edge, as a curve. It used to hand the
+ *  engine the traced points themselves, so a cutout was the one shape drawn and measured as a polygon
+ *  (Dan, 2026-09-05: "no polygons on canon and anywhere").
+ *
+ *  A FIT THAT CROSSES ITSELF IS REFUSED. An outline is the boundary between material and air, and
+ *  every measurement downstream — is this point inside, how far is the edge, where is the legal area —
+ *  reads it by crossing count. A self-crossing curve makes regions OUTSIDE the shape read as inside:
+ *  the duck grew a phantom island beyond its own bounding box and the engine centred the layout on it.
+ *  So the fit is validated, tightened once if it folds, and refused to the traced polygon if it still
+ *  does — a polygon outline is worse to look at, never wrong to measure. */
 export function normMaskContour(mask: Uint8Array, w: number, h: number): Contour | null {
   const raw = traceContourRaw(mask, w, h)
   if (!raw || raw.length < 3) return null
-  // A raw half-pixel trace carries thousands of points; the engine's cost scales with them.
-  // Decimate to the same order the AI path's flatten produces — sub-0.2mm fidelity at product
-  // sizes, ~10x cheaper solves.
+  // A raw half-pixel trace carries thousands of points; the fit's cost scales with them, and ~600
+  // samples pin a curve at any cutout size (the Studio's own budget).
   const MAXV = 600
   const k = Math.max(1, Math.ceil(raw.length / MAXV))
-  const ring: typeof raw = []
-  for (let i = 0; i < raw.length; i += k) ring.push(raw[i])
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-  for (const [x, y] of ring) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y }
-  const L = Math.max(maxX - minX, maxY - minY, 1)
-  return { outer: { pts: ring.map(([x, y]) => [(x - minX) / L, (maxY - y) / L] as Pt) }, holes: [] }
-}
-
-/** Generated polygon ring (image px, y-down) → mm contour normalized to 1mm, y-up. */
-export function normGeneratedRing(ring: ReadonlyArray<readonly [number, number]>, imgH: number): Contour | null {
-  if (ring.length < 3) return null
-  const bb = bboxOf(ring.map(([x, y]) => ({ x, y })))
-  const L = Math.max(bb.w, bb.h, 1)
-  return { outer: { pts: ring.map(([x, y]) => [x / L, (imgH - y) / L] as Pt) }, holes: [] }
+  const ring: Array<{ x: number; y: number }> = []
+  for (let i = 0; i < raw.length; i += k) ring.push({ x: raw[i][0], y: raw[i][1] })
+  const simple = (path: VPath): boolean => {
+    const flat = flattenPath(path, 0.25).map(({ x, y }) => [x, y] as Vec2Px)
+    return validateSelfIntersection(flat, 'cutout').length === 0
+  }
+  for (const tol of [CUTOUT_FIT_PX, CUTOUT_FIT_PX / 4]) {
+    const path = ringToVPath(ring, CUTOUT_CORNER_DEG, tol)
+    if (simple(path)) return normBaseContour({ paths: [path] }, h)
+  }
+  return normBaseContour({ paths: [{ anchors: ring.map((p) => ({ p, hIn: null, hOut: null, corner: true })) }] }, h)
 }
 
 /** The size range a surface may offer — the fixed board plus a margin so shapes can pad past it. */

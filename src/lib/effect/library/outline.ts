@@ -1,6 +1,6 @@
 import { RELEASED_PADDING_MM } from '../grid-magnet-spec'
 import { MANUFACTURING_OFFSET_ARC_TOLERANCE_MM, offsetPathMM } from '../offset'
-import { flattenPath, offsetConvexRingPath, pathBoundsMM, type OutlinePath } from '../foundation/path'
+import { flattenPath, offsetConvexRingPath, pathBoundsMM, pathFromAnchors, type OutlinePath } from '../foundation/path'
 import type { OutlineRecipe } from './class-contract'
 import { boundsMM, convexHull, rotateAround } from './geometry'
 import type { PointMM } from './types'
@@ -81,5 +81,6 @@ export function outlineFromLayout(nodesMM: readonly PointMM[], recipe: OutlineRe
   const raw = offsetPathMM(hull.map(([x, y]) => [x, y]), RELEASED_PADDING_MM, recipe.corners, end)
   if (!raw) throw new Error('library: population has no outline')
   const pts = hull.length === 1 && recipe.pointRotationDeg ? rotateAround(raw, hull[0], recipe.pointRotationDeg) : raw
-  return sized(pts)
+  // a polygon is a path of lines — carried as one, so its legal area can be built exactly from it
+  return sized(pts, pathFromAnchors(pts.map(([x, y]) => ({ p: { x, y } })), (v) => [v.x, v.y]))
 }

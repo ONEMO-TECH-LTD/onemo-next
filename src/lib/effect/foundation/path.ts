@@ -18,6 +18,7 @@
 // is a VIEW produced on demand from the path, never the source, and nothing measures against it.
 
 import type { Pt } from '../types'
+import { ringToVPath } from '@/lib/vector-core/fit'
 
 /** A step along the path, from the previous point to `to`.
  *
@@ -242,16 +243,119 @@ function cubicExtremaT(a: number, c1: number, c2: number, b: number): number[] {
   return out.filter((t) => t > 0 && t < 1)
 }
 
-/** EXACT distance from a point to the outline. No tolerance, no sampling. */
+/** A segment's bounding box — an arc's from its own extremes, a cubic's from its control net (which
+ *  contains the curve). Cheap, and only ever used to SKIP work: a segment whose box is already further
+ *  than the best distance found cannot hold the nearest point. */
+function segBox(from: Pt, seg: PathSeg): { minX: number; minY: number; maxX: number; maxY: number } {
+  if (seg.kind === 'cubic') return {
+    minX: Math.min(from[0], seg.c1[0], seg.c2[0], seg.to[0]), maxX: Math.max(from[0], seg.c1[0], seg.c2[0], seg.to[0]),
+    minY: Math.min(from[1], seg.c1[1], seg.c2[1], seg.to[1]), maxY: Math.max(from[1], seg.c1[1], seg.c2[1], seg.to[1]),
+  }
+  if (seg.kind === 'line') return {
+    minX: Math.min(from[0], seg.to[0]), maxX: Math.max(from[0], seg.to[0]),
+    minY: Math.min(from[1], seg.to[1]), maxY: Math.max(from[1], seg.to[1]),
+  }
+  const r = radiusOf(seg.centre, from)
+  const box = { minX: Math.min(from[0], seg.to[0]), maxX: Math.max(from[0], seg.to[0]), minY: Math.min(from[1], seg.to[1]), maxY: Math.max(from[1], seg.to[1]) }
+  for (let q = 0; q < 4; q++) {
+    const a = q * Math.PI / 2
+    if (!withinSweep(seg.centre, from, seg.to, seg.ccw, a)) continue
+    const x = seg.centre[0] + r * Math.cos(a), y = seg.centre[1] + r * Math.sin(a)
+    if (x < box.minX) box.minX = x; if (x > box.maxX) box.maxX = x
+    if (y < box.minY) box.minY = y; if (y > box.maxY) box.maxY = y
+  }
+  return box
+}
+
+/** SQUARED distance from a point to a box — zero inside it. A lower bound on the distance to anything
+ *  in it, and squared so a query never pays for a square root it only compares. */
+const box2 = (p: Pt, b: { minX: number; minY: number; maxX: number; maxY: number }): number => {
+  const dx = Math.max(b.minX - p[0], 0, p[0] - b.maxX), dy = Math.max(b.minY - p[1], 0, p[1] - b.maxY)
+  return dx * dx + dy * dy
+}
+
+/** Split a cubic at t — de Casteljau, exact: the two halves ARE the curve, not an approximation. */
+function splitCubic(c: Cubic, t: number): [Cubic, Cubic] {
+  const m = (p: Pt, q: Pt): Pt => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]
+  const ab = m(c.a, c.c1), bc = m(c.c1, c.c2), cd = m(c.c2, c.b)
+  const abbc = m(ab, bc), bccd = m(bc, cd), mid = m(abbc, bccd)
+  return [{ a: c.a, c1: ab, c2: abbc, b: mid }, { a: mid, c1: bccd, c2: cd, b: c.b }]
+}
+
+type Piece = { box: { minX: number; minY: number; maxX: number; maxY: number } } & (
+  | { kind: 'line'; from: Pt; to: Pt }
+  | { kind: 'arc'; from: Pt; seg: Extract<PathSeg, { kind: 'arc' }> }
+  | { kind: 'cubic'; c: Cubic })
+
+/** A path prepared for distance queries, computed ONCE. Two things happen here, both for speed only:
+ *  every piece's bounding box is built up front (a solve asks the same outline for millions of
+ *  distances), and every cubic is split into four — exactly, by de Casteljau — so that a query's
+ *  bound rules out most of the curve before paying for a single quintic root isolation. The answer is
+ *  identical either way; only the number of exact solves changes. Keyed on the path object, so a
+ *  rebuilt path is a different entry and nothing can go stale. */
+const prepared = new WeakMap<OutlinePath, Piece[]>()
+const cubicBox = (c: Cubic) => ({
+  minX: Math.min(c.a[0], c.c1[0], c.c2[0], c.b[0]), maxX: Math.max(c.a[0], c.c1[0], c.c2[0], c.b[0]),
+  minY: Math.min(c.a[1], c.c1[1], c.c2[1], c.b[1]), maxY: Math.max(c.a[1], c.c1[1], c.c2[1], c.b[1]),
+})
+function piecesOf(path: OutlinePath): Piece[] {
+  let w = prepared.get(path)
+  if (!w) {
+    w = []
+    eachSeg(path, (from, seg) => {
+      if (seg.kind === 'line') { w!.push({ kind: 'line', from, to: seg.to, box: segBox(from, seg) }); return }
+      if (seg.kind === 'arc') { w!.push({ kind: 'arc', from, seg, box: segBox(from, seg) }); return }
+      const [h1, h2] = splitCubic(cubicOf(from, seg), 0.5)
+      for (const half of [h1, h2]) for (const q of splitCubic(half, 0.5)) w!.push({ kind: 'cubic', c: q, box: cubicBox(q) })
+    })
+    prepared.set(path, w)
+  }
+  return w
+}
+
+/** EXACT distance from a point to the outline. No tolerance, no sampling.
+ *
+ *  Every segment is still measured exactly; a segment is only SKIPPED when its bounding box is
+ *  already further away than the best exact distance found so far, which no point inside it can beat.
+ *  On a traced cutout — dozens of cubics, each costing a quintic root isolation — this is the
+ *  difference between a solve in seconds and one in minutes, and it cannot change an answer. */
 export function distanceToPathMM(path: OutlinePath, p: Pt): number {
-  let best = Infinity
-  eachSeg(path, (from, seg) => {
-    const d = seg.kind === 'line' ? distToSegment(p, from, seg.to)
-      : seg.kind === 'arc' ? distToArc(p, from, seg)
-      : distToCubic(p, cubicOf(from, seg))
-    if (d < best) best = d
-  })
-  return best
+  const pieces = piecesOf(path)
+  // A bound to prune against, from points that are ON the path: every piece's own ends. Cheap, and it
+  // is a true upper bound on the answer, so it can never exclude the real nearest point.
+  let best2 = Infinity
+  for (const q of pieces) {
+    const e = q.kind === 'cubic' ? q.c.b : q.kind === 'line' ? q.to : q.seg.to
+    const dx = e[0] - p[0], dy = e[1] - p[1]
+    const d2 = dx * dx + dy * dy
+    if (d2 < best2) best2 = d2
+  }
+  // straight and circular pieces next: exact and cheap, and they tighten the bound further
+  for (const q of pieces) {
+    if (q.kind === 'cubic' || box2(p, q.box) >= best2) continue
+    const d = q.kind === 'line' ? distToSegment(p, q.from, q.to) : distToArc(p, q.from, q.seg)
+    if (d * d < best2) best2 = d * d
+  }
+  // Curved pieces, NEAREST BOX FIRST. Each exact solve tightens the bound for the rest, and starting
+  // with the piece whose box is closest usually makes that bound final — so the remaining boxes are
+  // all further away and no more quintics are solved. Order changes nothing but the count of solves.
+  let nearest = -1, nearestBox = Infinity
+  for (let i = 0; i < pieces.length; i++) {
+    if (pieces[i].kind !== 'cubic') continue
+    const b = box2(p, pieces[i].box)
+    if (b < nearestBox) { nearestBox = b; nearest = i }
+  }
+  if (nearest >= 0 && nearestBox < best2) {
+    const d = distToCubic(p, (pieces[nearest] as Extract<Piece, { kind: 'cubic' }>).c)
+    if (d * d < best2) best2 = d * d
+  }
+  for (let i = 0; i < pieces.length; i++) {
+    const q = pieces[i]
+    if (i === nearest || q.kind !== 'cubic' || box2(p, q.box) >= best2) continue
+    const d = distToCubic(p, q.c)
+    if (d * d < best2) best2 = d * d
+  }
+  return Math.sqrt(best2)
 }
 
 /** Inside test by ray casting, with arcs crossed analytically rather than through their chords: the
@@ -263,9 +367,22 @@ export function distanceToPathMM(path: OutlinePath, p: Pt): number {
  *  whose end sits on the ray counts only if it arrived from above. An arc's direction at the hit says
  *  the same thing: dy/dθ is r·cos θ, signed by which way it turns. Tangent, where that is zero, is a
  *  touch and not a crossing. Without this a magnet centre in a pill read as OUTSIDE its own shape,
- *  because the cap's arc ended on the ray at the very point the straight side left it. */
+ *  because the cap's arc ended on the ray at the very point the straight side left it.
+ *
+ *  THE RAY IS NUDGED OFF EVERY EXACT COINCIDENCE. Those rules are exact in real arithmetic and a
+ *  coin-toss in floating point whenever the ray runs exactly through a vertex, a join, or a curve's
+ *  own extreme — which is not a rare accident but the common case, because a mesh is laid out FROM
+ *  the shape's bounding box and its first row therefore sits precisely on the lowest point. Getting
+ *  it wrong there flips parity for the whole row: a traced duck grew a legal island 2mm outside
+ *  itself and the engine centred the layout on it (Dan, 2026-09-05). Lifting the scan line by a
+ *  billionth of the shape's own height — far below any manufacturing scale, far above float noise —
+ *  removes every coincidence at once, and cannot change which side of an edge a real point is on. */
 export function pointInPath(path: OutlinePath, p: Pt): boolean {
   const NEAR = 1e-9
+  const b = pathBoundsMM(path)
+  const span = Math.max(b.maxY - b.minY, b.maxX - b.minX)
+  const y = p[1] + (span > 0 ? span * 1e-9 : 1e-12)
+  p = [p[0], y]
   let crossings = 0
   eachSeg(path, (from, seg) => {
     if (seg.kind === 'line') {
@@ -278,15 +395,32 @@ export function pointInPath(path: OutlinePath, p: Pt): boolean {
     }
     if (seg.kind === 'cubic') {
       // the ray meets the curve where B_y(t) = p[1]; each root is a crossing if it is to the right,
-      // with the same half-open rule via the curve's direction there
+      // with the same half-open rule via the curve's direction there.
+      // A curve whose control net lies wholly above, below, or left of the ray cannot meet it to the
+      // right — the net contains the curve — so it is skipped before paying for a root isolation.
       const c = cubicOf(from, seg)
+      const loY = Math.min(c.a[1], c.c1[1], c.c2[1], c.b[1]), hiY = Math.max(c.a[1], c.c1[1], c.c2[1], c.b[1])
+      if (p[1] < loY - NEAR || p[1] > hiY + NEAR) return
+      if (Math.max(c.a[0], c.c1[0], c.c2[0], c.b[0]) <= p[0]) return
       for (const t of cubicRootsY(c, p[1])) {
         const x = bez(c.a[0], c.c1[0], c.c2[0], c.b[0], t)
         if (x <= p[0]) continue
         const rise = bezD(c.a[1], c.c1[1], c.c2[1], c.b[1], t)
-        if (Math.abs(rise) < NEAR) continue
         if (t < NEAR) { if (rise > 0) crossings++; continue }
         if (t > 1 - NEAR) { if (rise < 0) crossings++; continue }
+        // A TOUCH IS NOT A CROSSING. Where the ray runs through a curve's own extreme — the lowest
+        // point of a shape, say — the root is DOUBLE: the curve reaches the line and turns back
+        // without passing through. The derivative is zero there in theory and merely tiny in
+        // arithmetic, so testing it decided parity on rounding, and a scan line grazing a traced
+        // cutout's lowest point made everything to its left read as INSIDE — a phantom legal island
+        // outside the shape, which the engine then centred a layout on (Dan, 2026-09-05, the duck).
+        // The sign of the curve either side of the root cannot be fooled that way: it changes on a
+        // real crossing and does not on a touch.
+        const yOff = (u: number) => bez(c.a[1], c.c1[1], c.c2[1], c.b[1], u) - p[1]
+        const h = 1e-6
+        const before = yOff(Math.max(0, t - h)), after = yOff(Math.min(1, t + h))
+        if (before === 0 || after === 0) { if (Math.abs(rise) >= NEAR) crossings++; continue }
+        if (before * after > 0) continue
         crossings++
       }
       return
@@ -565,4 +699,114 @@ export function pathAreaCentroidMM(path: OutlinePath): { areaMM2: number; centro
     return { areaMM2, centroid: [(b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2] }
   }
   return { areaMM2, centroid: [mx / (2 * areaMM2), -my / (2 * areaMM2)] }
+}
+
+/** THE PATH AS SVG — arcs as `A`, cubics as `C`, lines as `L`. The screen draws the true curve; it
+ *  does not draw a polygon of it (Dan, 2026-09-05: "why is the pill outline on the zoom look uneven
+ *  and wobbly like the polygon" — because the shell was still drawing the flattened view). `flipY`
+ *  mirrors the engine's y-up millimetres onto the screen's y-down: the picture is the same picture,
+ *  so an arc that turns counter-clockwise still turns counter-clockwise on screen, which in SVG's
+ *  y-down convention is sweep-flag 0. */
+export function pathToSvgD(path: OutlinePath, opts: { flipY?: boolean; precision?: number } = {}): string {
+  const flip = opts.flipY ? -1 : 1
+  const f = (v: number) => v.toFixed(opts.precision ?? 4)
+  const P = (p: Pt) => `${f(p[0])} ${f(p[1] * flip)}`
+  let d = `M ${P(path.start)}`
+  eachSeg(path, (from, seg) => {
+    if (seg.kind === 'line') { d += ` L ${P(seg.to)}`; return }
+    if (seg.kind === 'cubic') { d += ` C ${P(seg.c1)} ${P(seg.c2)} ${P(seg.to)}`; return }
+    const r = radiusOf(seg.centre, from)
+    const sweep = sweepOf(seg.centre, from, seg.to, seg.ccw)
+    // SVG draws sweep-flag 1 in its positive-angle direction, which on a y-down screen is clockwise.
+    // A ccw arc in y-up mm is ccw on screen either way (the flip mirrors the whole picture), so its
+    // flag is 0 when flipped and 1 when not.
+    const sweepFlag = (seg.ccw ? 1 : 0) ^ (opts.flipY ? 1 : 0)
+    const largeArc = sweep > Math.PI ? 1 : 0
+    d += ` A ${f(r)} ${f(r)} 0 ${largeArc} ${sweepFlag} ${P(seg.to)}`
+  })
+  return d + ' Z'
+}
+
+/** THE INWARD OFFSET OF AN OFFSET — exact, for the paths this product makes. Every canon outline is a
+ *  convex ring grown by the rim: lines joined by arcs of one radius R about the ring's vertices. Its
+ *  legal area — where a magnet centre may sit — is that same construction with radius R − rim about
+ *  the same centres, and when R − rim reaches zero the arcs vanish and the legal area IS the ring of
+ *  centres, a true polygon with truly straight sides. The segment unit drew this from a 2mm marching
+ *  mesh pulled onto the field, which at zoom read as facets (Dan, 2026-09-05: "every line in the
+ *  engine now wobbly"). Null for a path with a cubic in it or with arcs of unequal radius — there is
+ *  no exact inset for those yet, and the caller keeps its mesh. */
+export function insetOffsetPath(path: OutlinePath, insetMM: number): OutlinePath | null {
+  const centres: Pt[] = []
+  let radius: number | null = null
+  let ok = true
+  eachSeg(path, (from, seg) => {
+    if (seg.kind === 'cubic') { ok = false; return }
+    if (seg.kind !== 'arc') return
+    const r = radiusOf(seg.centre, from)
+    if (radius === null) radius = r
+    else if (Math.abs(r - radius) > 1e-9) ok = false
+    if (!centres.some((c) => Math.hypot(c[0] - seg.centre[0], c[1] - seg.centre[1]) < 1e-9)) centres.push(seg.centre)
+  })
+  if (!ok) return null
+  if (radius === null) return insetConvexPolygonPath(path, insetMM)
+  if (!centres.length) return null
+  const inner = radius - insetMM
+  if (inner > 1e-9) return offsetConvexRingPath(centres, inner)
+  if (centres.length === 1) return null            // a single disc shrunk past its centre: no area
+  const ring = centres.length === 2 ? centres : centres
+  return { start: ring[0], segs: [...ring.slice(1).map((p): PathSeg => ({ kind: 'line', to: p })), { kind: 'line', to: ring[0] }] }
+}
+
+/** The inset of an all-line CONVEX polygon — a square, a rectangle, a triangle, a diamond — is the
+ *  polygon whose sides are the same lines moved inward: exact, and truly straight. Each new vertex is
+ *  where two moved sides meet. Null for a concave polygon (its inset trims itself and is not this
+ *  construction) or one shrunk past existence. */
+function insetConvexPolygonPath(path: OutlinePath, insetMM: number): OutlinePath | null {
+  const verts: Pt[] = [path.start]
+  for (const seg of path.segs) if (seg.kind === 'line') verts.push(seg.to)
+  if (Math.hypot(verts[0][0] - verts[verts.length - 1][0], verts[0][1] - verts[verts.length - 1][1]) < 1e-9) verts.pop()
+  const n = verts.length
+  if (n < 3) return null
+  const ccw = signedArea(verts) >= 0 ? verts : [...verts].reverse()
+  // convex: every turn goes the same way
+  for (let i = 0; i < n; i++) {
+    const a = ccw[i], b = ccw[(i + 1) % n], c = ccw[(i + 2) % n]
+    if ((b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]) < -1e-9) return null
+  }
+  // side i runs a->b; its inward normal (for a counter-clockwise ring) is (-dy, dx)
+  const moved = ccw.map((a, i) => {
+    const b = ccw[(i + 1) % n]
+    const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy)
+    const nx = -dy / len * insetMM, ny = dx / len * insetMM
+    return { p: [a[0] + nx, a[1] + ny] as Pt, d: [dx, dy] as Pt }
+  })
+  const out: Pt[] = []
+  for (let i = 0; i < n; i++) {
+    const A = moved[(i - 1 + n) % n], B = moved[i]     // the vertex between side i-1 and side i
+    const det = A.d[0] * B.d[1] - A.d[1] * B.d[0]
+    if (Math.abs(det) < 1e-12) return null
+    const t = ((B.p[0] - A.p[0]) * B.d[1] - (B.p[1] - A.p[1]) * B.d[0]) / det
+    out.push([A.p[0] + A.d[0] * t, A.p[1] + A.d[1] * t])
+  }
+  // shrunk past existence: a moved side that now runs backwards has crossed its opposite
+  for (let i = 0; i < n; i++) {
+    const a = out[i], b = out[(i + 1) % n]
+    if ((b[0] - a[0]) * moved[i].d[0] + (b[1] - a[1]) * moved[i].d[1] <= 1e-9) return null
+  }
+  return { start: out[0], segs: [...out.slice(1).map((p): PathSeg => ({ kind: 'line', to: p })), { kind: 'line', to: out[0] }] }
+}
+
+/** A CURVE THROUGH EXACT SAMPLES. Where an outline exists only as points that were each placed ON a
+ *  true curve — the legal area's edge pulled onto the exact clearance field, a cutout's traced edge —
+ *  this fits smooth cubic chains through them within `tolMM`, true corners kept as corners. It is the
+ *  Studio's own fit (the Schneider fit behind its Simplify and its generators), so a curve the engine
+ *  draws and a curve the Studio draws are the same kind of curve. It is not a conversion of chords:
+ *  the samples are on the curve and the fit is bounded to them, never to the chords between them
+ *  (Dan, 2026-09-05: "if you convert polygon into the path it will be dirty"). */
+export function pathFromRingFit(ring: readonly Pt[], tolMM: number, cornerDeg = 60): OutlinePath {
+  if (ring.length < 3) throw new Error('path: a fit needs at least three samples')
+  const fitted = ringToVPath(ring.map(([x, y]) => ({ x, y })), cornerDeg, tolMM)
+  // a sliver too small to hold a curve between its corners fits to nothing: it IS its corners
+  const anchors = fitted.anchors.length >= 2 ? fitted.anchors : ring.map(([x, y]) => ({ p: { x, y } }))
+  return pathFromAnchors(anchors, (v) => [v.x, v.y])
 }

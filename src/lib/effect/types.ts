@@ -19,6 +19,8 @@ export interface SafeMass {
   peakClearMM: number
   bbox: BBox
   rings: Pt[][]
+  /** The mass's outline as the screen draws it — a curve, see SafeSegment.paths. */
+  paths: OutlinePath[]
 }
 
 /** One connected island of the legal magnet-centre area, measured on a mesh. */
@@ -31,8 +33,14 @@ export interface SafeSegment {
   /** The island's peak clearance, mm — how deep its most buried point sits. */
   peakClearMM: number
   bbox: BBox
-  /** The island's edge-offset outline(s) — smooth closed rings, mm, engine y-up. */
+  /** The island's edge samples — points placed ON the exact clearance curve, mm, engine y-up. The
+   *  measurement's evidence, and what `paths` is fitted through. Never drawn: chords are not the edge. */
   rings: Pt[][]
+  /** The island's outline as the screen draws it — one curve per ring. EXACT where a closed form
+   *  exists (a canon outline's legal area is its own construction shrunk by the rim: lines and arcs, or
+   *  a convex polygon's moved sides); elsewhere a smooth cubic fit through the exact samples, within
+   *  0.01mm of every one. Empty at 'light' detail, which measures and never draws. */
+  paths: OutlinePath[]
   /** Sub-masses at the depth probe: limbs and slivers die shallow, true masses survive. */
   masses: SafeMass[]
 }
@@ -316,6 +324,9 @@ export interface UnsupportedBoundaryInterval {
 
 export interface UnprotectedEvidence {
   ringsMM: Pt[][]
+  /** The unprotected regions as the screen draws them — smooth curves fitted through the measured
+   *  region boundary, in place of Clipper's 72-gon discs and chords. */
+  pathsMM: OutlinePath[]
   materialAreaMM2: number
   areaMM2: number
   percent: number

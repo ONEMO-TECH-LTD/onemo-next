@@ -15,7 +15,7 @@ import ts from 'typescript'
 import { describe, expect, it, vi } from 'vitest'
 import { bandOuterMM, classifyBands, computeGrid } from '../grid-magnet'
 import { canonLayoutForFrame, optimalLayoutForBox } from '../grid-magnet-library-catalogue'
-import { solveCanonExperiment } from '../grid-magnet-canon-experiment'
+import { slimOnAxisMM, solveCanonExperiment } from '../grid-magnet-canon-experiment'
 import { anchorFnFor, solveGrid } from '../pipeline/solve'
 import { canonPriorityOf, frameOfMasses, positionsAcross } from '../units/classifier'
 import type { BBox, SafeMass, SafeSegment } from '../types'
@@ -186,7 +186,11 @@ describe('2 — traffic is one-way', () => {
     'grid-magnet-class.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/foundation\/[a-z-]+$/, /^\.\/units\/[a-z-]+$/],
     'grid-magnet-library-bridge.ts': [/^\.\/types$/, /^\.\/grid-magnet[a-z-]*$/, /^\.\/library[/a-z-]*$/, /^\.\/foundation\/[a-z-]+$/],
     'grid-magnet-library-catalogue.ts': [/^\.\/types$/, /^\.\/grid-magnet[a-z-]*$/, /^\.\/library[/a-z-]*$/],
-    'grid-magnet-bridge.ts': [/^\.\/types$/, /^\.\/geometry-truth$/, /^\.\/contour$/, /^\.\/offset$/, /^\.\/grid-magnet$/, /^\.\/grid-magnet-compute$/, /^@\/lib\/vector-core$/],
+    // + outline-core/math (2026-09-05): the bridge fits a traced cutout into a curve, and an outline
+    // that crosses itself is not an outline — every measurement downstream reads it by crossing count.
+    // The repo's own self-intersection check is what refuses such a fit; growing a second one here
+    // would be the duplication these lists exist to prevent.
+    'grid-magnet-bridge.ts': [/^\.\/types$/, /^\.\/geometry-truth$/, /^\.\/contour$/, /^\.\/offset$/, /^\.\/grid-magnet$/, /^\.\/grid-magnet-compute$/, /^@\/lib\/vector-core$/, /^@\/lib\/outline-core\/math$/],
   }
 
   it('every module file imports only from its allow-list', () => {
@@ -320,7 +324,10 @@ describe('2c — the foundation holds primitives only', () => {
     existsSync(FOUNDATION) ? readdirSync(FOUNDATION).filter((f) => f.endsWith('.ts')) : []
   // a foundation primitive may stand on another foundation primitive (geometry reads the path
   // for a ring that carries one); it still may not reach a unit or an aggregate
-  const FOUNDATION_ALLOWED = [/^\.\.\/types$/, /^\.\.\/grid-magnet-spec$/, /^@\/lib\/grid-engine\/compute\/geometry$/, /^\.\/path$/]
+  // + the repo's ONE curve fitter (vector-core/fit, the Schneider fit behind the Studio's Simplify and
+  //   its generators): foundation/path builds the drawn curve through exact edge samples with it, so the
+  //   engine and the Studio draw the same kind of curve rather than the engine growing a second fitter.
+  const FOUNDATION_ALLOWED = [/^\.\.\/types$/, /^\.\.\/grid-magnet-spec$/, /^@\/lib\/grid-engine\/compute\/geometry$/, /^\.\/path$/, /^@\/lib\/vector-core\/fit$/]
 
   it('imports nothing but shared types, spec and the repo-wide geometry kernel', () => {
     for (const f of foundationFiles()) {
@@ -413,7 +420,11 @@ describe('2e — the pipeline is the one sequencer the shells reach; adapters on
 
   it('gridViewModel projects only: its sole runtime edge is the door\'s band-range conversion (T2)', () => {
     const text = readFileSync(ADAPTER, 'utf8')
-    expect(runtimeImportsOf(text)).toEqual([{ from: '../grid-magnet', names: ['bandOuterMM'] }])
+    // + pathToSvgD (2026-09-05): the adapter turns the engine's measured outline into what the screen
+    // strokes. It is the engine's own serialiser reached through the door — the adapter still decides
+    // nothing — and the alternative was a second serialiser in the shell, which is exactly how the
+    // drawn outline stayed a polygon while the measured one was a path (Dan: "all lines here are wobbly").
+    expect(runtimeImportsOf(text)).toEqual([{ from: '../grid-magnet', names: ['bandOuterMM', 'pathToSvgD'] }])
     expect(text, 'adapter must never re-run a decision').not.toMatch(/defaultLanding|classFrameNodes|shapeFamilyOf|solveGrid|computeGrid|safeSegments/)
   })
 
@@ -676,13 +687,13 @@ describe('1b — the frame comes from the usable material', () => {
   const mass = (bbox: BBox): SafeMass => ({
     areaMM2: (bbox.maxX - bbox.minX) * (bbox.maxY - bbox.minY),
     centreMM: [(bbox.minX + bbox.maxX) / 2, (bbox.minY + bbox.maxY) / 2],
-    peakClearMM: 48, bbox, rings: [],
+    peakClearMM: 48, bbox, rings: [], paths: [],
   })
   const segment = (bbox: BBox, masses: SafeMass[]): SafeSegment => ({
     areaMM2: (bbox.maxX - bbox.minX) * (bbox.maxY - bbox.minY),
     centreMM: [(bbox.minX + bbox.maxX) / 2, (bbox.minY + bbox.maxY) / 2],
     meanMM: [(bbox.minX + bbox.maxX) / 2, (bbox.minY + bbox.maxY) / 2],
-    peakClearMM: 3, bbox, rings: [], masses,
+    peakClearMM: 3, bbox, rings: [], paths: [], masses,
   })
 
   it('COUNTEREXAMPLE: a dead limb never enlarges the frame', () => {
@@ -1311,7 +1322,7 @@ describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside
     expect(Math.abs(optimal.at.originMM[0] - optimal.at.anchorMM[0]))
       .toBeLessThanOrEqual(Math.abs(canon.at.originMM[0] - canon.at.anchorMM[0]))
     // the blind row IS the parent's Optimal, byte-for-behaviour
-    expect(canon.at.sizeMM).toBeCloseTo(143.84, 2); expect(canon.at.count).toBe(4)
+    expect(canon.at.sizeMM).toBeCloseTo(143.80, 2); expect(canon.at.count).toBe(4)
     expect(blindOnly.offers).toHaveLength(1)
     expect(blindOnly.offers[0].at.sizeMM).toBe(canon.at.sizeMM)
     expect(blindOnly.offers[0].at.points).toEqual(canon.at.points)
@@ -1324,7 +1335,7 @@ describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside
     const canon = withPriority.offers.find((o) => o.roles.includes('canon'))!
     expect(priorityTupleOf(nodesOf(optimal), priority).slice(0, 4)).toEqual([1, 1, 1, 0])
     expect(priorityTupleOf(nodesOf(canon), priority)[3], 'the blind row must still carry its orphans — that is the comparison').toBeLessThan(0)
-    expect(canon.at.sizeMM).toBeCloseTo(204.99, 2); expect(canon.at.count).toBe(9)
+    expect(canon.at.sizeMM).toBeCloseTo(204.93, 2); expect(canon.at.count).toBe(9)
     // Non-slim invariant (QA): a 3x4 frame is not slim, so no size ladder runs. Control: the same
     // solve with slim forced on must do MORE wraps; the real solve must not. Mutating the production
     // guard to run the ladder unconditionally makes the two traces equal and fails this.
@@ -1340,7 +1351,7 @@ describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside
     expect(withPriority.offers).toHaveLength(1)
     expect(withPriority.offers[0].roles).toEqual(['optimal', 'canon'])
     expect(priorityTupleOf(nodesOf(withPriority.offers[0]), priority).slice(0, 4)).toEqual([1, 1, 1, 0])
-    expect(withPriority.offers[0].at.sizeMM).toBeCloseTo(140.97, 2)
+    expect(withPriority.offers[0].at.sizeMM).toBeCloseTo(140.96, 2)
   }, 120_000)
 
   it('dual accumulator: a lower-count phase wins priority while the blind result is byte-identical (QA F2)', async () => {
@@ -1372,7 +1383,7 @@ describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside
     const optimal = withPriority.offers.find((o) => o.roles.includes('optimal'))!
     const canon = withPriority.offers.find((o) => o.roles.includes('canon'))!
     expect(sortedPairs(nodesOf(optimal).map((i) => colRow[i]))).toEqual(sortedPairs(fx.deliveredCanonNodes))
-    expect(canon.at.sizeMM).toBeCloseTo(87.46, 2)
+    expect(canon.at.sizeMM).toBeCloseTo(87.41, 2)
     expect(optimal.at.sizeMM).toBeGreaterThan(canon.at.sizeMM)
     const dx = (o: typeof optimal) => Math.abs(o.at.originMM[0] - o.at.anchorMM[0])
     expect(dx(optimal), 'relevantAxisCentreOffMM < canon (frozen comparator)').toBeLessThan(dx(canon))
@@ -1384,7 +1395,7 @@ describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside
     const { priority, withPriority } = await solveFixture('duck-b3')
     expect(priority.slim).toBe(false)
     const optimal = withPriority.offers.find((o) => o.roles.includes('optimal'))!
-    expect(optimal.at.sizeMM).toBeCloseTo(146.11, 2)
+    expect(optimal.at.sizeMM).toBeCloseTo(146.01, 2)
     expect(Math.abs(optimal.at.originMM[0] - optimal.at.anchorMM[0])).toBeLessThan(3)
   }, 120_000)
 
@@ -1440,9 +1451,22 @@ describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside
       const optimal = solve.offers.find((o) => o.roles.includes('optimal'))!
       results[plan] = { sizeMM: optimal.at.sizeMM, dx: Math.abs(optimal.at.originMM[0] - optimal.at.anchorMM[0]) }
     }
-    expect(results.all6.sizeMM).toBeCloseTo(156.89, 2); expect(results.all6.dx).toBeLessThanOrEqual(3)
-    expect(results.all8.sizeMM).toBeCloseTo(155.89, 2); expect(results.all8.dx).toBeLessThanOrEqual(4)
-    expect(results.corners8.sizeMM).toBeCloseTo(156.89, 2); expect(results.corners8.dx).toBeLessThanOrEqual(3)
+    // The rule is that the SOLVER supplies the plan's radius; the ranker test above proves the ranker
+    // honours it. This arm used to prove the wiring through an emergent size, because BOT's winning
+    // offer happened to sit in the 1 mm window between the 6 mm and 8 mm thresholds. It no longer
+    // does: with cutouts fitted as curves the winner is 1.90 mm off-axis, inside BOTH thresholds, so
+    // every plan agrees — correct behaviour, and no longer a counterexample. Nor is one available:
+    // no cutout, pitch or band in the fixture set now separates the two (swept 2026-09-05). So the
+    // wiring is proven where it lives, by `slimOnAxisMM`, and this arm keeps what it can still show —
+    // that all three plans solve, and agree, on a slim frame.
+    expect(slimOnAxisMM({ plan: 'all6' })).toBe(3)
+    expect(slimOnAxisMM({ plan: 'all8' })).toBe(4)
+    expect(slimOnAxisMM({ plan: 'corners8' })).toBe(3)
+    expect(slimOnAxisMM({})).toBe(3)
+    for (const plan of ['all6', 'all8', 'corners8'] as const) {
+      expect(results[plan].sizeMM, plan).toBeCloseTo(156.84, 2)
+      expect(results[plan].dx, plan).toBeLessThanOrEqual(3)
+    }
   }, 300_000)
 
   it('a one-column placement is not a base: the triangle keeps its two corners (Batwoman B2, Deepest)', async () => {

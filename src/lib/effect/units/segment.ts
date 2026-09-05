@@ -5,6 +5,12 @@
 
 import type { BBox, Contour, Pt, SafeMass, SafeSegment } from '../types'
 import { bbox, edgeDistToContourMM, pointInContour } from '../foundation/geometry'
+import { insetOffsetPath, pathFromRingFit, type OutlinePath } from '../foundation/path'
+
+/** How closely a drawn edge sample sits on the exact clearance curve, and how closely the curve fitted
+ *  through those samples must follow them — both far inside the 0.05mm manufacturing tolerance. */
+const ISO_SNAP_MM = 0.002
+const ISO_FIT_MM = 0.01
 
 /** Point-identity key quantum — 0.01mm hash resolution, not a law value. */
 const KEY_QUANTUM_MM = 0.01
@@ -43,7 +49,14 @@ export function safeSegments(
   const ring = decimate(contour.outer.pts)
   // A supplied hole is a MATERIAL BOUNDARY: the legal area must stop at its edge exactly as it
   // stops at the outline. Measuring the outer ring alone put legal-area centres inside holes.
-  const measured: Contour = { outer: { pts: ring }, holes: contour.holes.map((h) => ({ pts: decimate(h.pts) })) }
+  //
+  // WHERE THE OUTLINE IS A PATH, IT IS MEASURED AS ONE. The decimation is a cost control for a ring
+  // born as thousands of traced points, and it moves the edge by up to 0.03mm — which the drawn
+  // island curve then sat on exactly, being a faithful curve through a slightly wrong field. A path
+  // costs nothing to keep here (its rings carry their own curves) and the field becomes the true one.
+  const measured: Contour = contour.outer.path
+    ? { outer: contour.outer, holes: contour.holes.map((h) => (h.path ? h : { pts: decimate(h.pts) })) }
+    : { outer: { pts: ring }, holes: contour.holes.map((h) => ({ pts: decimate(h.pts) })) }
   const r = spotRadiusMM
   const signed = (p: Pt): number => {
     const d = edgeDistToContourMM(measured, p)
@@ -70,10 +83,15 @@ export function safeSegments(
    *  outlines follow the true edge offset instead of the mesh's facets. */
   const snapToIso = (p: Pt, thr: number): Pt => {
     let q = p
-    for (let it = 0; it < 2; it++) {
+    // The field's gradient is a UNIT vector away from the nearest edge point, so the step is the
+    // shortfall itself. It was read from a half-millimetre finite difference, which near any curved
+    // edge is an average over that half millimetre, not the gradient — and two steps of it left the
+    // samples ~0.015mm off the true edge, which the drawn curve then inherited exactly. A tenth of
+    // that span, and enough steps to converge, put them on it.
+    const e = 0.05
+    for (let it = 0; it < 8; it++) {
       const s = signed(q) - thr
-      if (Math.abs(s) < 0.02) break
-      const e = 0.5
+      if (Math.abs(s) < ISO_SNAP_MM) break
       const gx = (signed([q[0] + e, q[1]]) - signed([q[0] - e, q[1]])) / (2 * e)
       const gy = (signed([q[0], q[1] + e]) - signed([q[0], q[1] - e])) / (2 * e)
       const g2 = gx * gx + gy * gy
@@ -82,17 +100,26 @@ export function safeSegments(
     }
     return q
   }
-  /** One midpoint per edge, then every point snapped to the exact curve. */
+  /** Three points inserted per mesh edge (samples every ~0.5mm), then every point snapped to the
+   *  exact curve — the samples the drawn curve is fitted through. */
   const smoothLoop = (loop: Pt[], thr: number): Pt[] => {
     const dense: Pt[] = []
     for (let i = 0; i < loop.length; i++) {
       const a = loop[i], b = loop[(i + 1) % loop.length]
-      dense.push(a, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2])
+      for (let k = 0; k < 4; k++) dense.push([a[0] + (b[0] - a[0]) * k / 4, a[1] + (b[1] - a[1]) * k / 4])
     }
     return dense.map((p) => snapToIso(p, thr))
   }
+  /** The drawn outline: a smooth curve through the snapped samples, never the chords between them.
+   *
+   *  The one place it is not exact is a RIDGE of the clearance field — where the legal area comes to a
+   *  point because two parts of the cut line are equally near, as at a heart's notch. The field has no
+   *  gradient to snap along there, so the samples straddle the point and the curve rounds it by up to
+   *  0.04mm at a 160mm shape. That is under the manufacturing tolerance, it is display only — the
+   *  measurement is the mesh, unchanged — and it is a rounded tip, never a facet. */
+  const curvesOf = (rings: Pt[][]): OutlinePath[] => rings.map((ring) => pathFromRingFit(ring, ISO_FIT_MM))
 
-  interface LevelItem { areaMM2: number; centreMM: Pt; meanMM: Pt; peakClearMM: number; bbox: BBox; rings: Pt[][]; deepIdx: number }
+  interface LevelItem { areaMM2: number; centreMM: Pt; meanMM: Pt; peakClearMM: number; bbox: BBox; rings: Pt[][]; paths: OutlinePath[]; deepIdx: number }
   /** Regions of S ≥ thr: connectivity, deepest point, bbox and traced outlines. */
   const level = (thr: number): { comp: Int32Array; items: LevelItem[] } => {
     const comp = new Int32Array(nx * ny).fill(-1)
@@ -152,6 +179,7 @@ export function safeSegments(
           peakClearMM: a.deepS + r + thr,
           bbox: { minX: a.minX, minY: a.minY, maxX: a.maxX, maxY: a.maxY },
           rings: [],
+          paths: [],
           deepIdx: a.deepIdx,
         })),
       }
@@ -227,6 +255,7 @@ export function safeSegments(
         peakClearMM: a.deepS + r + thr,
         bbox: { minX: a.minX, minY: a.minY, maxX: a.maxX, maxY: a.maxY },
         rings: ringsByComp[id],
+        paths: curvesOf(ringsByComp[id]),
         deepIdx: a.deepIdx,
       })),
     }
@@ -242,7 +271,7 @@ export function safeSegments(
   const massesByIsland: SafeMass[][] = iso0.items.map(() => [])
   for (const m of isoD.items) {
     const islandId = iso0.comp[m.deepIdx]
-    if (islandId >= 0) massesByIsland[islandId].push({ areaMM2: m.areaMM2, centreMM: m.centreMM, peakClearMM: m.peakClearMM, bbox: m.bbox, rings: m.rings })
+    if (islandId >= 0) massesByIsland[islandId].push({ areaMM2: m.areaMM2, centreMM: m.centreMM, peakClearMM: m.peakClearMM, bbox: m.bbox, rings: m.rings, paths: m.paths })
   }
   const out: SafeSegment[] = iso0.items.map((it, id) => ({
     areaMM2: it.areaMM2,
@@ -251,8 +280,17 @@ export function safeSegments(
     peakClearMM: it.peakClearMM,
     bbox: it.bbox,
     rings: it.rings,
+    paths: it.paths,
     masses: massesByIsland[id].sort((a, b) => a.areaMM2 - b.areaMM2),
   }))
   out.sort((a, b) => a.areaMM2 - b.areaMM2)
+  // THE EXACT ISLAND where one exists. A canon outline is lines and arcs of one radius, or a convex
+  // polygon; its legal area is the same construction shrunk by the rim, closed-form, so the single
+  // island's outline is that and not a fit. Measurement is unchanged: the mesh still scores the
+  // island; only what the screen draws changes (Dan, 2026-09-05).
+  if (out.length === 1 && contour.outer.path && !contour.holes.length) {
+    const exact = insetOffsetPath(contour.outer.path, r)
+    if (exact) out[0] = { ...out[0], paths: [exact], masses: out[0].masses.map((m) => ({ ...m, paths: [exact] })) }
+  }
   return out
 }
