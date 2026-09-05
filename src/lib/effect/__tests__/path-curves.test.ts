@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest'
 import { unitShape } from '@/lib/shape-library/defs'
 import { transformShape } from '@/lib/vector-core'
 import { contourFromShape } from '../geometry-truth'
-import { distanceToPathMM, eachSeg, insetOffsetPath, pathFromRingFit, type OutlinePath } from '../foundation/path'
+import { clearsPathBy, distanceToPathMM, eachSeg, insetOffsetPath, pathFromRingFit, type OutlinePath } from '../foundation/path'
 import { edgeDistToContourMM } from '../foundation/geometry'
 import { normMaskContour } from '../grid-magnet-bridge'
 import { safeSegments } from '../units/segment'
@@ -56,6 +56,42 @@ describe('the exact inset of a convex polygon', () => {
 
   it('shrunk past existence is null, not an inverted polygon', () => {
     expect(insetOffsetPath(square, 60)).toBeNull()
+  })
+})
+
+describe('the fast clearance test cannot pass a point that is too close', () => {
+  // s63-pixel-meta, 2026-09-05. clearsPathBy skips a curve whose chord bound puts it far enough away,
+  // so the bound must never UNDERSTATE how far a curve strays from its chord. Measured perpendicular
+  // to the chord's infinite line it did: this cubic hooks out along the chord's own direction, staying
+  // near the line while running past the segment, and a point 0.0001mm from the curve was reported as
+  // clearing 0.001mm. The bound is now taken between corresponding points (|B(t) − L(t)|), which is a
+  // true bound on the distance to the segment. Restore the perpendicular form and this fails.
+  const hooked: OutlinePath = { start: [0, 0], segs: [
+    { kind: 'cubic', c1: [10, 0.1], c2: [-10, 0.2], to: [1, 0.3] },
+    { kind: 'line', to: [20, 0.3] }, { kind: 'line', to: [20, -0.1] },
+    { kind: 'line', to: [0, -0.1] }, { kind: 'line', to: [0, 0] },
+  ] }
+  const t = (180 - Math.sqrt(10440)) / 366, u = 1 - t
+  const near: Pt = [30 * u * u * t - 30 * u * t * t + t * t * t + 0.0001, 0.3 * t]
+
+  it('a hooked cubic does not clear a threshold it lies inside', () => {
+    const d = distanceToPathMM(hooked, near)
+    expect(d).toBeLessThan(0.001)
+    expect(clearsPathBy(hooked, near, 0.001)).toBe(false)
+  })
+
+  it('and the two agree either side of the threshold, on the same point', () => {
+    const d = distanceToPathMM(hooked, near)
+    expect(clearsPathBy(hooked, near, d / 2)).toBe(true)
+    expect(clearsPathBy(hooked, near, d * 2)).toBe(false)
+  })
+
+  it('the fast answer agrees with the exact distance over a field of points', () => {
+    for (let i = 0; i < 400; i++) {
+      const p: Pt = [(i * 37) % 21 - 0.5, ((i * 53) % 9) / 10 - 0.4]
+      const d = distanceToPathMM(hooked, p)
+      for (const thr of [d * 0.5, d * 1.5]) expect(clearsPathBy(hooked, p, thr), `${p} @ ${thr}`).toBe(d >= thr)
+    }
   })
 })
 

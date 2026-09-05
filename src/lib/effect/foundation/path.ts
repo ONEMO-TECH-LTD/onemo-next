@@ -276,18 +276,24 @@ const box2 = (p: Pt, b: { minX: number; minY: number; maxX: number; maxY: number
   return dx * dx + dy * dy
 }
 
-/** HOW FAR A SUB-CURVE CAN STRAY FROM ITS OWN CHORD. The classical bound: a cubic lies within
- *  (3/4) of the greater control-point offset from the chord. Taken once per piece at build, it lets a
- *  query answer with chord arithmetic — the same arithmetic a polygon would use — and reach for the
- *  exact curve mathematics only where the bound admits the piece could hold the true nearest point.
- *  Nothing is approximated: the bound decides only whether an exact solve is NEEDED. */
+/** HOW FAR A SUB-CURVE CAN STRAY FROM ITS OWN CHORD — the classical Bézier bound, taken between
+ *  CORRESPONDING points: |B(t) − L(t)| ≤ (3/4)·max(|c1 − L(⅓)|, |c2 − L(⅔)|), where L is the straight
+ *  interpolation of the ends. Since L(t) lies on the chord, this bounds the distance from any point of
+ *  the curve to the chord SEGMENT, which is what a query compares against.
+ *
+ *  It was measured perpendicular to the chord's infinite LINE, which is not the same thing and is not
+ *  a bound: a curve whose control points swing far along the chord's own direction — a hook — stays
+ *  close to the line while running well past the segment, so the deviation was underestimated and a
+ *  point 0.0001mm from such a curve was reported as clearing 0.001mm (s63-pixel-meta, 2026-09-05,
+ *  reproduced here: `a hooked cubic does not clear a threshold it lies inside`). The correspondence
+ *  bound has no such gap, and the coincident-ends case falls out of it unchanged. */
 function chordDeviation(c: Cubic): number {
   const dx = c.b[0] - c.a[0], dy = c.b[1] - c.a[1]
-  const len = Math.hypot(dx, dy)
-  if (len < 1e-12) return Math.max(
-    Math.hypot(c.c1[0] - c.a[0], c.c1[1] - c.a[1]), Math.hypot(c.c2[0] - c.a[0], c.c2[1] - c.a[1]))
-  const off = (q: Pt) => Math.abs((q[0] - c.a[0]) * dy - (q[1] - c.a[1]) * dx) / len
-  return 0.75 * Math.max(off(c.c1), off(c.c2))
+  const l1x = c.a[0] + dx / 3, l1y = c.a[1] + dy / 3
+  const l2x = c.a[0] + 2 * dx / 3, l2y = c.a[1] + 2 * dy / 3
+  const d1 = Math.hypot(c.c1[0] - l1x, c.c1[1] - l1y)
+  const d2 = Math.hypot(c.c2[0] - l2x, c.c2[1] - l2y)
+  return 0.75 * Math.max(d1, d2)
 }
 
 /** Split a cubic at t — de Casteljau, exact: the two halves ARE the curve, not an approximation. */
