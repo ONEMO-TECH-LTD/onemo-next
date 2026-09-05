@@ -14,6 +14,7 @@ import { anchorBakeOf, anchorFromBake, applyCoverage, assignSizes, centeringAnch
 import { classFrameNodes, shapeFamilyOf, type ShapeFamily } from '@/lib/effect/grid-magnet-class'
 
 import { defaultLanding } from '@/lib/effect/units/judge'
+import { makeContourSeatPredicate } from '@/lib/effect/units/layout'
 import { canonPriorityOf, positionsAcross } from '@/lib/effect/units/classifier'
 import { DEFAULT_PITCH_MM, PADDING_FLOOR_MM } from '@/lib/effect/grid-magnet-spec'
 import { contourCacheKey, makeSizer, sizeRange } from '@/lib/effect/grid-magnet-bridge'
@@ -161,7 +162,46 @@ export function solveGrid(req: GridRequest): GridSolve {
           ? rawRungs.indexOf(landing[defaultLanding(landing, pitch)]) : defaultLanding(rawRungs, pitch)
         const idx = Math.min(stepSel ?? ruleIdx, rawRungs.length - 1)
         const perimeterOnly = cfg.perimeterOnly ?? true
-        const rungs = rawRungs.map((rg) => {
+        const padMM = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
+        const seatR = spotRadiusOf(padMM)
+        /** THE FRAME IS THE START OF THE ANSWER, NOT ALL OF IT.
+         *
+         *  Canon delivers whole rectangles. An organic shape's legal area is not a rectangle, so the
+         *  widest rectangle that can be COMPLETED is often much smaller than the area itself, and
+         *  every legal seat outside it was being thrown away: a blob at B5 measured five legal seats
+         *  in two columns the frame did not reach, left them empty, and reported 44.5% of its
+         *  material unsupported with a patch across the whole lobe (Dan, 2026-09-05: "there is clear
+         *  difference here between perimeter and empty space ... those left seats are not
+         *  recognised"). They were recognised — the engine's own seat test passes them — and then
+         *  discarded for not being part of a rectangle.
+         *
+         *  So OPTIMAL takes the canon frame and then every remaining seat on the frame's own lattice
+         *  that the seat test accepts. Nothing about the frame moves: same size, same phase, same
+         *  nodes, same centring. CANON is untouched — it remains the pure rectangle, beside it, for
+         *  comparison. Coverage still applies afterwards, so Belt thins the enlarged population the
+         *  same way it thins any other. */
+        const withLegalExtras = (rg: typeof rawRungs[number]) => {
+          if (!rg.roles.includes('optimal') || rg.at.points.length === 0) return rg
+          const fits = makeContourSeatPredicate(sized(rg.at.sizeMM), seatR)
+          if (!fits) return rg
+          const held = new Set(rg.at.points.map((q) => q[0].toFixed(3) + ',' + q[1].toFixed(3)))
+          // the frame's own lattice, extended over the shape's box — phase comes from a placed node
+          const box = bbox(sized(rg.at.sizeMM).outer.pts)
+          const [ax, ay] = rg.at.points[0]
+          const from = (a: number, lo: number) => a - Math.ceil((a - lo) / pitch) * pitch
+          const extra: Pt[] = []
+          for (let x = from(ax, box.minX); x <= box.maxX; x += pitch)
+            for (let y = from(ay, box.minY); y <= box.maxY; y += pitch) {
+              const p: Pt = [x, y]
+              if (held.has(x.toFixed(3) + ',' + y.toFixed(3))) continue
+              if (fits(p)) extra.push(p)
+            }
+          if (!extra.length) return rg
+          return { ...rg, at: { ...rg.at, points: [...rg.at.points, ...extra],
+            count: rg.at.points.length + extra.length,
+            gapsMM: [...rg.at.gapsMM, ...extra.map(() => 0)] } }
+        }
+        const rungs = rawRungs.map(withLegalExtras).map((rg) => {
           const points = applyCoverage([...rg.at.points], perimeterOnly, pitch).seated
           if (points.length === rg.at.points.length) return rg
           const kept = new Set(points)

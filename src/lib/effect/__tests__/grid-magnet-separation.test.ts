@@ -404,7 +404,12 @@ describe('2e — the pipeline is the one sequencer the shells reach; adapters on
 
   it('pipeline/solve.ts holds exactly the unit edges the worker body carried — pinned, so a new one is deliberate', () => {
     const edges = [...new Set(moduleRefsOf(readFileSync(PIPELINE, 'utf8')).filter((i) => /\/units\//.test(i)))].sort()
-    expect(edges).toEqual(['@/lib/effect/units/centring', '@/lib/effect/units/classifier', '@/lib/effect/units/judge', '@/lib/effect/units/protection'])
+    // + units/layout (2026-09-05): the delivered OPTIMAL row is the canon frame plus every remaining
+    // seat on its own lattice that layout's seat test accepts. Asking layout whether a seat is legal
+    // is sequencing — the pipeline decides nothing about legality, it takes layout's answer — and the
+    // edge is pinned here rather than arriving quietly, because the alternative was a second seat
+    // test in the pipeline, which is exactly what these pins exist to prevent.
+    expect(edges).toEqual(['@/lib/effect/units/centring', '@/lib/effect/units/classifier', '@/lib/effect/units/judge', '@/lib/effect/units/layout', '@/lib/effect/units/protection'])
   })
 
   const runtimeImportsOf = (text: string) => {
