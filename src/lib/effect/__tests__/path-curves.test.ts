@@ -87,9 +87,17 @@ describe('the fast clearance test cannot pass a point that is too close', () => 
   })
 
   it('the fast answer agrees with the exact distance over a field of points', () => {
-    for (let i = 0; i < 400; i++) {
-      const p: Pt = [(i * 37) % 21 - 0.5, ((i * 53) % 9) / 10 - 0.4]
+    // A real field, and its size is asserted rather than assumed: the first version of this test
+    // walked 400 iterations of two modular sequences that between them visited only 63 distinct
+    // points (s63-pixel-meta, 2026-09-05). A sweep whose coverage is smaller than its loop count is
+    // a test that reads stronger than it is.
+    const field: Pt[] = []
+    for (let i = 0; i < 26; i++) for (let j = 0; j < 17; j++) field.push([-0.5 + i * 0.84, -0.45 + j * 0.05])
+    expect(new Set(field.map((p) => p.join(','))).size, 'the field must be as wide as it claims').toBe(field.length)
+    expect(field.length).toBeGreaterThan(400)
+    for (const p of field) {
       const d = distanceToPathMM(hooked, p)
+      if (d === 0) continue
       for (const thr of [d * 0.5, d * 1.5]) expect(clearsPathBy(hooked, p, thr), `${p} @ ${thr}`).toBe(d >= thr)
     }
   })

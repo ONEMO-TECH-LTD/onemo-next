@@ -286,7 +286,13 @@ const box2 = (p: Pt, b: { minX: number; minY: number; maxX: number; maxY: number
  *  close to the line while running well past the segment, so the deviation was underestimated and a
  *  point 0.0001mm from such a curve was reported as clearing 0.001mm (s63-pixel-meta, 2026-09-05,
  *  reproduced here: `a hooked cubic does not clear a threshold it lies inside`). The correspondence
- *  bound has no such gap, and the coincident-ends case falls out of it unchanged. */
+ *  bound has no such gap, and the coincident-ends case falls out of it unchanged.
+ *
+ *  A tighter bound is also sound — project the controls onto the chord segment, and the Bernstein
+ *  blend of those projections lies on it, giving 3t(1−t)·max(dist(c1,S), dist(c2,S)) ≤ ¾·max
+ *  (s63-pixel-meta). Being smaller does not make a bound unsafe, and I was wrong to say so. This one
+ *  is kept because it is the standard form and its proof needs no projection argument; the tighter
+ *  one is the place to look if these queries ever need to be cheaper. */
 function chordDeviation(c: Cubic): number {
   const dx = c.b[0] - c.a[0], dy = c.b[1] - c.a[1]
   const l1x = c.a[0] + dx / 3, l1y = c.a[1] + dy / 3
