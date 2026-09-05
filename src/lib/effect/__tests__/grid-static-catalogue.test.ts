@@ -10,7 +10,12 @@ import {
   type GridPlanOptions,
   type StandardLadderShape,
 } from '../grid'
-import { createGridWorkerClient, gridJobKey } from '../grid-client'
+import {
+  cachedGridJob,
+  createGridWorkerClient,
+  gridJobKey,
+  requestGridJob,
+} from '../grid-client'
 import {
   GRID_STATIC_CATALOGUE_CACHE_VERSION,
   GRID_STATIC_CATALOGUE_ENTRIES,
@@ -56,8 +61,13 @@ describe('version-locked Grid Lab static catalogue', () => {
 
     for (const entry of GRID_STATIC_CATALOGUE_ENTRIES) {
       expect(JSON.stringify(entry.result)).toBe(JSON.stringify(handleGridJob(entry.job)))
+      if (entry.result.operation === 'ladder') {
+        const labels: string[] = entry.result.value.map((rung) => rung.label)
+        expect(entry.result.value.every((rung) => rung.points >= 2)).toBe(true)
+        expect(labels).not.toContain('ONE')
+      }
     }
-  })
+  }, 15_000)
 
   it('covers every standard shape and density through the exact live Grid Lab identity', () => {
     const client = createGridWorkerClient()
@@ -74,6 +84,38 @@ describe('version-locked Grid Lab static catalogue', () => {
       shapes.flatMap((shape) => densities.map((density) => `${shape}/${density}`)).sort(),
     )
     client.dispose()
+  })
+
+  it('publishes a caller frame from the neutral static ladder without a worker solve', async () => {
+    let compared = 0
+    for (const shape of shapes) for (const density of densities) {
+      const baseJob = liveGridLabJob(shape, density)
+      if (baseJob.operation !== 'ladder') throw new Error('Expected a ladder job.')
+      const framedJob: GridJob = {
+        ...baseJob,
+        options: { ...baseJob.options, frameBufferMM: 3 },
+      }
+      const base = cachedGridJob(baseJob)
+      const framed = cachedGridJob(framedJob)
+      const requested = await requestGridJob(framedJob)
+      if (base?.operation !== 'ladder' || framed?.operation !== 'ladder') {
+        throw new Error('Expected both static ladder results.')
+      }
+
+      expect(requested).toEqual(framed)
+      expect(framed.key).toBe(gridJobKey(framedJob))
+      expect(framed.value).toHaveLength(base.value.length)
+      for (let index = 0; index < base.value.length; index++) {
+        compared++
+        expect(framed.value[index]).toMatchObject({
+          baseSizeMM: base.value[index].baseSizeMM,
+          sizeMM: base.value[index].baseSizeMM + 6,
+          frameBufferMM: 3,
+          construction: base.value[index].construction,
+        })
+      }
+    }
+    expect(compared).toBeGreaterThan(0)
   })
 
   it('leaves a changed law out of the static table for exact lazy worker fallback', () => {

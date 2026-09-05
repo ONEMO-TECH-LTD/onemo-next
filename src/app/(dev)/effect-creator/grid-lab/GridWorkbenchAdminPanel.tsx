@@ -17,6 +17,8 @@ export interface GridWorkbenchAdminPanelProps {
   setDensity: (value: GridDensity) => void
   pad: number
   setPad: (value: number) => void
+  frameBufferMM: number
+  setFrameBufferMM: (value: number) => void
   marginMode: MarginMode
   setMarginMode: (value: MarginMode) => void
   appliedMarginMM: number
@@ -53,7 +55,7 @@ export interface GridWorkbenchAdminPanelProps {
 
 export function GridWorkbenchAdminPanel({
   pitch, setPitch, pitchAuto, setPitchAuto,
-  density, setDensity, pad, setPad,
+  density, setDensity, pad, setPad, frameBufferMM, setFrameBufferMM,
   marginMode, setMarginMode, appliedMarginMM, manualMarginMM, setManualMarginMM,
   minMarginMM, setMinMarginMM, maxMarginMM, setMaxMarginMM,
   pattern, setPattern,
@@ -81,6 +83,14 @@ export function GridWorkbenchAdminPanel({
         </div>
       </div>
       <Slider label="Magnet padding · per spot · min 10" unit="mm" v={pad} set={setPad} min={10} max={30} onInteractionChange={onSliderInteractionChange} />
+      <NumberField
+        label="Frame buffer"
+        unit="mm"
+        v={frameBufferMM}
+        set={setFrameBufferMM}
+        min={0}
+        onInteractionChange={onSliderInteractionChange}
+      />
       <div className="gl-field" data-grid-margin-mode={marginMode}><span>Fit offset mode</span>
         <div className="gl-seg">
           <button aria-pressed={marginMode === 'auto'} onClick={() => setMarginMode('auto')}>Auto</button>
@@ -184,7 +194,7 @@ function NumberField({ label, v, set, min, max, unit, readOnly = false, disabled
   v: number
   set: (n: number) => void
   min: number
-  max: number
+  max?: number
   unit?: string
   readOnly?: boolean
   disabled?: boolean

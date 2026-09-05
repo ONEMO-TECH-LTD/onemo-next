@@ -6,7 +6,7 @@ import {
   stdShapeContour,
 } from '../../src/lib/effect/grid'
 const SHAPES = ['square', 'circle', 'triangle', 'diamondShape'] as const
-const RUNG_INSET_MM = DEFAULT_LAW.paddingMM + DEFAULT_LAW.frameMM
+const RUNG_INSET_MM = DEFAULT_LAW.paddingMM
 
 let constructionIdentityMismatch = 0
 let constructionMismatch = 0

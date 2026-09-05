@@ -2,7 +2,7 @@
 // Run: npx tsx src/lib/effect/grid-audit.ts   → exits non-zero on any violation.
 // Covers the launch laws across representative contour families: 48/68 vocabulary, mode purity,
 // coverage semantics, ring spacing, focal-8 radial extremes, padding monotonicity, centering,
-// semantic ladders (ONE + sequential labels, ascending sizes), caps/floors/format laws.
+// semantic ladders (geometric S minimum + sequential labels, ascending sizes), caps/floors/format laws.
 import { computeGrid, autoGrid, balancedFit, semanticLadder, stdShapeContour, maxDesignMM, minEffectMM, rectFormat, legalPatterns, DEFAULT_LAW } from './grid'
 import { insetRingMM } from './offset'
 import type { Contour, Pt } from './types'
@@ -39,7 +39,7 @@ for (const [nm, mk] of SH) {
     }
     const lad = semanticLadder((s) => mk(s), DEFAULT_LAW, mode)
     if (!lad.length) flag(`${nm}/${mode}: EMPTY ladder`)
-    if (lad.length && lad[0].label !== 'ONE') flag(`${nm}/${mode}: first rung not ONE`)
+    if (lad.length && lad[0].label !== 'S') flag(`${nm}/${mode}: first rung not S`)
     // multi-point sizes are required in AUTO (the default mode — union of all legal layouts);
     // strict sub-modes may legitimately express fewer (a triangle's 60° tips can't take dice/diamond)
     if (mode === 'auto' && ['square', 'diamond', 'circle', 'triangle'].includes(nm) && !lad.some(r => r.points >= 2)) flag(`${nm}/auto: no multi-point sizes`)
@@ -79,23 +79,44 @@ for (const [nm, mk] of SH.slice(0, 4)) {
 // FOCAL-RAMP LAW (auto plan default): <=100mm all-6; >100mm 8mm at radial extremes (+6 rest when
 // interior anchors exist); ramp widens >=200
 {
-  const g70 = computeGrid(stdShapeContour('square', 70), { pitchMM: 48, paddingMM: 10 })
-  if (g70.anchors.some(a => a.dia === 8)) flag('focal: 8mm below 100')
-  const g118 = computeGrid(stdShapeContour('square', 118), { pitchMM: 48, paddingMM: 10 })
-  if (!g118.anchors.some(a => a.dia === 8) || !g118.anchors.some(a => a.dia === 6)) flag('focal: 118 not mixed 8+6')
-  const g214 = computeGrid(stdShapeContour('square', 214), { pitchMM: 48, paddingMM: 10 })
+  const g68 = computeGrid(stdShapeContour('square', 68), { pitchMM: 48, paddingMM: 10 })
+  if (g68.anchors.some(a => a.dia === 8)) flag('focal: 8mm below 100')
+  const g116 = computeGrid(stdShapeContour('square', 116), { pitchMM: 48, paddingMM: 10 })
+  if (!g116.anchors.some(a => a.dia === 8) || !g116.anchors.some(a => a.dia === 6)) flag('focal: 116 not mixed 8+6')
+  const g212 = computeGrid(stdShapeContour('square', 212), { pitchMM: 48, paddingMM: 10 })
   const n8 = (g: ReturnType<typeof computeGrid>) => g.anchors.filter(a => a.dia === 8).length
-  if (n8(g214) <= n8(g118)) flag('focal: ramp did not widen at 214')
+  if (n8(g212) <= n8(g116)) flag('focal: ramp did not widen at 212')
   const gd = computeGrid(stdShapeContour('diamondShape', 176), { pitchMM: 48, paddingMM: 10, pattern: 'diamond' })
   if (gd.anchors.length >= 3 && !gd.anchors.some(a => a.dia === 8)) flag('focal: rotated diamond got no 8mm')
 }
-// canon: the square's exact zero-points
-const sqLad = semanticLadder((s) => stdShapeContour('square', s), DEFAULT_LAW, 'auto').map(r => r.sizeMM)
-for (const c of [22, 70, 118, 166, 214, 262, 310]) if (!sqLad.includes(c)) flag(`square canon missing ${c} (got ${sqLad.join(',')})`)
+// Square zero-points are derived from their construction span plus padding — never pinned numbers.
+const sqLad = semanticLadder(
+  (s) => stdShapeContour('square', s),
+  DEFAULT_LAW,
+  'auto',
+  { source: 'std', density: 'standard' },
+)
+for (const rung of sqLad) {
+  const [[ax, ay], [bx, by]] = rung.construction.basisMM
+  const pts = rung.construction.population.map(([a, b]) => [
+    rung.construction.originMM[0] + a * ax + b * bx,
+    rung.construction.originMM[1] + a * ay + b * by,
+  ] as Pt)
+  const span = pts.length
+    ? Math.max(
+        Math.max(...pts.map(([x]) => x)) - Math.min(...pts.map(([x]) => x)),
+        Math.max(...pts.map(([, y]) => y)) - Math.min(...pts.map(([, y]) => y)),
+      )
+    : 0
+  const derived = span + 2 * DEFAULT_LAW.paddingMM
+  if (Math.abs(rung.baseSizeMM - derived) > 1e-6 || rung.sizeMM !== rung.baseSizeMM) {
+    flag(`square ${rung.label}: size ${rung.sizeMM}, base ${rung.baseSizeMM}, derived ${derived}`)
+  }
+}
 // scalar laws
 if (maxDesignMM('std') !== 310 || maxDesignMM('preset') !== 310) flag('std/preset cap != 310')
 if (maxDesignMM('gen') !== 180 || maxDesignMM('magic') !== 180) flag('random cap != 180')
-if (minEffectMM() !== 22) flag('ONE floor != 22')
+if (minEffectMM() !== 20) flag('engine/freeform floor != 20')
 if (rectFormat(214, 70) !== 'strip' || rectFormat(214, 118) !== 'panoramic' || rectFormat(166, 118) !== 'block') flag('rectFormat broken')
 if (legalPatterns(48).includes('quincunx')) flag('dice legal at 48')
 

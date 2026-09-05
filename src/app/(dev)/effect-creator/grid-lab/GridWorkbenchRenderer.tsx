@@ -24,7 +24,10 @@ interface GridWorkbenchNearestAnchorPair {
 interface GridWorkbenchModel {
   planKey: string
   contour: Contour
+  base: Contour
   design: Contour
+  marginMM: number
+  frameBufferMM: number
   grid: GridWorkbenchGrid
   patternUsed: string
   anchorPair: GridWorkbenchNearestAnchorPair | null
@@ -77,12 +80,13 @@ export function GridWorkbenchStage({
         <span className="gl-eye">{model ? `1mm = ${scale.toFixed(2)} px` : '—'}</span>
       </div>
       <div className="gl-vp">
-        {model ? <Stage contour={model.contour} design={model.design} grid={model.grid} anchorPair={model.anchorPair} front={front} frontArtwork={frontArtwork} viewportPx={viewportPx} fit={fit} />
+        {model ? <Stage contour={model.contour} base={model.base} design={model.design} marginMM={model.marginMM} frameBufferMM={model.frameBufferMM} grid={model.grid} anchorPair={model.anchorPair} front={front} frontArtwork={frontArtwork} viewportPx={viewportPx} fit={fit} />
           : <Empty text={emptyText} spin={emptySpin} />}
       </div>
       <div className="gl-legend">
         <span><i style={{ background: 'var(--magnet)' }} />6mm magnet</span>
         <span><i style={{ background: 'var(--mag8)' }} />8mm magnet</span>
+        <span><i style={{ background: 'var(--frame)' }} />frame buffer</span>
         <span><i style={{ background: 'var(--margin)' }} />margin band</span>
         <span><i style={{ background: 'var(--grid)', opacity: .55 }} />node · no material</span>
         <span><i style={{ background: 'var(--fail)' }} />flap risk</span>
@@ -105,7 +109,7 @@ export function GridWorkbenchReadouts({ model, scale }: { model: GridWorkbenchMo
 }
 
 const pathFrom = (pp: Pt[]) => 'M ' + pp.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(' L ') + ' Z'
-function Stage({ contour, design, grid, anchorPair, front, frontArtwork, viewportPx, fit }: { contour: Contour; design: Contour; grid: GridWorkbenchGrid; anchorPair: GridWorkbenchNearestAnchorPair | null; front: boolean; frontArtwork: GridWorkbenchFrontArtwork | null; viewportPx: number; fit: number }) {
+function Stage({ contour, base, design, marginMM, frameBufferMM, grid, anchorPair, front, frontArtwork, viewportPx, fit }: { contour: Contour; base: Contour; design: Contour; marginMM: number; frameBufferMM: number; grid: GridWorkbenchGrid; anchorPair: GridWorkbenchNearestAnchorPair | null; front: boolean; frontArtwork: GridWorkbenchFrontArtwork | null; viewportPx: number; fit: number }) {
   const ePts = contour.outer.pts.map(([x, y]) => [x, -y] as Pt)
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   for (const [x, y] of ePts) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y }
@@ -115,7 +119,10 @@ function Stage({ contour, design, grid, anchorPair, front, frontArtwork, viewpor
   const S = (viewportPx * fit) / Math.max(vbW, vbH)
   const fontMM = pad * 0.5
   const eD = pathFrom(ePts)
-  const hasMargin = design !== contour && design.outer.pts.length >= 3
+  const hasFrame = frameBufferMM > 0.005 && base.outer.pts.length >= 3
+  const hasMargin = marginMM > 0.005 && design.outer.pts.length >= 3
+  const bPts = base.outer.pts.map(([x, y]) => [x, -y] as Pt)
+  const bD = hasFrame ? pathFrom(bPts) : ''
   const dPts = design.outer.pts.map(([x, y]) => [x, -y] as Pt)
   const dD = hasMargin ? pathFrom(dPts) : ''
   const fy = (p: Pt): Pt => [p[0], -p[1]]
@@ -156,12 +163,13 @@ function Stage({ contour, design, grid, anchorPair, front, frontArtwork, viewpor
           </g>
         })}
       </> : <>
-      {/* effect = design + margin: fill the whole effect as MARGIN material, then the design on top → the
-          margin band shows as the ring between the dashed design outline and the effect edge. */}
-      <path d={eD} fill={hasMargin ? 'var(--margin)' : 'var(--suede)'} />
+      {/* Published effect = magnetic base + frame buffer; base = design + optional fit offset. */}
+      <path d={eD} fill={hasFrame ? 'var(--frame)' : hasMargin ? 'var(--margin)' : 'var(--suede)'} />
+      {hasFrame && <path d={bD} fill={hasMargin ? 'var(--margin)' : 'var(--suede)'} />}
       {hasMargin && <path d={dD} fill="var(--suede)" />}
       {/* Flap risk remains diagnostic; passing shapes have no cosmetic outline over their material. */}
       {hasFlap && <path d={eD} fill="none" stroke="var(--fail)" strokeOpacity={0.85} strokeWidth={1.5} strokeLinejoin="round" />}
+      {hasFrame && <path d={bD} fill="none" stroke="var(--ink-3)" strokeOpacity={0.65} strokeWidth={0.8} strokeDasharray="2 2" />}
       {hasMargin && <path d={dD} fill="none" stroke="var(--accent)" strokeOpacity={0.6} strokeWidth={0.8} strokeDasharray="3 2" />}
       {grid.candidates.filter(c => !seat.has(c[0].toFixed(2) + ',' + c[1].toFixed(2))).map((c, i) => {
         const p = fy(c); return <circle key={'c' + i} cx={p[0]} cy={p[1]} r={1.6} fill="var(--grid)" fillOpacity={0.5} />

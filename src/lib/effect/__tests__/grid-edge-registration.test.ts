@@ -24,8 +24,8 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_LAW, resolveGridPlan, semanticLadder, stdShapeContour } from '../grid'
 import type { ResolvedGridPlan } from '../grid'
 
-/** The zero-point inset every outermost anchor must sit at: padding floor + frame. */
-const FLOOR_MM = DEFAULT_LAW.paddingMM + DEFAULT_LAW.frameMM // 11
+/** The zero-point inset every outermost anchor must sit at: the padding floor. */
+const FLOOR_MM = DEFAULT_LAW.paddingMM
 
 function axes(plan: ResolvedGridPlan) {
   const pts = plan.effectContourMM.outer.pts
@@ -57,27 +57,27 @@ function registrationSlackMM(plan: ResolvedGridPlan): number {
 const BASE_OPTIONS = { mode: 'auto', baseMarginMM: 0, maxGrowMM: 0 } as const
 
 describe('edge-registration law — every edge registers on its own zero-point', () => {
-  it('registers a rectangle long edge exactly as the same-length square edge (166x70)', () => {
-    const rect = resolveGridPlan(stdShapeContour('rect', 166, 70), {
+  it('registers a rectangle long edge exactly as the same-length square edge (164x68)', () => {
+    const rect = resolveGridPlan(stdShapeContour('rect', 164, 68), {
       ...BASE_OPTIONS,
       density: 'standard',
     })
-    const square = resolveGridPlan(stdShapeContour('square', 166, 166), {
+    const square = resolveGridPlan(stdShapeContour('square', 164, 164), {
       ...BASE_OPTIONS,
       density: 'standard',
     })
 
-    // The square is the reference: 166 is a zero-point, so its edge anchors sit at the floor.
+    // The square is the reference: 164 is a zero-point, so its edge anchors sit at the floor.
     const sq = axes(square)
     expect(sq.left).toBeCloseTo(FLOOR_MM, 3)
     expect(sq.right).toBeCloseTo(FLOOR_MM, 3)
 
-    // The rectangle's 166 edge must do the same.
+    // The rectangle's 164 edge must do the same.
     const r = axes(rect)
     expect(r.left).toBeCloseTo(FLOOR_MM, 3)
     expect(r.right).toBeCloseTo(FLOOR_MM, 3)
 
-    // The 70 edge is a zero-point too and already registered — it must stay that way.
+    // The 68 edge is a zero-point too and already registered — it must stay that way.
     expect(r.top).toBeCloseTo(FLOOR_MM, 3)
     expect(r.bottom).toBeCloseTo(FLOOR_MM, 3)
 
@@ -87,9 +87,9 @@ describe('edge-registration law — every edge registers on its own zero-point',
   it('leaves no dead border on any rung-by-rung rectangle', () => {
     // Standard/48 rung pairs traced in the design probe.
     const pairs: Array<[number, number]> = [
-      [118, 70],
-      [166, 70],
-      [166, 118],
+      [116, 68],
+      [164, 68],
+      [164, 116],
     ]
     for (const [longMM, shortMM] of pairs) {
       const plan = resolveGridPlan(stdShapeContour('rect', longMM, shortMM), {
@@ -125,7 +125,7 @@ describe('edge-registration law — every edge registers on its own zero-point',
   })
 
   it('still keeps Standard on one 48mm lattice population', () => {
-    const plan = resolveGridPlan(stdShapeContour('rect', 166, 70), {
+    const plan = resolveGridPlan(stdShapeContour('rect', 164, 68), {
       ...BASE_OPTIONS,
       density: 'standard',
     })
@@ -142,7 +142,7 @@ describe('edge-registration law — every edge registers on its own zero-point',
   it('does not trade coverage for registration', () => {
     // Registration leads only inside the conforming pool; an accepted registered layout must still
     // be covered, so zero-point selection cannot bring back a flap-bearing construction.
-    for (const [longMM, shortMM] of [[166, 70], [166, 118]] as Array<[number, number]>) {
+    for (const [longMM, shortMM] of [[164, 68], [164, 116]] as Array<[number, number]>) {
       const plan = resolveGridPlan(stdShapeContour('rect', longMM, shortMM), {
         ...BASE_OPTIONS,
         density: 'standard',
@@ -194,7 +194,7 @@ describe('edge-registration law — every edge registers on its own zero-point',
     // All-or-nothing keeps the axes tied, so symmetry survives. Exact outer-wrap coverage may select
     // a different symmetric pitch on this off-ladder diagnostic size; population is not the law here.
     // This fails loudly if the term is ever loosened back to a partial-credit, asymmetric score.
-    const plan = resolveGridPlan(stdShapeContour('circle', 166, 166), {
+    const plan = resolveGridPlan(stdShapeContour('circle', 164, 164), {
       ...BASE_OPTIONS,
       density: 'light',
     })
