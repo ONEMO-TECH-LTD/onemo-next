@@ -69,12 +69,14 @@ export function eachSeg(path: OutlinePath, visit: (from: Pt, seg: PathSeg) => vo
   for (const seg of path.segs) { visit(from, seg); from = seg.to }
 }
 
-const distToSegment = (p: Pt, a: Pt, b: Pt): number => {
+const segDist2 = (p: Pt, a: Pt, b: Pt): number => {
   const vx = b[0] - a[0], vy = b[1] - a[1]
   const len2 = vx * vx + vy * vy
   const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((p[0] - a[0]) * vx + (p[1] - a[1]) * vy) / len2))
-  return Math.hypot(p[0] - (a[0] + t * vx), p[1] - (a[1] + t * vy))
+  const dx = p[0] - (a[0] + t * vx), dy = p[1] - (a[1] + t * vy)
+  return dx * dx + dy * dy
 }
+const distToSegment = (p: Pt, a: Pt, b: Pt): number => Math.sqrt(segDist2(p, a, b))
 
 /** Distance to an arc: to the circle where the foot of the perpendicular lies on the arc, and to the
  *  nearer end otherwise. This is the whole reason the path exists — on a chopped curve this same
@@ -274,6 +276,20 @@ const box2 = (p: Pt, b: { minX: number; minY: number; maxX: number; maxY: number
   return dx * dx + dy * dy
 }
 
+/** HOW FAR A SUB-CURVE CAN STRAY FROM ITS OWN CHORD. The classical bound: a cubic lies within
+ *  (3/4) of the greater control-point offset from the chord. Taken once per piece at build, it lets a
+ *  query answer with chord arithmetic — the same arithmetic a polygon would use — and reach for the
+ *  exact curve mathematics only where the bound admits the piece could hold the true nearest point.
+ *  Nothing is approximated: the bound decides only whether an exact solve is NEEDED. */
+function chordDeviation(c: Cubic): number {
+  const dx = c.b[0] - c.a[0], dy = c.b[1] - c.a[1]
+  const len = Math.hypot(dx, dy)
+  if (len < 1e-12) return Math.max(
+    Math.hypot(c.c1[0] - c.a[0], c.c1[1] - c.a[1]), Math.hypot(c.c2[0] - c.a[0], c.c2[1] - c.a[1]))
+  const off = (q: Pt) => Math.abs((q[0] - c.a[0]) * dy - (q[1] - c.a[1]) * dx) / len
+  return 0.75 * Math.max(off(c.c1), off(c.c2))
+}
+
 /** Split a cubic at t — de Casteljau, exact: the two halves ARE the curve, not an approximation. */
 function splitCubic(c: Cubic, t: number): [Cubic, Cubic] {
   const m = (p: Pt, q: Pt): Pt => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]
@@ -285,7 +301,9 @@ function splitCubic(c: Cubic, t: number): [Cubic, Cubic] {
 type Piece = { box: { minX: number; minY: number; maxX: number; maxY: number } } & (
   | { kind: 'line'; from: Pt; to: Pt }
   | { kind: 'arc'; from: Pt; seg: Extract<PathSeg, { kind: 'arc' }> }
-  | { kind: 'cubic'; c: Cubic })
+  /** `dev` bounds how far this sub-curve strays from its own chord — the standard control-point
+   *  bound, exact enough to be trusted as a bound and cheap enough to be taken once. */
+  | { kind: 'cubic'; c: Cubic; dev: number; monotoneY: boolean })
 
 /** A path prepared for distance queries, computed ONCE. Two things happen here, both for speed only:
  *  every piece's bounding box is built up front (a solve asks the same outline for millions of
@@ -293,23 +311,86 @@ type Piece = { box: { minX: number; minY: number; maxX: number; maxY: number } }
  *  bound rules out most of the curve before paying for a single quintic root isolation. The answer is
  *  identical either way; only the number of exact solves changes. Keyed on the path object, so a
  *  rebuilt path is a different entry and nothing can go stale. */
-const prepared = new WeakMap<OutlinePath, Piece[]>()
+const prepared = new WeakMap<OutlinePath, Prepared>()
+/** A path's own size, measured once — the scale the inside test nudges its scan line by. */
+const spans = new WeakMap<OutlinePath, number>()
+/** A fine point view kept WITH the path, for one purpose: a tight starting bound for distance
+ *  queries. Its vertices lie ON the curve, so the distance to it is never less than the distance to
+ *  the curve, and never more than `POLY_TOL_MM` beyond it — which is all a bound has to be. Seeding
+ *  from the segment ENDS instead left the bound so loose on a long curve that almost every piece
+ *  survived pruning and paid for a quintic; a blob's largest band took twenty seconds where it used
+ *  to take four (Dan, 2026-09-05: "B4 on Bot is 38 sec ... it was 4-5 sec before"). */
+const POLY_TOL_MM = 0.05
+const polys = new WeakMap<OutlinePath, Pt[]>()
+const polyOf = (path: OutlinePath): Pt[] => {
+  let v = polys.get(path)
+  if (!v) { v = flattenPath(path, POLY_TOL_MM); polys.set(path, v) }
+  return v
+}
 const cubicBox = (c: Cubic) => ({
   minX: Math.min(c.a[0], c.c1[0], c.c2[0], c.b[0]), maxX: Math.max(c.a[0], c.c1[0], c.c2[0], c.b[0]),
   minY: Math.min(c.a[1], c.c1[1], c.c2[1], c.b[1]), maxY: Math.max(c.a[1], c.c1[1], c.c2[1], c.b[1]),
 })
-function piecesOf(path: OutlinePath): Piece[] {
+interface Prepared {
+  pieces: Piece[]
+  /** A uniform grid over the outline: for each cell, the pieces whose box touches it. */
+  cell: number; x0: number; y0: number; nx: number; ny: number
+  bins: Int32Array[]
+  stamp: Int32Array
+  token: number
+  /** Per-query scratch, allocated with the outline: a distance query runs millions of times and must
+   *  not allocate. */
+  lower: Float64Array
+  cand: Int32Array
+}
+
+function piecesOf(path: OutlinePath): Prepared {
   let w = prepared.get(path)
-  if (!w) {
-    w = []
-    eachSeg(path, (from, seg) => {
-      if (seg.kind === 'line') { w!.push({ kind: 'line', from, to: seg.to, box: segBox(from, seg) }); return }
-      if (seg.kind === 'arc') { w!.push({ kind: 'arc', from, seg, box: segBox(from, seg) }); return }
-      const [h1, h2] = splitCubic(cubicOf(from, seg), 0.5)
-      for (const half of [h1, h2]) for (const q of splitCubic(half, 0.5)) w!.push({ kind: 'cubic', c: q, box: cubicBox(q) })
+  if (w) return w
+  const pieces: Piece[] = []
+  eachSeg(path, (from, seg) => {
+    if (seg.kind === 'line') { pieces.push({ kind: 'line', from, to: seg.to, box: segBox(from, seg) }); return }
+    if (seg.kind === 'arc') { pieces.push({ kind: 'arc', from, seg, box: segBox(from, seg) }); return }
+    // THREE LEVELS of exact halving. A sub-curve's box is its control net, which on a long curve
+    // stands clear of the curve itself and so survives pruning it should not; halving tightens the
+    // net quadratically, and it is paid once per outline, not per query.
+    let level: Cubic[] = [cubicOf(from, seg)]
+    for (let i = 0; i < 2; i++) level = level.flatMap((q) => splitCubic(q, 0.5))
+    for (const q of level) pieces.push({
+      kind: 'cubic', c: q, box: cubicBox(q), dev: chordDeviation(q),
+      // no turning point in y: the curve's own y-range is then exactly its endpoints', and a ray
+      // between them crosses it once and only once
+      monotoneY: cubicExtremaT(q.a[1], q.c1[1], q.c2[1], q.b[1]).length === 0,
     })
-    prepared.set(path, w)
+  })
+  // THE INDEX. A solve asks one outline for millions of distances, and every one of them used to walk
+  // every piece — which is why a blob's largest band went from four seconds to nearly forty once the
+  // pieces were curves (Dan, 2026-09-05). A uniform grid makes a query touch only what is near it.
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+  for (const q of pieces) {
+    if (q.box.minX < x0) x0 = q.box.minX; if (q.box.maxX > x1) x1 = q.box.maxX
+    if (q.box.minY < y0) y0 = q.box.minY; if (q.box.maxY > y1) y1 = q.box.maxY
   }
+  const span = Math.max(x1 - x0, y1 - y0, 1e-9)
+  const target = Math.max(8, Math.min(48, Math.round(Math.sqrt(pieces.length) * 2)))
+  const cell = span / target
+  const nx = Math.max(1, Math.ceil((x1 - x0) / cell) + 1), ny = Math.max(1, Math.ceil((y1 - y0) / cell) + 1)
+  const lists: number[][] = Array.from({ length: nx * ny }, () => [])
+  pieces.forEach((q, i) => {
+    const ax = Math.max(0, Math.min(nx - 1, Math.floor((q.box.minX - x0) / cell)))
+    const bx = Math.max(0, Math.min(nx - 1, Math.floor((q.box.maxX - x0) / cell)))
+    const ay = Math.max(0, Math.min(ny - 1, Math.floor((q.box.minY - y0) / cell)))
+    const by = Math.max(0, Math.min(ny - 1, Math.floor((q.box.maxY - y0) / cell)))
+    for (let gy = ay; gy <= by; gy++) for (let gx = ax; gx <= bx; gx++) lists[gy * nx + gx].push(i)
+  })
+  w = {
+    pieces, cell, x0, y0, nx, ny,
+    bins: lists.map((l) => Int32Array.from(l)),
+    stamp: new Int32Array(pieces.length), token: 0,
+    lower: new Float64Array(pieces.length),
+    cand: new Int32Array(pieces.length),
+  }
+  prepared.set(path, w)
   return w
 }
 
@@ -320,42 +401,95 @@ function piecesOf(path: OutlinePath): Piece[] {
  *  On a traced cutout — dozens of cubics, each costing a quintic root isolation — this is the
  *  difference between a solve in seconds and one in minutes, and it cannot change an answer. */
 export function distanceToPathMM(path: OutlinePath, p: Pt): number {
-  const pieces = piecesOf(path)
-  // A bound to prune against, from points that are ON the path: every piece's own ends. Cheap, and it
-  // is a true upper bound on the answer, so it can never exclude the real nearest point.
-  let best2 = Infinity
-  for (const q of pieces) {
-    const e = q.kind === 'cubic' ? q.c.b : q.kind === 'line' ? q.to : q.seg.to
-    const dx = e[0] - p[0], dy = e[1] - p[1]
-    const d2 = dx * dx + dy * dy
-    if (d2 < best2) best2 = d2
+  const g = piecesOf(path)
+  const { pieces, cell, x0, y0, nx, ny, bins, lower } = g
+  const token = ++g.token
+  const stamp = g.stamp
+  // NEAR FIRST, AND CHEAPLY. The index says which pieces are close; the chord bound says which of
+  // those could hold the nearest point; only those are solved exactly. Every step is a bound, so the
+  // answer is the same one an exhaustive exact search gives — what changes is that a solve walked
+  // every piece and paid for a quintic on several of them, tens of thousands of times per band.
+  let bestUpper = Infinity
+  let count = 0
+  const cand = g.cand
+  const cx = Math.max(0, Math.min(nx - 1, Math.floor((p[0] - x0) / cell)))
+  const cy = Math.max(0, Math.min(ny - 1, Math.floor((p[1] - y0) / cell)))
+  const reach = nx + ny
+  for (let r = 0; r <= reach; r++) {
+    if (r > 0 && count > 0) {
+      const inner = (r - 1) * cell
+      if (bestUpper <= inner) break
+    }
+    const gx0 = cx - r, gx1 = cx + r, gy0 = cy - r, gy1 = cy + r
+    if (gx1 < 0 || gy1 < 0 || gx0 >= nx || gy0 >= ny) { if (count > 0) break; else continue }
+    for (let gy = gy0; gy <= gy1; gy++) {
+      if (gy < 0 || gy >= ny) continue
+      const edgeRow = gy === gy0 || gy === gy1
+      for (let gx = gx0; gx <= gx1; gx++) {
+        if (gx < 0 || gx >= nx) continue
+        if (!edgeRow && gx !== gx0 && gx !== gx1) continue
+        const bin = bins[gy * nx + gx]
+        for (let k = 0; k < bin.length; k++) {
+          const i = bin[k]
+          if (stamp[i] === token) continue
+          stamp[i] = token
+          const q = pieces[i]
+          if (q.kind === 'cubic') {
+            const d = Math.sqrt(segDist2(p, q.c.a, q.c.b))
+            lower[i] = d - q.dev
+            if (d + q.dev < bestUpper) bestUpper = d + q.dev
+          } else {
+            const d = q.kind === 'line' ? distToSegment(p, q.from, q.to) : distToArc(p, q.from, q.seg)
+            lower[i] = d
+            if (d < bestUpper) bestUpper = d
+          }
+          cand[count++] = i
+        }
+      }
+    }
   }
-  // straight and circular pieces next: exact and cheap, and they tighten the bound further
-  for (const q of pieces) {
-    if (q.kind === 'cubic' || box2(p, q.box) >= best2) continue
-    const d = q.kind === 'line' ? distToSegment(p, q.from, q.to) : distToArc(p, q.from, q.seg)
-    if (d * d < best2) best2 = d * d
+  let best = bestUpper
+  for (let k = 0; k < count; k++) {
+    const i = cand[k]
+    const q = pieces[i]
+    if (q.kind !== 'cubic' || lower[i] >= best) continue
+    const d = distToCubic(p, q.c)
+    if (d < best) best = d
   }
-  // Curved pieces, NEAREST BOX FIRST. Each exact solve tightens the bound for the rest, and starting
-  // with the piece whose box is closest usually makes that bound final — so the remaining boxes are
-  // all further away and no more quintics are solved. Order changes nothing but the count of solves.
-  let nearest = -1, nearestBox = Infinity
-  for (let i = 0; i < pieces.length; i++) {
-    if (pieces[i].kind !== 'cubic') continue
-    const b = box2(p, pieces[i].box)
-    if (b < nearestBox) { nearestBox = b; nearest = i }
-  }
-  if (nearest >= 0 && nearestBox < best2) {
-    const d = distToCubic(p, (pieces[nearest] as Extract<Piece, { kind: 'cubic' }>).c)
-    if (d * d < best2) best2 = d * d
-  }
+  return best
+}
+
+/** DOES THIS POINT CLEAR THE OUTLINE BY `minMM`? The seat predicate asks exactly this, millions of
+ *  times in a phase sweep, and asking it as "compute the distance, then compare" pays for the nearest
+ *  point on the whole outline when almost every candidate is settled by one piece. Here a piece whose
+ *  chord bound puts it certainly nearer than `minMM` ends the question immediately, and only a piece
+ *  whose bound straddles the threshold is solved exactly. Same answer, a fraction of the work.
+ *
+ *  It walks pieces in index order rather than by locality: a failing candidate usually fails on the
+ *  first nearby piece, and the ring search's own bookkeeping costs more than the scan it saves here. */
+export function clearsPathBy(path: OutlinePath, p: Pt, minMM: number): boolean {
+  const { pieces } = piecesOf(path)
+  const min2 = minMM * minMM
+  const ambiguous: number[] = []
   for (let i = 0; i < pieces.length; i++) {
     const q = pieces[i]
-    if (i === nearest || q.kind !== 'cubic' || box2(p, q.box) >= best2) continue
-    const d = distToCubic(p, q.c)
-    if (d * d < best2) best2 = d * d
+    if (q.kind === 'cubic') {
+      // the chord's own box already answers for a piece that is far away
+      if (box2(p, q.box) >= min2) continue
+      const d = Math.sqrt(segDist2(p, q.c.a, q.c.b))
+      if (d + q.dev < minMM) return false            // certainly nearer than the clearance asked for
+      if (d - q.dev < minMM) ambiguous.push(i)       // the bound straddles it: needs the exact answer
+    } else {
+      if (box2(p, q.box) >= min2) continue
+      const d = q.kind === 'line' ? distToSegment(p, q.from, q.to) : distToArc(p, q.from, q.seg)
+      if (d < minMM) return false
+    }
   }
-  return Math.sqrt(best2)
+  for (const i of ambiguous) {
+    const q = pieces[i] as Extract<Piece, { kind: 'cubic' }>
+    if (distToCubic(p, q.c) < minMM) return false
+  }
+  return true
 }
 
 /** Inside test by ray casting, with arcs crossed analytically rather than through their chords: the
@@ -379,49 +513,55 @@ export function distanceToPathMM(path: OutlinePath, p: Pt): number {
  *  removes every coincidence at once, and cannot change which side of an edge a real point is on. */
 export function pointInPath(path: OutlinePath, p: Pt): boolean {
   const NEAR = 1e-9
-  const b = pathBoundsMM(path)
-  const span = Math.max(b.maxY - b.minY, b.maxX - b.minX)
-  const y = p[1] + (span > 0 ? span * 1e-9 : 1e-12)
-  p = [p[0], y]
+  // The nudge is a property of the SHAPE, not of the query: computing the bounds — which walks every
+  // segment and solves each curve's extremes — on every inside test made a blob's solve take half a
+  // minute (Dan, Safari, 2026-09-05: "31 sec blob b4"). One measurement per outline, kept with it.
+  let span = spans.get(path)
+  if (span === undefined) {
+    const b = pathBoundsMM(path)
+    span = Math.max(b.maxY - b.minY, b.maxX - b.minX)
+    spans.set(path, span)
+  }
+  p = [p[0], p[1] + (span > 0 ? span * 1e-9 : 1e-12)]
   let crossings = 0
+  // THE SUB-CURVES DECIDE MOST CROSSINGS WITHOUT BEING SOLVED. A piece with no turning point in y
+  // spans exactly its endpoints' y-range, so a ray between them meets it once: if the piece lies
+  // wholly to the right the crossing counts, wholly to the left it does not, and only a piece the ray
+  // actually enters needs its roots. Solving every curve instead made a phase sweep pay for certified
+  // root isolation on candidates a comparison settles (Dan, 2026-09-05: the blob's largest band).
+  const { pieces } = piecesOf(path)
+  for (const q of pieces) {
+    if (q.kind !== 'cubic') continue
+    if (q.monotoneY) {
+      const y0 = q.c.a[1], y1 = q.c.b[1]
+      const lo = y0 < y1 ? y0 : y1, hi = y0 < y1 ? y1 : y0
+      if (p[1] <= lo || p[1] > hi) continue           // the ray misses this piece entirely
+      if (q.box.maxX <= p[0]) continue                // it lies behind the ray's origin
+      if (q.box.minX > p[0]) { crossings++; continue } // it lies wholly ahead: exactly one crossing
+    }
+    for (const t of cubicRootsY(q.c, p[1])) {
+      const x = bez(q.c.a[0], q.c.c1[0], q.c.c2[0], q.c.b[0], t)
+      if (x <= p[0]) continue
+      const rise = bezD(q.c.a[1], q.c.c1[1], q.c.c2[1], q.c.b[1], t)
+      if (t < NEAR) { if (rise > 0) crossings++; continue }
+      if (t > 1 - NEAR) { if (rise < 0) crossings++; continue }
+      // A TOUCH IS NOT A CROSSING: where the ray runs through a curve's own extreme the root is
+      // double and the curve turns back without passing through. The sign either side says which.
+      const yOff = (u: number) => bez(q.c.a[1], q.c.c1[1], q.c.c2[1], q.c.b[1], u) - p[1]
+      const h = 1e-6
+      const before = yOff(Math.max(0, t - h)), after = yOff(Math.min(1, t + h))
+      if (before === 0 || after === 0) { if (Math.abs(rise) >= NEAR) crossings++; continue }
+      if (before * after > 0) continue
+      crossings++
+    }
+  }
   eachSeg(path, (from, seg) => {
+    if (seg.kind === 'cubic') return                    // answered above, piece by piece
     if (seg.kind === 'line') {
       const [ax, ay] = from, [bx, by] = seg.to
       if ((ay > p[1]) !== (by > p[1])) {
         const x = ax + ((p[1] - ay) / (by - ay)) * (bx - ax)
         if (x > p[0]) crossings++
-      }
-      return
-    }
-    if (seg.kind === 'cubic') {
-      // the ray meets the curve where B_y(t) = p[1]; each root is a crossing if it is to the right,
-      // with the same half-open rule via the curve's direction there.
-      // A curve whose control net lies wholly above, below, or left of the ray cannot meet it to the
-      // right — the net contains the curve — so it is skipped before paying for a root isolation.
-      const c = cubicOf(from, seg)
-      const loY = Math.min(c.a[1], c.c1[1], c.c2[1], c.b[1]), hiY = Math.max(c.a[1], c.c1[1], c.c2[1], c.b[1])
-      if (p[1] < loY - NEAR || p[1] > hiY + NEAR) return
-      if (Math.max(c.a[0], c.c1[0], c.c2[0], c.b[0]) <= p[0]) return
-      for (const t of cubicRootsY(c, p[1])) {
-        const x = bez(c.a[0], c.c1[0], c.c2[0], c.b[0], t)
-        if (x <= p[0]) continue
-        const rise = bezD(c.a[1], c.c1[1], c.c2[1], c.b[1], t)
-        if (t < NEAR) { if (rise > 0) crossings++; continue }
-        if (t > 1 - NEAR) { if (rise < 0) crossings++; continue }
-        // A TOUCH IS NOT A CROSSING. Where the ray runs through a curve's own extreme — the lowest
-        // point of a shape, say — the root is DOUBLE: the curve reaches the line and turns back
-        // without passing through. The derivative is zero there in theory and merely tiny in
-        // arithmetic, so testing it decided parity on rounding, and a scan line grazing a traced
-        // cutout's lowest point made everything to its left read as INSIDE — a phantom legal island
-        // outside the shape, which the engine then centred a layout on (Dan, 2026-09-05, the duck).
-        // The sign of the curve either side of the root cannot be fooled that way: it changes on a
-        // real crossing and does not on a touch.
-        const yOff = (u: number) => bez(c.a[1], c.c1[1], c.c2[1], c.b[1], u) - p[1]
-        const h = 1e-6
-        const before = yOff(Math.max(0, t - h)), after = yOff(Math.min(1, t + h))
-        if (before === 0 || after === 0) { if (Math.abs(rise) >= NEAR) crossings++; continue }
-        if (before * after > 0) continue
-        crossings++
       }
       return
     }

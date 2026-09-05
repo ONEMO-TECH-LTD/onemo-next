@@ -50,18 +50,31 @@ export function safeSegments(
   // A supplied hole is a MATERIAL BOUNDARY: the legal area must stop at its edge exactly as it
   // stops at the outline. Measuring the outer ring alone put legal-area centres inside holes.
   //
-  // WHERE THE OUTLINE IS A PATH, IT IS MEASURED AS ONE. The decimation is a cost control for a ring
-  // born as thousands of traced points, and it moves the edge by up to 0.03mm — which the drawn
-  // island curve then sat on exactly, being a faithful curve through a slightly wrong field. A path
-  // costs nothing to keep here (its rings carry their own curves) and the field becomes the true one.
-  const measured: Contour = contour.outer.path
-    ? { outer: contour.outer, holes: contour.holes.map((h) => (h.path ? h : { pts: decimate(h.pts) })) }
-    : { outer: { pts: ring }, holes: contour.holes.map((h) => ({ pts: decimate(h.pts) })) }
+  // TWO FIELDS, and the difference between them is deliberate.
+  //
+  // The MESH is a 2mm sampling grid. What it needs from the boundary is a value per sample, tens of
+  // thousands of times per solve, and its own grain is a thousand times coarser than the point view's
+  // error. Measuring every sample against the curve made a blob's largest band take half a minute
+  // where it used to take four seconds (Dan, 2026-09-05) and bought accuracy the grid cannot express.
+  //
+  // The EDGE IT DRAWS is the opposite: a few hundred points, each pulled onto the boundary and then
+  // fitted into the curve the screen strokes. Those go to the path, which is why the drawn island now
+  // sits 0.0024mm from the true clearance line instead of 0.015mm.
+  //
+  // Neither is magnet legality. That is decided per magnet, against the path, by the seat predicate.
+  const measured: Contour = { outer: { pts: ring }, holes: contour.holes.map((h) => ({ pts: decimate(h.pts) })) }
   const r = spotRadiusMM
   const signed = (p: Pt): number => {
     const d = edgeDistToContourMM(measured, p)
     return pointInContour(p, measured) ? d - r : -(d + r)
   }
+  /** The same field taken against the outline itself — for the handful of points that are drawn. */
+  const signedExact = contour.outer.path
+    ? (p: Pt): number => {
+        const d = edgeDistToContourMM(contour, p)
+        return pointInContour(p, contour) ? d - r : -(d + r)
+      }
+    : signed
   const step = 2 // mesh grain, mm
   const bb = bbox(ring)
   // One sample beyond the box on every side so outlines always close.
@@ -90,10 +103,10 @@ export function safeSegments(
     // that span, and enough steps to converge, put them on it.
     const e = 0.05
     for (let it = 0; it < 8; it++) {
-      const s = signed(q) - thr
+      const s = signedExact(q) - thr
       if (Math.abs(s) < ISO_SNAP_MM) break
-      const gx = (signed([q[0] + e, q[1]]) - signed([q[0] - e, q[1]])) / (2 * e)
-      const gy = (signed([q[0], q[1] + e]) - signed([q[0], q[1] - e])) / (2 * e)
+      const gx = (signedExact([q[0] + e, q[1]]) - signedExact([q[0] - e, q[1]])) / (2 * e)
+      const gy = (signedExact([q[0], q[1] + e]) - signedExact([q[0], q[1] - e])) / (2 * e)
       const g2 = gx * gx + gy * gy
       if (g2 < 1e-9) break
       q = [q[0] - s * gx / g2, q[1] - s * gy / g2]

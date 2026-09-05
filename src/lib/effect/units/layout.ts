@@ -13,7 +13,7 @@ import { MIN_ANCHORS } from '../grid-magnet-spec'
 import {
   bbox, edgeDistMM, edgeDistToContourMM, pointInOuter,
 } from '../foundation/geometry'
-import { distanceToPathMM, pointInPath } from '../foundation/path'
+import { clearsPathBy, pointInPath } from '../foundation/path'
 import {
   BANDS, DEFAULT_PITCH_MM, FIELD_POSITIONS_PER_AXIS, PADDING_FLOOR_MM, PHASE_STEP_MM, SNAP_STEP_MM,
 } from '../grid-magnet-spec'
@@ -164,14 +164,17 @@ export function makeContourSeatPredicate(
   contour: Contour, spotRadiusMM: number,
 ): ((pt: Pt) => boolean) | null {
   const path = contour.outer.path
+  // Clearance first: it is the cheaper question and the one most candidates fail (a phase sweep spends
+  // its time just outside the legal area), and asked as a THRESHOLD it stops at the first piece that
+  // settles it instead of finding the nearest point on the whole outline.
   const outerFits = path
-    ? (pt: Pt) => pointInPath(path, pt) && distanceToPathMM(path, pt) + SEAT_QUANTUM_MM / 2 >= spotRadiusMM
+    ? (pt: Pt) => clearsPathBy(path, pt, spotRadiusMM - SEAT_QUANTUM_MM / 2) && pointInPath(path, pt)
     : makeSeatPredicate(contour.outer.pts, spotRadiusMM)
   if (!outerFits) return null
   if (!contour.holes.length) return outerFits
   // a hole is a boundary like the outline, and a hole with a path is measured exactly like one
   const holeBlocks = (h: Contour['holes'][number], pt: Pt) => h.path
-    ? pointInPath(h.path, pt) || distanceToPathMM(h.path, pt) < spotRadiusMM
+    ? pointInPath(h.path, pt) || !clearsPathBy(h.path, pt, spotRadiusMM)
     : pointInOuter(pt, h.pts) || edgeDistMM(h.pts, pt) < spotRadiusMM
   return (pt: Pt) => outerFits(pt) && !contour.holes.some((h) => holeBlocks(h, pt))
 }
