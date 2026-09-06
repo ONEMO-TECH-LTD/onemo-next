@@ -93,12 +93,11 @@ function discOutline(nodesMM: readonly PointMM[]): LibraryOutline {
  *  (Dan, 2026-09-06: "we are in the library we need mathematical way to determine not using the
  *  solver"). The shape is free to grow past the frame, as the pill's does.
  *
- *  The centre is the population's bounding-box centre, true because these populations are masks of a
- *  square patch and therefore symmetric about it, so a record carries magnets and a recipe and the
- *  shape follows. */
-function regularOutline(nodesMM: readonly PointMM[], sides: number): LibraryOutline {
-  const xs = nodesMM.map(([x]) => x), ys = nodesMM.map(([, y]) => y)
-  const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2
+ *  The centre comes from the record, not from the magnets' bounding box: an odd-sided polygon's
+ *  complete population is not symmetric about its centre, and deriving it would move the shape off
+ *  the population it was sized for — reopening seats the record does not hold. */
+function regularOutline(nodesMM: readonly PointMM[], sides: number, centreMM: PointMM): LibraryOutline {
+  const [cx, cy] = centreMM
   const apothem = Math.cos(Math.PI / sides)
   // a corner at the top, so the first edge normal sits half a step round from it
   const normals = Array.from({ length: sides }, (_, k) => {
@@ -125,8 +124,8 @@ export function outlineFromLayout(nodesMM: readonly PointMM[], recipe: OutlineRe
   if (!nodesMM.length) throw new Error('library: empty population has no outline')
   if (recipe.corners === 'disc') return discOutline(nodesMM)
   if (recipe.corners === 'regular') {
-    if (!recipe.sides) throw new Error('library: a regular outline needs its side count')
-    return regularOutline(nodesMM, recipe.sides)
+    if (!recipe.sides || !recipe.centreMM) throw new Error('library: a regular outline needs its side count and centre')
+    return regularOutline(nodesMM, recipe.sides, recipe.centreMM)
   }
   if (recipe.corners === 'stadium') return stadiumOutline(nodesMM)
   const hull = convexHull(nodesMM)

@@ -9,9 +9,10 @@ export type CornerMode = 'sharp' | 'bevel' | 'round' | 'stadium' | 'disc' | 'reg
 export interface OutlineRecipe {
   corners: CornerMode
   pointRotationDeg?: number
-  /** `regular` only: how many sides the boundary has. Its size is then arithmetic over the magnets
-   *  it holds — see regularOutline. */
+  /** `regular` only: how many sides the boundary has, and the centre it is drawn about, in the same
+   *  millimetres as the magnets. Its size is then arithmetic over the magnets it holds. */
   sides?: number
+  centreMM?: readonly [number, number]
 }
 
 /** Which way round a frame sits. A fact of the record, not a transform of it: a 3x4 and a 4x3

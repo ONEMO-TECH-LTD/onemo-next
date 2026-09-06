@@ -1,6 +1,9 @@
 import { transformLayout } from './transforms'
-import { BOARD_HEIGHT_MM, BOARD_WIDTH_MM } from '../grid-magnet-spec'
+import { BOARD_HEIGHT_MM, BOARD_WIDTH_MM, RELEASED_PADDING_MM } from '../grid-magnet-spec'
 import type { FrameExtent, LibraryLayout, LibraryTransform, PointMM } from './types'
+
+/** THE RIM IN LATTICE UNITS — the released rim, expressed in the units a mask counts in. */
+export const rimLattice = (pitchMM: number): number => RELEASED_PADDING_MM / pitchMM
 
 /** THE BOARD IN POSITIONS, per lattice — the inverse of the flip below: millimetres to a position
  *  count. The board is fixed at 384x480mm of legal area; a coarser pitch reaches it with fewer

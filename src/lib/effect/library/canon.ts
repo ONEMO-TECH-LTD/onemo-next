@@ -161,6 +161,58 @@ export function circleLayouts(pitchMM: number): ReadonlyArray<{ nodes: Pt[]; col
   return out.sort((a, b) => a.nodes.length - b.nodes.length)
 }
 
+/** A POLYGON'S POPULATION — the square canon decides how big the shape is, and the shape then holds
+ *  EVERY seat it legally can.
+ *
+ *  Both halves matter and I shipped only the first. A published record is a complete population: the
+ *  square is fully populated, the diamond is its whole mask, the pill takes the magnets its ends grew
+ *  room for. A pentagon drawn around a 4x4 square is much bigger than that square, so it has seats to
+ *  spare — and a record that leaves them empty is not a vetted layout (Dan, 2026-09-06: "no empty
+ *  seats how do you even let it be?").
+ *
+ *  Both halves are arithmetic. A regular polygon is the intersection of `sides` half-planes whose
+ *  normals never move, so the scale that clears the square canon is
+ *      scale = max over the square's magnets, over edges, of (p·n_k + rim) / cos(pi/n)
+ *  and the population is every lattice node the polygon at THAT scale clears:
+ *      p·n_k <= scale·cos(pi/n) − rim, for every edge.
+ *  Adding those nodes cannot change the scale — they were chosen for clearing it — so it is one pass,
+ *  no search, and the outline recomputes the same number from the finished population. */
+export function polygonPopulation(
+  sides: number, cols: number, rows: number, rimLattice: number,
+): { nodes: Pt[]; centre: Pt } {
+  const cx = (cols - 1) / 2, cy = (rows - 1) / 2
+  const apothem = Math.cos(Math.PI / sides)
+  const normals = Array.from({ length: sides }, (_, k) => {
+    const a = Math.PI / 2 + Math.PI / sides + (2 * Math.PI * k) / sides
+    return [Math.cos(a), Math.sin(a)] as const
+  })
+  // The lattice counts rows DOWNWARD and the finished record is laid out y-UP (placeMM flips it), so
+  // the boundary is measured in the placed orientation. Selecting against the unflipped one chose the
+  // population of a pentagon pointing the other way, and the shape that was drawn around them then
+  // had to grow to cover magnets it was never sized for.
+  const demand = (x: number, y: number) => Math.max(
+    ...normals.map(([nx, ny]) => ((x - cx) * nx + (cy - y) * ny + rimLattice) / apothem))
+  let scale = 0
+  for (const [x, y] of fullNodes(cols, rows)) {
+    const need = demand(x, y)
+    if (need > scale) scale = need
+  }
+  const reach = Math.ceil(scale) + 1
+  const held: Pt[] = []
+  for (let x = Math.floor(cx) - reach; x <= Math.ceil(cx) + reach; x++)
+    for (let y = Math.floor(cy) - reach; y <= Math.ceil(cy) + reach; y++)
+      if (demand(x, y) <= scale + 1e-9) held.push([x, y])
+  const xs = held.map(([x]) => x), ys = held.map(([, y]) => y)
+  const ox = Math.min(...xs), oy = Math.min(...ys)
+  return {
+    nodes: held.map(([x, y]) => [x - ox, y - oy] as Pt).sort((a, b) => a[0] - b[0] || a[1] - b[1]),
+    // An odd-sided polygon's complete population is NOT symmetric about its centre — a pentagon
+    // holds an extra row along its flat bottom — so the centre cannot be read off the bounding box
+    // and the record states it, exactly as the stadium takes the frame rather than the magnets.
+    centre: [cx - ox, cy - oy],
+  }
+}
+
 /** The circle's frames. ONE POPULATION PER RECORD, like every other class — a 3x3 box holds both the
  *  nine-magnet disc and the five-magnet cross, and those are two products rather than one product
  *  with a second panel of settings. They share an extent, so each states its own key. */

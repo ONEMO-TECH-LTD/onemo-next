@@ -12,7 +12,7 @@ interface RegistryClassConfig {
   typeOfFrame(frame: LibraryFrame): string
   label(frame: LibraryFrame): string
   orientations: readonly { id: string; view: LibraryTransform }[]
-  outline: OutlineRecipe | ((frame: LibraryFrame) => OutlineRecipe)
+  outline: OutlineRecipe | ((frame: LibraryFrame, pitchMM: number) => OutlineRecipe)
   validateDraft(draft: DraftShape, frame: LibraryFrame): string[]
   draftMatches(draft: DraftIdentity, sel: LibrarySelection, frameKey: string): boolean
   draftIdParts(sel: LibrarySelection, frameKey: string): DraftIdentity
@@ -59,7 +59,7 @@ export function registryClass(config: RegistryClassConfig): LibraryClass {
       bandId: band,
       orientation: frame.cols === frame.rows ? 'square' : frame.rows > frame.cols ? 'portrait' : 'landscape',
       frame, view: none,
-      outline: typeof config.outline === 'function' ? config.outline(frame) : config.outline,
+      outline: typeof config.outline === 'function' ? config.outline(frame, pitchMM) : config.outline,
       selection: { classId: config.classId, frameKey: frameKeyOf(frame) },
     }
   }
