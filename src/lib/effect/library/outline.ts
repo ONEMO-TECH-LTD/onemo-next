@@ -66,8 +66,20 @@ function stadiumOutline(nodesMM: readonly PointMM[]): LibraryOutline {
   return sized(flattenPath(path, MANUFACTURING_OFFSET_ARC_TOLERANCE_MM), path)
 }
 
+/** THE DISC — the circle the population fits in: centred on the population's own middle, with the
+ *  radius that reaches its furthest magnet plus the rim. One arc pair, exact, rather than a hull
+ *  offset that would draw a many-sided rounded polygon and call it round. */
+function discOutline(nodesMM: readonly PointMM[]): LibraryOutline {
+  const xs = nodesMM.map(([x]) => x), ys = nodesMM.map(([, y]) => y)
+  const centre: PointMM = [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2]
+  const reach = Math.max(...nodesMM.map(([x, y]) => Math.hypot(x - centre[0], y - centre[1])))
+  const path = offsetConvexRingPath([[centre[0], centre[1]]], reach + RELEASED_PADDING_MM)
+  return sized(flattenPath(path, MANUFACTURING_OFFSET_ARC_TOLERANCE_MM), path)
+}
+
 export function outlineFromLayout(nodesMM: readonly PointMM[], recipe: OutlineRecipe): LibraryOutline {
   if (!nodesMM.length) throw new Error('library: empty population has no outline')
+  if (recipe.corners === 'disc') return discOutline(nodesMM)
   if (recipe.corners === 'stadium') return stadiumOutline(nodesMM)
   const hull = convexHull(nodesMM)
   if (!hull.length) throw new Error('library: empty population has no outline')

@@ -2,8 +2,9 @@ import type { LibraryFamily, LibraryFrame, LibrarySelection, LibraryTransform } 
 
 /** How a population's outline finishes. The first three are offset joins on the population's own hull;
  *  `stadium` is not a join at all — it is the frame's box carried out to the largest circular radius
- *  the lattice allows, which is why it needs the frame rather than the surviving magnets. */
-export type CornerMode = 'sharp' | 'bevel' | 'round' | 'stadium'
+ *  the lattice allows, which is why it needs the frame rather than the surviving magnets. `disc` is
+ *  the circle the population fits in: its own centre, its furthest magnet, plus the rim. */
+export type CornerMode = 'sharp' | 'bevel' | 'round' | 'stadium' | 'disc'
 
 export interface OutlineRecipe {
   corners: CornerMode

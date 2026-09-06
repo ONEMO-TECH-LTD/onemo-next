@@ -118,6 +118,66 @@ export function pillFrames(pitchMM: number): readonly LibraryFrame[] {
   }).filter((frame) => frame.cols <= board.cols && frame.rows <= board.rows)
 }
 
+/** THE CIRCLE'S POPULATIONS — what a round shape can actually hold, which is not what a square box
+ *  of the same width holds. A circle of 216mm classifies as a 5x5 box and cannot seat one: the corner
+ *  node of a full 5x5 sits 96*sqrt(2) = 135.8mm from the centre and needs 147.8mm of radius, so the
+ *  solver was left to discover a partial frame by search and delivered 18 of 25 with the gaps wherever
+ *  the phase happened to fall (Dan, 2026-09-06: "add to the library circle so we do not guess it").
+ *
+ *  Published as arithmetic, like every other canon: grow a radius from the centre and take every
+ *  lattice node inside it. Each distinct radius that admits a new node is a distinct population. Two
+ *  centres exist on a lattice and both are real products — ON a node (odd counts: 1, 5, 9, 13, 21) and
+ *  on a cell centre, halfway between four (even counts: 4, 12, 16). Nothing is masked or chosen; the
+ *  lattice and the circle decide together.
+ *
+ *  The outline is then the circle these nodes fit in — max node distance plus the rim — which the
+ *  outline recipe draws exactly rather than as a rounded polygon. */
+export function circleLayouts(pitchMM: number): ReadonlyArray<{ nodes: Pt[]; cols: number; rows: number }> {
+  const board = boardPositions(pitchMM)
+  const reach = Math.max(board.cols, board.rows)
+  const out: Array<{ nodes: Pt[]; cols: number; rows: number }> = []
+  const seen = new Set<string>()
+  for (const onNode of [true, false]) {
+    // candidate nodes about the centre, in lattice units; a cell centre sits at (0.5, 0.5)
+    const off = onNode ? 0 : 0.5
+    const grid: Array<{ x: number; y: number; d: number }> = []
+    for (let x = -reach; x <= reach; x++) for (let y = -reach; y <= reach; y++)
+      grid.push({ x, y, d: Math.hypot(x - off, y - off) })
+    const radii = [...new Set(grid.map((g) => +g.d.toFixed(9)))].sort((a, b) => a - b)
+    for (const r of radii) {
+      const held = grid.filter((g) => g.d <= r + 1e-9)
+      const xs = held.map((g) => g.x), ys = held.map((g) => g.y)
+      const cols = Math.max(...xs) - Math.min(...xs) + 1, rows = Math.max(...ys) - Math.min(...ys) + 1
+      if (cols > board.cols || rows > board.rows) break
+      const ox = Math.min(...xs), oy = Math.min(...ys)
+      const nodes = held.map((g) => [g.x - ox, g.y - oy] as Pt)
+        .sort((a, b) => a[0] - b[0] || a[1] - b[1])
+      const key = nodes.map((n) => n.join(',')).join(';')
+      if (seen.has(key)) continue
+      seen.add(key)
+      out.push({ nodes, cols, rows })
+    }
+  }
+  return out.sort((a, b) => a.nodes.length - b.nodes.length)
+}
+
+/** The circle's frames. Several populations share a bounding box — a 3x3 box holds both the five-node
+ *  cross and the nine-node disc — so they are published as separate LAYOUTS of one frame, which is
+ *  what layouts are for. */
+export function circleFrames(pitchMM: number): readonly LibraryFrame[] {
+  const extents = new Map<string, { cols: number; rows: number }>()
+  const grouped = new Map<string, Array<{ name: string; nodes: Pt[] }>>()
+  for (const layout of circleLayouts(pitchMM)) {
+    const key = layout.cols + 'x' + layout.rows
+    extents.set(key, { cols: layout.cols, rows: layout.rows })
+    grouped.set(key, [...(grouped.get(key) ?? []), { name: DISC_LAYOUT + layout.nodes.length, nodes: layout.nodes }])
+  }
+  return [...grouped.entries()].map(([key, layouts]) => ({ ...extents.get(key)!, layouts }))
+}
+
+/** A circle population's name carries its count, because a frame publishes more than one. */
+export const DISC_LAYOUT = 'disc'
+
 /** How narrow a rectangular frame is on its minor axis — independent of which way round it sits:
  *  a 2×5 and a 5×2 are both banners. Shared for the same reason as the frame set. */
 export const rectangularTypeOf = (cols: number, rows: number): string =>

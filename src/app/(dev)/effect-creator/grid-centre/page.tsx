@@ -16,7 +16,7 @@ import {
   DEFAULT_LIBRARY_BROWSE,
   type LibraryBrowse, type LibraryDraft, type LibraryEdit, type LibrarySelection,
 } from '@/lib/effect/library'
-import { getShape, hasVectorDef, type VectorShapeKind } from '@/lib/shape-library'
+import { getShape, hasVectorDef, isExactCircle, type VectorShapeKind } from '@/lib/shape-library'
 import { type VShape } from '@/lib/vector-core'
 import { type ShapeKind } from '../v5.3.1/user/shapes'
 import { vecFromGenerator } from '../v5.3.1/user/editor/producers'
@@ -370,7 +370,7 @@ export default function GridLab() {
     const w = workerRef.current
     if (!w || !bandScopeReady) return
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
-    const cfg = { pitchMM: pitch, paddingMM: pad, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle', classifierRuler: ruler }
+    const cfg = { pitchMM: pitch, paddingMM: pad, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && isExactCircle(preset), classifierRuler: ruler }
     // Manual in a band (forced registration OR manual band scale): the walk is meaningless —
     // solve that size directly, exactly like free mode, band chip stays active.
     const manualBand = manual !== null || bandScale !== null   // manual scale/pan: solved directly at the requested size
