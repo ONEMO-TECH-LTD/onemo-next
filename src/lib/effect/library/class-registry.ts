@@ -4,6 +4,7 @@ import { diamondClass } from './diamond-class'
 import { triangleClass } from './triangle-class'
 import { pillClass } from './pill-class'
 import { circleClass } from './circle-class'
+import { polygonClass } from './polygon-class'
 import type { LibraryClass } from './class-contract'
 import type { LibraryFamily } from './types'
 
@@ -14,6 +15,7 @@ export const CLASS_SPECS = {
   triangle: triangleClass,
   pill: pillClass,
   circle: circleClass,
+  polygon: polygonClass,
 } as const satisfies Record<string, LibraryClass>
 
 type RegisteredClassId = keyof typeof CLASS_SPECS

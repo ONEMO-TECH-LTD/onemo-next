@@ -4,11 +4,14 @@ import type { LibraryFamily, LibraryFrame, LibrarySelection, LibraryTransform } 
  *  `stadium` is not a join at all — it is the frame's box carried out to the largest circular radius
  *  the lattice allows, which is why it needs the frame rather than the surviving magnets. `disc` is
  *  the circle the population fits in: its own centre, its furthest magnet, plus the rim. */
-export type CornerMode = 'sharp' | 'bevel' | 'round' | 'stadium' | 'disc'
+export type CornerMode = 'sharp' | 'bevel' | 'round' | 'stadium' | 'disc' | 'regular'
 
 export interface OutlineRecipe {
   corners: CornerMode
   pointRotationDeg?: number
+  /** `regular` only: how many sides the boundary has. Its size is then arithmetic over the magnets
+   *  it holds — see regularOutline. */
+  sides?: number
 }
 
 /** Which way round a frame sits. A fact of the record, not a transform of it: a 3x4 and a 4x3

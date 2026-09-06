@@ -77,9 +77,57 @@ function discOutline(nodesMM: readonly PointMM[]): LibraryOutline {
   return sized(flattenPath(path, MANUFACTURING_OFFSET_ARC_TOLERANCE_MM), path)
 }
 
+/** A REGULAR BOUNDARY around the magnets, in CLOSED FORM.
+ *
+ *  A regular polygon is the intersection of `sides` half-planes. Each edge's outward normal is a fixed
+ *  direction — it does not move when the shape grows — and the edge itself sits at `scale · cos(pi/n)`
+ *  along that normal. So a magnet at p clears edge k by the rim exactly when
+ *
+ *      p · n_k  <=  scale · cos(pi/n) − rim
+ *
+ *  and the record's size is the largest demand any magnet makes of any edge:
+ *
+ *      scale = max over magnets, over edges, of (p · n_k + rim) / cos(pi/n)
+ *
+ *  That is arithmetic over the population — no search, no solver, which is what the library is for
+ *  (Dan, 2026-09-06: "we are in the library we need mathematical way to determine not using the
+ *  solver"). The shape is free to grow past the frame, as the pill's does.
+ *
+ *  The centre is the population's bounding-box centre, true because these populations are masks of a
+ *  square patch and therefore symmetric about it, so a record carries magnets and a recipe and the
+ *  shape follows. */
+function regularOutline(nodesMM: readonly PointMM[], sides: number): LibraryOutline {
+  const xs = nodesMM.map(([x]) => x), ys = nodesMM.map(([, y]) => y)
+  const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2
+  const apothem = Math.cos(Math.PI / sides)
+  // a corner at the top, so the first edge normal sits half a step round from it
+  const normals = Array.from({ length: sides }, (_, k) => {
+    const a = Math.PI / 2 + Math.PI / sides + (2 * Math.PI * k) / sides
+    return [Math.cos(a), Math.sin(a)] as const
+  })
+  let scale = 0
+  for (const [x, y] of nodesMM) {
+    const px = x - cx, py = y - cy
+    for (const [nx, ny] of normals) {
+      const need = (px * nx + py * ny + RELEASED_PADDING_MM) / apothem
+      if (need > scale) scale = need
+    }
+  }
+  const pts: PointMM[] = Array.from({ length: sides }, (_, i) => {
+    const a = Math.PI / 2 + (2 * Math.PI * i) / sides
+    return [cx + scale * Math.cos(a), cy + scale * Math.sin(a)] as PointMM
+  })
+  const path = pathFromAnchors(pts.map(([x, y]) => ({ p: { x, y } })), (v) => [v.x, v.y])
+  return sized(pts, path)
+}
+
 export function outlineFromLayout(nodesMM: readonly PointMM[], recipe: OutlineRecipe): LibraryOutline {
   if (!nodesMM.length) throw new Error('library: empty population has no outline')
   if (recipe.corners === 'disc') return discOutline(nodesMM)
+  if (recipe.corners === 'regular') {
+    if (!recipe.sides) throw new Error('library: a regular outline needs its side count')
+    return regularOutline(nodesMM, recipe.sides)
+  }
   if (recipe.corners === 'stadium') return stadiumOutline(nodesMM)
   const hull = convexHull(nodesMM)
   if (!hull.length) throw new Error('library: empty population has no outline')

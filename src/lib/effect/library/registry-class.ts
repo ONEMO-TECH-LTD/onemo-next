@@ -12,7 +12,7 @@ interface RegistryClassConfig {
   typeOfFrame(frame: LibraryFrame): string
   label(frame: LibraryFrame): string
   orientations: readonly { id: string; view: LibraryTransform }[]
-  outline: OutlineRecipe
+  outline: OutlineRecipe | ((frame: LibraryFrame) => OutlineRecipe)
   validateDraft(draft: DraftShape, frame: LibraryFrame): string[]
   draftMatches(draft: DraftIdentity, sel: LibrarySelection, frameKey: string): boolean
   draftIdParts(sel: LibrarySelection, frameKey: string): DraftIdentity
@@ -37,6 +37,18 @@ export function boundsAndDuplicateErrors(draft: DraftShape, frame: LibraryFrame)
 }
 
 export function registryClass(config: RegistryClassConfig): LibraryClass {
+  // A class's frames are arithmetic over the pitch and never change within a run, but `variants` is
+  // asked once per TYPE and the catalogue asks for every type: a family with nine types regenerated
+  // its whole frame list nine times, and the generated families made that the difference between a
+  // catalogue in a second and one that does not finish (2026-09-06).
+  const framesByPitch = new Map<number, readonly LibraryFrame[]>()
+  const frames = (pitchMM: number): readonly LibraryFrame[] => {
+    const hit = framesByPitch.get(pitchMM)
+    if (hit) return hit
+    const built = config.frames(pitchMM)
+    framesByPitch.set(pitchMM, built)
+    return built
+  }
   const variant = (frame: LibraryFrame, typeId: string, pitchMM: number): ClassVariant => {
     const band = bandOfFrame(frame, pitchMM)
     return {
@@ -47,12 +59,12 @@ export function registryClass(config: RegistryClassConfig): LibraryClass {
       bandId: band,
       orientation: frame.cols === frame.rows ? 'square' : frame.rows > frame.cols ? 'portrait' : 'landscape',
       frame, view: none,
-      outline: config.outline,
+      outline: typeof config.outline === 'function' ? config.outline(frame) : config.outline,
       selection: { classId: config.classId, frameKey: frameKeyOf(frame) },
     }
   }
   const variantFrame = (sel: LibrarySelection, pitchMM: number) => {
-    const frame = config.frames(pitchMM).find((candidate) => frameKeyOf(candidate) === sel.frameKey)
+    const frame = frames(pitchMM).find((candidate) => frameKeyOf(candidate) === sel.frameKey)
     if (!frame) throw new Error('library: unknown frameKey ' + sel.frameKey)
     return frame
   }
@@ -63,7 +75,7 @@ export function registryClass(config: RegistryClassConfig): LibraryClass {
     types: config.types,
     variants: (typeId, pitchMM) => {
       assertTypeId(config.classId, config.types, typeId)
-      return config.frames(pitchMM).filter((frame) => config.typeOfFrame(frame) === typeId)
+      return frames(pitchMM).filter((frame) => config.typeOfFrame(frame) === typeId)
         .map((frame) => variant(frame, typeId, pitchMM))
     },
     variantOf: (sel, pitchMM) => {
@@ -77,7 +89,7 @@ export function registryClass(config: RegistryClassConfig): LibraryClass {
   }
   const controls: ClassControls = {
     open: (current, pitchMM) => {
-      const frame = config.frames(pitchMM)[0]
+      const frame = frames(pitchMM)[0]
       return { ...current, classId: config.classId, geometryId: undefined, frameKey: frameKeyOf(frame), layoutId: frame.layouts[0].name, view: none }
     },
     orientations: config.orientations,

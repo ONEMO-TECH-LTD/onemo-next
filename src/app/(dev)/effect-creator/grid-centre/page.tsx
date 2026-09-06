@@ -16,7 +16,7 @@ import {
   DEFAULT_LIBRARY_BROWSE,
   type LibraryBrowse, type LibraryDraft, type LibraryEdit, type LibrarySelection,
 } from '@/lib/effect/library'
-import { getShape, hasVectorDef, isExactCircle, type VectorShapeKind } from '@/lib/shape-library'
+import { dialOf, getShape, hasVectorDef, isExactCircle, type VectorShapeKind } from '@/lib/shape-library'
 import { type VShape } from '@/lib/vector-core'
 import { type ShapeKind } from '../v5.3.1/user/shapes'
 import { vecFromGenerator } from '../v5.3.1/user/editor/producers'
@@ -639,8 +639,8 @@ export default function GridLab() {
                   <button key={k} aria-pressed={preset === k} onClick={() => setPreset(k as VectorShapeKind)}><b>{k}</b></button>
                 ))}
               </div>
-              {preset === 'polygon' && <Slider label="Sides" v={sides} set={setSides} min={3} max={12} />}
-              {preset === 'star' && <Slider label="Points" v={points} set={setPoints} min={3} max={12} />}
+              {dialOf(preset) === 'sides' && <Slider label="Sides" v={sides} set={setSides} min={3} max={12} />}
+              {dialOf(preset) === 'points' && <Slider label="Points" v={points} set={setPoints} min={3} max={12} />}
             </>}
 
             {src === 'gen' && <>
