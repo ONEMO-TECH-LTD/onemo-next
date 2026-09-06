@@ -172,7 +172,17 @@ export function circleFrames(pitchMM: number): readonly LibraryFrame[] {
     extents.set(key, { cols: layout.cols, rows: layout.rows })
     grouped.set(key, [...(grouped.get(key) ?? []), { name: DISC_LAYOUT + layout.nodes.length, nodes: layout.nodes }])
   }
-  return [...grouped.entries()].map(([key, layouts]) => ({ ...extents.get(key)!, layouts }))
+  // FULLEST FIRST, so a frame opens on the population that matches the square of the same frame and
+  // the sparser discs stand beside it as alternatives (Dan, 2026-09-06: "we must follow square add
+  // the 9 points but also add alternative layouts like band 3 current 5 points"). A 3x3 therefore
+  // opens on the nine-node disc — the square's own band-three population, wrapped in the circle that
+  // reaches its corners — and still offers the five-node cross.
+  return [...grouped.entries()]
+    .map(([key, layouts]) => ({
+      ...extents.get(key)!,
+      layouts: [...layouts].sort((a, b) => b.nodes.length - a.nodes.length),
+    }))
+    .sort((a, b) => a.cols - b.cols || a.rows - b.rows)
 }
 
 /** A circle population's name carries its count, because a frame publishes more than one. */
