@@ -14,7 +14,9 @@ export function transformLayout(
   return { cols: c, rows: r, nodes: ns }
 }
 
-export function frameKeyOf(f: FrameExtent): string { return f.cols + 'x' + f.rows }
+export function frameKeyOf(f: FrameExtent & { readonly key?: string }): string {
+  return f.key ?? f.cols + 'x' + f.rows
+}
 
 /** The inverse of transformLayout for ONE node: a view-space node back to canonical.
  *  Undo in reverse order — flipY, then flipX (both against the TRANSFORMED dimensions),

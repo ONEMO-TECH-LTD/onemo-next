@@ -161,33 +161,22 @@ export function circleLayouts(pitchMM: number): ReadonlyArray<{ nodes: Pt[]; col
   return out.sort((a, b) => a.nodes.length - b.nodes.length)
 }
 
-/** The circle's frames. Several populations share a bounding box — a 3x3 box holds both the five-node
- *  cross and the nine-node disc — so they are published as separate LAYOUTS of one frame, which is
- *  what layouts are for. */
+/** The circle's frames. ONE POPULATION PER RECORD, like every other class — a 3x3 box holds both the
+ *  nine-magnet disc and the five-magnet cross, and those are two products rather than one product
+ *  with a second panel of settings. They share an extent, so each states its own key. */
 export function circleFrames(pitchMM: number): readonly LibraryFrame[] {
-  const extents = new Map<string, { cols: number; rows: number }>()
-  const grouped = new Map<string, Array<{ name: string; nodes: Pt[] }>>()
-  for (const layout of circleLayouts(pitchMM)) {
-    const key = layout.cols + 'x' + layout.rows
-    extents.set(key, { cols: layout.cols, rows: layout.rows })
-    grouped.set(key, [...(grouped.get(key) ?? []), { name: DISC_LAYOUT + layout.nodes.length, nodes: layout.nodes }])
-  }
-  // FULLEST FIRST, so a frame opens on the population that matches the square of the same frame and
-  // the sparser discs stand beside it as alternatives (Dan, 2026-09-06: "we must follow square add
-  // the 9 points but also add alternative layouts like band 3 current 5 points"). A 3x3 therefore
-  // opens on the nine-node disc — the square's own band-three population, wrapped in the circle that
-  // reaches its corners — and still offers the five-node cross.
-  return [...grouped.entries()]
-    .map(([key, layouts]) => ({
-      ...extents.get(key)!,
-      layouts: [...layouts].sort((a, b) => b.nodes.length - a.nodes.length),
+  return circleLayouts(pitchMM)
+    .map((layout) => ({
+      cols: layout.cols, rows: layout.rows,
+      key: layout.cols + 'x' + layout.rows + '-' + layout.nodes.length,
+      layouts: [{ name: CANON_LAYOUT, nodes: layout.nodes }],
     }))
-    .sort((a, b) => a.cols - b.cols || a.rows - b.rows)
+    // fullest first within an extent, so a 3x3 opens on the square's own population and the sparser
+    // disc stands beside it (Dan: "we must follow square add the 9 points but also add alternative
+    // layouts like band 3 current 5 points")
+    .sort((a, b) => a.cols - b.cols || a.rows - b.rows
+      || b.layouts[0].nodes.length - a.layouts[0].nodes.length)
 }
-
-/** A circle population's name carries its count, because a frame publishes more than one. */
-export const DISC_LAYOUT = 'disc'
-
 /** How narrow a rectangular frame is on its minor axis — independent of which way round it sits:
  *  a 2×5 and a 5×2 are both banners. Shared for the same reason as the frame set. */
 export const rectangularTypeOf = (cols: number, rows: number): string =>

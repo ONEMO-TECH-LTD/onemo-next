@@ -23,9 +23,7 @@ export const circleClass = registryClass({
   types: [{ id: 'disc', label: 'disc' }],
   frames: circleFrames,
   typeOfFrame: () => 'disc',
-  label: (frame) => frame.layouts.length === 1
-    ? String(frame.layouts[0].nodes.length) + '⌾'
-    : frame.cols + '×' + frame.rows,
+  label: (frame) => frame.cols + '×' + frame.rows + ' · ' + frame.layouts[0].nodes.length,
   orientations: [],
   outline: { corners: 'disc' },
   validateDraft: () => [],
