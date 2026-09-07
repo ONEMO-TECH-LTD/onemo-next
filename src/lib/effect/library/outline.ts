@@ -2,7 +2,7 @@ import { RELEASED_PADDING_MM } from '../grid-magnet-spec'
 import { MANUFACTURING_OFFSET_ARC_TOLERANCE_MM, offsetPathMM } from '../offset'
 import { flattenPath, offsetConvexRingPath, pathBoundsMM, pathFromAnchors, type OutlinePath } from '../foundation/path'
 import type { OutlineRecipe } from './class-contract'
-import { boundsMM, convexHull, rotateAround } from './geometry'
+import { boundsMM, convexHull, regularApothem, regularNormals, rotateAround } from './geometry'
 import type { PointMM } from './types'
 
 /** The library's one door to the path foundation: zone 5 reads the type from here, not from outside. */
@@ -98,12 +98,9 @@ function discOutline(nodesMM: readonly PointMM[]): LibraryOutline {
  *  the population it was sized for — reopening seats the record does not hold. */
 function regularOutline(nodesMM: readonly PointMM[], sides: number, centreMM: PointMM): LibraryOutline {
   const [cx, cy] = centreMM
-  const apothem = Math.cos(Math.PI / sides)
-  // a corner at the top, so the first edge normal sits half a step round from it
-  const normals = Array.from({ length: sides }, (_, k) => {
-    const a = Math.PI / 2 + Math.PI / sides + (2 * Math.PI * k) / sides
-    return [Math.cos(a), Math.sin(a)] as const
-  })
+  // one definition of the edges, shared with the population that was selected against them
+  const apothem = regularApothem(sides)
+  const normals = regularNormals(sides)
   let scale = 0
   for (const [x, y] of nodesMM) {
     const px = x - cx, py = y - cy

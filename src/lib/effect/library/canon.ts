@@ -19,7 +19,7 @@
 // was mine on 2026-08-25 and it read "no generation AT SOLVE TIME", which is a different claim —
 // what was rejected then was a solve-time generator filtering patterns per family.
 
-import { boardPositions } from './geometry'
+import { boardPositions, regularApothem, regularNormals, smallestRegularCover } from './geometry'
 import type { LibraryFrame } from './types'
 
 type Pt = readonly [number, number]
@@ -170,46 +170,37 @@ export function circleLayouts(pitchMM: number): ReadonlyArray<{ nodes: Pt[]; col
  *  spare — and a record that leaves them empty is not a vetted layout (Dan, 2026-09-06: "no empty
  *  seats how do you even let it be?").
  *
- *  Both halves are arithmetic. A regular polygon is the intersection of `sides` half-planes whose
- *  normals never move, so the scale that clears the square canon is
- *      scale = max over the square's magnets, over edges, of (p·n_k + rim) / cos(pi/n)
- *  and the population is every lattice node the polygon at THAT scale clears:
- *      p·n_k <= scale·cos(pi/n) − rim, for every edge.
- *  Adding those nodes cannot change the scale — they were chosen for clearing it — so it is one pass,
- *  no search, and the outline recomputes the same number from the finished population. */
+ *  Both halves are arithmetic. The shape is the SMALLEST regular n-gon covering the square canon by
+ *  the rim — centre and size solved together, see smallestRegularCover; pinning the centre and
+ *  solving size alone made every record far bigger than its magnets need. The population is then
+ *  every lattice node that shape clears. Admitting them cannot make it grow — they were chosen for
+ *  fitting inside it — so it is one solve and one pass, and the outline recomputes the same size
+ *  from the finished population. */
 export function polygonPopulation(
   sides: number, cols: number, rows: number, rimLattice: number,
-): { nodes: Pt[]; centre: Pt } {
-  const cx = (cols - 1) / 2, cy = (rows - 1) / 2
-  const apothem = Math.cos(Math.PI / sides)
-  const normals = Array.from({ length: sides }, (_, k) => {
-    const a = Math.PI / 2 + Math.PI / sides + (2 * Math.PI * k) / sides
-    return [Math.cos(a), Math.sin(a)] as const
-  })
+): { nodes: Pt[]; centre: Pt; inradius: number } {
   // The lattice counts rows DOWNWARD and the finished record is laid out y-UP (placeMM flips it), so
-  // the boundary is measured in the placed orientation. Selecting against the unflipped one chose the
-  // population of a pentagon pointing the other way, and the shape that was drawn around them then
-  // had to grow to cover magnets it was never sized for.
-  const demand = (x: number, y: number) => Math.max(
-    ...normals.map(([nx, ny]) => ((x - cx) * nx + (cy - y) * ny + rimLattice) / apothem))
-  let scale = 0
-  for (const [x, y] of fullNodes(cols, rows)) {
-    const need = demand(x, y)
-    if (need > scale) scale = need
-  }
-  const reach = Math.ceil(scale) + 1
+  // the shape is solved in the placed orientation: w = -y. Selecting against the unflipped one chose
+  // the population of a pentagon pointing the other way, and the shape drawn around them then had to
+  // grow to cover magnets it was never sized for.
+  const seed = fullNodes(cols, rows).map(([x, y]) => [x, -y] as const)
+  const { centre: [cx, cw], inradius } = smallestRegularCover(seed, sides, rimLattice)
+  const normals = regularNormals(sides)
+  const clear = inradius - rimLattice
+  const reach = Math.ceil(inradius / regularApothem(sides)) + 1
   const held: Pt[] = []
   for (let x = Math.floor(cx) - reach; x <= Math.ceil(cx) + reach; x++)
-    for (let y = Math.floor(cy) - reach; y <= Math.ceil(cy) + reach; y++)
-      if (demand(x, y) <= scale + 1e-9) held.push([x, y])
+    for (let w = Math.floor(cw) - reach; w <= Math.ceil(cw) + reach; w++)
+      if (normals.every(([nx, ny]) => (x - cx) * nx + (w - cw) * ny <= clear + 1e-9)) held.push([x, -w])
   const xs = held.map(([x]) => x), ys = held.map(([, y]) => y)
   const ox = Math.min(...xs), oy = Math.min(...ys)
   return {
     nodes: held.map(([x, y]) => [x - ox, y - oy] as Pt).sort((a, b) => a[0] - b[0] || a[1] - b[1]),
-    // An odd-sided polygon's complete population is NOT symmetric about its centre — a pentagon
-    // holds an extra row along its flat bottom — so the centre cannot be read off the bounding box
-    // and the record states it, exactly as the stadium takes the frame rather than the magnets.
-    centre: [cx - ox, cy - oy],
+    // An odd-sided polygon's complete population is NOT symmetric about its centre, and the solved
+    // centre is not the population's middle either, so it cannot be read off the bounding box — the
+    // record states it, exactly as the stadium takes the frame rather than the magnets.
+    centre: [cx - ox, -cw - oy],
+    inradius,
   }
 }
 
