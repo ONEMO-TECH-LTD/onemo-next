@@ -46,11 +46,11 @@ const sized = (pts: PointMM[], path?: OutlinePath): LibraryOutline => {
  *  The outline is then simply that core offset by the radius — two points, so a stadium — as an exact
  *  path. The tangent-polygon emitter and the outward micron rounding that used to live here were both
  *  compensation for measuring against chords, and are gone with the chords. */
-function stadiumOutline(nodesMM: readonly PointMM[]): LibraryOutline {
+function stadiumOutline(nodesMM: readonly PointMM[], width?: 'x' | 'y'): LibraryOutline {
   const xs = nodesMM.map(([x]) => x), ys = nodesMM.map(([, y]) => y)
   const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]
-  const tall = x1 - x0 <= y1 - y0
-  const across = Math.min(x1 - x0, y1 - y0)
+  const tall = width ? width === 'x' : x1 - x0 <= y1 - y0
+  const across = tall ? x1 - x0 : y1 - y0
   const radiusMM = across / 2 + RELEASED_PADDING_MM
   const centre = tall ? (x0 + x1) / 2 : (y0 + y1) / 2
   const alongOf = (p: PointMM) => (tall ? p[1] : p[0])
@@ -124,7 +124,7 @@ export function outlineFromLayout(nodesMM: readonly PointMM[], recipe: OutlineRe
     if (!recipe.sides || !recipe.centreMM) throw new Error('library: a regular outline needs its side count and centre')
     return regularOutline(nodesMM, recipe.sides, recipe.centreMM)
   }
-  if (recipe.corners === 'stadium') return stadiumOutline(nodesMM)
+  if (recipe.corners === 'stadium') return stadiumOutline(nodesMM, recipe.across)
   const hull = convexHull(nodesMM)
   if (!hull.length) throw new Error('library: empty population has no outline')
   if (recipe.corners === 'round') {

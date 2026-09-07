@@ -46,10 +46,13 @@ export function diamondMask(cols: number, nodes: readonly Pt[]): Pt[] {
  *
  *  Lattice arithmetic, pitch cancelled: the end cap is a circle of radius r + rim about the end of the
  *  population's centre line, so a position is held exactly when it lies within r of that line. */
-export function pillCapNodes(cols: number, rows: number): Pt[] {
+export function pillCapNodes(cols: number, rows: number, across?: PillAxis): Pt[] {
   const spanX = cols - 1, spanY = rows - 1
-  const tall = spanX <= spanY
-  const r = Math.min(spanX, spanY) / 2
+  // which side is the WIDTH — the caps are drawn about the other. Left unsaid, the shorter side; said,
+  // a body may be wider than it is long (Dan, 2026-09-07: a 3x4 pill is two rows of three plus a
+  // magnet at each end)
+  const tall = across ? across === 'x' : spanX <= spanY
+  const r = (tall ? spanX : spanY) / 2
   const reach = Math.ceil(r)
   // the population's centre line: the axis the end caps are drawn about
   const held = (across: number, along: number, alongSpan: number) =>
@@ -100,22 +103,48 @@ export function rectangularFrames(pitchMM: number): readonly LibraryFrame[] {
   return rectangularFrameSizes(pitchMM).map(([c, r]) => frameOf(c, r))
 }
 
-/** THE PILL'S FRAMES — the rectangle's population plus the magnets its rounded ends hold, published
- *  at the extent that population actually occupies. A three-wide pill reaches one lattice row past the
- *  rectangle at each end, so its frame is that much taller: nodes outside their own frame would break
- *  transform closure, and the frame is the truthful extent either way. */
+/** Which side of a pill's body is its width: the caps are drawn about the other. */
+export type PillAxis = 'x' | 'y'
+
+/** The axis a pill frame's key carries, where it carries one. A square extent hides which way the
+ *  pill lies — a 2x2 body is a 72x120 stadium one way and 120x72 the other — so those keys say. */
+export const pillAxisOfKey = (key: string): PillAxis | undefined =>
+  key.endsWith('-x') ? 'x' : key.endsWith('-y') ? 'y' : undefined
+
+/** THE PILL'S FRAMES — a body's population plus the magnets its rounded ends hold, published at the
+ *  extent that population actually occupies. A three-wide pill reaches one lattice row past the body
+ *  at each end, so its frame is that much taller: nodes outside their own frame would break transform
+ *  closure, and the frame is the truthful extent either way.
+ *
+ *  THE BODY IS ANY RECTANGLE, SQUARES INCLUDED, AND EITHER SIDE MAY BE THE WIDTH. Wrapping only the
+ *  rectangle's frames, shorter side as width, left whole bands empty: no 2x2 (the B2 banner), no
+ *  3x4 (two rows of three plus one at each end, B4), no 3x5 (the 3x3 square plus one at each end,
+ *  B5) — Dan, 2026-09-07: "B5 has place there for sure it is 3x3 square with single magnets on each
+ *  end like in B6", "it can be 3x4 and 3x5". The one body NOT a pill is one a single row deep along
+ *  its length: its straight section is zero and the shape is a disc, which is the circle's. */
 export function pillFrames(pitchMM: number): readonly LibraryFrame[] {
   const board = boardPositions(pitchMM)
-  return rectangularFrameSizes(pitchMM).map(([c, r]) => {
-    const nodes = [...fullNodes(c, r), ...pillCapNodes(c, r)]
+  const out: LibraryFrame[] = []
+  const byKey = new Map<string, string>()
+  for (let c = 1; c <= board.cols; c++) for (let r = 1; r <= board.rows; r++) for (const across of ['x', 'y'] as const) {
+    const long = across === 'x' ? r : c
+    if (long < 2) continue
+    const nodes = [...fullNodes(c, r), ...pillCapNodes(c, r, across)]
     const xs = nodes.map(([x]) => x), ys = nodes.map(([, y]) => y)
     const [ox, oy] = [Math.min(...xs), Math.min(...ys)]
-    return {
-      cols: Math.max(...xs) - ox + 1, rows: Math.max(...ys) - oy + 1,
-      layouts: [{ name: CANON_LAYOUT, nodes: nodes.map(([x, y]) => [x - ox, y - oy] as Pt) }],
-    }
-  // grown out of the board is not a frame the board can carry
-  }).filter((frame) => frame.cols <= board.cols && frame.rows <= board.rows)
+    const cols = Math.max(...xs) - ox + 1, rows = Math.max(...ys) - oy + 1
+    // grown out of the board is not a frame the board can carry
+    if (cols > board.cols || rows > board.rows) continue
+    const placed = nodes.map(([x, y]) => [x - ox, y - oy] as Pt).sort((a, b) => a[0] - b[0] || a[1] - b[1])
+    const key = cols + 'x' + rows + (cols === rows ? '-' + across : '')
+    const population = placed.map((n) => n.join(',')).join(';') + '|' + across
+    const prior = byKey.get(key)
+    if (prior === population) continue
+    if (prior !== undefined) throw new Error('library: pill ' + key + ' at ' + pitchMM + 'mm names two populations')
+    byKey.set(key, population)
+    out.push({ cols, rows, key, layouts: [{ name: CANON_LAYOUT, nodes: placed }] })
+  }
+  return out.sort((a, b) => Math.max(a.cols, a.rows) - Math.max(b.cols, b.rows) || a.cols - b.cols || a.rows - b.rows)
 }
 
 /** THE CIRCLE'S POPULATIONS — what a round shape can actually hold, which is not what a square box

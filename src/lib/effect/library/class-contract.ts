@@ -13,6 +13,9 @@ export interface OutlineRecipe {
    *  millimetres as the magnets. Its size is then arithmetic over the magnets it holds. */
   sides?: number
   centreMM?: readonly [number, number]
+  /** `stadium` only: which side of the population is the width. Read off the extent when unsaid; a
+   *  square extent cannot say, and the same four magnets are a 72x120 pill one way and 120x72 the other. */
+  across?: 'x' | 'y'
 }
 
 /** Which way round a frame sits. A fact of the record, not a transform of it: a 3x4 and a 4x3
