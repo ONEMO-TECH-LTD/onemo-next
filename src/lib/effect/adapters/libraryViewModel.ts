@@ -26,25 +26,3 @@ export function librarySegments(stage: { contour: Contour }): SafeSegment[] {
   measured.set(key, segs)
   return segs
 }
-
-/** Measure a class's records ahead of the click, one per idle slice, so the first visit is a hit
- *  too. Returns the cancel; a class switch mid-warm stops the old list rather than finishing it. */
-export function warmLibrarySegments(contours: readonly Contour[]): () => void {
-  let i = 0, handle: ReturnType<typeof setTimeout> | number | null = null
-  const idle = typeof requestIdleCallback === 'function'
-    ? (f: () => void) => requestIdleCallback(() => f(), { timeout: 250 })
-    : (f: () => void) => setTimeout(f, 16)
-  const step = () => {
-    while (i < contours.length && measured.has(keyOf(contours[i]))) i++
-    if (i >= contours.length) { handle = null; return }
-    librarySegments({ contour: contours[i++] })
-    handle = idle(step)
-  }
-  handle = idle(step)
-  return () => {
-    if (handle === null) return
-    if (typeof cancelIdleCallback === 'function' && typeof handle === 'number') cancelIdleCallback(handle)
-    else clearTimeout(handle as ReturnType<typeof setTimeout>)
-    handle = null
-  }
-}

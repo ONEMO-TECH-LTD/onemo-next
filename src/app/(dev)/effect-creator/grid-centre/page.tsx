@@ -8,7 +8,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import LibraryPanel from './LibraryPanel'
-import { libraryContour, libraryStageModel } from '@/lib/effect/grid-magnet-library-bridge'
+import { libraryStageModel } from '@/lib/effect/grid-magnet-library-bridge'
 import {
   DEFAULT_LIBRARY_SELECTION, LIBRARY_FAMILIES, selectionForFamily, librarySurface, DRAFT_STORE_KEY,
   startAdd as libStartAdd, startEdit as libStartEdit, saveEdit as libSaveEdit,
@@ -24,7 +24,7 @@ import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt, UnprotectedEvidence } from '@/lib/effect/types'
 import type { GridResult, MagnetPlan, SafeSegment } from '@/lib/effect/types'
 import { bandRangeForControl, outlineSvgD, svgDOf, type GridPageModel } from '@/lib/effect/adapters/gridViewModel'
-import { librarySegments as librarySegmentsOf, warmLibrarySegments } from '@/lib/effect/adapters/libraryViewModel'
+import { librarySegments as librarySegmentsOf } from '@/lib/effect/adapters/libraryViewModel'
 import { createPerfLog, type PerfRow } from './perf-log'
 import { BANDS, CENTRE_MODE, DEFAULT_PITCH_MM, GOVERNOR, PADDING_CEIL_MM, PADDING_FLOOR_MM, PROTECTION_PADDING_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-magnet-spec'
 import { fieldSpots, normBaseContour, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-magnet-bridge'
@@ -150,13 +150,6 @@ export default function GridLab() {
   // Measured by the engine through the library view adapter — the bridge is a pure type adapter
   // (library law, STEP 5) and the page computes nothing (T2).
   const librarySegments = useMemo(() => libraryModel ? librarySegmentsOf(libraryModel) : [], [libraryModel])
-  // and measured AHEAD of the click for every record the FRAME list offers, in idle time, so the
-  // first visit to a record is as instant as the second (Dan, 2026-09-07: "these are precomputed
-  // must be instant"). The adapter measures and caches; the page only names the records.
-  useEffect(() => {
-    if (!libraryState) return
-    return warmLibrarySegments(libraryState.offered().map(libraryContour))
-  }, [libraryState])
   /** Selected step on the band's ladder; null = the band's own pick (smallest size at max count). */
   const [stepSel, setStepSel] = useState<number | null>(null)
   /** Manual scale inside the band's range; null = the ladder rules. */

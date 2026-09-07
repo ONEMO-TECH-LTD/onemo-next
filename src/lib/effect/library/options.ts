@@ -6,8 +6,7 @@
 import { specOf } from './class-registry'
 import type { ClassVariant, FrameOrientation, LibraryClass } from './class-contract'
 import { frameKeyOf, transformLayout, viewName } from './transforms'
-import { draftLayoutId, resolveSelection, selectVariant, type ResolvedSelection } from './selection'
-import { materializeResolved, type MaterializedLibrary } from './materialize'
+import { draftLayoutId, selectVariant, type ResolvedSelection } from './selection'
 import type { LibraryDraft } from './drafts'
 import type {
   LibraryFamily, LibraryFrame, LibraryLayout, LibrarySelection, LibraryTransform,
@@ -240,23 +239,4 @@ export function panelOptionsResolved(
       })),
     ],
   }
-}
-
-/** THE RECORDS THE FRAME ROW OFFERS, materialised — the same list panelOptionsResolved shows, in the
- *  same order, so a warm-up can measure them ahead of the click (Dan, 2026-09-07: "these are
- *  precomputed must be instant"). Lazy by design: this is off the click path, and the shell must not
- *  enumerate records itself (STEP 5) — it asks the surface, which asks here. */
-export function offeredRecords(
-  sel: LibrarySelection, drafts: readonly LibraryDraft[], pitchMM: number, resolved: ResolvedSelection,
-  browse: LibraryBrowse = DEFAULT_LIBRARY_BROWSE,
-): MaterializedLibrary[] {
-  const all = resolved.spec.variants(resolved.typeId, pitchMM)
-  const { applied } = browseRows(all, browse, sel)
-  return all
-    .filter((v) => (applied.bandId === null || v.bandId === applied.bandId)
-      && (applied.orientation === null || v.orientation === applied.orientation))
-    .map((v) => {
-      const r = resolveSelection(selectVariant(sel, v), drafts, pitchMM)
-      return materializeResolved(r, r.draft?.nodes ?? null, pitchMM)
-    })
 }
