@@ -1,5 +1,5 @@
 import { materializeResolved, type MaterializedLibrary } from './materialize'
-import { DEFAULT_LIBRARY_BROWSE, panelOptionsResolved, type LibraryBrowse, type PanelOptions } from './options'
+import { DEFAULT_LIBRARY_BROWSE, offeredRecords, panelOptionsResolved, type LibraryBrowse, type PanelOptions } from './options'
 import { resolveSelection } from './selection'
 import type { LibraryEdit } from './authoring'
 import type { LibraryDraft } from './drafts'
@@ -10,6 +10,8 @@ export interface LibrarySurface {
   materialized: MaterializedLibrary
   options: PanelOptions
   isDraft: boolean
+  /** The records the FRAME row offers, materialised on demand — for measuring ahead of the click. */
+  offered: () => readonly MaterializedLibrary[]
 }
 
 export function librarySurface(
@@ -23,5 +25,6 @@ export function librarySurface(
     materialized: materializeResolved(resolved, nodes ?? null, pitchMM),
     options: panelOptionsResolved(selection, drafts, pitchMM, resolved, browse),
     isDraft: Boolean(resolved.draft),
+    offered: () => offeredRecords(selection, drafts, pitchMM, resolved, browse),
   }
 }

@@ -23,9 +23,13 @@ const pts = (ps: MaterializedLibrary['nodesMM']): Pt[] => ps.map((p) => [p[0], p
 
 /** The engine's picture of a materialised library record. The lattice field is seeded only when
  *  nothing is drawn, so an empty canvas still has somewhere to click. */
+/** A record's outline as the engine's Contour — the one shape the engine measures for the Library. */
+export const libraryContour = (materialized: MaterializedLibrary): Contour =>
+  ({ outer: { pts: pts(materialized.outlineMM), path: materialized.outlinePath ?? undefined }, holes: [] })
+
 export function libraryStageModel(materialized: MaterializedLibrary, pitchMM: number): LibraryStageModel {
   const nodesMM = pts(materialized.nodesMM)
-  const contour: Contour = { outer: { pts: pts(materialized.outlineMM), path: materialized.outlinePath ?? undefined }, holes: [] }
+  const contour = libraryContour(materialized)
   const grid: GridResult = {
     anchors: nodesMM.map((p) => ({ p, dia: MAGNET_DIA_SMALL_MM })),
     pitchCentreMM: pitchMM,

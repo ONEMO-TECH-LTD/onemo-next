@@ -6,7 +6,8 @@
 import { specOf } from './class-registry'
 import type { ClassVariant, FrameOrientation, LibraryClass } from './class-contract'
 import { frameKeyOf, transformLayout, viewName } from './transforms'
-import { draftLayoutId, selectVariant, type ResolvedSelection } from './selection'
+import { draftLayoutId, resolveSelection, selectVariant, type ResolvedSelection } from './selection'
+import { materializeResolved, type MaterializedLibrary } from './materialize'
 import type { LibraryDraft } from './drafts'
 import type {
   LibraryFamily, LibraryFrame, LibraryLayout, LibrarySelection, LibraryTransform,
@@ -130,11 +131,24 @@ function rankOf(view: LibraryTransform, base: LibraryTransform, spec: LibraryCla
   return i >= 0 ? i : 10 + MIRROR_ORDER.indexOf(viewName(base, view))
 }
 
-/** The selection a class tab lands on. The page passes a family; the class decides the rest. */
+/** The selection a class tab lands on. The page passes a family; the class decides the rest.
+ *
+ *  Landing is judged UNDER THE BROWSE FILTER you arrive with. A class opens on its first record —
+ *  the smallest, band 1 — while the band you were browsing carries across, so the FRAME list showed
+ *  one band's records and the canvas a 1x1 that was in none of them (Dan, 2026-09-07: "it also
+ *  loads from B1 ... so it is not showing the true layout"). Same rule as a band chip: the first
+ *  record still visible. A band the class does not reach is not a filter here either. */
 export function selectionForFamily(
   current: LibrarySelection, family: LibraryFamily, pitchMM: number,
+  browse: LibraryBrowse = DEFAULT_LIBRARY_BROWSE,
 ): LibrarySelection {
-  return specOf(family).open(current, pitchMM)
+  const spec = specOf(family)
+  const opened = spec.open(current, pitchMM)
+  const variants = spec.types.flatMap((t) => spec.variants(t.id, pitchMM))
+  const { applied } = browseRows(variants, browse, opened)
+  const first = variants.find((v) => (applied.bandId === null || v.bandId === applied.bandId)
+    && (applied.orientation === null || v.orientation === applied.orientation))
+  return first ? selectVariant(opened, first) : opened
 }
 
 /** The band and orientation rows, and the frames that survive them. Filtering lives HERE and not
@@ -153,24 +167,27 @@ function browseRows(
   }
   const chip = (id: string, label: string, active: boolean, next: LibraryBrowse): BrowseOption =>
     ({ id, label, active, next, select: landing(next) })
-  const bands: BrowseOption[] = ids.length > 1 ? [
-    chip('band-all', 'all', browse.bandId === null, { ...browse, bandId: null }),
-    ...ids.map((id) => chip('band' + id, 'B' + id, browse.bandId === id, { ...browse, bandId: id })),
-  ] : []
   // only a class publishing BOTH ways round has a choice to offer
   const ways = new Set(variants.map((v) => v.orientation))
-  const frameOrientations: BrowseOption[] = ways.has('portrait') && ways.has('landscape') ? [
-    chip('o-all', 'all', browse.orientation === null, { ...browse, orientation: null }),
-    chip('o-portrait', 'portrait', browse.orientation === 'portrait', { ...browse, orientation: 'portrait' }),
-    chip('o-landscape', 'landscape', browse.orientation === 'landscape', { ...browse, orientation: 'landscape' }),
-  ] : []
+  const offersOrientation = ways.has('portrait') && ways.has('landscape')
   // A FILTER THAT IS NOT OFFERED MUST NOT FILTER. Carrying "portrait" from the rectangle tab into
   // the square tab emptied the list — squares are neither portrait nor landscape, so every chip
   // was excluded by a control the class never showed. Same for a band this class does not reach.
+  // The chips light from THIS, not from the raw browse: a carried band the class does not reach
+  // otherwise left no chip lit at all.
   const applied: LibraryBrowse = {
     bandId: browse.bandId !== null && ids.includes(browse.bandId) ? browse.bandId : null,
-    orientation: frameOrientations.length ? browse.orientation : null,
+    orientation: offersOrientation ? browse.orientation : null,
   }
+  const bands: BrowseOption[] = ids.length > 1 ? [
+    chip('band-all', 'all', applied.bandId === null, { ...browse, bandId: null }),
+    ...ids.map((id) => chip('band' + id, 'B' + id, applied.bandId === id, { ...browse, bandId: id })),
+  ] : []
+  const frameOrientations: BrowseOption[] = offersOrientation ? [
+    chip('o-all', 'all', applied.orientation === null, { ...browse, orientation: null }),
+    chip('o-portrait', 'portrait', applied.orientation === 'portrait', { ...browse, orientation: 'portrait' }),
+    chip('o-landscape', 'landscape', applied.orientation === 'landscape', { ...browse, orientation: 'landscape' }),
+  ] : []
   return { bands, frameOrientations, applied }
 }
 
@@ -223,4 +240,23 @@ export function panelOptionsResolved(
       })),
     ],
   }
+}
+
+/** THE RECORDS THE FRAME ROW OFFERS, materialised — the same list panelOptionsResolved shows, in the
+ *  same order, so a warm-up can measure them ahead of the click (Dan, 2026-09-07: "these are
+ *  precomputed must be instant"). Lazy by design: this is off the click path, and the shell must not
+ *  enumerate records itself (STEP 5) — it asks the surface, which asks here. */
+export function offeredRecords(
+  sel: LibrarySelection, drafts: readonly LibraryDraft[], pitchMM: number, resolved: ResolvedSelection,
+  browse: LibraryBrowse = DEFAULT_LIBRARY_BROWSE,
+): MaterializedLibrary[] {
+  const all = resolved.spec.variants(resolved.typeId, pitchMM)
+  const { applied } = browseRows(all, browse, sel)
+  return all
+    .filter((v) => (applied.bandId === null || v.bandId === applied.bandId)
+      && (applied.orientation === null || v.orientation === applied.orientation))
+    .map((v) => {
+      const r = resolveSelection(selectVariant(sel, v), drafts, pitchMM)
+      return materializeResolved(r, r.draft?.nodes ?? null, pitchMM)
+    })
 }
