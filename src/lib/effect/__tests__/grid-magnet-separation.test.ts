@@ -22,7 +22,8 @@ import type { BBox, SafeMass, SafeSegment } from '../types'
 import { BANDS, BAND_STEP_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_MM, PROTECTION_PADDING_MM, RELEASED_PADDING_MM } from '../grid-magnet-spec'
 import { bandRangeForControl } from '../adapters/gridViewModel'
 import { librarySegments } from '../adapters/libraryViewModel'
-import { spotRadiusOf } from '../grid-magnet'
+import { insetOffsetPath, pathFromAnchors, spotRadiusOf } from '../grid-magnet'
+import { offsetConvexRingPath } from '../foundation/path'
 import { scaleContour } from '../grid-magnet-compute'
 import { applyCoverage, enumerateCanonPhaseWindows, enumerateFreePhaseMax, fallbackRevealSizes, makeCircleSeatPredicate, makeContourSeatPredicate, priorityTupleOf, symmetricCores } from '../units/layout'
 import { wrapGroup } from '../units/wrap'
@@ -435,10 +436,14 @@ describe('2e — the pipeline is the one sequencer the shells reach; adapters on
 
   it('libraryViewModel asks the engine for one measurement: runtime edges are the door and the spec (T2)', () => {
     const text = readFileSync(join(LIB, 'adapters/libraryViewModel.ts'), 'utf8')
+    // the legal area of a record is KNOWN — the outline shrunk by the rim — so the adapter reaches the
+    // exact inset through the door, and no measurement at all (2026-09-07: the mesh here was the
+    // Library paying the solver's price for a fact it already held)
     expect(runtimeImportsOf(text)).toEqual([
-      { from: '../grid-magnet', names: ['safeSegments', 'spotRadiusOf'] },
+      { from: '../grid-magnet', names: ['insetOffsetPath', 'pathBoundsMM', 'pathFromAnchors'] },
       { from: '../grid-magnet-spec', names: ['RELEASED_PADDING_MM'] },
     ])
+    expect(text).not.toMatch(/safeSegments|spotRadiusOf/)
     for (const f of ['adapters/gridViewModel.ts', 'adapters/libraryViewModel.ts']) {
       // gridViewModel's GridSolve type import from pipeline/types is the projection's input — type-only, by design
       const refs = moduleRefsOf(readFileSync(join(LIB, f), 'utf8')).filter((i) => /\/units\/|\/foundation\/|^@\/app\//.test(i))
@@ -446,9 +451,22 @@ describe('2e — the pipeline is the one sequencer the shells reach; adapters on
     }
   })
 
-  it('the moved measurements answer exactly what the page computed before (T2)', () => {
-    const sq: Contour = { outer: { pts: [[0, 0], [120, 0], [120, 120], [0, 120]] as Pt[] }, holes: [] }
-    expect(librarySegments({ contour: sq })).toEqual(safeSegments(sq, spotRadiusOf(RELEASED_PADDING_MM), 'full'))
+  it('the Library draws the SAME legal line the measurement drew — without measuring (T2)', () => {
+    // a library record carries its outline as an exact path; the mesh's own drawn edge for such a
+    // shape is the exact inset, so the two lines must be identical, and the adapter's must be free
+    const ring: Pt[] = [[0, 0], [120, 0], [120, 120], [0, 120]]
+    const path = pathFromAnchors(ring.map(([x, y]) => ({ p: { x, y } })), (v) => [v.x, v.y])
+    const sq: Contour = { outer: { pts: ring, path }, holes: [] }
+    const drawn = librarySegments({ contour: sq })
+    const measured = safeSegments(sq, spotRadiusOf(RELEASED_PADDING_MM), 'full')
+    expect(drawn).toHaveLength(1)
+    expect(drawn[0].paths).toEqual(measured[0].paths)
+    expect(drawn[0].paths[0]).toEqual(insetOffsetPath(path, RELEASED_PADDING_MM))
+    // a points-only outline (no path) is carried as lines and shrunk the same way
+    expect(librarySegments({ contour: { outer: { pts: ring }, holes: [] } })[0].paths).toEqual(drawn[0].paths)
+    // a single disc shrunk past its centre has no legal area — and says so rather than inventing one
+    const disc = offsetConvexRingPath([[0, 0]], RELEASED_PADDING_MM)
+    expect(librarySegments({ contour: { outer: { pts: [], path: disc }, holes: [] } })).toEqual([])
     for (const band of BANDS) for (const pad of [PADDING_FLOOR_MM, RELEASED_PADDING_MM, PADDING_CEIL_MM])
       expect(bandRangeForControl(band, pad)).toEqual(bandOuterMM(band, pad))
   })

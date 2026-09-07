@@ -40,7 +40,7 @@ export {
 export { bandOf, bandOuterMM, legalOfOuterMM, type Anchor, type MagnetDia, type MagnetPlan } from './grid-magnet-logic'
 // The screen draws what the engine measured, so the engine's own path serialiser is part of the door:
 // the alternative is a second one in the shell, which is how the drawn outline became a polygon.
-export { pathToSvgD, type OutlinePath } from './foundation/path'
+export { insetOffsetPath, pathBoundsMM, pathFromAnchors, pathToSvgD, type OutlinePath } from './foundation/path'
 
 /** Sweep the lattice phase at the placement step (ruled 1mm), seat exactly, score, apply coverage, report. */
 

@@ -24,10 +24,10 @@ import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt, UnprotectedEvidence } from '@/lib/effect/types'
 import type { GridResult, MagnetPlan, SafeSegment } from '@/lib/effect/types'
 import { bandRangeForControl, outlineSvgD, svgDOf, type GridPageModel } from '@/lib/effect/adapters/gridViewModel'
-import { librarySegments as librarySegmentsOf } from '@/lib/effect/adapters/libraryViewModel'
+import { librarySegments as librarySegmentsOf, type LibraryLegalArea } from '@/lib/effect/adapters/libraryViewModel'
 import { createPerfLog, type PerfRow } from './perf-log'
 import { BANDS, CENTRE_MODE, DEFAULT_PITCH_MM, GOVERNOR, PADDING_CEIL_MM, PADDING_FLOOR_MM, PROTECTION_PADDING_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-magnet-spec'
-import { fieldSpots, normBaseContour, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-magnet-bridge'
+import { normBaseContour, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-magnet-bridge'
 
 /** Bench test libraries — static assets, listed by a committed manifest. */
 const LIB_MANIFEST = '/grid-engine/library.json'
@@ -760,7 +760,7 @@ function dim(c: Contour, axis: 0 | 1): number {
 const SEG_HUES = ['#e0762f', '#7a4ae0', '#2fa864', '#e04a8f', '#2f9fe0']
 
 function Stage({ contour, grid, lattice, box, segments, segFill, unprotected, onPan, onZoom, onReset, onPickNode, viewport }: {
-  contour: Contour; grid: GridResult; lattice: boolean; box: boolean; segments: SafeSegment[]; segFill: boolean
+  contour: Contour; grid: GridResult; lattice: boolean; box: boolean; segments: LibraryLegalArea[]; segFill: boolean
   unprotected?: UnprotectedEvidence | null
   onPan: (dxMM: number, dyMM: number) => void; onZoom: (f: number) => void; onReset: () => void
   /** Library authoring: a lattice spot was clicked (mm, engine y-up). Display layer only. */
@@ -836,16 +836,33 @@ function Stage({ contour, grid, lattice, box, segments, segFill, unprotected, on
   const vx = cx - spanMM / 2 + (viewport ? viewport.panMM[0] : 0)
   const vy = cy - spanMM / 2 - (viewport ? viewport.panMM[1] : 0)
 
-  // Spots come from the bridge; the toggle picks field vs seated. This file draws circles.
-  // On the free viewport the SVG slices to the element's aspect, so the field must be generated
-  // well past the square viewBox — the lattice is infinite, never a window.
+  // On the free viewport the SVG slices to the element's aspect, so the ground is painted well past
+  // the square viewBox — the lattice is infinite, never a window.
   const fp = viewport ? spanMM : 0
-  const spots: readonly FieldSpot[] = lattice
-    ? fieldSpots(grid, { minX: vx - fp, minY: -(vy + spanMM + fp), maxX: vx + spanMM + fp, maxY: -(vy - fp) })
-    : seatedSpots(grid)
-  // Rule anchor: any spot is on the lattice, so lines cross at the centres.
-  const A0 = spots[0]
-  const Afy: [number, number] = A0 ? [A0.x, -A0.y] : [0, 0]
+  // THE FIELD IS A TILE, NOT A LIST. One <pattern> paints every empty spot at constant cost under any
+  // pan or zoom; listing the visible spots put 2,300 circles in the DOM and re-diffed all of them on
+  // every click — 234 ms, the Library "freezing" (Dan, 2026-09-07). Only the HELD spots are elements.
+  const held: readonly FieldSpot[] = seatedSpots(grid)
+  const A = grid.anchors[0]?.p ?? grid.lattice[0]
+  // Rule anchor: a lattice node, so rule lines cross at the centres and the field tile lands on them.
+  const Afy: [number, number] = A ? [A[0], -A[1]] : [0, 0]
+  const spotR = grid.spotRadiusMM
+  /** Library authoring: the click snaps to the nearest lattice node, and counts only within the spot
+   *  disc — the same target the per-spot hit circles used to give. Anywhere else the svg pans. */
+  const pickAt = (e: React.PointerEvent<SVGRectElement>) => {
+    const svg = svgRef.current
+    if (!svg || !onPickNode || !A) return
+    const m = svg.getScreenCTM()
+    if (!m) return
+    const at = new DOMPoint(e.clientX, e.clientY).matrixTransform(m.inverse())
+    // undo the live-gesture translate, then the y flip
+    const x = at.x - pend.x, y = -(at.y + pend.y)
+    const pitch = grid.pitchCentreMM
+    const nx = A[0] + Math.round((x - A[0]) / pitch) * pitch, ny = A[1] + Math.round((y - A[1]) / pitch) * pitch
+    if (Math.hypot(x - nx, y - ny) > spotR) return
+    e.stopPropagation()
+    onPickNode([nx, ny])
+  }
 
   return (
     <svg ref={svgRef} width={VP} height={VP} viewBox={`${vx} ${vy} ${spanMM} ${spanMM}`}
@@ -916,6 +933,14 @@ function Stage({ contour, grid, lattice, box, segments, segFill, unprotected, on
         {/* Registration dots on every 12mm cell corner — the board's atom, phase-locked to the
             lattice so 12mm steps and centres are always visible. Dot sits at tile centre; the
             pattern origin is shifted half a tile so dots land on the corners unclipped. */}
+        {/* Every empty spot of the field: one tile per pitch, its disc centred on a lattice node. INNER
+            stroke — the line's outer edge sits exactly on the true spot radius, so a tangent disc
+            never reads past the cut line. */}
+        <pattern id="gl-field" width={grid.pitchCentreMM} height={grid.pitchCentreMM}
+          patternUnits="userSpaceOnUse" x={Afy[0] - grid.pitchCentreMM / 2} y={Afy[1] - grid.pitchCentreMM / 2}>
+          <circle cx={grid.pitchCentreMM / 2} cy={grid.pitchCentreMM / 2} r={spotR - 0.25}
+            fill="var(--ink)" fillOpacity={0.04} stroke="var(--ink)" strokeOpacity={0.25} strokeWidth={0.5} />
+        </pattern>
         <pattern id="gl-dots" width={DEFAULT_PITCH_MM / 4} height={DEFAULT_PITCH_MM / 4}
           patternUnits="userSpaceOnUse" x={Afy[0] - DEFAULT_PITCH_MM / 8} y={Afy[1] - DEFAULT_PITCH_MM / 8}>
           <circle cx={DEFAULT_PITCH_MM / 8} cy={DEFAULT_PITCH_MM / 8} r={0.05} fill="var(--ink)" fillOpacity={0.35} />
@@ -1026,21 +1051,20 @@ function Stage({ contour, grid, lattice, box, segments, segFill, unprotected, on
           fill="none" stroke="#e5484d" strokeWidth={1.2} vectorEffect="non-scaling-stroke" />
         <circle cx={unprotected.repairTargetMM[0]} cy={-unprotected.repairTargetMM[1]} r={0.7} fill="#e5484d" />
       </g>}
-      {/* Every spot the bridge handed over: faint where empty, accent where a magnet seats. */}
+      {/* The field: faint where empty (the tile), accent where a magnet seats (an element each). */}
       <g transform={pend.x || pend.y ? `translate(${pend.x} ${-pend.y})` : undefined}>
-      {spots.map((sp, i) => {
-        // INNER stroke: the line's outer edge sits exactly on the true spot radius, so a
-        // tangent disc never reads past the cut line.
-        const sw = sp.held ? 0.6 : 0.5
-        return <g key={'f' + i}>
-          <circle cx={sp.x} cy={-sp.y} r={sp.r - sw / 2}
-            fill={sp.held ? 'var(--accent)' : 'var(--ink)'} fillOpacity={sp.held ? 0.10 : 0.04}
-            stroke={sp.held ? 'var(--accent)' : 'var(--ink)'} strokeOpacity={sp.held ? 0.55 : 0.25}
-            strokeWidth={sw} />
+      {lattice && A && <rect x={vx - fp - Math.abs(pend.x)} y={vy - fp - Math.abs(pend.y)}
+        width={spanMM + 2 * fp + 2 * Math.abs(pend.x)} height={spanMM + 2 * fp + 2 * Math.abs(pend.y)}
+        fill="url(#gl-field)" style={onPickNode ? { cursor: 'pointer' } : undefined}
+        onPointerDown={onPickNode ? pickAt : undefined} />}
+      {held.map((sp, i) => (
+        <g key={'f' + i}>
+          <circle cx={sp.x} cy={-sp.y} r={sp.r - 0.3}
+            fill="var(--accent)" fillOpacity={0.10} stroke="var(--accent)" strokeOpacity={0.55} strokeWidth={0.6} />
           {onPickNode && <circle cx={sp.x} cy={-sp.y} r={sp.r} fill="transparent" style={{ cursor: 'pointer' }}
             onPointerDown={(e) => { e.stopPropagation(); onPickNode([sp.x, sp.y]) }} />}
         </g>
-      })}
+      ))}
       {grid.anchors.map((a, i) => {
         const p = fy(a.p)
         // While authoring, a placed magnet must not swallow its own spot's hit target —

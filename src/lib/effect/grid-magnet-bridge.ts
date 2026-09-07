@@ -10,7 +10,6 @@ import { validateSelfIntersection, type Vec2Px } from '@/lib/outline-core/math'
 import type { Contour, Pt } from './types'
 import {
   fieldSpanMM,
-  latticeOver,
   MIN_EFFECT_MM,
   SIZE_CEIL_MARGIN_MM,
   type GridResult,
@@ -120,28 +119,6 @@ export interface FieldSpot {
   readonly y: number
   readonly r: number
   readonly held: boolean
-}
-
-/** Every lattice position over a region as a display list, on the engine's own phase.
- *  Phase is re-anchored on a real answer point: the generator's phase is relative to the region's
- *  min, so the same phase over a different region would be a different absolute lattice. */
-export function fieldSpots(
-  grid: GridResult,
-  view: { minX: number; minY: number; maxX: number; maxY: number },
-): FieldSpot[] {
-  const A = grid.anchors[0]?.p ?? grid.lattice[0]
-  if (!A) return []
-  const pad = grid.spotRadiusMM
-  const rgn = { minX: view.minX - pad, minY: view.minY - pad, maxX: view.maxX + pad, maxY: view.maxY + pad }
-  // A spot holds a magnet when one SITS ON IT. Matching by rounded-coordinate string keys made
-  // that a knife edge: the generator steps its axis by repeated addition while the solver's
-  // anchors are origin + k·pitch, so a coordinate near a rounding boundary keyed differently the
-  // further out it sat — and a whole column of seated magnets drew as empty. Distance decides;
-  // the lattice is 48mm apart, so half a millimetre is unambiguous.
-  const near = (n: Pt) => grid.anchors.some((a) => Math.abs(a.p[0] - n[0]) < 0.5 && Math.abs(a.p[1] - n[1]) < 0.5)
-  return latticeOver(rgn, grid.pitchCentreMM, [A[0] - rgn.minX, A[1] - rgn.minY]).map((n) => (
-    { x: n[0], y: n[1], r: grid.spotRadiusMM, held: near(n) }
-  ))
 }
 
 /** The seated spots alone — what a surface draws when the full field is off. */
