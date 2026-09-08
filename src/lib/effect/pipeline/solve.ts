@@ -20,7 +20,7 @@ import { DEFAULT_PITCH_MM, PADDING_FLOOR_MM } from '@/lib/effect/grid-magnet-spe
 import { contourCacheKey, makeSizer, sizeRange } from '@/lib/effect/grid-magnet-bridge'
 import type { Pt } from '@/lib/effect/types'
 import type { GridRequest, GridSolve } from './types'
-import { LOCK_PROFILE, sealRequest } from '@/lib/effect/locks'
+import { LOCK_PROFILE, profileSnapshot, sealRequest } from '@/lib/effect/locks'
 
 // Computed once = computed. Per-shape bakes and per-band solves are keyed by shape + config and
 // reused across interactions; a new shape clears everything. The per-size walk cache and the idle
@@ -107,7 +107,7 @@ export function solveGrid(rawReq: GridRequest): GridSolve {
         cfg.pitchMM ?? DEFAULT_PITCH_MM, protectionPaddingMM, grid.anchors.map((anchor) => anchor.dia / 2))
       return {
         contour, grid, effSize: sizeMM, rungs: [], selectedRungIndex: 0, segments: grid.segments, unprotected: evidence,
-        profile: LOCK_PROFILE,
+        profile: profileSnapshot(LOCK_PROFILE),
       }
     } else {
       // Coverage is delivery-only. The entire solve and its cache identity stay raw so toggling
@@ -240,7 +240,7 @@ export function solveGrid(rawReq: GridRequest): GridSolve {
           contour: drawn.contour, grid: { ...drawn.grid, anchors, segments },
           effSize: at.sizeMM, rungs: ladder, selectedRungIndex: idx, segments, offMM: at.centreOffMM, classificationDiagnostics: recog,
           bandClass, bandClasses, recommendation, unprotected: deliveredEvidence,
-          profile: LOCK_PROFILE,
+          profile: profileSnapshot(LOCK_PROFILE),
         }
       }
       // NO LAWFUL OFFER. Judge allowed nothing in this band. The witness comes from LAYOUT's own
@@ -255,7 +255,7 @@ export function solveGrid(rawReq: GridRequest): GridSolve {
       return {
         contour, grid, effSize: bestSeatedMM, rungs: [], selectedRungIndex: 0, segments: grid.segments,
         offers: [], diagnostic: { reason: 'no-lawful-offer', bestSeatedMM },
-        bandClass, bandClasses, recommendation, profile: LOCK_PROFILE,
+        bandClass, bandClasses, recommendation, profile: profileSnapshot(LOCK_PROFILE),
       }
     }
   }

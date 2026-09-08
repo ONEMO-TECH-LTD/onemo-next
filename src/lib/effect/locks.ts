@@ -36,6 +36,18 @@ export interface LockProfile {
   locks: Readonly<Partial<{ [K in LockKey]: Lock<K> }>>
 }
 
+/** THE PROFILE AS A RECORD — a deep copy, so an answer carries what was sealed rather than a handle on
+ *  the engine's own policy. Returning the singleton let a caller flip `record.profile.locks.x.locked`
+ *  and unseal every later solve in the process (QA F2, 2026-09-08). A manufacturing record is data. */
+export function profileSnapshot(profile: LockProfile = LOCK_PROFILE): LockProfile {
+  const locks: Record<string, Lock> = {}
+  for (const [key, lock] of Object.entries(profile.locks)) {
+    if (!lock) continue
+    locks[key] = { locked: lock.locked, value: Array.isArray(lock.value) ? [...lock.value] : lock.value } as Lock
+  }
+  return { version: 1, locks }
+}
+
 export const lockOf = <K extends LockKey>(profile: LockProfile, key: K): Lock<K> | undefined => profile.locks[key] as Lock<K> | undefined
 export const isLocked = (profile: LockProfile, key: LockKey): boolean => profile.locks[key]?.locked === true
 

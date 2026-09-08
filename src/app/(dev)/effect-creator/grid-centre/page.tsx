@@ -51,6 +51,12 @@ const FIT = 0.86
 
 /** The dial shapes: a generator is anything that hangs on a slider (Dan, 2026-09-07). The ring
  *  generators take two dials; the polygon and the star are exact vector definitions with one. */
+/** WHERE THE BENCH OPENS. Presets are the Library's released records, so with nothing released yet
+ *  the Presets tab is empty — and opening there left the bench with no shape at all ("shape
+ *  unavailable", 2026-09-08). Generators always have one, so that is the opening tab until the admin
+ *  releases something. */
+const OPENING_TAB: Src = releasedRecords(DEFAULT_PITCH_MM, LIBRARY_RELEASE_STATE).length ? 'preset' : 'gen'
+
 const VECTOR_GENS: { k: VectorShapeKind; label: string; dial: 'sides' | 'points' }[] = [
   { k: 'polygon', label: 'Polygon', dial: 'sides' }, { k: 'star', label: 'Star', dial: 'points' },
 ]
@@ -80,7 +86,7 @@ function usePersisted(key: string, initial: number): [number, (n: number) => voi
 }
 
 export default function GridLab() {
-  const [src, setSrc] = useState<Src>('preset')
+  const [src, setSrc] = useState<Src>(OPENING_TAB)
   /** The released record on the bench — its catalogue id; '' until something is released. */
   const [preset, setPreset] = useState<string>('')
   /** A ring generator, or one of the vector dial shapes. */

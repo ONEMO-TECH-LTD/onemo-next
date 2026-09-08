@@ -19,7 +19,7 @@ import { DEFAULT_CIRCLE_TESSELLATION_CALIBRATION } from './effect-calibration'
 import { MANUFACTURING_TOLERANCE_MM } from './geometry-truth'
 import { roundedSquareContourMM } from './rounded-square'
 import { insetRingMM, MANUFACTURING_OFFSET_ARC_TOLERANCE_MM } from './offset'
-import { coverageLock, sealedPlanValues } from './locks'
+import { LOCK_PROFILE, coverageLock, profileSnapshot, sealedPlanValues, type LockProfile } from './locks'
 import {
   PreparedContourSource,
   distanceToPreparedContour,
@@ -1571,6 +1571,9 @@ export interface ResolvedGridPlan {
   resolvedMarginMM: number
   grewMM: number
   nearestAnchorMM: number | null
+  /** THE SEALED PROFILE this plan was made under — a production record proves what was locked when it
+   *  was made, exactly as the bench's does (QA F1, 2026-09-08). */
+  profile: LockProfile
 }
 
 /** Add/remove only the effect's OUTER margin. Interior cut-outs remain physical cut-outs. */
@@ -1616,7 +1619,8 @@ export function resolveGridPlan(
   // PRODUCTION CONSUMES LOCKED VALUES AND CANNOT CHANGE THEM (Dan, 2026-09-04: "any prod cannot
   // change them by accident unless we change it in the admin engine version"). The sealed profile is
   // applied here, at the door, before anything is derived from the caller's options.
-  const opts: GridPlanOptions = { ...given, ...sealedPlanValues() }
+  const profile = profileSnapshot(LOCK_PROFILE)
+  const opts: GridPlanOptions = { ...given, ...sealedPlanValues(profile) }
   const attachment = opts.attachment ?? 'magnetic'
   const source = opts.source ?? 'std'
   const mode = opts.mode ?? 'auto'
@@ -1652,6 +1656,7 @@ export function resolveGridPlan(
       resolvedMarginMM: baseMarginMM,
       grewMM: 0,
       nearestAnchorMM: null,
+      profile,
     }
   }
 
@@ -1673,6 +1678,7 @@ export function resolveGridPlan(
       resolvedMarginMM: baseMarginMM,
       grewMM: 0,
       nearestAnchorMM: nearestAnchorPair(grid.anchors)?.distanceMM ?? null,
+      profile,
     }
   }
 
@@ -1695,6 +1701,7 @@ export function resolveGridPlan(
     resolvedMarginMM: fit.sizeMM,
     grewMM: fit.grew,
     nearestAnchorMM: nearestAnchorPair(fit.grid.anchors)?.distanceMM ?? null,
+    profile,
   }
 }
 
@@ -1896,7 +1903,10 @@ export function gridLadderCacheKey(
   })
 }
 
-function effectiveGridPlanOptions(opts: GridPlanOptions = {}) {
+/** The options a plan is actually resolved with — SEALED FIRST, so two callers whose requests differ
+ *  only where a lock overrides them share one cache entry rather than two (QA F1). */
+function effectiveGridPlanOptions(given: GridPlanOptions = {}) {
+  const opts: GridPlanOptions = { ...given, ...sealedPlanValues() }
   return {
     attachment: opts.attachment ?? 'magnetic',
     source: opts.source ?? 'std',
