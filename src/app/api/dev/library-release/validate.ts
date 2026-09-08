@@ -26,4 +26,3 @@ export function unsound(v: unknown): string | null {
   }
   return null
 }
-
