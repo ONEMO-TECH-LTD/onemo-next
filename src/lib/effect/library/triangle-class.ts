@@ -6,7 +6,7 @@ import { frameKeyOf } from './transforms'
 import { TRIANGLE_TYPES, restsFlat, triangleTypeOf, trianglesOfType, uprightView, type TriangleProductType } from './triangle-types'
 import { assertTrianglePopulation, boundsOf, type TriangleLayout } from './triangle-geometry'
 import { outlineFromLayout } from './outline'
-import { boundsMM, placeMM } from './geometry'
+import { boundsMM, fitsBoardMM, placeMM } from './geometry'
 import { triangleById, triangleFrame } from './triangle-frames'
 import type { LibraryFrame, LibrarySelection } from './types'
 
@@ -18,13 +18,24 @@ const types: readonly ClassType[] = TRIANGLE_TYPES.map((id) => ({ id, label: lab
 /** ONE recipe for the class, so the chip and the canvas cannot be measured differently. */
 const OUTLINE: OutlineRecipe = { corners: 'sharp' }
 
-/** The chip reads the size the producer would draw — same placement, same recipe, same bounds. */
-const sizeOf = (triangle: TriangleLayout, pitchMM: number) => {
+/** The size the producer would draw — same placement, same recipe, same bounds. */
+const extentOf = (triangle: TriangleLayout, pitchMM: number) => {
   const bounds = boundsOf([...triangle.vertices])
   const placed = placeMM({ cols: bounds.cols, rows: bounds.rows },
     { name: 'corners', nodes: [...triangle.vertices] }, uprightView(triangle), pitchMM)
-  const { widthMM, heightMM } = boundsMM(outlineFromLayout(placed.nodesMM, OUTLINE).pts)
+  return boundsMM(outlineFromLayout(placed.nodesMM, OUTLINE).pts)
+}
+/** The chip reads that size. */
+const sizeOf = (triangle: TriangleLayout, pitchMM: number) => {
+  const { widthMM, heightMM } = extentOf(triangle, pitchMM)
   return Math.round(widthMM) + '×' + Math.round(heightMM)
+}
+/** PUBLISHED ONLY WHERE THE BOARD CAN MAKE IT. The triangle builds its own variants rather than
+ *  through the registry, so it applies the board's one shape rule itself: an acute corner reaches far
+ *  past its magnets, and at 96mm eleven geometries whose magnets fit drew 420–490mm shapes. */
+const onBoard = (triangle: TriangleLayout, pitchMM: number): boolean => {
+  const { widthMM, heightMM } = extentOf(triangle, pitchMM)
+  return fitsBoardMM(widthMM, heightMM)
 }
 
 const asVariant = (triangle: TriangleLayout, pitchMM: number, index?: number, frame = triangleFrame(triangle)): ClassVariant => {
@@ -63,17 +74,21 @@ export const triangleClass: LibraryClass = {
   types,
   variants: (typeId, pitchMM) => {
     assertTypeId('triangle', types, typeId)
-    return trianglesOfType(typeId as TriangleProductType).map((triangle, index) => asVariant(triangle, pitchMM, index))
+    return trianglesOfType(typeId as TriangleProductType).filter((triangle) => onBoard(triangle, pitchMM))
+      .map((triangle, index) => asVariant(triangle, pitchMM, index))
   },
   variantOf: (sel, pitchMM) => {
     const triangle = triangleBySelection(sel)
     const frame = triangleFrame(triangle)
     const frameKey = frameKeyOf(frame)
     if (frameKey !== sel.frameKey) throw new Error('library: frameKey ' + sel.frameKey + ' does not match geometry ' + triangle.id + ' (' + frameKey + ')')
+    // a geometry the board refuses is not LISTED (variants/open), but a selection naming it still
+    // resolves: the geometry ids are stable identities the authoring and the tests reach by name
     return asVariant(triangle, pitchMM, undefined, frame)
   },
   validateDraft: triangleDraftErrors,
-  open: (current, pitchMM) => selectVariant(current, asVariant(trianglesOfType(TRIANGLE_TYPES[0])[0], pitchMM, 0)),
+  open: (current, pitchMM) => selectVariant(current,
+    asVariant(trianglesOfType(TRIANGLE_TYPES[0]).find((t) => onBoard(t, pitchMM)) ?? trianglesOfType(TRIANGLE_TYPES[0])[0], pitchMM, 0)),
   orientations: [],
   baseView: (sel) => uprightView(triangleBySelection(sel)),
   draftMatches: (draft, sel, frameKey) => draft.className === 'triangle' && draft.frameKey === frameKey && draft.geometryId === sel.geometryId,

@@ -1,5 +1,5 @@
 import { polygonPopulation, CANON_LAYOUT } from './canon'
-import { boardPositions, placePointMM, regularFitsBoard, rimLattice } from './geometry'
+import { boardPositions, placePointMM, rimLattice } from './geometry'
 import { registryClass } from './registry-class'
 import type { LibraryFrame } from './types'
 
@@ -24,18 +24,16 @@ function polygonFrames(pitchMM: number): readonly LibraryFrame[] {
   const rim = rimLattice(pitchMM)
   const out: LibraryFrame[] = []
   for (const sides of SIDES) for (let n = 1; n <= side; n++) {
-    const { nodes, inradius } = polygonPopulation(sides, n, n, rim)
+    const { nodes } = polygonPopulation(sides, n, n, rim)
     const xs = nodes.map(([x]) => x), ys = nodes.map(([, y]) => y)
     const frame = {
       cols: Math.max(...xs) + 1, rows: Math.max(...ys) + 1,
       key: 'p' + sides + '-' + n + 'x' + n,
       layouts: [{ name: nodes.length === 1 ? 'single' : CANON_LAYOUT, nodes }],
     }
-    // grown past what the board can carry is not a record the board can hold — and for a polygon
-    // that is the SHAPE's question, not the magnets': it reaches half again past its population, so
-    // frames whose magnets fit comfortably still drew shapes the board cannot make
-    if (frame.cols <= cols && frame.rows <= rows && regularFitsBoard(sides, inradius, pitchMM))
-      out.push(frame)
+    // magnets off the board are not a frame the board can hold; whether the SHAPE fits is the
+    // registry's question, asked once for every class
+    if (frame.cols <= cols && frame.rows <= rows) out.push(frame)
   }
   return out
 }

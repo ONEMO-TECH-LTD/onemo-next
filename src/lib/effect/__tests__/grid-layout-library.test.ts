@@ -20,8 +20,9 @@ import { materializeSelection, materializeResolved } from '../library/materializ
 import { librarySurface } from '../library/surface'
 import { catalogue } from '../library/catalogue'
 
-import { CANON_LAYOUT } from '../library/canon'
-import { boardPositions } from '../library/geometry'
+import { CANON_LAYOUT, diamondMask, frameOf } from '../library/canon'
+import { boardPositions, fitsBoardMM, placeMM } from '../library/geometry'
+import { outlineFromLayout } from '../library/outline'
 import { bandOfFrame } from '../library/rules'
 import type { LibraryFrame, LibrarySelection } from '../library/types'
 import { libraryStageModel } from '../grid-magnet-library-bridge'
@@ -438,12 +439,22 @@ describe('rectangle class', () => {
 })
 
 describe('diamond class', () => {
-  it('carries every odd patch the board holds at that lattice', () => {
+  it('carries every odd patch the board holds at that lattice — whose shape the board can make', () => {
+    // the magnets of the largest odd patch fit the board, but a diamond's corners reach rim·√2 past
+    // them: 17x17 at 24mm is a 418mm shape on a 408mm board. The board rule is one rule for every
+    // class (2026-09-08), so the expected set is the odd patches minus those it refuses.
+    const none = { transpose: false, flipX: false, flipY: false }
     for (const pitch of [24, 48, 96]) {
       const { cols, rows } = boardPositions(pitch)
       const side = Math.min(cols, rows)
       const want: string[] = []
-      for (let n = 1; (n - 1) * 2 + 1 <= side; n++) { const p = (n - 1) * 2 + 1; want.push(`${p}x${p}`) }
+      for (let n = 1; (n - 1) * 2 + 1 <= side; n++) {
+        const p = (n - 1) * 2 + 1
+        const frame = frameOf(p, p, (nodes) => diamondMask(p, nodes))
+        const outline = outlineFromLayout(placeMM(frame, frame.layouts[0], none, pitch).nodesMM, { corners: 'sharp', pointRotationDeg: 45 })
+        if (fitsBoardMM(outline.widthMM, outline.heightMM)) want.push(`${p}x${p}`)
+      }
+      expect(want.length, `diamond @${pitch} keeps most patches`).toBeGreaterThan(0)
       expect(framesAt('diamond', pitch).map(frameKeyOf).sort(), `diamond @${pitch}`).toEqual(want.sort())
     }
   })

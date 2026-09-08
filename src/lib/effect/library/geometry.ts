@@ -63,23 +63,14 @@ export const regularNormals = (sides: number): readonly (readonly [number, numbe
 /** Inradius over circumradius for a regular n-gon: where its edge sits when its corner is at 1. */
 export const regularApothem = (sides: number): number => Math.cos(Math.PI / sides)
 
-/** WILL THE BOARD CARRY IT — a regular n-gon of this inradius, on this lattice.
+/** WILL THE BOARD CARRY IT — the largest shape it can is its legal area plus the rim on each side.
  *
- *  A record whose MAGNETS fit is not a record whose SHAPE fits. Every other family's outline hugs
- *  its population, so the two questions have always had the same answer; a polygon reaches half
- *  again past its magnets by construction, and asking only about the magnets published records the
- *  board cannot make (2026-09-06). The largest shape it can carry is the legal area plus the rim on
- *  each side; the polygon's own extent is its corners', a polygon being straight lines. */
-export function regularFitsBoard(sides: number, inradius: number, pitchMM: number): boolean {
-  const s = inradius / regularApothem(sides)
-  const cs: number[] = [], sn: number[] = []
-  for (let i = 0; i < sides; i++) {
-    const a = Math.PI / 2 + (2 * Math.PI * i) / sides
-    cs.push(Math.cos(a)); sn.push(Math.sin(a))
-  }
-  return (Math.max(...cs) - Math.min(...cs)) * s * pitchMM <= BOARD_WIDTH_MM + 2 * RELEASED_PADDING_MM + 1e-9
-    && (Math.max(...sn) - Math.min(...sn)) * s * pitchMM <= BOARD_HEIGHT_MM + 2 * RELEASED_PADDING_MM + 1e-9
-}
+ *  A record whose MAGNETS fit is not a record whose SHAPE fits: a polygon reaches half again past its
+ *  population, a diamond's corners and a pill's caps reach past theirs too, and asking only about the
+ *  magnets published records the board cannot make (2026-09-06/08). One rule, every class. */
+export const fitsBoardMM = (widthMM: number, heightMM: number): boolean =>
+  widthMM <= BOARD_WIDTH_MM + 2 * RELEASED_PADDING_MM + 1e-9
+  && heightMM <= BOARD_HEIGHT_MM + 2 * RELEASED_PADDING_MM + 1e-9
 
 const det3 = (a: readonly (readonly number[])[]): number =>
   a[0][0] * (a[1][1] * a[2][2] - a[1][2] * a[2][1])
