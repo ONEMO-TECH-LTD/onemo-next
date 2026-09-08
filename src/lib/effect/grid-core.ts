@@ -19,6 +19,7 @@ import { DEFAULT_CIRCLE_TESSELLATION_CALIBRATION } from './effect-calibration'
 import { MANUFACTURING_TOLERANCE_MM } from './geometry-truth'
 import { roundedSquareContourMM } from './rounded-square'
 import { insetRingMM, MANUFACTURING_OFFSET_ARC_TOLERANCE_MM } from './offset'
+import { coverageLock, sealedPlanValues } from './locks'
 import {
   PreparedContourSource,
   distanceToPreparedContour,
@@ -1610,8 +1611,12 @@ export function nearestAnchorPair(anchors: ReadonlyArray<Anchor>): NearestAnchor
  */
 export function resolveGridPlan(
   contourMM: Contour,
-  opts: GridPlanOptions = {},
+  given: GridPlanOptions = {},
 ): ResolvedGridPlan {
+  // PRODUCTION CONSUMES LOCKED VALUES AND CANNOT CHANGE THEM (Dan, 2026-09-04: "any prod cannot
+  // change them by accident unless we change it in the admin engine version"). The sealed profile is
+  // applied here, at the door, before anything is derived from the caller's options.
+  const opts: GridPlanOptions = { ...given, ...sealedPlanValues() }
   const attachment = opts.attachment ?? 'magnetic'
   const source = opts.source ?? 'std'
   const mode = opts.mode ?? 'auto'
@@ -1630,7 +1635,7 @@ export function resolveGridPlan(
     paddingMM: opts.paddingMM ?? PADDING_FLOOR_MM,
     plan: opts.plan ?? 'auto',
     center: opts.center ?? 'centroid',
-    perimeterOnly: perimeterForDensity(density, source),
+    perimeterOnly: coverageLock() ? coverageLock() === 'perimeter' : perimeterForDensity(density, source),
     sparseThin: sparseThinForDensity(density, source),
   }
 

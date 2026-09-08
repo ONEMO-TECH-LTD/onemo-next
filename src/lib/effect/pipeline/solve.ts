@@ -20,6 +20,7 @@ import { DEFAULT_PITCH_MM, PADDING_FLOOR_MM } from '@/lib/effect/grid-magnet-spe
 import { contourCacheKey, makeSizer, sizeRange } from '@/lib/effect/grid-magnet-bridge'
 import type { Pt } from '@/lib/effect/types'
 import type { GridRequest, GridSolve } from './types'
+import { LOCK_PROFILE, sealRequest } from '@/lib/effect/locks'
 
 // Computed once = computed. Per-shape bakes and per-band solves are keyed by shape + config and
 // reused across interactions; a new shape clears everything. The per-size walk cache and the idle
@@ -82,7 +83,10 @@ export function anchorFnFor(
 
 const FITS_CAP = 12
 
-export function solveGrid(req: GridRequest): GridSolve {
+export function solveGrid(rawReq: GridRequest): GridSolve {
+  // THE DOOR APPLIES THE SEALED PROFILE FIRST: a locked dial is what it is sealed at, whatever the
+  // caller sent — the Grid Lab included. The record carries the profile it was made under.
+  const req = sealRequest(rawReq, LOCK_PROFILE)
   const { base, offsetMM, cfg, mode, manualBand, sizeMM, stepSel, settings,
     activeBandIds = BANDS.map((band) => band.id) } = req
   const { protectionPaddingMM } = settings
@@ -103,6 +107,7 @@ export function solveGrid(req: GridRequest): GridSolve {
         cfg.pitchMM ?? DEFAULT_PITCH_MM, protectionPaddingMM, grid.anchors.map((anchor) => anchor.dia / 2))
       return {
         contour, grid, effSize: sizeMM, rungs: [], selectedRungIndex: 0, segments: grid.segments, unprotected: evidence,
+        profile: LOCK_PROFILE,
       }
     } else {
       // Coverage is delivery-only. The entire solve and its cache identity stay raw so toggling
@@ -235,6 +240,7 @@ export function solveGrid(req: GridRequest): GridSolve {
           contour: drawn.contour, grid: { ...drawn.grid, anchors, segments },
           effSize: at.sizeMM, rungs: ladder, selectedRungIndex: idx, segments, offMM: at.centreOffMM, classificationDiagnostics: recog,
           bandClass, bandClasses, recommendation, unprotected: deliveredEvidence,
+          profile: LOCK_PROFILE,
         }
       }
       // NO LAWFUL OFFER. Judge allowed nothing in this band. The witness comes from LAYOUT's own
@@ -249,7 +255,7 @@ export function solveGrid(req: GridRequest): GridSolve {
       return {
         contour, grid, effSize: bestSeatedMM, rungs: [], selectedRungIndex: 0, segments: grid.segments,
         offers: [], diagnostic: { reason: 'no-lawful-offer', bestSeatedMM },
-        bandClass, bandClasses, recommendation,
+        bandClass, bandClasses, recommendation, profile: LOCK_PROFILE,
       }
     }
   }

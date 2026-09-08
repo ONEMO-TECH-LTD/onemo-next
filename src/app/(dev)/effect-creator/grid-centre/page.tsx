@@ -29,6 +29,7 @@ import { librarySegments as librarySegmentsOf, type LibraryLegalArea } from '@/l
 import { createPerfLog, type PerfRow } from './perf-log'
 import { BANDS, CENTRE_MODE, DEFAULT_PITCH_MM, GOVERNOR, PADDING_CEIL_MM, PADDING_FLOOR_MM, PROTECTION_PADDING_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-magnet-spec'
 import { normBaseContour, normMaskContour, normRecordContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-magnet-bridge'
+import { LOCK_PROFILE, isLocked, withLock, type LockKey, type LockProfile, type LockValues } from '@/lib/effect/locks'
 
 /** Bench test libraries — static assets, listed by a committed manifest. */
 const LIB_MANIFEST = '/grid-engine/library.json'
@@ -92,7 +93,6 @@ export default function GridLab() {
   /** Free-slider limits — typed, persisted across reloads. */
   const [pitch, setPitch] = useState(DEFAULT_PITCH_MM)
   const [pad, setPad] = usePersisted('pad', RELEASED_PADDING_MM)
-  const [padLock, setPadLock] = usePersisted('padLock', 1)
   /** Centre-mode switch — which centre drives anchoring and balance. */
   /** Engine mode — 1 wrap ladder (band offers) · 2 free + snap (continuous). */
   const [centreMode, setCentreMode] = usePersisted('centreMode', CENTRE_MODE)
@@ -140,6 +140,16 @@ export default function GridLab() {
   }
   // how the library LISTING is browsed — band and orientation. A filter over what is shown, not
   // part of the selection: turning the filter never changes which record is selected.
+  // THE SEALED PROFILE — which dials are locked and at what value. A file in the repo, written back
+  // through the dev route, read by BOTH engine doors: locking here is what stops production changing
+  // a value by accident (Dan, 2026-09-04). Grid Lab is the admin engine; this is the only surface
+  // that can take the action.
+  const [profile, setProfile] = useState<LockProfile>(LOCK_PROFILE)
+  const saveProfile = (next: LockProfile) => {
+    setProfile(next)
+    fetch('/api/dev/lock-profile', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(next) })
+      .catch(() => { /* the live copy stands; the file catches up on the next lock */ })
+  }
   const [libBrowse, setLibBrowse] = useState<LibraryBrowse>(DEFAULT_LIBRARY_BROWSE)
   // what the Library shows and what it releases — a file in the repo, written back through the dev
   // route so the admin's toggles are what ships (Dan, 2026-09-07). The page holds the live copy.
@@ -222,7 +232,7 @@ export default function GridLab() {
       pad: RELEASED_PADDING_MM, centreMode: CENTRE_MODE, governor: GOVERNOR,
     }
     try { const raw = localStorage.getItem('grid-centre.defaults'); if (raw) d = { ...d, ...JSON.parse(raw) } } catch { }
-    setPad(d.pad); setPadLock(1); setCentreMode(d.centreMode); setGovernor(d.governor)
+    setPad(d.pad); setCentreMode(d.centreMode); setGovernor(d.governor)
   }
 
   const [magic, setMagic] = useState<MagicState>(null)
@@ -547,8 +557,11 @@ export default function GridLab() {
             }} /> : null}</> : <>
           <Fold title="Grid settings" panel="grid">
             <div className="gl-field gl-bandfield">
-              <div className="gl-fieldhead"><span>Band · available</span>
-                <button className="gl-edit" onClick={() => setBandScopeDraft((draft) => draft ? null : [...activeBandIds])}>Edit</button>
+              <div className="gl-fieldhead"><span>Band · available{isLocked(profile, 'activeBandIds') ? ' · locked' : ''}</span>
+                <span className="gl-headbtns">
+                  {!isLocked(profile, 'activeBandIds') && <button className="gl-edit" onClick={() => setBandScopeDraft((draft) => draft ? null : [...activeBandIds])}>Edit</button>}
+                  <LockBtn label="Band · available" k="activeBandIds" v={activeBandIds} profile={profile} setProfile={saveProfile} />
+                </span>
               </div>
               <div className="gl-seg gl-bandactive">
                 {BANDS.filter((b) => activeBandIds.includes(b.id)).map((b) =>
@@ -600,33 +613,33 @@ export default function GridLab() {
                   min={b.minMM} max={b.maxMM} />
               })()}
             </>}
-            <div className="gl-field"><span>Grid pitch · released tiers</span>
+            <Lockable label="Grid pitch · released tiers" k="pitchMM" v={pitch} profile={profile} setProfile={saveProfile}>
               <div className="gl-seg">
                 {RELEASED_PITCHES_MM.map(({ mm, label }) =>
                   <button key={mm} aria-pressed={pitch === mm} onClick={() => setPitch(mm)}>{label}</button>)}
               </div>
-            </div>
-            <LockNum label="Magnet padding · per spot" unit="mm" v={pad} set={setPad}
-              min={PADDING_FLOOR_MM} max={PADDING_CEIL_MM} locked={padLock} setLocked={setPadLock}
-              released={RELEASED_PADDING_MM} />
-            <div className="gl-field"><span>Classifier ruler · what the band is measured on</span>
+            </Lockable>
+            <Lockable label="Magnet padding · per spot" k="paddingMM" v={pad} profile={profile} setProfile={saveProfile}>
+              <NumIn v={pad} set={setPad} min={PADDING_FLOOR_MM} max={PADDING_CEIL_MM} unit="mm" />
+            </Lockable>
+            <Lockable label="Classifier ruler · what the band is measured on" k="classifierRuler" v={ruler} profile={profile} setProfile={saveProfile}>
               <div className="gl-seg">
                 <button aria-pressed={ruler === 'legal'} onClick={() => setRuler('legal')}>legal area</button>
                 <button aria-pressed={ruler === 'outer'} onClick={() => setRuler('outer')}>outer box</button>
               </div>
-            </div>
-            <div className="gl-field"><span>Coverage</span>
+            </Lockable>
+            <Lockable label="Coverage" k="coverage" v={coverage} profile={profile} setProfile={saveProfile}>
               <div className="gl-seg">
                 {([['full', 'Full grid'], ['perimeter', 'Perimeter belt']] as ['full' | 'perimeter', string][]).map(([c, l]) =>
                   <button key={c} aria-pressed={coverage === c} onClick={() => setCoverage(c)}>{l}</button>)}
               </div>
-            </div>
-            <div className="gl-field"><span>Magnet plan</span>
+            </Lockable>
+            <Lockable label="Magnet plan" k="plan" v={plan} profile={profile} setProfile={saveProfile}>
               <div className="gl-seg">
                 {([['all6', 'All 6mm'], ['all8', 'All 8mm'], ['corners8', 'Corners 8']] as [MagnetPlan, string][]).map(([p, l]) =>
                   <button key={p} aria-pressed={plan === p} onClick={() => setPlan(p)}>{l}</button>)}
               </div>
-            </div>
+            </Lockable>
             <label className="gl-toggle"><span>Show lattice <small style={{ color: 'var(--ink-3)' }}>· every position tried</small></span>
               <input type="checkbox" checked={showLattice} onChange={e => setShowLattice(e.target.checked)} />
             </label>
@@ -732,18 +745,18 @@ export default function GridLab() {
 
 
           <Fold title="Centering" panel="centre">
-            <div className="gl-field"><span>Centre mode</span>
+            <Lockable label="Centre mode" k="centreMode" v={centreMode} profile={profile} setProfile={saveProfile}>
               <div className="gl-seg gl-wrap">
                 {([[0, 'Box'], [1, 'Core'], [2, 'Masses'], [3, 'Weight'], [4, 'Deep'], [5, 'Top']] as [number, string][]).map(([m, l]) =>
                   <button key={m} aria-pressed={centreMode === m} onClick={() => setCentreMode(m)}>{l}</button>)}
               </div>
-            </div>
-            {centreMode === 2 && <div className="gl-field"><span>Governor</span>
+            </Lockable>
+            {centreMode === 2 && <Lockable label="Governor" k="governor" v={governor} profile={profile} setProfile={saveProfile}>
               <div className="gl-seg gl-wrap">
                 {([[0, 'Smallest'], [1, 'Deepest'], [2, 'Top'], [3, 'Top-small']] as [number, string][]).map(([g, l]) =>
                   <button key={g} aria-pressed={governor === g} onClick={() => setGovernor(g)}>{l}</button>)}
               </div>
-            </div>}
+            </Lockable>}
           </Fold>
           <Fold title={<>Performance <small style={{ color: 'var(--ink-3)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>· this build{buildPort ? ' · :' + buildPort : ''}</small></>} panel="perf">
             <div className="gl-field"><span>Latest</span>
@@ -762,8 +775,9 @@ export default function GridLab() {
             </div>}
           </Fold>
           <Fold title="Protection" panel="protect">
-            <Slider label="Protection padding · from magnet edge" unit="mm"
-              v={protectionPadding} set={setProtectionPadding} min={0} max={96} />
+            <Lockable label="Protection padding · from magnet edge" k="protectionPaddingMM" v={protectionPadding} profile={profile} setProfile={saveProfile}>
+              <Slider label="" unit="mm" v={protectionPadding} set={setProtectionPadding} min={0} max={96} />
+            </Lockable>
             {model?.unprotected && <div className="gl-field"><span>Unsupported material</span>
               <div className="gl-snap">{model.unprotected.percent.toFixed(1)}% ·{' '}
                 {Math.round(model.unprotected.areaMM2)} mm² · {model.unprotected.patches.length} patch{model.unprotected.patches.length === 1 ? '' : 'es'} ·{' '}
@@ -1158,27 +1172,54 @@ function Stepper({ label, v, set }: { label: string; v: number; set: (n: number)
     </div>
   )
 }
-/** Perf value in seconds — green when fast, red past the 2s comfort line. */
-function LockNum({ label, unit, v, set, min, max, locked, setLocked, released }: {
-  label: string; unit?: string; v: number; set: (n: number) => void
-  min: number; max: number; locked: number; setLocked: (n: number) => void; released: number
-}) {
+/** A typed value with its unit — the entry half of what LockNum used to be; the lock half is Lockable,
+ *  because a lock is now one control with one meaning on every dial. */
+function NumIn({ v, set, min, max, unit }: { v: number; set: (n: number) => void; min: number; max: number; unit?: string }) {
   return (
-    <div className="gl-field"><span>{label}{locked ? ' · locked' : ' · unlocked for testing'}</span>
-      <div className="gl-limits">
-        <button className="gl-lock" aria-pressed={locked !== 0} title={locked ? 'locked to the released value' : 'unlocked — typed values allowed'}
-          onClick={() => { const next = locked ? 0 : 1; setLocked(next); if (next) set(released) }}>
-          {locked ? '🔒' : '🔓'}
-        </button>
-        <span className="gl-num"><i>{unit ?? ''}</i>
-          <input key={String(locked) + v} type="number" defaultValue={v} disabled={locked !== 0}
-            onBlur={(e) => { const n = +e.currentTarget.value; if (Number.isFinite(n) && n >= min && n <= max) set(n); else e.currentTarget.value = String(v) }}
-            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} />
-        </span>
-      </div>
+    <div className="gl-limits">
+      <span className="gl-num"><i>{unit ?? ''}</i>
+        <input key={v} type="number" defaultValue={v}
+          onBlur={(e) => { const n = +e.currentTarget.value; if (Number.isFinite(n) && n >= min && n <= max) set(n); else e.currentTarget.value = String(v) }}
+          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} />
+      </span>
     </div>
   )
 }
+
+/** THE ADMIN LOCK, on one dial. Pressing it SEALS the dial's current value into the profile both
+ *  engine doors read — this bench's own solve and production's alike — and writes that profile into
+ *  the repo. Pressing again releases it. Dan, 2026-09-04: "add locks to all configs and make them go
+ *  through into the spec as locked as well so any prod cannot change them by accident unless we
+ *  change it in the admin engine version." Grid Lab IS the admin engine, so this is the only surface
+ *  where the action exists. */
+function LockBtn<K extends LockKey>({ label, k, v, profile, setProfile }: {
+  label: string; k: K; v: LockValues[K]; profile: LockProfile; setProfile: (next: LockProfile) => void
+}) {
+  const locked = isLocked(profile, k)
+  return (
+    <button className="gl-lock" aria-pressed={locked} aria-label={(locked ? 'unlock ' : 'lock ') + label}
+      title={locked ? 'sealed — production reads this value and cannot change it' : 'unlocked — seal the current value'}
+      onClick={() => setProfile(withLock(profile, k, v, !locked))}>{locked ? '\u{1F512}' : '\u{1F513}'}</button>
+  )
+}
+
+/** One dial with its lock. Sealed, the control is inert: the value is the profile's, not the bench's. */
+function Lockable<K extends LockKey>({ label, k, v, profile, setProfile, children }: {
+  label: string; k: K; v: LockValues[K]; profile: LockProfile
+  setProfile: (next: LockProfile) => void; children: React.ReactNode
+}) {
+  const locked = isLocked(profile, k)
+  return (
+    <div className="gl-field">
+      <div className="gl-fieldhead"><span>{label}{locked ? ' \u00b7 locked' : ''}</span>
+        <LockBtn label={label} k={k} v={v} profile={profile} setProfile={setProfile} />
+      </div>
+      <div className={locked ? 'gl-sealed' : undefined} aria-disabled={locked || undefined}>{children}</div>
+    </div>
+  )
+}
+
+/** Perf value in seconds — green when fast, red past the 2s comfort line. */
 
 function Sec({ ms }: { ms?: number }) {
   if (ms == null) return <b>—</b>
@@ -1270,6 +1311,8 @@ const CSS = `
 .gl-slider-row{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;color:var(--ink-2)}
 .gl-slider-row b{font:600 12.5px var(--mono);color:var(--ink);font-variant-numeric:tabular-nums}
 .gl-sizerow{display:flex;align-items:flex-end;gap:6px}.gl-sizerow-slider{flex:1;min-width:0}.gl-chev{width:26px;height:26px;margin-bottom:2px;display:grid;place-items:center;font-size:15px;line-height:1;color:var(--ink-2);background:var(--panel-2);border:1px solid var(--line);border-radius:7px;cursor:pointer}.gl-chev:active{background:var(--line)}
+.gl-sealed{pointer-events:none;opacity:.5}
+.gl-headbtns{display:flex;align-items:center;gap:6px}
 .gl-lock{width:30px;height:26px;display:grid;place-items:center;font-size:13px;line-height:1;background:var(--panel-2);border:1px solid var(--line);border-radius:6px;cursor:pointer}
 .gl-num{display:inline-flex;align-items:center;gap:4px}
 .gl-num input{width:54px;font:600 12.5px var(--mono);color:var(--ink);background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:3px 6px;text-align:right;font-variant-numeric:tabular-nums}

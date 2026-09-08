@@ -1,5 +1,6 @@
 // pipeline/types.ts — the data-only boundary of the headless solve (T1).
 import type { Contour, GridConfig, GridResult, SafeSegment, UnprotectedEvidence } from '../types'
+import type { LockProfile } from '../locks'
 
 export interface GridRequest {
   base: Contour
@@ -34,4 +35,8 @@ export interface GridSolve {
   unprotected?: UnprotectedEvidence | null
   offers?: never[]
   diagnostic?: { reason: 'no-lawful-offer'; bestSeatedMM: number }
+  /** THE SEALED PROFILE this answer was made under — which dials were locked, at what value. A record
+   *  proves what was fixed when it was made (Dan, 2026-09-04: locks "go through into the spec as
+   *  locked"). */
+  profile: LockProfile
 }
