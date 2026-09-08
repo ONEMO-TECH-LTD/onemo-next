@@ -25,7 +25,7 @@ import { librarySegments } from '../adapters/libraryViewModel'
 import { insetOffsetPath, pathFromAnchors, spotRadiusOf } from '../grid-magnet'
 import { offsetConvexRingPath } from '../foundation/path'
 import { scaleContour } from '../grid-magnet-compute'
-import { applyCoverage, enumerateCanonPhaseWindows, enumerateFreePhaseMax, fallbackRevealSizes, makeCircleSeatPredicate, makeContourSeatPredicate, priorityTupleOf, symmetricCores } from '../units/layout'
+import { applyCoverage, enumerateCanonPhaseWindows, enumerateFreePhaseMax, fallbackRevealSizes, makeCircleSeatPredicate, makeContourSeatPredicate, priorityTupleOf, symmetricCores, tupleCmp } from '../units/layout'
 import { wrapGroup } from '../units/wrap'
 import { wrapBandLadder } from '../grid-magnet-wrap-compute'
 import { contourCentroidOf } from '../units/centring'
@@ -1377,10 +1377,12 @@ describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside
     expect(withPriority.offers[0].at.sizeMM).toBeCloseTo(140.96, 2)
   }, 120_000)
 
-  it('dual accumulator: a lower-count phase wins priority while the blind result is byte-identical (QA F2)', async () => {
-    // Duck B4 at 213 mm: the blind maximum is an 8-seat lopsided set; the best priority set is a
-    // 6-seat symmetric one that lives in a phase with fewer free seats. The blind output must not
-    // move when a priority is supplied, and the priority output must be the lower-count identity.
+  it('dual accumulator: count leads, priorities break the tie, and the blind result is byte-identical (QA F2 · 2026-09-08)', async () => {
+    // Duck B4 at 213 mm. Under the 1 Sep rule the priority winner was a 6-seat symmetric set beating
+    // the blind maximum of 7–8 — symmetry bought with support, which is what cost circle B5 three
+    // magnets and the blob six (Dan, 2026-09-08: count first). Now the priority winner holds AS MANY
+    // seats as the blind maximum, and the priorities only choose among sets of that count. The blind
+    // output must still not move when a priority is supplied.
     const sized = makeSizer(cutout('public/grid-engine/cutouts/DUCK.png'), 0)
     const anchorAt = await workerAnchor(sized, cfg, 'gate2-dual-accumulator')
     const row = classifyBands(sized, cfg, anchorAt, [BANDS.find((b) => b.id === 4)!]).find((r) => r.bandId === 4)!
@@ -1395,9 +1397,16 @@ describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside
     expect(both.priorityCandidates.length).toBeGreaterThan(0)
     const blindMax = Math.max(...blind.candidates.map((c) => c.points.length))
     const priorityCount = both.priorityCandidates[0].points.length
-    expect(priorityCount, 'the proof needs a LOWER-count priority winner').toBeLessThan(blindMax)
-    for (const c of both.priorityCandidates)
-      expect(priorityTupleOf(c.id.split(',').map(Number), priority).slice(0, 4)).toEqual([1, 1, 1, 0])
+    expect(priorityCount, 'count leads: the priority winner holds the blind maximum').toBe(blindMax)
+    // among the maximum-count sets, the winners are the best-ranked by the priority tuple — no
+    // max-count candidate anywhere in the enumeration outranks them
+    const best = priorityTupleOf(both.priorityCandidates[0].id.split(',').map(Number), priority)
+    for (const c of both.priorityCandidates) {
+      expect(c.points.length).toBe(blindMax)
+      expect(tupleCmp(priorityTupleOf(c.id.split(',').map(Number), priority), best)).toBe(0)
+    }
+    for (const c of blind.candidates)
+      expect(tupleCmp(priorityTupleOf(c.id.split(',').map(Number), priority), best), c.id).toBeLessThanOrEqual(0)
     expect(blind.priorityCandidates).toEqual([])
   }, 120_000)
 

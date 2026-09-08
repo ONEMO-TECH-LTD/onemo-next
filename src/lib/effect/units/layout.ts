@@ -277,12 +277,15 @@ export function symmetricCores(heldIds: ReadonlyArray<number>, priority: CanonPr
   return [...out.values()]
 }
 
-const fullPriority = (t: ReadonlyArray<number> | null): t is number[] =>
-  !!t && t[0] === 1 && t[1] === 1 && t[2] === 1 && t[3] === 0
-
-/** Lexicographic tuple order — shared by the enumeration and the solver's cross-reveal floor. */
+/** COUNT FIRST, then the priorities as the tiebreak — shared by the enumeration and the solver's
+ *  cross-reveal floor. The tuple is still [top, corners, interior, −orphans, count]; what changed is
+ *  the ORDER it is read in. Reading the priorities first (1 Sep) let symmetry buy itself by throwing
+ *  away support: circle B5 fell from 21 magnets to 18, the blob from 19 to 13, and every round or
+ *  lopsided shape lost 3–6 seats (Dan, 2026-09-08: "do it"). Symmetry still decides between
+ *  placements holding the SAME number of magnets — which is where it was earning its keep. */
+const TUPLE_ORDER = [4, 0, 1, 2, 3] as const
 export const tupleCmp = (a: ReadonlyArray<number>, b: ReadonlyArray<number>): number => {
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] - b[i]
+  for (const i of TUPLE_ORDER) if (a[i] !== b[i]) return a[i] - b[i]
   return 0
 }
 
@@ -382,9 +385,9 @@ export function enumerateCanonPhaseWindows(
   let bestTuple: number[] | null = priorityFloor ? [...priorityFloor] : null
   for (const { px, py, count: phaseCount, free } of phaseRows) {
     const blindOpen = phaseCount >= maxCount
-    // A phase with fewer free seats than the best full-priority window's count cannot beat it: the
+    // A phase with fewer free seats than the best window's count cannot beat it: the
     // first four slots are already maximal there (three 1-bits and zero orphans), so only count could.
-    const priorityOpen = !!priority && !(fullPriority(bestTuple) && phaseCount < bestTuple[4])
+    const priorityOpen = !!priority && !(bestTuple && phaseCount < bestTuple[4])
     if (!blindOpen && !priorityOpen) break
     const baseX = bb.minX + px, baseY = bb.minY + py
     const ix0 = Math.ceil((bb.minX - relMaxX - baseX) / pitch)
@@ -407,8 +410,8 @@ export function enumerateCanonPhaseWindows(
         const previous = unique.get(id)
         if (!previous || anchorDistance < previous.anchorDistance) unique.set(id, row)
       }
-      // Once a full-priority window exists only count can beat it — the cheap skip counting had.
-      if (priorityOpen && !(fullPriority(bestTuple) && ids.length < bestTuple[4])) {
+      // Count leads, so a window with fewer seats than the best cannot beat it — the cheap skip counting had.
+      if (priorityOpen && !(bestTuple && ids.length < bestTuple[4])) {
         // Every window offers two candidates: everything that fits, and its SYMMETRIC CORE — the
         // same seats with unmatched ones dropped. Dan: "try full frame but sacrifice parts of it …
         // in favour of the priorities". A shape whose arm is 0.2 mm too thin for one mirror seat
