@@ -67,11 +67,30 @@ const withClass = (state: LibraryReleaseState, classId: LibraryFamily, cls: Clas
   return { version: 1, classes }
 }
 
-/** THE PRESETS — every catalogue record whose frame the admin released, at this pitch. A record's
- *  release id is its frame key within its class, so every layout and view of a released frame ships
- *  with it. Empty until something is released: the Presets tab shows what the Library let out, and
- *  nothing else (Dan, 2026-09-07: "the presets i asked to swap for the library presets"). */
+/** A catalogue record's release identity: the class's own variant id, as the Frame toggle stored it.
+ *  The catalogue id carries that segment URL-encoded — a triangle's `tri:0,0;0,2;2,1` reads
+ *  `tri%3A0%2C0%3B…` there — so it is decoded before it is compared (QA F1, 2026-09-08: releasing a
+ *  triangle produced no preset). */
+export const releaseIdOf = (entry: CatalogueEntry): string => decodeURIComponent(entry.id.split('/')[2])
+
+/** THE PRESETS — every catalogue record whose frame the admin released, at this pitch, in a band the
+ *  Library SHOWS. Dan's flow is "select what the Library displays, and from those release" — so a
+ *  hidden size is not shippable even if it was released while shown (QA F2). Every layout and view of
+ *  a released frame ships with it. Empty until something is released (Dan, 2026-09-07: "the presets i
+ *  asked to swap for the library presets"). */
 export const releasedRecords = (pitchMM: number, state: LibraryReleaseState): readonly CatalogueEntry[] =>
-  catalogue(pitchMM).filter((e) => recordReleased(state, e.classId, e.id.split('/')[2]))
+  catalogue(pitchMM).filter((e) => bandShown(state, e.classId, e.bandId) && recordReleased(state, e.classId, releaseIdOf(e)))
+
+/** The release ids the library knows at all, per class — what a stored state may legitimately name.
+ *  Read off the catalogue at every released pitch, so the dev route can refuse an id no class ever
+ *  published (QA F3). */
+export function knownReleaseIds(pitches: readonly number[]): ReadonlyMap<string, ReadonlySet<string>> {
+  const out = new Map<string, Set<string>>()
+  for (const pitchMM of pitches) for (const e of catalogue(pitchMM)) {
+    const set = out.get(e.classId) ?? new Set<string>()
+    set.add(releaseIdOf(e)); out.set(e.classId, set)
+  }
+  return out
+}
 
 export { LIBRARY_RELEASE_STATE }

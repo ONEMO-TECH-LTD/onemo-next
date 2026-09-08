@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import type { LibraryReleaseState } from '@/lib/effect/library'
+import { unsound } from './validate'
 
 /** THE LIBRARY'S RELEASE STATE, written back to the repo. Dev only: the Grid Lab is the admin and the
  *  file it writes is what ships — there is no runtime store to drift from it. */
@@ -13,25 +15,14 @@ import type { LibraryReleaseState } from './release'
 
 export const LIBRARY_RELEASE_STATE: LibraryReleaseState = `
 
-const sound = (v: unknown): v is { version: 1; classes: Record<string, { shownBands: number[] | null; released: string[] }> } => {
-  if (!v || typeof v !== 'object') return false
-  const s = v as { version?: unknown; classes?: unknown }
-  if (s.version !== 1 || !s.classes || typeof s.classes !== 'object') return false
-  return Object.values(s.classes as Record<string, unknown>).every((c) => {
-    if (!c || typeof c !== 'object') return false
-    const cls = c as { shownBands?: unknown; released?: unknown }
-    const bandsOk = cls.shownBands === null || (Array.isArray(cls.shownBands) && cls.shownBands.every((b) => Number.isInteger(b)))
-    const relOk = Array.isArray(cls.released) && cls.released.every((r) => typeof r === 'string')
-    return bandsOk && relOk
-  })
-}
-
 export async function POST(req: Request) {
   if (process.env.NODE_ENV === 'production') return NextResponse.json({ error: 'dev only' }, { status: 404 })
   try {
-    const body = await req.json()
-    if (!sound(body)) return NextResponse.json({ error: 'not a release state' }, { status: 400 })
-    await writeFile(STATE_FILE, HEADER + JSON.stringify(body, null, 2) + '\n')
+    const body: unknown = await req.json()
+    const why = unsound(body)
+    if (why) return NextResponse.json({ error: why }, { status: 400 })
+    const state = body as LibraryReleaseState
+    await writeFile(STATE_FILE, HEADER + JSON.stringify(state, null, 2) + '\n')
     return NextResponse.json({ saved: true })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })

@@ -21,6 +21,8 @@ import { librarySurface } from '../library/surface'
 import { catalogue } from '../library/catalogue'
 
 import { CANON_LAYOUT, diamondMask, frameOf } from '../library/canon'
+import { releasedRecords, releaseIdOf, withBandShown, withReleased, type LibraryReleaseState } from '../library/release'
+import { unsound } from '@/app/api/dev/library-release/validate'
 import { boardPositions, fitsBoardMM, placeMM } from '../library/geometry'
 import { outlineFromLayout } from '../library/outline'
 import { bandOfFrame } from '../library/rules'
@@ -1393,5 +1395,48 @@ describe('authoring transitions — the five the page used to spell out itself',
     expect(after.drafts.map((d) => d.geometryId)).toEqual([pair[1].id])
     // and the surviving one is still reachable from its own selection
     expect(resolveSelection(b.s, after.drafts, 48).draft?.name).toBe('same-name')
+  })
+})
+
+describe('release — what the Library shows and what it lets out to presets', () => {
+  const EMPTY: LibraryReleaseState = { version: 1, classes: {} }
+  const pitches = [24, 48, 96]
+  it('a released frame ships every layout and view of that frame, at every pitch it is published — the triangle included', () => {
+    // QA F1 (2026-09-08): the Frame toggle stores the class's RAW variant id (`tri:0,0;0,2;2,1`), the
+    // catalogue id carries it URL-encoded; comparing the two shipped no triangle preset at all.
+    for (const [classId, rawId] of [['square', '3x3'], ['pill', '3x5'], ['triangle', 'tri:0,0;0,2;2,1']] as const) {
+      const state = withReleased(EMPTY, classId, rawId, true)
+      let seen = 0
+      for (const pitch of pitches) {
+        const published = catalogue(pitch).filter((e) => e.classId === classId && releaseIdOf(e) === rawId)
+        const released = releasedRecords(pitch, state)
+        expect(released.map((e) => e.id).sort(), `${classId} ${rawId} @${pitch}`).toEqual(published.map((e) => e.id).sort())
+        seen += published.length
+      }
+      expect(seen, `${rawId} is a real record somewhere`).toBeGreaterThan(0)
+    }
+  })
+  it('a hidden band is not shippable — presets come FROM the sizes the Library displays', () => {
+    // QA F2: released while shown, then hidden → must leave the presets; shown again → back
+    const b3 = catalogue(48).find((e) => e.classId === 'square' && releaseIdOf(e) === '3x3')!
+    expect(b3.bandId).toBe(3)
+    const released = withReleased(EMPTY, 'square', '3x3', true)
+    expect(releasedRecords(48, released).map((e) => e.id)).toEqual([b3.id])
+    const reach = [...new Set(catalogue(48).filter((e) => e.classId === 'square').map((e) => e.bandId))]
+    const hidden = withBandShown(released, 'square', 3, false, reach)
+    expect(releasedRecords(48, hidden)).toEqual([])
+    const shown = withBandShown(hidden, 'square', 3, true, reach)
+    expect(shown.classes.square.shownBands, 'every band back → null, not a list').toBeNull()
+    expect(releasedRecords(48, shown).map((e) => e.id)).toEqual([b3.id])
+  })
+  it('the dev route refuses a state the library cannot mean, and accepts one it can (QA F3)', () => {
+    expect(unsound({ version: 1, classes: { triangle: { shownBands: [-999], released: [] } } })).toMatch(/unknown band/)
+    expect(unsound({ version: 1, classes: { triangle: { shownBands: null, released: ['not-a-variant'] } } })).toMatch(/unknown release id/)
+    expect(unsound({ version: 1, classes: { nope: { shownBands: null, released: [] } } })).toMatch(/unknown class/)
+    expect(unsound({ version: 1, classes: { pill: { shownBands: [3, 3], released: [] } } })).toMatch(/duplicate/)
+    expect(unsound({ version: 2, classes: {} })).toMatch(/version/)
+    expect(unsound({ version: 1, classes: { square: { shownBands: [1, 2, 3], released: ['3x3'] } } })).toBeNull()
+    expect(unsound({ version: 1, classes: { triangle: { shownBands: null, released: ['tri:0,0;0,2;2,1'] } } })).toBeNull()
+    expect(unsound(EMPTY)).toBeNull()
   })
 })
