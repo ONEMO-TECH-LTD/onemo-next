@@ -415,7 +415,7 @@ export default function GridLab() {
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, shapeLabel, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler, protectionPadding, activeBandIds, bandScopeReady])
+  }, [base, src, preset, presetRecord, shapeLabel, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler, protectionPadding, activeBandIds, bandScopeReady])
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]

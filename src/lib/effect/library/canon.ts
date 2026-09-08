@@ -104,7 +104,7 @@ export function rectangularFrames(pitchMM: number): readonly LibraryFrame[] {
 }
 
 /** Which side of a pill's body is its width: the caps are drawn about the other. */
-export type PillAxis = 'x' | 'y'
+type PillAxis = 'x' | 'y'
 
 /** The axis a pill frame's key carries, where it carries one. A square extent hides which way the
  *  pill lies — a 2x2 body is a 72x120 stadium one way and 120x72 the other — so those keys say. */

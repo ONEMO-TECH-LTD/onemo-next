@@ -27,7 +27,7 @@ export interface LibraryReleaseState {
 
 const NONE: ClassRelease = { shownBands: null, released: [] }
 
-export const classRelease = (state: LibraryReleaseState, classId: LibraryFamily): ClassRelease =>
+const classRelease = (state: LibraryReleaseState, classId: LibraryFamily): ClassRelease =>
   state.classes[classId] ?? NONE
 
 export const bandShown = (state: LibraryReleaseState, classId: LibraryFamily, bandId: number): boolean => {
