@@ -10,6 +10,7 @@ import { validateSelfIntersection, type Vec2Px } from '@/lib/outline-core/math'
 import type { Contour, Pt } from './types'
 import {
   fieldSpanMM,
+  type OutlinePath,
   MIN_EFFECT_MM,
   SIZE_CEIL_MARGIN_MM,
   type GridResult,
@@ -30,6 +31,20 @@ export function normBaseContour(vs: VShape, maskHeightPx: number): Contour | nul
   if (!c) return null
   // Every ring normalises, path included. Dropping holes here deleted them before the engine ever saw them.
   return scaleContour(c, 1 / FLATTEN_REF_MM)
+}
+
+/** A LIBRARY RECORD AS A BENCH BASE — its published outline, exact path included, normalised the same
+ *  way every other source is (longest side = 1) so the bands size it like any preset. The record is
+ *  what the Library released; the bench is where it gets solved at every size. */
+export function normRecordContour(record: {
+  readonly outlineMM: readonly (readonly [number, number])[]
+  readonly outlinePath: OutlinePath | null
+  readonly widthMM: number; readonly heightMM: number
+}): Contour | null {
+  const L = Math.max(record.widthMM, record.heightMM)
+  if (!(L > 0) || record.outlineMM.length < 3) return null
+  const c: Contour = { outer: { pts: record.outlineMM.map(([x, y]) => [x, y] as Pt), path: record.outlinePath ?? undefined }, holes: [] }
+  return scaleContour(c, 1 / L)
 }
 
 /** Sizer for one base contour: real-mm contour at any longest side, outline offset applied.

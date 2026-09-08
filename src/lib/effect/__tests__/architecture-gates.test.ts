@@ -891,7 +891,7 @@ describe('Shape-Layout Library Law — activation schedule', () => {
   it('STEP 5: surface, bridge, barrel, and shell use the contract boundary', () => {
     expect(barrelExports()).toEqual({
       types: ['BrowseOption', 'CatalogueEntry', 'ClassBandRange', 'CornerMode', 'LibraryBrowse', 'LibraryDraft', 'LibraryEdit', 'LibraryFamily', 'LibraryReleaseState', 'LibrarySelection', 'LibrarySurface', 'MaterializedLibrary', 'PanelOption', 'PanelOptions', 'ReleaseOption'],
-      values: ['CATALOGUE_FORMAT_VERSION', 'DEFAULT_LIBRARY_BROWSE', 'DEFAULT_LIBRARY_SELECTION', 'DRAFT_STORE_KEY', 'LIBRARY_FAMILIES', 'LIBRARY_RELEASE_STATE', 'bandIdOfMM', 'canonCatalogue', 'catalogue', 'classBandRanges', 'deleteEdit', 'librarySurface', 'saveEdit', 'selectionForFamily', 'sizeRangeForBand', 'startAdd', 'startEdit', 'toggleNodeAt'],
+      values: ['CATALOGUE_FORMAT_VERSION', 'DEFAULT_LIBRARY_BROWSE', 'DEFAULT_LIBRARY_SELECTION', 'DRAFT_STORE_KEY', 'LIBRARY_FAMILIES', 'LIBRARY_RELEASE_STATE', 'bandIdOfMM', 'canonCatalogue', 'catalogue', 'classBandRanges', 'deleteEdit', 'librarySurface', 'releasedRecords', 'saveEdit', 'selectionForFamily', 'sizeRangeForBand', 'startAdd', 'startEdit', 'toggleNodeAt'],
       wildcards: [],
       aliases: [],
     })

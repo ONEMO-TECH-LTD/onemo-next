@@ -10,6 +10,7 @@
 // its shape; the state file is data.
 
 import { LIBRARY_RELEASE_STATE } from './release-state'
+import { catalogue, type CatalogueEntry } from './catalogue'
 import type { LibraryFamily } from './types'
 
 export interface ClassRelease {
@@ -65,5 +66,12 @@ const withClass = (state: LibraryReleaseState, classId: LibraryFamily, cls: Clas
   else classes[classId] = cls
   return { version: 1, classes }
 }
+
+/** THE PRESETS — every catalogue record whose frame the admin released, at this pitch. A record's
+ *  release id is its frame key within its class, so every layout and view of a released frame ships
+ *  with it. Empty until something is released: the Presets tab shows what the Library let out, and
+ *  nothing else (Dan, 2026-09-07: "the presets i asked to swap for the library presets"). */
+export const releasedRecords = (pitchMM: number, state: LibraryReleaseState): readonly CatalogueEntry[] =>
+  catalogue(pitchMM).filter((e) => recordReleased(state, e.classId, e.id.split('/')[2]))
 
 export { LIBRARY_RELEASE_STATE }

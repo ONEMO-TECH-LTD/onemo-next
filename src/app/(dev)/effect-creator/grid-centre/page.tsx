@@ -2,8 +2,9 @@
 
 // grid-magnet — the v3.5 magnetic-grid bench (2D vector).
 // ALL engine shape sources through contourFromShape → computeGrid, rendered true-to-scale:
-//   • Presets    — shape-library getShape() (baked vector data)
-//   • Generators — generateShapeRing() (blob / clover / daisy / pinwheel)
+//   • Presets    — the layout library's RELEASED records (what the Library admin let out)
+//   • Generators — anything with a dial: generateShapeRing() (blob / clover / daisy / pinwheel) and
+//                  the exact vector polygon (sides) and star (points)
 //   • AI Magic   — image upload → prepareShaped() → u2netp lightweight cut-out → outline
 
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -13,21 +14,21 @@ import {
   DEFAULT_LIBRARY_SELECTION, LIBRARY_FAMILIES, selectionForFamily, librarySurface, DRAFT_STORE_KEY,
   startAdd as libStartAdd, startEdit as libStartEdit, saveEdit as libSaveEdit,
   deleteEdit as libDeleteEdit, toggleNodeAt,
-  DEFAULT_LIBRARY_BROWSE, LIBRARY_RELEASE_STATE,
+  DEFAULT_LIBRARY_BROWSE, LIBRARY_RELEASE_STATE, releasedRecords,
   type LibraryBrowse, type LibraryDraft, type LibraryEdit, type LibraryReleaseState, type LibrarySelection,
 } from '@/lib/effect/library'
-import { dialOf, getShape, hasVectorDef, isExactCircle, type VectorShapeKind } from '@/lib/shape-library'
+import { getShape, type VectorShapeKind } from '@/lib/shape-library'
 import { type VShape } from '@/lib/vector-core'
 import { type ShapeKind } from '../v5.3.1/user/shapes'
 import { vecFromGenerator } from '../v5.3.1/user/editor/producers'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt, UnprotectedEvidence } from '@/lib/effect/types'
-import type { GridResult, MagnetPlan, SafeSegment } from '@/lib/effect/types'
+import type { GridResult, MagnetPlan } from '@/lib/effect/types'
 import { bandRangeForControl, outlineSvgD, svgDOf, type GridPageModel } from '@/lib/effect/adapters/gridViewModel'
 import { librarySegments as librarySegmentsOf, type LibraryLegalArea } from '@/lib/effect/adapters/libraryViewModel'
 import { createPerfLog, type PerfRow } from './perf-log'
 import { BANDS, CENTRE_MODE, DEFAULT_PITCH_MM, GOVERNOR, PADDING_CEIL_MM, PADDING_FLOOR_MM, PROTECTION_PADDING_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-magnet-spec'
-import { normBaseContour, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-magnet-bridge'
+import { normBaseContour, normMaskContour, normRecordContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-magnet-bridge'
 
 /** Bench test libraries — static assets, listed by a committed manifest. */
 const LIB_MANIFEST = '/grid-engine/library.json'
@@ -47,7 +48,11 @@ const IMG = 1024
 const VP = 640
 const FIT = 0.86
 
-const PRESETS: VectorShapeKind[] = ['squircle', 'square', 'circle', 'pill', 'heart', 'star', 'polygon', 'diamond', 'plus', 'teardrop', 'leaf', 'lens', 'bolt', 'sparkle', 'pinched', 'asterisk', 'bowtie']
+/** The dial shapes: a generator is anything that hangs on a slider (Dan, 2026-09-07). The ring
+ *  generators take two dials; the polygon and the star are exact vector definitions with one. */
+const VECTOR_GENS: { k: VectorShapeKind; label: string; dial: 'sides' | 'points' }[] = [
+  { k: 'polygon', label: 'Polygon', dial: 'sides' }, { k: 'star', label: 'Star', dial: 'points' },
+]
 const GENS: { k: ShapeKind; label: string; p1: [string, string]; p2: [string, string]; p2min: number; p2max: number; p2start: number }[] = [
   { k: 'blob', label: 'Blob', p1: ['Waviness', '%'], p2: ['Seed', ''], p2min: 1, p2max: 100, p2start: 7 },
   { k: 'form', label: 'Clover', p1: ['Pinch', '%'], p2: ['Lobes', ''], p2min: 1, p2max: 8, p2start: 4 },
@@ -75,8 +80,10 @@ function usePersisted(key: string, initial: number): [number, (n: number) => voi
 
 export default function GridLab() {
   const [src, setSrc] = useState<Src>('preset')
-  const [preset, setPreset] = useState<VectorShapeKind>('squircle')
-  const [gen, setGen] = useState<ShapeKind>('blob')
+  /** The released record on the bench — its catalogue id; '' until something is released. */
+  const [preset, setPreset] = useState<string>('')
+  /** A ring generator, or one of the vector dial shapes. */
+  const [gen, setGen] = useState<ShapeKind | VectorShapeKind>('blob')
   const [p1, setP1] = useState(55) // waviness / pinch / depth / swirl
   const [p2, setP2] = useState(7)  // seed / lobes / petals / blades
   const [sides, setSides] = useState(6)
@@ -142,6 +149,13 @@ export default function GridLab() {
     fetch('/api/dev/library-release', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(next) })
       .catch(() => { /* the live copy stands; the file catches up on the next save */ })
   }
+  // THE PRESETS are the Library's released records at this pitch — nothing baked, nothing else
+  const presets = useMemo(() => releasedRecords(pitch, release), [pitch, release])
+  const presetRecord = presets.find((r) => r.id === preset) ?? null
+  useEffect(() => {
+    // the bench lands on the first released record when its own is gone or nothing was chosen yet
+    if (!presetRecord && presets.length > 0) setPreset(presets[0].id)
+  }, [presetRecord, presets])
   const libraryState = useMemo(() => tab === 'library'
     ? librarySurface(librarySel, drafts, edit, pitch, libBrowse, release) : null,
   [tab, librarySel, pitch, edit, drafts, libBrowse, release])
@@ -314,19 +328,22 @@ export default function GridLab() {
         if (!magic) return null
         return normBaseContour(magic.vshape, magic.maskH)
       }
-      if (src === 'preset' && hasVectorDef(preset)) {
-        return normBaseContour(getShape(preset, IMG, IMG, { sides, points }), IMG)
+      if (src === 'preset') {
+        const record = presets.find((r) => r.id === preset)
+        return record ? normRecordContour(record) : null
       }
+      const vector = VECTOR_GENS.find((g) => g.k === gen)
+      if (vector) return normBaseContour(getShape(vector.k, IMG, IMG, { sides, points }), IMG)
       const params = gen === 'blob' ? { waviness: p1, seed: p2 }
         : gen === 'form' ? { pinch: p1, lobes: p2 }
           : gen === 'daisy' ? { depth: p1, petals: p2 }
             : { swirl: p1, blades: p2 }
       // The Studio's own generator: its ring is fitted ONCE into a vector at generation, so a
       // generated shape is a curve like every preset — the bench used to take the raw ring.
-      return normBaseContour(vecFromGenerator(gen, params, { widthPx: IMG, heightPx: IMG }), IMG)
+      return normBaseContour(vecFromGenerator(gen as ShapeKind, params, { widthPx: IMG, heightPx: IMG }), IMG)
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
     finally { genMsRef.current = performance.now() - t0 }
-  }, [src, preset, gen, p1, p2, sides, points, magic, cutC])
+  }, [src, preset, presets, gen, p1, p2, sides, points, magic, cutC])
 
   // The solve runs in a worker so the page never freezes; the last result stays up while solving.
   type Model = GridPageModel
@@ -347,7 +364,7 @@ export default function GridLab() {
   const busyRef = useRef(false)
   const queuedRef = useRef<object | null>(null)
   const effSizeRef = useRef(0)
-  const shapeLabel = src === 'preset' ? preset : src === 'gen' ? gen : src === 'cut' ? (cutSel || 'cutout') : src
+  const shapeLabel = src === 'preset' ? (presetRecord ? presetRecord.classId + ' ' + presetRecord.label : 'preset') : src === 'gen' ? gen : src === 'cut' ? (cutSel || 'cutout') : src
   useEffect(() => {
     const w = new Worker(new URL('./solve.worker.ts', import.meta.url))
     workerRef.current = w
@@ -378,7 +395,7 @@ export default function GridLab() {
     const w = workerRef.current
     if (!w || !bandScopeReady) return
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
-    const cfg = { pitchMM: pitch, paddingMM: pad, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && isExactCircle(preset), classifierRuler: ruler }
+    const cfg = { pitchMM: pitch, paddingMM: pad, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && presetRecord?.corners === 'disc', classifierRuler: ruler }
     // Manual in a band (forced registration OR manual band scale): the walk is meaningless —
     // solve that size directly, exactly like free mode, band chip stays active.
     const manualBand = manual !== null || bandScale !== null   // manual scale/pan: solved directly at the requested size
@@ -402,6 +419,7 @@ export default function GridLab() {
 
   const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
+  const vectorGen = VECTOR_GENS.find((g) => g.k === gen) ?? null
 
   return (
     <div className="gl">
@@ -642,21 +660,31 @@ export default function GridLab() {
           </div>
           <Fold title="Shape" panel="shape">
             {src === 'preset' && <>
-              <div className="gl-lib">
-                {PRESETS.map((k) => (
-                  <button key={k} aria-pressed={preset === k} onClick={() => setPreset(k as VectorShapeKind)}><b>{k}</b></button>
-                ))}
-              </div>
-              {dialOf(preset) === 'sides' && <Slider label="Sides" v={sides} set={setSides} min={3} max={12} />}
-              {dialOf(preset) === 'points' && <Slider label="Points" v={points} set={setPoints} min={3} max={12} />}
+              {presets.length > 0 ? (
+                <div className="gl-lib">
+                  {presets.map((r) => (
+                    <button key={r.id} aria-pressed={preset === r.id} onClick={() => setPreset(r.id)}
+                      title={r.id}><b>{r.classId}</b><span>{r.label}</span></button>
+                  ))}
+                </div>
+              ) : (
+                <div className="gl-hint">Nothing released yet — Library → Frame → <b>release</b> puts a record here.</div>
+              )}
             </>}
 
             {src === 'gen' && <>
               <div className="gl-seg gl-wrap">
                 {GENS.map(g => <button key={g.k} aria-pressed={gen === g.k} onClick={() => { setGen(g.k); setP1(50); setP2(g.p2start) }}>{g.label}</button>)}
+                {VECTOR_GENS.map(g => <button key={g.k} aria-pressed={gen === g.k} onClick={() => setGen(g.k)}>{g.label}</button>)}
               </div>
-              <Slider label={genDef.p1[0]} unit={genDef.p1[1]} v={p1} set={setP1} min={0} max={100} />
-              <Slider label={genDef.p2[0]} v={p2} set={setP2} min={genDef.p2min} max={genDef.p2max} />
+              {vectorGen ? (
+                vectorGen.dial === 'sides'
+                  ? <Slider label="Sides" v={sides} set={setSides} min={3} max={12} />
+                  : <Slider label="Points" v={points} set={setPoints} min={3} max={12} />
+              ) : <>
+                <Slider label={genDef.p1[0]} unit={genDef.p1[1]} v={p1} set={setP1} min={0} max={100} />
+                <Slider label={genDef.p2[0]} v={p2} set={setP2} min={genDef.p2min} max={genDef.p2max} />
+              </>}
             </>}
 
             {src === 'cut' && <>
@@ -1319,6 +1347,7 @@ const CSS = `
 .gl-libadd b{color:var(--ink-3);font-size:16px!important}
 .gl-libedit{display:flex;align-items:center;gap:6px;margin-top:8px}
 .gl-rel{font-style:normal;color:var(--pass);margin-left:5px;font-weight:700}
+.gl-hint{font:500 12px var(--mono);color:var(--ink-3);line-height:1.5;padding:4px 2px}
 .gl-release-pop{position:static;margin-top:2px}
 .gl-libedit input{flex:1;min-width:0;font:600 12px var(--mono);color:var(--ink);background:var(--panel-2);
   border:1px solid var(--line);border-radius:7px;padding:6px 8px}
