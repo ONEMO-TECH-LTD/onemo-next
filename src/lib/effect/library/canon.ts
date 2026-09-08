@@ -111,6 +111,26 @@ export type PillAxis = 'x' | 'y'
 export const pillAxisOfKey = (key: string): PillAxis | undefined =>
   key.endsWith('-x') ? 'x' : key.endsWith('-y') ? 'y' : undefined
 
+/** WHAT KIND OF PILL a frame is — read off its population, so the record and its category cannot
+ *  disagree. Width is the side the caps are drawn about; the body is the run of full lines across it.
+ *  Fatter with each step (Dan, 2026-09-07: "after frame make it 'stadium' and 'o-shape'"):
+ *    slim    — one wide            banner  — two wide
+ *    frame   — body longer than wide (3x6, 4x7)      stadium — a square body plus its caps (3x5, 4x6)
+ *    o-shape — body wider than long (3x4, 4x4, 4x5) */
+export function pillTypeOf(frame: LibraryFrame): string {
+  const nodes = frame.layouts[0].nodes
+  // a square extent says which way it lies; otherwise the caps run along the longer side
+  const across = pillAxisOfKey(frame.key ?? '') ?? (frame.cols <= frame.rows ? 'x' : 'y')
+  const wide = across === 'x' ? frame.cols : frame.rows
+  if (wide <= 1) return 'slim'
+  if (wide === 2) return 'banner'
+  const perLine = new Map<number, number>()
+  for (const [x, y] of nodes) { const k = across === 'x' ? y : x; perLine.set(k, (perLine.get(k) ?? 0) + 1) }
+  let long = 0
+  for (const n of perLine.values()) if (n === wide) long++
+  return long > wide ? 'frame' : long === wide ? 'stadium' : 'o-shape'
+}
+
 /** THE PILL'S FRAMES — a body's population plus the magnets its rounded ends hold, published at the
  *  extent that population actually occupies. A three-wide pill reaches one lattice row past the body
  *  at each end, so its frame is that much taller: nodes outside their own frame would break transform

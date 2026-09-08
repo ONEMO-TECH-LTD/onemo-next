@@ -1,4 +1,4 @@
-import { pillAxisOfKey, pillFrames, rectangularTypeOf } from './canon'
+import { pillAxisOfKey, pillFrames, pillTypeOf } from './canon'
 import { registryClass } from './registry-class'
 
 /** PILL — the rectangle's layout, wrapped by a stadium (Dan, 2026-09-04: "we need to wrap rectangle
@@ -21,9 +21,10 @@ export const pillClass = registryClass({
   classId: 'pill',
   catalogueRole: 'preset',
   bothOrdersPublished: true,
-  types: [{ id: 'frame', label: 'frame' }, { id: 'banner', label: 'banner' }, { id: 'slim', label: 'slim' }],
+  // fatter with each step: frame → stadium → o-shape; then the two narrow kinds
+  types: [{ id: 'frame', label: 'frame' }, { id: 'stadium', label: 'stadium' }, { id: 'o-shape', label: 'o-shape' }, { id: 'banner', label: 'banner' }, { id: 'slim', label: 'slim' }],
   frames: pillFrames,
-  typeOfFrame: (frame) => rectangularTypeOf(frame.cols, frame.rows),
+  typeOfFrame: pillTypeOf,
   // a square extent lies either way, and the chip says which: ↕ is a tall pill, ↔ a wide one
   label: (frame) => frame.cols + '×' + frame.rows
     + (pillAxisOfKey(frame.key ?? '') === 'x' ? ' ↕' : pillAxisOfKey(frame.key ?? '') === 'y' ? ' ↔' : ''),
