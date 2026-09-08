@@ -8,6 +8,7 @@ import type { ClassVariant, FrameOrientation, LibraryClass } from './class-contr
 import { frameKeyOf, transformLayout, viewName } from './transforms'
 import { draftLayoutId, selectVariant, type ResolvedSelection } from './selection'
 import type { LibraryDraft } from './drafts'
+import { bandShown, recordReleased, withBandShown, withReleased, type LibraryReleaseState } from './release'
 import type {
   LibraryFamily, LibraryFrame, LibraryLayout, LibrarySelection, LibraryTransform,
 } from './types'
@@ -27,6 +28,17 @@ export interface PanelOption {
   disabled?: boolean
   /** A hand-authored layout rather than a corpus one. */
   custom?: boolean
+  /** A frame released to presets — the admin's cherry-pick. */
+  released?: boolean
+}
+/** A release toggle. Same idiom again: it carries the whole release state it produces, so the view
+ *  never edits state — it hands one back. */
+export interface ReleaseOption {
+  id: string
+  label: string
+  /** Shown (a band) or released (a record) as things stand. */
+  on: boolean
+  next: LibraryReleaseState
 }
 /** HOW THE ADMIN IS BROWSING — which band and which way round, independent of what is selected.
  *  A filter over the listing, never a transform of a record: portrait and landscape are separate
@@ -66,6 +78,12 @@ export interface PanelOptions {
   /** The frame's canon population, plus the admin's own saved ones. The belt, the corners and
    *  the 96mm spacing are not offered here: they are filters the engine applies (Dan, 08-29). */
   layouts: PanelOption[]
+  /** THE RELEASE DIALS (Dan, 2026-09-07: "select what sizes the library is displaying and from them is
+   *  release ready for presets", "per shape so we can cherry pick"). Every block is a list of chips,
+   *  these included: `releaseBands` is every band the class reaches with its shown state — the
+   *  admin's edit view, hidden ones too; `releaseRecord` is the one toggle for the selected frame. */
+  releaseBands: ReleaseOption[]
+  releaseRecord: ReleaseOption[]
 }
 
 /** The eight lattice views, as the library's own transform. */
@@ -139,16 +157,21 @@ function rankOf(view: LibraryTransform, base: LibraryTransform, spec: LibraryCla
  *  record still visible. A band the class does not reach is not a filter here either. */
 export function selectionForFamily(
   current: LibrarySelection, family: LibraryFamily, pitchMM: number,
-  browse: LibraryBrowse = DEFAULT_LIBRARY_BROWSE,
+  browse: LibraryBrowse = DEFAULT_LIBRARY_BROWSE, release?: LibraryReleaseState,
 ): LibrarySelection {
   const spec = specOf(family)
   const opened = spec.open(current, pitchMM)
-  const variants = spec.types.flatMap((t) => spec.variants(t.id, pitchMM))
+  const variants = shownVariants(spec.types.flatMap((t) => spec.variants(t.id, pitchMM)), family, release)
   const { applied } = browseRows(variants, browse, opened)
   const first = variants.find((v) => (applied.bandId === null || v.bandId === applied.bandId)
     && (applied.orientation === null || v.orientation === applied.orientation))
   return first ? selectVariant(opened, first) : opened
 }
+
+/** WHAT THE LIBRARY DISPLAYS: the class's records in its shown bands. A hidden band's records are not
+ *  offered, not landed on, not counted — the admin said the size is clutter (Dan, 2026-09-07). */
+const shownVariants = (variants: readonly ClassVariant[], classId: LibraryFamily, release?: LibraryReleaseState) =>
+  release ? variants.filter((v) => v.bandId === null || bandShown(release, classId, v.bandId)) : variants
 
 /** The band and orientation rows, and the frames that survive them. Filtering lives HERE and not
  *  in the panel: the view renders options and holds no class logic (Dan, 08-26 "no logic in UI
@@ -192,17 +215,31 @@ function browseRows(
 
 export function panelOptionsResolved(
   sel: LibrarySelection, drafts: readonly LibraryDraft[], pitchMM: number, resolved: ResolvedSelection,
-  browse: LibraryBrowse = DEFAULT_LIBRARY_BROWSE,
+  browse: LibraryBrowse = DEFAULT_LIBRARY_BROWSE, release?: LibraryReleaseState,
 ): PanelOptions {
   const { spec, variant, typeId: type, frame, layout, draft } = resolved
+  const classId = spec.classId
   // a saved custom layout is deduped from ITS OWN population, not from the corpus layout the
   // resolver falls back to for a draft (QA F2)
   const visible: LibraryLayout = draft ? { name: draftLayoutId(draft.name), nodes: draft.nodes } : layout
   const orientations = orientationOptions(sel, frame, visible, spec, spec.baseView(sel, pitchMM))
   const variantId = variant.id
   const layoutSel = (name: string): LibrarySelection => ({ ...sel, layoutId: name })
-  const allVariants = spec.variants(type, pitchMM)
+  const allVariants = shownVariants(spec.variants(type, pitchMM), classId, release)
   const rows = browseRows(allVariants, browse, sel)
+  // the release dials: every band this class reaches at all (hidden ones too — that is the edit view),
+  // and the selected frame's own release
+  const reach = [...new Set(spec.types.flatMap((t) => spec.variants(t.id, pitchMM)).map((v) => v.bandId)
+    .filter((b): b is number => b !== null))].sort((a, b) => a - b)
+  const state: LibraryReleaseState = release ?? { version: 1, classes: {} }
+  const releaseBands: ReleaseOption[] = reach.map((b) => ({
+    id: 'show' + b, label: 'B' + b, on: bandShown(state, classId, b),
+    next: withBandShown(state, classId, b, !bandShown(state, classId, b), reach),
+  }))
+  const releaseRecord: ReleaseOption[] = [{
+    id: 'release', label: 'release', on: recordReleased(state, classId, variant.id),
+    next: withReleased(state, classId, variant.id, !recordReleased(state, classId, variant.id)),
+  }]
 
   return {
     // a class with one type offers no choice, so its chip is inert. WHICH controls are inert is
@@ -222,6 +259,7 @@ export function panelOptionsResolved(
       .map((v) => ({
         id: v.id, label: v.label, accessibleLabel: v.accessibleLabel,
         active: v.id === variantId, next: selectVariant(sel, v),
+        released: recordReleased(state, classId, v.id),
       })),
     // a class with no named views of its own, and no turn that changes the picture, offers none.
     // A CLASS THAT PUBLISHES BOTH ORDERS IS LOCKED: the record's orientation is part of what it is,
@@ -238,5 +276,6 @@ export function panelOptionsResolved(
         active: sel.layoutId === draftLayoutId(d.name), next: layoutSel(draftLayoutId(d.name)),
       })),
     ],
+    releaseBands, releaseRecord,
   }
 }

@@ -13,8 +13,8 @@ import {
   DEFAULT_LIBRARY_SELECTION, LIBRARY_FAMILIES, selectionForFamily, librarySurface, DRAFT_STORE_KEY,
   startAdd as libStartAdd, startEdit as libStartEdit, saveEdit as libSaveEdit,
   deleteEdit as libDeleteEdit, toggleNodeAt,
-  DEFAULT_LIBRARY_BROWSE,
-  type LibraryBrowse, type LibraryDraft, type LibraryEdit, type LibrarySelection,
+  DEFAULT_LIBRARY_BROWSE, LIBRARY_RELEASE_STATE,
+  type LibraryBrowse, type LibraryDraft, type LibraryEdit, type LibraryReleaseState, type LibrarySelection,
 } from '@/lib/effect/library'
 import { dialOf, getShape, hasVectorDef, isExactCircle, type VectorShapeKind } from '@/lib/shape-library'
 import { type VShape } from '@/lib/vector-core'
@@ -134,9 +134,17 @@ export default function GridLab() {
   // how the library LISTING is browsed — band and orientation. A filter over what is shown, not
   // part of the selection: turning the filter never changes which record is selected.
   const [libBrowse, setLibBrowse] = useState<LibraryBrowse>(DEFAULT_LIBRARY_BROWSE)
+  // what the Library shows and what it releases — a file in the repo, written back through the dev
+  // route so the admin's toggles are what ships (Dan, 2026-09-07). The page holds the live copy.
+  const [release, setRelease] = useState<LibraryReleaseState>(LIBRARY_RELEASE_STATE)
+  const saveRelease = (next: LibraryReleaseState) => {
+    setRelease(next)
+    fetch('/api/dev/library-release', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(next) })
+      .catch(() => { /* the live copy stands; the file catches up on the next save */ })
+  }
   const libraryState = useMemo(() => tab === 'library'
-    ? librarySurface(librarySel, drafts, edit, pitch, libBrowse) : null,
-  [tab, librarySel, pitch, edit, drafts, libBrowse])
+    ? librarySurface(librarySel, drafts, edit, pitch, libBrowse, release) : null,
+  [tab, librarySel, pitch, edit, drafts, libBrowse, release])
   const libraryModel = useMemo(() => libraryState
     ? libraryStageModel(libraryState.materialized, pitch) : null,
   [libraryState, pitch])
@@ -408,7 +416,7 @@ export default function GridLab() {
             {LIBRARY_FAMILIES.map((fam) => (
               <button key={fam} aria-pressed={libraryState?.classId === fam} onClick={() => {
                 setEdit(null)
-                setLibrarySel((current) => selectionForFamily(current, fam, pitch, libBrowse))
+                setLibrarySel((current) => selectionForFamily(current, fam, pitch, libBrowse, release))
               }}>{fam}</button>
             ))}
           </div>
@@ -497,7 +505,7 @@ export default function GridLab() {
               <button aria-label="zoom in" onClick={() => setLibView((v) => ({ ...v, zoom: camStep(v.zoom, +1) }))}>+</button>
             </div>
           </div>
-          {libraryState ? <LibraryPanel setSel={setLibrarySel} setBrowse={setLibBrowse} Fold={Fold} options={libraryState.options}
+          {libraryState ? <LibraryPanel setSel={setLibrarySel} setBrowse={setLibBrowse} setRelease={saveRelease} Fold={Fold} options={libraryState.options}
             boxMM={{ w: libraryState.materialized.widthMM, h: libraryState.materialized.heightMM }}
             bandId={libraryState.materialized.bandId}
             showBox={showBox} setShowBox={setShowBox} edit={edit} setEdit={setEdit}
@@ -1310,6 +1318,8 @@ const CSS = `
 .gl-camzoom button:active{background:var(--accent);border-color:var(--accent);color:#fff}
 .gl-libadd b{color:var(--ink-3);font-size:16px!important}
 .gl-libedit{display:flex;align-items:center;gap:6px;margin-top:8px}
+.gl-rel{font-style:normal;color:var(--pass);margin-left:5px;font-weight:700}
+.gl-release-pop{position:static;margin-top:2px}
 .gl-libedit input{flex:1;min-width:0;font:600 12px var(--mono);color:var(--ink);background:var(--panel-2);
   border:1px solid var(--line);border-radius:7px;padding:6px 8px}
 .gl-libedit button{font:600 10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);

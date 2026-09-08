@@ -60,7 +60,7 @@ const ZONE_FILES: Record<Exclude<Zone, 1 | 3>, readonly string[]> = {
   0: ['types.ts', 'class-contract.ts'],
   2: ['geometry.ts', 'transforms.ts', 'outline.ts', 'rules.ts', 'selection-transition.ts', 'canon.ts'],
   4: ['class-registry.ts'],
-  5: ['selection.ts', 'options.ts', 'authoring.ts', 'materialize.ts', 'catalogue.ts', 'band-ranges.ts', 'drafts.ts', 'integrity.ts'],
+  5: ['selection.ts', 'options.ts', 'authoring.ts', 'materialize.ts', 'catalogue.ts', 'band-ranges.ts', 'drafts.ts', 'integrity.ts', 'release.ts', 'release-state.ts'],
   6: ['surface.ts'],
   7: ['index.ts'],
 }
@@ -890,8 +890,8 @@ describe('Shape-Layout Library Law — activation schedule', () => {
   }, 20_000)
   it('STEP 5: surface, bridge, barrel, and shell use the contract boundary', () => {
     expect(barrelExports()).toEqual({
-      types: ['BrowseOption', 'CatalogueEntry', 'ClassBandRange', 'CornerMode', 'LibraryBrowse', 'LibraryDraft', 'LibraryEdit', 'LibraryFamily', 'LibrarySelection', 'LibrarySurface', 'MaterializedLibrary', 'PanelOption', 'PanelOptions'],
-      values: ['CATALOGUE_FORMAT_VERSION', 'DEFAULT_LIBRARY_BROWSE', 'DEFAULT_LIBRARY_SELECTION', 'DRAFT_STORE_KEY', 'LIBRARY_FAMILIES', 'bandIdOfMM', 'canonCatalogue', 'catalogue', 'classBandRanges', 'deleteEdit', 'librarySurface', 'saveEdit', 'selectionForFamily', 'sizeRangeForBand', 'startAdd', 'startEdit', 'toggleNodeAt'],
+      types: ['BrowseOption', 'CatalogueEntry', 'ClassBandRange', 'CornerMode', 'LibraryBrowse', 'LibraryDraft', 'LibraryEdit', 'LibraryFamily', 'LibraryReleaseState', 'LibrarySelection', 'LibrarySurface', 'MaterializedLibrary', 'PanelOption', 'PanelOptions', 'ReleaseOption'],
+      values: ['CATALOGUE_FORMAT_VERSION', 'DEFAULT_LIBRARY_BROWSE', 'DEFAULT_LIBRARY_SELECTION', 'DRAFT_STORE_KEY', 'LIBRARY_FAMILIES', 'LIBRARY_RELEASE_STATE', 'bandIdOfMM', 'canonCatalogue', 'catalogue', 'classBandRanges', 'deleteEdit', 'librarySurface', 'saveEdit', 'selectionForFamily', 'sizeRangeForBand', 'startAdd', 'startEdit', 'toggleNodeAt'],
       wildcards: [],
       aliases: [],
     })

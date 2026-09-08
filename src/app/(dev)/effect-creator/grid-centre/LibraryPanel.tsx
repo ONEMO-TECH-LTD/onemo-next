@@ -5,18 +5,20 @@
 // no sub-type test, no layout filtering, no draft matching. Options in, chips out.
 // Dan, 08-26: "no logic in UI shell and poage".
 
-import type { ReactElement, ReactNode } from 'react'
-import type { BrowseOption, LibraryBrowse, LibraryEdit, LibrarySelection, PanelOption, PanelOptions } from '@/lib/effect/library'
+import { useState, type ReactElement, type ReactNode } from 'react'
+import type { BrowseOption, LibraryBrowse, LibraryEdit, LibraryReleaseState, LibrarySelection, PanelOption, PanelOptions, ReleaseOption } from '@/lib/effect/library'
 
 type FoldComponent = (p: { title: ReactNode; children: ReactNode }) => ReactElement
 
 export default function LibraryPanel({
-  setSel, setBrowse, Fold, options, boxMM, bandId, showBox, setShowBox, editError,
+  setSel, setBrowse, setRelease, Fold, options, boxMM, bandId, showBox, setShowBox, editError,
   edit, setEdit, saveEdit, deleteEdit, startAdd, startEdit, isDraft,
 }: {
   setSel: (next: LibrarySelection) => void
   /** How the listing is being browsed — which band, which way round. A filter, not a selection. */
   setBrowse: (next: LibraryBrowse) => void
+  /** The admin's release dials — what the Library shows, what presets get. Persists to the repo. */
+  setRelease: (next: LibraryReleaseState) => void
   Fold: FoldComponent
   options: PanelOptions
   boxMM: { w: number; h: number }
@@ -41,6 +43,9 @@ export default function LibraryPanel({
   // canvas never sits on a record the list no longer shows (Dan, 2026-08-30)
   const browseTo = (o: BrowseOption) => { setEdit(null); setBrowse(o.next); if (o.select) setSel(o.select) }
   const pressed = (o: PanelOption) => !edit && o.active
+  // the other state the view adds: whether the band edit (which bands the Library shows) is open
+  const [editingBands, setEditingBands] = useState(false)
+  const toggle = (o: ReleaseOption) => setRelease(o.next)
   return (
     <>
       <div className="gl-card gl-libsize">
@@ -67,13 +72,25 @@ export default function LibraryPanel({
           </div>
         </Fold>
       )}
-      {opts.bands.length > 0 && (
-        <Fold title="Band">
-          <div className="gl-seg gl-bandrow">
-            {opts.bands.map((o: BrowseOption) => (
-              <button key={o.id} aria-pressed={o.active} onClick={() => browseTo(o)}>{o.label}</button>
-            ))}
-          </div>
+      {(opts.bands.length > 0 || opts.releaseBands.length > 0) && (
+        <Fold title={<span className="gl-fieldhead"><span>Band</span>
+          <button className="gl-edit" aria-pressed={editingBands} onClick={() => setEditingBands((v) => !v)}>{editingBands ? 'Done' : 'Edit'}</button></span>}>
+          {editingBands ? (
+            <div className="gl-scope-pop gl-release-pop" role="dialog" aria-label="Which bands the Library shows">
+              <div className="gl-glabel">Shown in the Library</div>
+              <div className="gl-seg gl-bandrow gl-scope">
+                {opts.releaseBands.map((o) => (
+                  <button key={o.id} aria-pressed={o.on} onClick={() => toggle(o)}>{o.label}</button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="gl-seg gl-bandrow">
+              {opts.bands.map((o: BrowseOption) => (
+                <button key={o.id} aria-pressed={o.active} onClick={() => browseTo(o)}>{o.label}</button>
+              ))}
+            </div>
+          )}
         </Fold>
       )}
       {opts.frameOrientations.length > 0 && (
@@ -85,11 +102,14 @@ export default function LibraryPanel({
           </div>
         </Fold>
       )}
-      <Fold title="Frame">
+      <Fold title={<span className="gl-fieldhead"><span>Frame</span>
+        {opts.releaseRecord.map((o) => (
+          <button key={o.id} className="gl-edit" aria-pressed={o.on} onClick={() => toggle(o)}>{o.on ? 'released ✓' : o.label}</button>
+        ))}</span>}>
         <div className="gl-lib">
           {opts.frames.map((o) => (
-            <button key={o.id} aria-pressed={o.active} onClick={() => go(o)}
-              aria-label={o.accessibleLabel} title={o.accessibleLabel}><b>{o.label}</b></button>
+            <button key={o.id} aria-pressed={o.active} onClick={() => go(o)} data-released={o.released || undefined}
+              aria-label={o.accessibleLabel} title={o.accessibleLabel}><b>{o.label}</b>{o.released && <i className="gl-rel" aria-label="released">✓</i>}</button>
           ))}
         </div>
       </Fold>
