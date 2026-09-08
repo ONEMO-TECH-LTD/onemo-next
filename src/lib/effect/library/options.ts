@@ -244,12 +244,17 @@ export function panelOptionsResolved(
   return {
     // a class with one type offers no choice, so its chip is inert. WHICH controls are inert is
     // the library's answer; the view counted the options itself and decided (law 14).
-    types: spec.types.map((t) => {
+    // A TYPE WITH NO RECORD IS NOT AN OFFER. Reading variants[0] blind crashed the whole Library the
+    // moment a class declared a type its populations never produce — the oval declares slim/banner/
+    // frame and publishes no slim (2026-09-08). A class may legitimately name a type it does not
+    // reach at every pitch, so the panel drops it rather than the page dying on it.
+    types: spec.types.flatMap((t) => {
       const first = spec.variants(t.id, pitchMM)[0]
-      return {
+      if (!first) return []
+      return [{
         id: t.id, label: t.label, active: t.id === type,
         disabled: spec.types.length === 1, next: selectVariant(sel, first),
-      }
+      }]
     }),
     bands: rows.bands,
     frameOrientations: rows.frameOrientations,
