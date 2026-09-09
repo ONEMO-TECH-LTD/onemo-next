@@ -5,5 +5,64 @@ import type { LibraryReleaseState } from './release'
 
 export const LIBRARY_RELEASE_STATE: LibraryReleaseState = {
   "version": 1,
-  "classes": {}
+  "classes": {
+    "square": {
+      "shownBands": null,
+      "released": [
+        "2x2",
+        "3x3",
+        "4x4"
+      ]
+    },
+    "rectangle": {
+      "shownBands": null,
+      "released": [
+        "1x2",
+        "2x3",
+        "3x4"
+      ]
+    },
+    "diamond": {
+      "shownBands": null,
+      "released": [
+        "3x3"
+      ]
+    },
+    "triangle": {
+      "shownBands": null,
+      "released": [
+        "tri:0,0;0,2;2,1"
+      ]
+    },
+    "pill": {
+      "shownBands": null,
+      "released": [
+        "2x2-x",
+        "2x3",
+        "3x4"
+      ]
+    },
+    "circle": {
+      "shownBands": null,
+      "released": [
+        "2x2-4",
+        "3x3-9",
+        "4x4-16"
+      ]
+    },
+    "oval": {
+      "shownBands": null,
+      "released": [
+        "72x120-1x2",
+        "72x120-1x3",
+        "72x120-2x4",
+        "84x120-1x2",
+        "84x120-2x2",
+        "84x120-3x5",
+        "96x168-1x2",
+        "96x168-2x3",
+        "96x168-3x7"
+      ]
+    }
+  }
 }
