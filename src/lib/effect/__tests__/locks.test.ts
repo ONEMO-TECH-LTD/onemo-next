@@ -75,6 +75,16 @@ describe('the sealed profile', () => {
     expect(solve.profile).toEqual(SEALED)
   }, 180_000)
 
+  it('THE RECORD DOOR: a delivered record wears the sealed coverage, not the caller\'s', async () => {
+    const { deliverRecord } = await import('../pipeline/solve')
+    const { catalogue } = await import('../library')
+    const circle = catalogue(48).find((e) => e.classId === 'circle' && e.frameCols === 3 && e.frameRows === 3 && e.nodesMM.length === 9)!
+    const delivered = deliverRecord({ record: circle, cfg: { plan: 'all6', perimeterOnly: true }, settings: { protectionPaddingMM: PROTECTION_PADDING_MM } })
+    expect(delivered.grid.anchors, 'coverage sealed to full: the belt the caller asked for is refused').toHaveLength(9)
+    expect(delivered.grid.pitchCentreMM, 'a record\'s lattice is its own, not the sealed pitch dial').toBe(48)
+    expect(delivered.profile).toEqual(SEALED)
+  })
+
   it('THE PRODUCTION DOOR: resolveGridPlan cannot be talked out of a sealed value', () => {
     expect(sealedPlanValues()).toEqual({ paddingMM: 20, pitchMM: 96 })
     expect(coverageLock()).toBe('full')

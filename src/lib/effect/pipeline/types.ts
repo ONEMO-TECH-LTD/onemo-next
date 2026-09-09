@@ -1,6 +1,7 @@
 // pipeline/types.ts — the data-only boundary of the headless solve (T1).
 import type { Contour, GridConfig, GridResult, SafeSegment, UnprotectedEvidence } from '../types'
 import type { LockProfile } from '../locks'
+import type { CatalogueEntry } from '../library'
 
 export interface GridRequest {
   base: Contour
@@ -14,6 +15,17 @@ export interface GridRequest {
   /** Spec-owned settings that shape the answer's evidence but not its search or cache identity. */
   settings: { protectionPaddingMM: number }
   /** Admin compute scope. Band definitions remain complete; only enabled rows are measured. */
+  activeBandIds?: number[]
+}
+
+/** A RELEASED RECORD to deliver — no search: the record's own magnets, outline and size, put through
+ *  the same delivery every solve gets (coverage, magnet plan, protection, the sealed profile). The
+ *  config carries only the delivery dials; padding, centring, governor and ruler are search dials and
+ *  have nothing to act on here (QA F1, 2026-09-09). */
+export interface RecordRequest {
+  record: CatalogueEntry
+  cfg: GridConfig
+  settings: { protectionPaddingMM: number }
   activeBandIds?: number[]
 }
 

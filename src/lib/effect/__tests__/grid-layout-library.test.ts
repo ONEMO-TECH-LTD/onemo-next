@@ -1439,4 +1439,23 @@ describe('release — what the Library shows and what it lets out to presets', (
     expect(unsound({ version: 1, classes: { triangle: { shownBands: null, released: ['tri:0,0;0,2;2,1'] } } })).toBeNull()
     expect(unsound(EMPTY)).toBeNull()
   })
+  it('a released record is DELIVERED, never searched — coverage, plan and protection still apply to it (QA F1, 2026-09-09)', async () => {
+    const { deliverRecord } = await import('../pipeline')
+    const circle = catalogue(48).find((e) => e.classId === 'circle' && releaseIdOf(e) === '3x3-9')!
+    const settings = { protectionPaddingMM: 24 }
+    const full6 = deliverRecord({ record: circle, cfg: { plan: 'all6', perimeterOnly: false }, settings })
+    expect(full6.grid.anchors.map((a) => a.p), 'the record\'s own magnets, exactly').toEqual(circle.nodesMM.map(([x, y]) => [x, y]))
+    expect(full6.grid.anchors.every((a) => a.dia === 6)).toBe(true)
+    expect(full6.rungs, 'nothing was solved').toEqual([])
+    expect(full6.contour.outer.path, 'the exact published outline').toEqual(circle.outlinePath ?? undefined)
+    const belt = deliverRecord({ record: circle, cfg: { plan: 'all6', perimeterOnly: true }, settings })
+    expect(belt.grid.anchors, 'perimeter belt drops the surrounded centre').toHaveLength(8)
+    const full8 = deliverRecord({ record: circle, cfg: { plan: 'all8', perimeterOnly: false }, settings })
+    expect(full8.grid.anchors).toHaveLength(9)
+    expect(full8.grid.anchors.every((a) => a.dia === 8)).toBe(true)
+    const wider = deliverRecord({ record: circle, cfg: { plan: 'all6', perimeterOnly: false }, settings: { protectionPaddingMM: 48 } })
+    expect(wider.grid.anchors, 'protection padding changes the evidence only').toEqual(full6.grid.anchors)
+    expect(wider.unprotected!.areaMM2).toBeLessThanOrEqual(full6.unprotected!.areaMM2)
+    expect(full6.unprotected!.areaMM2, 'a 3x3 disc at 24mm padding has unsupported material to report').toBeGreaterThan(0)
+  })
 })
