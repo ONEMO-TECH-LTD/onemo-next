@@ -1,6 +1,6 @@
 import { RELEASED_PADDING_MM } from '../grid-magnet-spec'
 import { MANUFACTURING_OFFSET_ARC_TOLERANCE_MM, offsetPathMM } from '../offset'
-import { flattenPath, offsetConvexRingPath, pathBoundsMM, pathFromAnchors, type OutlinePath } from '../foundation/path'
+import { clearsPathBy, flattenPath, offsetConvexRingPath, pathBoundsMM, pathFromAnchors, pointInPath, type OutlinePath, type PathSeg } from '../foundation/path'
 import type { OutlineRecipe } from './class-contract'
 import { boundsMM, convexHull, regularApothem, regularNormals, rotateAround } from './geometry'
 import type { PointMM } from './types'
@@ -77,6 +77,78 @@ function discOutline(nodesMM: readonly PointMM[]): LibraryOutline {
   return sized(flattenPath(path, MANUFACTURING_OFFSET_ARC_TOLERANCE_MM), path)
 }
 
+/** THE ELLIPSE — the corner mode behind the OVAL family. Named for the geometry, never the family:
+ *  `oval` is a registered class id now, and no code may branch on a class name (the same rule that
+ *  made the circle's mode `disc`). It is the smallest ellipse of the population's own proportions that clears every magnet by
+ *  the rim. A circle is the case where those proportions are square, which is why the circle keeps
+ *  that case and the oval is published only where the population is longer one way than the other.
+ *
+ *  Unlike the polygon there is NO closed form here, and pretending otherwise would be a lie: the
+ *  offset of an ellipse is not an ellipse (nor any conic), so "the ellipse whose 12mm offset touches
+ *  this magnet" cannot be solved in one expression the way n half-planes can. What IS exact is the
+ *  test — the engine measures a magnet's clearance against the drawn curve itself — and the size is
+ *  monotone in the scale, so the smallest clearing ellipse is found by bisection on that exact
+ *  predicate, to a thousandth of a millimetre. That is arithmetic over the magnets, deterministic and
+ *  reproducible; it is not the solver searching placements, which is what the library forbids.
+ *
+ *  Drawn as eight cubic arcs. Four would leave ~0.03% radial error — 0.04mm on a 300mm oval, inside
+ *  the manufacturing tolerance but not comfortably; eight is three orders better, and the clearance
+ *  is measured against those very cubics, so the shape that ships is the shape that was tested. */
+const ELLIPSE_ARCS = 8
+function ellipsePath(cx: number, cy: number, a: number, b: number): OutlinePath {
+  const at = (t: number): [number, number] => [cx + a * Math.cos(t), cy + b * Math.sin(t)]
+  const d = (t: number): [number, number] => [-a * Math.sin(t), b * Math.cos(t)]
+  const step = (2 * Math.PI) / ELLIPSE_ARCS
+  const alpha = (4 / 3) * Math.tan(step / 4)
+  const start = at(0)
+  const segs: PathSeg[] = []
+  for (let i = 0; i < ELLIPSE_ARCS; i++) {
+    const t0 = i * step, t1 = (i + 1) * step
+    const p0 = at(t0), p1 = at(t1), d0 = d(t0), d1 = d(t1)
+    segs.push({
+      kind: 'cubic',
+      c1: [p0[0] + alpha * d0[0], p0[1] + alpha * d0[1]],
+      c2: [p1[0] - alpha * d1[0], p1[1] - alpha * d1[1]],
+      to: i === ELLIPSE_ARCS - 1 ? start : p1,
+    })
+  }
+  return { start, segs }
+}
+
+function ovalOutline(nodesMM: readonly PointMM[], authored?: { widthMM: number; heightMM: number }): LibraryOutline {
+  if (authored) {
+    const xs = nodesMM.map(([x]) => x), ys = nodesMM.map(([, y]) => y)
+    const path = ellipsePath((Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2,
+      authored.widthMM / 2, authored.heightMM / 2)
+    return sized(flattenPath(path, MANUFACTURING_OFFSET_ARC_TOLERANCE_MM), path)
+  }
+  const xs = nodesMM.map(([x]) => x), ys = nodesMM.map(([, y]) => y)
+  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys)
+  const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2
+  // the population's own proportions; a degenerate axis (one row or one column) still has the rim
+  const spanX = maxX - minX, spanY = maxY - minY
+  const longest = Math.max(spanX, spanY, 1e-9)
+  const ax = Math.max(spanX, longest * 1e-3), ay = Math.max(spanY, longest * 1e-3)
+  // A MAGNET MUST BE INSIDE AND CLEAR. clearsPathBy measures the DISTANCE to the curve, not which
+  // side of it a point is on, so a magnet far outside a tiny ellipse passed it — the bisection then
+  // collapsed to a 0x0 shape that crashed the offsetter (2026-09-08). Containment is the other half.
+  const clears = (s: number) => {
+    const path = ellipsePath(cx, cy, (ax / 2) * s, (ay / 2) * s)
+    return nodesMM.every((p) => pointInPath(path, [p[0], p[1]])
+      && clearsPathBy(path, [p[0], p[1]], RELEASED_PADDING_MM))
+  }
+  // a scale that certainly clears, then the smallest that still does
+  let hi = 1 + (2 * RELEASED_PADDING_MM) / Math.max(ax, ay)
+  for (let i = 0; i < 64 && !clears(hi); i++) hi *= 1.5
+  let lo = 0
+  for (let i = 0; i < 60 && (hi - lo) * Math.max(ax, ay) > 1e-3; i++) {
+    const mid = (lo + hi) / 2
+    if (clears(mid)) hi = mid; else lo = mid
+  }
+  const path = ellipsePath(cx, cy, (ax / 2) * hi, (ay / 2) * hi)
+  return sized(flattenPath(path, MANUFACTURING_OFFSET_ARC_TOLERANCE_MM), path)
+}
+
 /** A REGULAR BOUNDARY around the magnets, in CLOSED FORM.
  *
  *  A regular polygon is the intersection of `sides` half-planes. Each edge's outward normal is a fixed
@@ -120,6 +192,7 @@ function regularOutline(nodesMM: readonly PointMM[], sides: number, centreMM: Po
 export function outlineFromLayout(nodesMM: readonly PointMM[], recipe: OutlineRecipe): LibraryOutline {
   if (!nodesMM.length) throw new Error('library: empty population has no outline')
   if (recipe.corners === 'disc') return discOutline(nodesMM)
+  if (recipe.corners === 'ellipse') return ovalOutline(nodesMM, recipe.ellipseMM)
   if (recipe.corners === 'regular') {
     if (!recipe.sides || !recipe.centreMM) throw new Error('library: a regular outline needs its side count and centre')
     return regularOutline(nodesMM, recipe.sides, recipe.centreMM)

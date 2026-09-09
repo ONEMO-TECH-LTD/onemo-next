@@ -4,7 +4,7 @@ import type { LibraryFamily, LibraryFrame, LibrarySelection, LibraryTransform } 
  *  `stadium` is not a join at all — it is the frame's box carried out to the largest circular radius
  *  the lattice allows, which is why it needs the frame rather than the surviving magnets. `disc` is
  *  the circle the population fits in: its own centre, its furthest magnet, plus the rim. */
-export type CornerMode = 'sharp' | 'bevel' | 'round' | 'stadium' | 'disc' | 'regular'
+export type CornerMode = 'sharp' | 'bevel' | 'round' | 'stadium' | 'disc' | 'regular' | 'ellipse'
 
 export interface OutlineRecipe {
   corners: CornerMode
@@ -13,6 +13,9 @@ export interface OutlineRecipe {
    *  millimetres as the magnets. Its size is then arithmetic over the magnets it holds. */
   sides?: number
   centreMM?: readonly [number, number]
+  /** `ellipse` only: the AUTHORED outline size in millimetres. The oval's sizes are Dan's own, drawn
+   *  rather than derived, so the record states them; without one the ellipse is fitted to the magnets. */
+  ellipseMM?: { readonly widthMM: number; readonly heightMM: number }
   /** `stadium` only: which side of the population is the width. Read off the extent when unsaid; a
    *  square extent cannot say, and the same four magnets are a 72x120 pill one way and 120x72 the other. */
   across?: 'x' | 'y'

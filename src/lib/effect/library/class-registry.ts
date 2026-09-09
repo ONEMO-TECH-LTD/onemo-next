@@ -5,6 +5,7 @@ import { triangleClass } from './triangle-class'
 import { pillClass } from './pill-class'
 import { circleClass } from './circle-class'
 import { polygonClass } from './polygon-class'
+import { ovalClass } from './oval-class'
 import type { LibraryClass } from './class-contract'
 import type { LibraryFamily } from './types'
 
@@ -16,6 +17,7 @@ export const CLASS_SPECS = {
   pill: pillClass,
   circle: circleClass,
   polygon: polygonClass,
+  oval: ovalClass,
 } as const satisfies Record<string, LibraryClass>
 
 type RegisteredClassId = keyof typeof CLASS_SPECS

@@ -19,7 +19,10 @@
 // was mine on 2026-08-25 and it read "no generation AT SOLVE TIME", which is a different claim —
 // what was rejected then was a solve-time generator filtering patterns per family.
 
-import { boardPositions, regularApothem, regularNormals, smallestRegularCover } from './geometry'
+import { boardPositions, latticeNodeMM, latticeReach, regularApothem, regularNormals, smallestRegularCover } from './geometry'
+import { outlineFromLayout } from './outline'
+import { clearsPathBy, pointInPath } from '../foundation/path'
+import { OVAL_SIZES_MM, RELEASED_PADDING_MM } from '../grid-magnet-spec'
 import type { LibraryFrame } from './types'
 
 type Pt = readonly [number, number]
@@ -165,6 +168,67 @@ export function pillFrames(pitchMM: number): readonly LibraryFrame[] {
     out.push({ cols, rows, key, layouts: [{ name: CANON_LAYOUT, nodes: placed }] })
   }
   return out.sort((a, b) => Math.max(a.cols, a.rows) - Math.max(b.cols, b.rows) || a.cols - b.cols || a.rows - b.rows)
+}
+
+/** THE OVALS — AUTHORED SHAPES, LATTICE-DECIDED POPULATIONS.
+ *
+ *  Dan drew three in Figma (2026-09-09) and the SIZES are his: 72x120, 84x120, 96x168 millimetres. A
+ *  generator cannot reproduce them and should not try — the smallest legal ellipse around a 2x2 grid
+ *  is 92x92, a circle, where he drew 84x120, a portrait oval. That is judgement (Dan: "feed the preset
+ *  canon hand made with layouts").
+ *
+ *  The POPULATION is not authored. Each shape holds whatever the lattice puts inside it with the rim
+ *  clear, which is the library's own doctrine everywhere else — the grid dictates the layout. So one
+ *  drawn oval is one product at every released lattice, carrying 3 magnets at 48mm and more at 24.
+ *  The sizes live in the SPEC with every other millimetre. */
+export function ovalFrames(pitchMM: number): readonly LibraryFrame[] {
+  const board = boardPositions(pitchMM)
+  const out: LibraryFrame[] = []
+  const seen = new Set<string>()
+  for (const size of OVAL_SIZES_MM) {
+    const nodes = ellipseHolds(size.widthMM, size.heightMM, pitchMM)
+    if (!nodes.length) continue
+    const cols = Math.max(...nodes.map(([x]) => x)) + 1, rows = Math.max(...nodes.map(([, y]) => y)) + 1
+    if (cols > board.cols || rows > board.rows) continue
+    // the record's identity is the drawn shape AND the grid that lattice puts in it: the same 72x120
+    // oval carries three magnets at 48mm and two at 96, and those are two products, not one wearing
+    // two frames — a catalogue id must mean the same thing at every pitch (gate STEP 4)
+    const key = size.widthMM + 'x' + size.heightMM + '-' + cols + 'x' + rows
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push({ cols, rows, key, layouts: [{ name: nodes.length === 1 ? SINGLE_LAYOUT : CANON_LAYOUT, nodes }] })
+  }
+  return out
+}
+
+/** The authored size a frame carries, by its key. */
+export const ovalSizeMM = (key: string): { widthMM: number; heightMM: number } | null =>
+  OVAL_SIZES_MM.find((o) => key.startsWith(o.widthMM + 'x' + o.heightMM + '-')) ?? null
+
+/** Every lattice node an authored oval holds with the rim clear — at the PHASE that fills it best.
+ *
+ *  The lattice may sit on the shape's centre or straddle it, per axis, and which one fills an oval is
+ *  not the same on both: Dan's 84x120 carries four magnets around its centre (straddling on both
+ *  axes) while his 96x168 carries six — straddling across, centred along. Phasing on a node alone gave
+ *  three magnets to all three ovals and lost his layouts entirely; the fullest of the four phases
+ *  returns each of them exactly. The disc makes the same choice, one axis at a time. */
+function ellipseHolds(widthMM: number, heightMM: number, pitchMM: number): Pt[] {
+  const { path } = outlineFromLayout([[0, 0]], { corners: 'ellipse', ellipseMM: { widthMM, heightMM } })
+  if (!path) return []
+  const reach = latticeReach(Math.max(widthMM, heightMM), pitchMM)
+  let best: Pt[] = []
+  for (const offX of [0, 0.5]) for (const offY of [0, 0.5]) {
+    const held: Array<readonly [number, number]> = []
+    for (let ix = -reach; ix <= reach; ix++) for (let iy = -reach; iy <= reach; iy++) {
+      const [px, py] = latticeNodeMM(ix, iy, offX, offY, pitchMM)
+      const p: [number, number] = [px, py]
+      if (pointInPath(path, p) && clearsPathBy(path, p, RELEASED_PADDING_MM)) held.push([ix, iy])
+    }
+    if (held.length <= best.length) continue
+    const ox = Math.min(...held.map(([x]) => x)), maxY = Math.max(...held.map(([, y]) => y))
+    best = held.map(([x, y]) => [x - ox, maxY - y] as Pt).sort((p, q) => p[0] - q[0] || p[1] - q[1])
+  }
+  return best
 }
 
 /** THE CIRCLE'S POPULATIONS — what a round shape can actually hold, which is not what a square box

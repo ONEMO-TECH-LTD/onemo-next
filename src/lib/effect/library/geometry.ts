@@ -44,6 +44,18 @@ export const placePointMM = (
   rows: number, point: readonly [number, number], pitchMM: number,
 ): PointMM => [point[0] * pitchMM, (rows - 1 - point[1]) * pitchMM]
 
+/** A LATTICE NODE IN MILLIMETRES, at a phase. `off` of 0 puts a node on the origin, 0.5 straddles it
+ *  — which of the two fills an authored shape is the shape's question, but the conversion is this
+ *  file's, like every other (writing it out in a class is what drew a polygon about a mirrored
+ *  centre, 2026-09-06). */
+export const latticeNodeMM = (
+  ix: number, iy: number, offX: number, offY: number, pitchMM: number,
+): PointMM => [(ix + offX) * pitchMM, (iy + offY) * pitchMM]
+
+/** How many lattice steps span a distance — the count a search must reach to cover it. A COUNT, not a
+ *  coordinate, but it is still the pitch dividing millimetres, so it lives with the conversions. */
+export const latticeReach = (spanMM: number, pitchMM: number): number => Math.ceil(spanMM / pitchMM) + 1
+
 /** placeMM inverted for ONE point: where a millimetre click lands on the view's lattice. The
  *  flip is the same one, so it lives beside it rather than being written out at the click site. */
 export const nodeAtMM = (

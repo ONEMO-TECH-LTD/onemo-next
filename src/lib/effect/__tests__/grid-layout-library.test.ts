@@ -1241,7 +1241,7 @@ describe('the class spec is portable, and nothing outside it knows a class by na
       const spec = specOf(fam)
       const opened = spec.open(sel(), 48)
       const variant = spec.variantOf(opened, 48)
-      expect(variant.outline.corners, fam).toMatch(/sharp|round|bevel|stadium|disc|regular/)
+      expect(variant.outline.corners, fam).toMatch(/sharp|round|bevel|stadium|disc|regular|ellipse/)
     }
   })
 
