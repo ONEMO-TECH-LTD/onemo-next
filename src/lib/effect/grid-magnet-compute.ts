@@ -2,7 +2,7 @@
 
 import type { Contour, Pt } from './types'
 import { edgeDistMM } from './foundation/geometry'
-import { scalePath } from './foundation/path'
+import { scalePath, type OutlinePath } from './foundation/path'
 
 // Moved to foundation/geometry.ts (S2 step 1). Re-exported so no consumer changes in the move.
 export { bbox } from './foundation/geometry'
@@ -50,8 +50,9 @@ export function contactPointsMM(
 export function scaleContour(base: Contour, longestMM: number): Contour {
   const scale = (pts: ReadonlyArray<Pt>): Pt[] => pts.map(([x, y]) => [x * longestMM, y * longestMM] as Pt)
   // Every supplied ring scales. Returning holes: [] here silently deleted a donut's hole.
-  return {
-    outer: { pts: scale(base.outer.pts), path: base.outer.path ? scalePath(base.outer.path, longestMM) : undefined },
-    holes: base.holes.map((h) => ({ pts: scale(h.pts), path: h.path ? scalePath(h.path, longestMM) : undefined })),
-  }
+  // A ring with no path carries NO `path` key — an explicit undefined is not plain data: it does not
+  // survive JSON, and the package's answer must (engine-package consumer test, 2026-09-09).
+  const ring = (r: { pts: ReadonlyArray<Pt>; path?: OutlinePath }) =>
+    r.path ? { pts: scale(r.pts), path: scalePath(r.path, longestMM) } : { pts: scale(r.pts) }
+  return { outer: ring(base.outer), holes: base.holes.map(ring) }
 }

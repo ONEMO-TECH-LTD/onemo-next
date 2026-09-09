@@ -92,7 +92,7 @@ export function frameOf(cols: number, rows: number, mask?: (nodes: readonly Pt[]
  *
  *  Portrait and landscape are separate frames, published separately: a 9-wide board carries 3×10
  *  and cannot carry 10×3 (Dan, 2026-08-30). */
-export function rectangularFrameSizes(pitchMM: number): ReadonlyArray<readonly [number, number]> {
+function rectangularFrameSizes(pitchMM: number): ReadonlyArray<readonly [number, number]> {
   const { cols, rows } = boardPositions(pitchMM)
   const out: Array<readonly [number, number]> = []
   for (let c = 1; c <= cols; c++) for (let r = c + 1; r <= rows; r++) {
@@ -245,7 +245,7 @@ function ellipseHolds(widthMM: number, heightMM: number, pitchMM: number): Pt[] 
  *
  *  The outline is then the circle these nodes fit in — max node distance plus the rim — which the
  *  outline recipe draws exactly rather than as a rounded polygon. */
-export function circleLayouts(pitchMM: number): ReadonlyArray<{ nodes: Pt[]; cols: number; rows: number }> {
+function circleLayouts(pitchMM: number): ReadonlyArray<{ nodes: Pt[]; cols: number; rows: number }> {
   const board = boardPositions(pitchMM)
   const reach = Math.max(board.cols, board.rows)
   const out: Array<{ nodes: Pt[]; cols: number; rows: number }> = []
