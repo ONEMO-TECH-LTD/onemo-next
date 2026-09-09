@@ -9,12 +9,12 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import LibraryPanel from './LibraryPanel'
-import { libraryStageModel } from '@/lib/effect/grid-magnet-library-bridge'
+import { libraryStageModel, recordStageModel } from '@/lib/effect/grid-magnet-library-bridge'
 import {
   DEFAULT_LIBRARY_SELECTION, LIBRARY_FAMILIES, selectionForFamily, librarySurface, DRAFT_STORE_KEY,
   startAdd as libStartAdd, startEdit as libStartEdit, saveEdit as libSaveEdit,
   deleteEdit as libDeleteEdit, toggleNodeAt,
-  DEFAULT_LIBRARY_BROWSE, LIBRARY_RELEASE_STATE, releasedRecords,
+  DEFAULT_LIBRARY_BROWSE, LIBRARY_RELEASE_STATE, releasedShapes,
   type LibraryBrowse, type LibraryDraft, type LibraryEdit, type LibraryReleaseState, type LibrarySelection,
 } from '@/lib/effect/library'
 import { getShape, type VectorShapeKind } from '@/lib/shape-library'
@@ -28,7 +28,7 @@ import { bandRangeForControl, outlineSvgD, svgDOf, type GridPageModel } from '@/
 import { librarySegments as librarySegmentsOf, type LibraryLegalArea } from '@/lib/effect/adapters/libraryViewModel'
 import { createPerfLog, type PerfRow } from './perf-log'
 import { BANDS, CENTRE_MODE, DEFAULT_PITCH_MM, GOVERNOR, PADDING_CEIL_MM, PADDING_FLOOR_MM, PROTECTION_PADDING_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-magnet-spec'
-import { normBaseContour, normMaskContour, normRecordContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-magnet-bridge'
+import { normBaseContour, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-magnet-bridge'
 import { LOCK_PROFILE, isLocked, withLock, type LockKey, type LockProfile, type LockValues } from '@/lib/effect/locks'
 
 /** Bench test libraries — static assets, listed by a committed manifest. */
@@ -55,7 +55,7 @@ const FIT = 0.86
  *  the Presets tab is empty — and opening there left the bench with no shape at all ("shape
  *  unavailable", 2026-09-08). Generators always have one, so that is the opening tab until the admin
  *  releases something. */
-const OPENING_TAB: Src = releasedRecords(DEFAULT_PITCH_MM, LIBRARY_RELEASE_STATE).length ? 'preset' : 'gen'
+const OPENING_TAB: Src = releasedShapes(DEFAULT_PITCH_MM, LIBRARY_RELEASE_STATE).length ? 'preset' : 'gen'
 
 const VECTOR_GENS: { k: VectorShapeKind; label: string; dial: 'sides' | 'points' }[] = [
   { k: 'polygon', label: 'Polygon', dial: 'sides' }, { k: 'star', label: 'Star', dial: 'points' },
@@ -66,7 +66,9 @@ const GENS: { k: ShapeKind; label: string; p1: [string, string]; p2: [string, st
   { k: 'daisy', label: 'Daisy', p1: ['Depth', '%'], p2: ['Petals', ''], p2min: 5, p2max: 12, p2start: 8 },
   { k: 'pinwheel', label: 'Pinwheel', p1: ['Swirl', '%'], p2: ['Blades', ''], p2min: 3, p2max: 8, p2start: 5 },
 ]
-const ALL_BAND_IDS = BANDS.map((band) => band.id)
+/** A record's size as the band row says it — one number for a square shape, w×h otherwise. */
+const sizeLabel = (r: { widthMM: number; heightMM: number }): string =>
+  Math.round(r.widthMM) === Math.round(r.heightMM) ? `${Math.round(r.widthMM)}` : `${Math.round(r.widthMM)}×${Math.round(r.heightMM)}`
 
 type Src = 'preset' | 'gen' | 'magic' | 'cut'
 type MagicState = { vshape: VShape; maskH: number; adapter: string; imgUrl: string } | null
@@ -87,7 +89,8 @@ function usePersisted(key: string, initial: number): [number, (n: number) => voi
 
 export default function GridLab() {
   const [src, setSrc] = useState<Src>(OPENING_TAB)
-  /** The released record on the bench — its catalogue id; '' until something is released. */
+  /** The released SHAPE on the bench — a class id; its size is the band row's (Dan, 2026-09-09).
+   *  '' until something is released. */
   const [preset, setPreset] = useState<string>('')
   /** A ring generator, or one of the vector dial shapes. */
   const [gen, setGen] = useState<ShapeKind | VectorShapeKind>('blob')
@@ -165,13 +168,6 @@ export default function GridLab() {
     fetch('/api/dev/library-release', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(next) })
       .catch(() => { /* the live copy stands; the file catches up on the next save */ })
   }
-  // THE PRESETS are the Library's released records at this pitch — nothing baked, nothing else
-  const presets = useMemo(() => releasedRecords(pitch, release), [pitch, release])
-  const presetRecord = presets.find((r) => r.id === preset) ?? null
-  useEffect(() => {
-    // the bench lands on the first released record when its own is gone or nothing was chosen yet
-    if (!presetRecord && presets.length > 0) setPreset(presets[0].id)
-  }, [presetRecord, presets])
   const libraryState = useMemo(() => tab === 'library'
     ? librarySurface(librarySel, drafts, edit, pitch, libBrowse, release) : null,
   [tab, librarySel, pitch, edit, drafts, libBrowse, release])
@@ -196,6 +192,29 @@ export default function GridLab() {
   const [manual, setManual] = useState<{ x: number; y: number } | null>(null)
   const [coverage, setCoverage] = useState<'full' | 'perimeter'>('perimeter')
 
+  // THE PRESETS are the Library's released SHAPES at this pitch — nothing baked, nothing else. The
+  // shape is the chip; the band row carries its released sizes; the record under shape+band is what
+  // lands on the canvas, as published — no solve (Dan, 2026-09-09).
+  const presetShapes = useMemo(() => releasedShapes(pitch, release), [pitch, release])
+  const presetShape = presetShapes.find((s) => s.classId === preset) ?? null
+  useEffect(() => {
+    // the bench lands on the first released shape when its own is gone or nothing was chosen yet
+    if (!presetShape && presetShapes.length > 0) setPreset(presetShapes[0].classId)
+  }, [presetShape, presetShapes])
+  // THE BENCH'S BANDS are the released ones and no other — "disable non-release sizes from the
+  // entire grid lab" (Dan, 2026-09-08). A preset offers its own released bands; every other source
+  // solves within the union of what any shape released, narrowed by the admin scope below.
+  const releasedBandIds = useMemo(() => [...new Set(presetShapes.flatMap((s) => s.bands.map((b) => b.bandId)))].sort((a, b) => a - b), [presetShapes])
+  const benchBandIds = useMemo(() => src === 'preset'
+    ? (presetShape?.bands.map((b) => b.bandId) ?? [])
+    : releasedBandIds.filter((id) => activeBandIds.includes(id)), [src, presetShape, releasedBandIds, activeBandIds])
+  useEffect(() => {
+    if (benchBandIds.length && !benchBandIds.includes(mode)) { setMode(benchBandIds[0]); setStepSel(null); setManual(null); setBandScale(null) }
+  }, [benchBandIds, mode])
+  const presetBand = presetShape?.bands.find((b) => b.bandId === mode) ?? null
+  const presetIdx = presetBand ? Math.min(stepSel ?? 0, presetBand.records.length - 1) : 0
+  const presetRecord = presetBand?.records[presetIdx] ?? null
+
   // On load the bench opens on B1 or the last band you pushed (Dan, 08-25). usePersisted loads
   // in a post-mount effect, so read storage directly for the one decision that must be right on
   // first paint.
@@ -203,12 +222,12 @@ export default function GridLab() {
     try {
       const saved = JSON.parse(localStorage.getItem('grid-centre.activeBands') ?? 'null')
       const active = Array.isArray(saved)
-        ? ALL_BAND_IDS.filter((id) => saved.includes(id)) : ALL_BAND_IDS
-      const next = active.length ? active : ALL_BAND_IDS
+        ? releasedBandIds.filter((id) => saved.includes(id)) : releasedBandIds
+      const next = active.length ? active : releasedBandIds
       setActiveBandIds(next)
       const selected = +(localStorage.getItem('grid-centre.band') ?? '1') || 1
       setMode(next.includes(selected) ? selected : next[0])
-    } catch { setActiveBandIds(ALL_BAND_IDS); setMode(ALL_BAND_IDS[0]) }
+    } catch { setActiveBandIds(releasedBandIds); setMode(releasedBandIds[0]) }
     setBandScopeReady(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -344,10 +363,7 @@ export default function GridLab() {
         if (!magic) return null
         return normBaseContour(magic.vshape, magic.maskH)
       }
-      if (src === 'preset') {
-        const record = presets.find((r) => r.id === preset)
-        return record ? normRecordContour(record) : null
-      }
+      if (src === 'preset') return null   // a released record is not solved; see presetModel
       const vector = VECTOR_GENS.find((g) => g.k === gen)
       if (vector) return normBaseContour(getShape(vector.k, IMG, IMG, { sides, points }), IMG)
       const params = gen === 'blob' ? { waviness: p1, seed: p2 }
@@ -359,7 +375,10 @@ export default function GridLab() {
       return normBaseContour(vecFromGenerator(gen as ShapeKind, params, { widthPx: IMG, heightPx: IMG }), IMG)
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
     finally { genMsRef.current = performance.now() - t0 }
-  }, [src, preset, presets, gen, p1, p2, sides, points, magic, cutC])
+  }, [src, gen, p1, p2, sides, points, magic, cutC])
+  // THE RECORD ON THE CANVAS — the released record under shape + band, as the Library published it.
+  const presetModel = useMemo(() => presetRecord ? recordStageModel(presetRecord, pitch) : null, [presetRecord, pitch])
+  const presetSegments = useMemo(() => presetModel ? librarySegmentsOf(presetModel) : [], [presetModel])
 
   // The solve runs in a worker so the page never freezes; the last result stays up while solving.
   type Model = GridPageModel
@@ -411,7 +430,7 @@ export default function GridLab() {
     const w = workerRef.current
     if (!w || !bandScopeReady) return
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
-    const cfg = { pitchMM: pitch, paddingMM: pad, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && presetRecord?.corners === 'disc', classifierRuler: ruler }
+    const cfg = { pitchMM: pitch, paddingMM: pad, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: false, classifierRuler: ruler }
     // Manual in a band (forced registration OR manual band scale): the walk is meaningless —
     // solve that size directly, exactly like free mode, band chip stays active.
     const manualBand = manual !== null || bandScale !== null   // manual scale/pan: solved directly at the requested size
@@ -431,9 +450,11 @@ export default function GridLab() {
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, presetRecord, shapeLabel, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler, protectionPadding, activeBandIds, bandScopeReady])
+  }, [base, src, shapeLabel, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler, protectionPadding, activeBandIds, bandScopeReady])
 
-  const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
+  /** What the bench shows: a released record as published, or the solver's answer. */
+  const view = src === 'preset' ? presetModel : model
+  const scale = view ? (VP * FIT) / Math.max(dim(view.contour, 0), dim(view.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
   const vectorGen = VECTOR_GENS.find((g) => g.k === gen) ?? null
 
@@ -483,14 +504,13 @@ export default function GridLab() {
             <span className="gl-eye">Grid Lab · v4</span>
             <span className="gl-eye">
               {tab === 'library' ? 'LIBRARY DRAFT · CANDIDATE REVIEW'
-                : model ? `1mm = ${scale.toFixed(2)} px` : '—'}
+                : view ? `1mm = ${scale.toFixed(2)} px` : '—'}
             </span>
           </div>
           <div className="gl-vp">
             {showSolving && <div className="gl-solving"><span className="gl-spin" />solving…</div>}
             {(() => {
-              const src2 = libraryModel ?? model
-              if (!src2) return null
+              if (!libraryModel && !view) return null
               const stageProps = libraryModel
                 ? { contour: libraryModel.contour, grid: libraryModel.grid, lattice: showLattice, box: showBox,
                     // the record's own legal area, dimensioned like the bench's
@@ -502,6 +522,13 @@ export default function GridLab() {
                     onPickNode: edit
                       ? (pMM: Pt) => setEdit((d) => (d ? toggleNodeAt(librarySel, drafts, d, pMM, pitch) : d))
                       : undefined }
+                : presetModel && src === 'preset'
+                ? { contour: presetModel.contour, grid: presetModel.grid, lattice: showLattice, box: showBox,
+                    viewport: { panMM: [0, 0] as Pt, zoom: camZoom * CAM_BASE },
+                    // the record's own legal area, dimensioned like the bench's; the record is as
+                    // published — no manual registration or scale to gesture
+                    segments: showSegs ? presetSegments : [], segFill: segFillN !== 0,
+                    onPan: () => { }, onZoom: () => { }, onReset: () => { } }
                 : { contour: model!.contour, grid: model!.grid, lattice: showLattice, box: showBox,
                     // 100% = the shape at half the board, so there is room around it (Dan).
                     viewport: { panMM: [0, 0] as Pt, zoom: camZoom * CAM_BASE },
@@ -516,11 +543,13 @@ export default function GridLab() {
                     onReset: () => setManual(null) }
               return <Stage {...stageProps} />
             })()}
-            {!libraryModel && !model && (src === 'magic'
+            {!libraryModel && !view && (src === 'magic'
               ? <Empty text={magStatus.startsWith('error') ? magStatus.slice(6) : magStatus === 'downloading-model' ? 'Downloading the cut-out model…' : magStatus.startsWith('cutting') ? 'Cutting out the shape…' : 'Upload an image to cut its outline'} spin={magStatus === 'downloading-model' || magStatus.startsWith('cutting')} />
               : src === 'cut'
                 ? <Empty text={cutStatus.startsWith('error') ? cutStatus.slice(6) : cutStatus === 'tracing' ? 'Tracing the outline…' : 'Pick a cutout from the library'} spin={cutStatus === 'tracing'} />
-                : <Empty text="shape unavailable" />)}
+                : src === 'preset'
+                  ? <Empty text="Nothing released yet — Library → Frame → release" />
+                  : <Empty text="shape unavailable" />)}
           </div>
         </section>
 
@@ -563,32 +592,44 @@ export default function GridLab() {
             }} /> : null}</> : <>
           <Fold title="Grid settings" panel="grid">
             <div className="gl-field gl-bandfield">
-              <div className="gl-fieldhead"><span>Band · available{isLocked(profile, 'activeBandIds') ? ' · locked' : ''}</span>
+              <div className="gl-fieldhead"><span>Band · {src === 'preset' ? 'released' : 'available'}{isLocked(profile, 'activeBandIds') ? ' · locked' : ''}</span>
                 <span className="gl-headbtns">
-                  {!isLocked(profile, 'activeBandIds') && <button className="gl-edit" onClick={() => setBandScopeDraft((draft) => draft ? null : [...activeBandIds])}>Edit</button>}
+                  {src !== 'preset' && !isLocked(profile, 'activeBandIds') && <button className="gl-edit" onClick={() => setBandScopeDraft((draft) => draft ? null : [...activeBandIds])}>Edit</button>}
                   <LockBtn label="Band · available" k="activeBandIds" v={activeBandIds} profile={profile} setProfile={saveProfile} />
                 </span>
               </div>
               <div className="gl-seg gl-bandactive">
-                {BANDS.filter((b) => activeBandIds.includes(b.id)).map((b) =>
-                  <button key={b.id} aria-pressed={mode === b.id}
-                    onClick={() => { setMode(b.id); setStepSel(null); setManual(null); setBandScale(null); try { localStorage.setItem('grid-centre.band', String(b.id)) } catch { } }}>B{b.id}</button>)}
+                {benchBandIds.map((id) => {
+                  // a preset's chip carries the record's own size — the sizes live here, not on the shape
+                  const first = presetShape?.bands.find((b) => b.bandId === id)?.records[0]
+                  return <button key={id} aria-pressed={mode === id}
+                    onClick={() => { setMode(id); setStepSel(null); setManual(null); setBandScale(null); try { localStorage.setItem('grid-centre.band', String(id)) } catch { } }}>
+                    B{id}{src === 'preset' && first && <small>{sizeLabel(first)}</small>}</button>
+                })}
               </div>
               {bandScopeDraft && <div className="gl-scope-pop" role="dialog" aria-label="Edit compute scope">
                 <div className="gl-glabel">Compute scope</div>
                 <div className="gl-seg gl-bandrow gl-scope">
-                  {BANDS.map((b) => <button key={b.id} aria-pressed={bandScopeDraft.includes(b.id)}
+                  {releasedBandIds.map((id) => <button key={id} aria-pressed={bandScopeDraft.includes(id)}
                     onClick={() => setBandScopeDraft((draft) => {
                       if (!draft) return null
-                      const enabled = draft.includes(b.id)
+                      const enabled = draft.includes(id)
                       if (enabled && draft.length === 1) return draft
-                      return ALL_BAND_IDS.filter((id) => id === b.id ? !enabled : draft.includes(id))
-                    })}>B{b.id}</button>)}
+                      return releasedBandIds.filter((b) => b === id ? !enabled : draft.includes(b))
+                    })}>B{id}</button>)}
                 </div>
                 <button className="gl-scope-save" onClick={saveBandScope}>Save</button>
               </div>}
             </div>
-            {true && <>
+            {src === 'preset' && presetBand && <div className="gl-steps">
+              {/* the records released in this band — the size and the count, as published */}
+              {presetBand.records.map((r, i) =>
+                <button key={r.id} aria-pressed={i === presetIdx} onClick={() => setStepSel(i)}>
+                  <b>{r.label}</b>
+                  <span>{sizeLabel(r)} mm · {r.nodesMM.length}⌾</span>
+                </button>)}
+            </div>}
+            {src !== 'preset' && <>
               {/* The FIT READOUT is gone (Dan, 2026-08-30: "this panel text I said to remove, there
                   were two plates like that and now 1 — I need it gone"). The offer rows below say
                   the size and the count and which probe found them, so the plate only repeated
@@ -679,11 +720,11 @@ export default function GridLab() {
           </div>
           <Fold title="Shape" panel="shape">
             {src === 'preset' && <>
-              {presets.length > 0 ? (
+              {presetShapes.length > 0 ? (
                 <div className="gl-lib">
-                  {presets.map((r) => (
-                    <button key={r.id} aria-pressed={preset === r.id} onClick={() => setPreset(r.id)}
-                      title={r.id}><b>{r.classId}</b><span>{r.label}</span></button>
+                  {presetShapes.map((s) => (
+                    <button key={s.classId} aria-pressed={preset === s.classId} onClick={() => { setPreset(s.classId); setStepSel(null) }}>
+                      <b>{s.classId}</b></button>
                   ))}
                 </div>
               ) : (
@@ -1300,6 +1341,7 @@ const CSS = `
    into one strip (Dan, 2026-08-30). A grid rather than wrap so the break is the same every time. */
 .gl-seg.gl-bandrow{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px}
 .gl-bandactive{display:grid;grid-template-columns:repeat(auto-fit,minmax(48px,1fr))}
+.gl-bandactive button small{display:block;font:600 9px var(--mono);font-variant-numeric:tabular-nums;opacity:.75;margin-top:1px}
 .gl-seg button:hover{color:var(--ink)}
 .gl-seg button[aria-pressed=true]{background:var(--accent);color:#fff;box-shadow:0 1px 2px #0002}
 .gl-seg button:disabled{opacity:.28;cursor:not-allowed}

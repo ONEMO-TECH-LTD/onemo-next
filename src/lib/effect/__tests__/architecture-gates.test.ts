@@ -366,7 +366,9 @@ const bridgeViolations = (code = source(BRIDGE)): string[] => {
     const exact = (expected: readonly string[]) => names.length === expected.length
       && names.every((name, index) => name === expected[index]) && !clause?.name
     if (specifier === './library') {
-      if (!typeOnly || !exact(['MaterializedLibrary'])) violations.push(specifier)
+      // the two records the bridge puts on the canvas — a materialised selection and a released
+      // catalogue entry — as types only: it wraps data, it never resolves it
+      if (!typeOnly || !exact(['CatalogueEntry', 'MaterializedLibrary'])) violations.push(specifier)
     } else if (specifier === './types' || specifier === './grid-magnet') {
       if (!typeOnly) violations.push(specifier)
     } else if (specifier === './grid-magnet-spec') {
@@ -890,8 +892,8 @@ describe('Shape-Layout Library Law — activation schedule', () => {
   }, 20_000)
   it('STEP 5: surface, bridge, barrel, and shell use the contract boundary', () => {
     expect(barrelExports()).toEqual({
-      types: ['BrowseOption', 'CatalogueEntry', 'ClassBandRange', 'CornerMode', 'LibraryBrowse', 'LibraryDraft', 'LibraryEdit', 'LibraryFamily', 'LibraryReleaseState', 'LibrarySelection', 'LibrarySurface', 'MaterializedLibrary', 'PanelOption', 'PanelOptions', 'ReleaseOption'],
-      values: ['CATALOGUE_FORMAT_VERSION', 'DEFAULT_LIBRARY_BROWSE', 'DEFAULT_LIBRARY_SELECTION', 'DRAFT_STORE_KEY', 'LIBRARY_FAMILIES', 'LIBRARY_RELEASE_STATE', 'bandIdOfMM', 'canonCatalogue', 'catalogue', 'classBandRanges', 'deleteEdit', 'knownReleaseIds', 'librarySurface', 'releasedRecords', 'saveEdit', 'selectionForFamily', 'sizeRangeForBand', 'startAdd', 'startEdit', 'toggleNodeAt'],
+      types: ['BrowseOption', 'CatalogueEntry', 'ClassBandRange', 'CornerMode', 'LibraryBrowse', 'LibraryDraft', 'LibraryEdit', 'LibraryFamily', 'LibraryReleaseState', 'LibrarySelection', 'LibrarySurface', 'MaterializedLibrary', 'PanelOption', 'PanelOptions', 'ReleaseOption', 'ReleasedShape'],
+      values: ['CATALOGUE_FORMAT_VERSION', 'DEFAULT_LIBRARY_BROWSE', 'DEFAULT_LIBRARY_SELECTION', 'DRAFT_STORE_KEY', 'LIBRARY_FAMILIES', 'LIBRARY_RELEASE_STATE', 'bandIdOfMM', 'canonCatalogue', 'catalogue', 'classBandRanges', 'deleteEdit', 'knownReleaseIds', 'librarySurface', 'releasedRecords', 'releasedShapes', 'saveEdit', 'selectionForFamily', 'sizeRangeForBand', 'startAdd', 'startEdit', 'toggleNodeAt'],
       wildcards: [],
       aliases: [],
     })

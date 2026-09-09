@@ -81,6 +81,28 @@ export const releaseIdOf = (entry: CatalogueEntry): string => decodeURIComponent
 export const releasedRecords = (pitchMM: number, state: LibraryReleaseState): readonly CatalogueEntry[] =>
   catalogue(pitchMM).filter((e) => bandShown(state, e.classId, e.bandId) && recordReleased(state, e.classId, releaseIdOf(e)))
 
+export interface ReleasedShape {
+  classId: LibraryFamily
+  /** The bands this shape is released in, ascending, each with its records. */
+  bands: readonly { bandId: number; records: readonly CatalogueEntry[] }[]
+}
+
+/** THE PRESETS AS THE BENCH READS THEM — one SHAPE per released class, its released bands, the
+ *  records in each. The shape is the preset; the band row is where its sizes live (Dan, 2026-09-09:
+ *  "preset must be shape name, the grid settings display the sizes"). Class order is the library's. */
+export function releasedShapes(pitchMM: number, state: LibraryReleaseState): readonly ReleasedShape[] {
+  const shapes = new Map<LibraryFamily, Map<number, CatalogueEntry[]>>()
+  for (const e of releasedRecords(pitchMM, state)) {
+    const bands = shapes.get(e.classId) ?? new Map<number, CatalogueEntry[]>()
+    bands.set(e.bandId, [...(bands.get(e.bandId) ?? []), e])
+    shapes.set(e.classId, bands)
+  }
+  return [...shapes].map(([classId, bands]) => ({
+    classId,
+    bands: [...bands].sort(([a], [b]) => a - b).map(([bandId, records]) => ({ bandId, records })),
+  }))
+}
+
 /** The release ids the library knows at all, per class — what a stored state may legitimately name.
  *  Read off the catalogue at every released pitch, so the dev route can refuse an id no class ever
  *  published (QA F3). */
