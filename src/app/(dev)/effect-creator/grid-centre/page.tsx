@@ -14,8 +14,8 @@ import {
   DEFAULT_LIBRARY_SELECTION, LIBRARY_FAMILIES, selectionForFamily, librarySurface, DRAFT_STORE_KEY,
   startAdd as libStartAdd, startEdit as libStartEdit, saveEdit as libSaveEdit,
   deleteEdit as libDeleteEdit, toggleNodeAt,
-  DEFAULT_LIBRARY_BROWSE, LIBRARY_RELEASE_STATE, releasedShapes,
-  type LibraryBrowse, type LibraryDraft, type LibraryEdit, type LibraryReleaseState, type LibrarySelection,
+  DEFAULT_LIBRARY_BROWSE, LIBRARY_RELEASE_STATE, orientationOf, releasedShapes,
+  type CatalogueEntry, type LibraryBrowse, type LibraryDraft, type LibraryEdit, type LibraryReleaseState, type LibrarySelection,
 } from '@/lib/effect/library'
 import { getShape, type VectorShapeKind } from '@/lib/shape-library'
 import { type VShape } from '@/lib/vector-core'
@@ -92,6 +92,10 @@ export default function GridLab() {
   /** The released SHAPE on the bench — a class id; its size is the band row's (Dan, 2026-09-09).
    *  '' until something is released. */
   const [preset, setPreset] = useState<string>('')
+  /** Within the shape: which TYPE (slim / banner / frame …) and which way round — the same two rows
+   *  the Library browses by. Orientation null = both. */
+  const [presetType, setPresetType] = useState<string | null>(null)
+  const [presetOrient, setPresetOrient] = useState<'portrait' | 'landscape' | null>(null)
   /** A ring generator, or one of the vector dial shapes. */
   const [gen, setGen] = useState<ShapeKind | VectorShapeKind>('blob')
   const [p1, setP1] = useState(55) // waviness / pinch / depth / swirl
@@ -205,13 +209,25 @@ export default function GridLab() {
   // entire grid lab" (Dan, 2026-09-08). A preset offers its own released bands; every other source
   // solves within the union of what any shape released, narrowed by the admin scope below.
   const releasedBandIds = useMemo(() => [...new Set(presetShapes.flatMap((s) => s.bands.map((b) => b.bandId)))].sort((a, b) => a - b), [presetShapes])
+  // the shape's types and orientations, as its released records publish them; the type row lands on
+  // the first, orientation is offered only where both ways exist (as the Library does)
+  const shapeRecords = useMemo(() => presetShape?.bands.flatMap((b) => b.records) ?? [], [presetShape])
+  const shapeTypes = useMemo(() => [...new Set(shapeRecords.map((r) => r.typeId))], [shapeRecords])
+  const shapeOrients = useMemo(() => (['portrait', 'landscape'] as const).filter((o) => shapeRecords.some((r) => orientationOf(r) === o)), [shapeRecords])
+  const typeSel = presetType && shapeTypes.includes(presetType) ? presetType : shapeTypes[0] ?? null
+  const orientSel = shapeOrients.length === 2 ? presetOrient : null
+  const inPreset = (r: CatalogueEntry) => r.typeId === typeSel && (orientSel === null || orientationOf(r) === orientSel)
+  const presetBands = useMemo(() => (presetShape?.bands ?? [])
+    .map((b) => ({ bandId: b.bandId, records: b.records.filter(inPreset) })).filter((b) => b.records.length),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [presetShape, typeSel, orientSel])
   const benchBandIds = useMemo(() => src === 'preset'
-    ? (presetShape?.bands.map((b) => b.bandId) ?? [])
-    : releasedBandIds.filter((id) => activeBandIds.includes(id)), [src, presetShape, releasedBandIds, activeBandIds])
+    ? presetBands.map((b) => b.bandId)
+    : releasedBandIds.filter((id) => activeBandIds.includes(id)), [src, presetBands, releasedBandIds, activeBandIds])
   useEffect(() => {
     if (benchBandIds.length && !benchBandIds.includes(mode)) { setMode(benchBandIds[0]); setStepSel(null); setManual(null); setBandScale(null) }
   }, [benchBandIds, mode])
-  const presetBand = presetShape?.bands.find((b) => b.bandId === mode) ?? null
+  const presetBand = presetBands.find((b) => b.bandId === mode) ?? null
   const presetIdx = presetBand ? Math.min(stepSel ?? 0, presetBand.records.length - 1) : 0
   const presetRecord = presetBand?.records[presetIdx] ?? null
 
@@ -613,7 +629,7 @@ export default function GridLab() {
               <div className="gl-seg gl-bandactive">
                 {benchBandIds.map((id) => {
                   // a preset's chip carries the record's own size — the sizes live here, not on the shape
-                  const first = presetShape?.bands.find((b) => b.bandId === id)?.records[0]
+                  const first = presetBands.find((b) => b.bandId === id)?.records[0]
                   return <button key={id} aria-pressed={mode === id}
                     onClick={() => { setMode(id); setStepSel(null); setManual(null); setBandScale(null); try { localStorage.setItem('grid-centre.band', String(id)) } catch { } }}>
                     B{id}{src === 'preset' && first && <small>{sizeLabel(first)}</small>}</button>
@@ -738,13 +754,26 @@ export default function GridLab() {
               {presetShapes.length > 0 ? (
                 <div className="gl-lib">
                   {presetShapes.map((s) => (
-                    <button key={s.classId} aria-pressed={preset === s.classId} onClick={() => { setPreset(s.classId); setStepSel(null) }}>
+                    <button key={s.classId} aria-pressed={preset === s.classId} onClick={() => { setPreset(s.classId); setPresetType(null); setPresetOrient(null); setStepSel(null) }}>
                       <b>{s.classId}</b></button>
                   ))}
                 </div>
               ) : (
                 <div className="gl-hint">Nothing released yet — Library → Frame → <b>release</b> puts a record here.</div>
               )}
+            </>}
+
+            {src === 'preset' && shapeTypes.length > 1 && <>
+              <div className="gl-glabel" style={{ marginTop: 10 }}>Type</div>
+              <div className="gl-lib">
+                {shapeTypes.map((t) => <button key={t} aria-pressed={typeSel === t} onClick={() => { setPresetType(t); setStepSel(null) }}><b>{t}</b></button>)}
+              </div>
+            </>}
+            {src === 'preset' && shapeOrients.length === 2 && <>
+              <div className="gl-glabel" style={{ marginTop: 10 }}>Orientation</div>
+              <div className="gl-seg gl-wrap">
+                {shapeOrients.map((o) => <button key={o} aria-pressed={orientSel === o} onClick={() => { setPresetOrient((v) => v === o ? null : o); setStepSel(null) }}>{o}</button>)}
+              </div>
             </>}
 
             {src === 'gen' && <>

@@ -103,6 +103,12 @@ export function releasedShapes(pitchMM: number, state: LibraryReleaseState): rea
   }))
 }
 
+/** WHICH WAY ROUND a released record is — portrait and landscape are separate published records,
+ *  so this is a filter over the list, never a turn of the record (Dan, 2026-08-30). Read off the
+ *  outline, so a pill whose body makes a 2x2 frame tall is portrait. */
+export const orientationOf = (e: Pick<CatalogueEntry, 'widthMM' | 'heightMM'>): 'portrait' | 'landscape' | 'square' =>
+  e.heightMM > e.widthMM + 1e-9 ? 'portrait' : e.widthMM > e.heightMM + 1e-9 ? 'landscape' : 'square'
+
 /** The release ids the library knows at all, per class — what a stored state may legitimately name.
  *  Read off the catalogue at every released pitch, so the dev route can refuse an id no class ever
  *  published (QA F3). */
