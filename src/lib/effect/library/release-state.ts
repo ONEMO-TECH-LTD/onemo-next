@@ -18,8 +18,17 @@ export const LIBRARY_RELEASE_STATE: LibraryReleaseState = {
       "shownBands": null,
       "released": [
         "1x2",
+        "1x3",
+        "1x4",
+        "2x1",
         "2x3",
-        "3x4"
+        "2x4",
+        "3x1",
+        "3x2",
+        "3x4",
+        "4x1",
+        "4x2",
+        "4x3"
       ]
     },
     "diamond": {
@@ -37,9 +46,22 @@ export const LIBRARY_RELEASE_STATE: LibraryReleaseState = {
     "pill": {
       "shownBands": null,
       "released": [
+        "1x2",
+        "1x3",
+        "1x4",
+        "2x1",
         "2x2-x",
+        "2x2-y",
         "2x3",
-        "3x4"
+        "2x4",
+        "3x1",
+        "3x2",
+        "3x4",
+        "4x1",
+        "4x2",
+        "4x3",
+        "4x4-x",
+        "4x4-y"
       ]
     },
     "circle": {
