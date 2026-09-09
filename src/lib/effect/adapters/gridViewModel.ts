@@ -4,9 +4,10 @@
 // classificationDiagnostics are engine decisions carried through, not recomputed.
 
 import type { Contour, GridResult, SafeSegment, UnprotectedEvidence } from '../types'
-import type { GridSolve } from '../pipeline/types'
+import type { GridSolve, RecordRequest } from '../pipeline/types'
 import type { Band } from '../grid-magnet-spec'
 import { bandOuterMM, pathToSvgD, type OutlinePath } from '../grid-magnet'
+import { deliverRecord } from '../pipeline/deliver-record'
 
 /** The bench model exactly as the page consumes it. */
 export interface GridPageModel {
@@ -34,6 +35,13 @@ export function toPageModel(solve: GridSolve): GridPageModel {
     idx: selectedRungIndex,
     ...(classificationDiagnostics !== undefined ? { recog: classificationDiagnostics } : {}),
   }
+}
+
+/** A RELEASED RECORD as the bench model — delivered on the calling thread, at once: a record is
+ *  precomputed, so it never waits behind a solve in the worker's queue (QA, 2026-09-09). The adapter
+ *  still decides nothing; delivery (coverage, plan, protection, seal) is the pipeline's. */
+export function deliveredRecordPageModel(req: RecordRequest): GridPageModel {
+  return toPageModel(deliverRecord(req))
 }
 
 /** The outline range a band spans for the shell's manual-size controls — a delegate to the engine's

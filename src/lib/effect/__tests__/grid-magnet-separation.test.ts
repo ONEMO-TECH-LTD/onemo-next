@@ -397,10 +397,12 @@ describe('2e — the pipeline is the one sequencer the shells reach; adapters on
   const ADAPTER = join(LIB, 'adapters/gridViewModel.ts')
   const WORKER = join(process.cwd(), 'src/app/(dev)/effect-creator/grid-centre/solve.worker.ts')
 
-  it('pipeline/solve.ts imports engine modules only — never the app, never a framework', () => {
-    const refs = moduleRefsOf(readFileSync(PIPELINE, 'utf8'))
-    const bad = refs.filter((i) => !/^@\/lib\/effect\/|^\.\/types$/.test(i))
-    expect(bad, 'pipeline reaches outside the engine: ' + bad.join(' · ')).toEqual([])
+  it('pipeline/solve.ts and deliver-record.ts import engine modules only — never the app, never a framework', () => {
+    for (const file of [PIPELINE, join(LIB, 'pipeline/deliver-record.ts')]) {
+      const refs = moduleRefsOf(readFileSync(file, 'utf8'))
+      const bad = refs.filter((i) => !/^@\/lib\/effect\/|^\.\/types$/.test(i))
+      expect(bad, 'pipeline reaches outside the engine: ' + bad.join(' · ')).toEqual([])
+    }
   })
 
   it('pipeline/solve.ts holds exactly the unit edges the worker body carried — pinned, so a new one is deliberate', () => {
@@ -430,7 +432,13 @@ describe('2e — the pipeline is the one sequencer the shells reach; adapters on
     // strokes. It is the engine's own serialiser reached through the door — the adapter still decides
     // nothing — and the alternative was a second serialiser in the shell, which is exactly how the
     // drawn outline stayed a polygon while the measured one was a path (Dan: "all lines here are wobbly").
-    expect(runtimeImportsOf(text)).toEqual([{ from: '../grid-magnet', names: ['bandOuterMM', 'pathToSvgD'] }])
+    // + deliverRecord (2026-09-09): a released record is delivered on the calling thread through the
+    // adapter — coverage, plan, protection and the seal are the pipeline's; the adapter still decides
+    // nothing. Reached by file so the adapter never loads the search half and its caches.
+    expect(runtimeImportsOf(text)).toEqual([
+      { from: '../grid-magnet', names: ['bandOuterMM', 'pathToSvgD'] },
+      { from: '../pipeline/deliver-record', names: ['deliverRecord'] },
+    ])
     expect(text, 'adapter must never re-run a decision').not.toMatch(/defaultLanding|classFrameNodes|shapeFamilyOf|solveGrid|computeGrid|safeSegments/)
   })
 

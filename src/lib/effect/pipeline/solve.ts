@@ -19,8 +19,7 @@ import { canonPriorityOf, positionsAcross } from '@/lib/effect/units/classifier'
 import { DEFAULT_PITCH_MM, PADDING_FLOOR_MM } from '@/lib/effect/grid-magnet-spec'
 import { contourCacheKey, makeSizer, sizeRange } from '@/lib/effect/grid-magnet-bridge'
 import type { Pt } from '@/lib/effect/types'
-import type { GridRequest, GridSolve, RecordRequest } from './types'
-import { recordStageModel } from '@/lib/effect/grid-magnet-library-bridge'
+import type { GridRequest, GridSolve } from './types'
 import { LOCK_PROFILE, profileSnapshot, sealRequest } from '@/lib/effect/locks'
 
 // Computed once = computed. Per-shape bakes and per-band solves are keyed by shape + config and
@@ -259,27 +258,5 @@ export function solveGrid(rawReq: GridRequest): GridSolve {
         bandClass, bandClasses, recommendation, profile: profileSnapshot(LOCK_PROFILE),
       }
     }
-  }
-}
-
-/** A RELEASED RECORD, DELIVERED. The Library answered the search — magnets, outline, size are the
- *  record's — so nothing is classified, seated or wrapped. What every solve still owes the answer
- *  is the DELIVERY: the sealed profile over the caller's dials, the coverage rule over the magnets,
- *  the magnet plan's sizes, and the protection evidence measured on exactly what is delivered.
- *  Dropping those with the search is what put nine 3mm magnets under "Perimeter belt · All 8mm"
- *  (QA F1, 2026-09-09). */
-export function deliverRecord(req: RecordRequest): GridSolve {
-  const { record, cfg, settings: { protectionPaddingMM } } = sealRequest(req)
-  // a record is published AT a lattice; its pitch is its own, not a dial
-  const pitchMM = record.pitchMM
-  const stage = recordStageModel(record, pitchMM)
-  const { seated } = applyCoverage(stage.grid.anchors.map((a) => a.p), cfg.perimeterOnly !== false, pitchMM)
-  const anchors = assignSizes(seated, cfg.plan ?? 'all6')
-  const grid = { ...stage.grid, anchors }
-  const evidence = measureProtection(stage.contour, anchors.map((a) => a.p), pitchMM, protectionPaddingMM, anchors.map((a) => a.dia / 2))
-  return {
-    contour: stage.contour, grid, effSize: Math.max(record.widthMM, record.heightMM),
-    rungs: [], selectedRungIndex: 0, segments: [], unprotected: evidence,
-    profile: profileSnapshot(LOCK_PROFILE),
   }
 }

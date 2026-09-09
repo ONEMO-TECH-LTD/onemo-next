@@ -24,9 +24,8 @@ export interface GridRequest {
  *  have nothing to act on here (QA F1, 2026-09-09). */
 export interface RecordRequest {
   record: CatalogueEntry
-  cfg: GridConfig
+  cfg: Pick<GridConfig, 'plan' | 'perimeterOnly'>
   settings: { protectionPaddingMM: number }
-  activeBandIds?: number[]
 }
 
 /** Domain facts and domain decisions, never page projection. Field list copied from the worker's

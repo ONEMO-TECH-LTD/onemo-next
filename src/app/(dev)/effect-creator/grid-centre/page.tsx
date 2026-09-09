@@ -24,7 +24,7 @@ import { vecFromGenerator } from '../v5.3.1/user/editor/producers'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt, UnprotectedEvidence } from '@/lib/effect/types'
 import type { GridResult, MagnetPlan } from '@/lib/effect/types'
-import { bandRangeForControl, outlineSvgD, svgDOf, type GridPageModel } from '@/lib/effect/adapters/gridViewModel'
+import { bandRangeForControl, deliveredRecordPageModel, outlineSvgD, svgDOf, type GridPageModel } from '@/lib/effect/adapters/gridViewModel'
 import { librarySegments as librarySegmentsOf, type LibraryLegalArea } from '@/lib/effect/adapters/libraryViewModel'
 import { createPerfLog, type PerfRow } from './perf-log'
 import { BANDS, CENTRE_MODE, DEFAULT_PITCH_MM, GOVERNOR, PADDING_CEIL_MM, PADDING_FLOOR_MM, PROTECTION_PADDING_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-magnet-spec'
@@ -431,9 +431,8 @@ export default function GridLab() {
       }
       if (e.data.id !== seqRef.current) return
       if (e.data.error) console.error('[grid-lab] solve failed', e.data.error)
-      // a delivered record was not solved: the readouts say so
-      const solveMs = e.data.record ? undefined : performance.now() - solveSentAt.current
-      setPerf((x) => ({ ...x, solveMs, genMs: e.data.record ? undefined : genMsRef.current }))
+      const solveMs = performance.now() - solveSentAt.current
+      setPerf((x) => ({ ...x, solveMs, genMs: genMsRef.current }))
       if (e.data.model) effSizeRef.current = e.data.model.effSize
       setModel(e.data.model)
       if (row) setPerfLog((rows) => [row, ...rows].slice(0, 12))
@@ -443,19 +442,7 @@ export default function GridLab() {
   useEffect(() => {
     const w = workerRef.current
     if (!w || !bandScopeReady) return
-    if (src === 'preset') {
-      // THE RECORD ON THE CANVAS — the released record under shape + band, delivered through the same
-      // transport as a solve (coverage, plan, protection, the seal) but never searched. Not a solve,
-      // so the performance log does not count it.
-      if (!presetRecord) { setModel(null); return }
-      const id = ++seqRef.current
-      const msg = { id, record: presetRecord, cfg: { plan, perimeterOnly: coverage === 'perimeter' }, settings: { protectionPaddingMM: protectionPadding }, activeBandIds }
-      if (busyRef.current) { queuedRef.current = msg; return }
-      busyRef.current = true
-      solveSentAt.current = performance.now()
-      w.postMessage(msg)
-      return
-    }
+    if (src === 'preset') return   // a released record is delivered on this thread — see presetModel
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
     const cfg = { pitchMM: pitch, paddingMM: pad, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: false, classifierRuler: ruler }
     // Manual in a band (forced registration OR manual band scale): the walk is meaningless —
@@ -477,11 +464,20 @@ export default function GridLab() {
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, presetRecord, shapeLabel, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler, protectionPadding, activeBandIds, bandScopeReady])
+  }, [base, src, shapeLabel, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler, protectionPadding, activeBandIds, bandScopeReady])
+  // THE RECORD ON THE CANVAS — the released record under shape + band, delivered AT ONCE on this
+  // thread through the adapter (coverage, plan, protection, the seal), never searched and never
+  // queued behind a solve. Not a solve, so no readout and no performance row.
+  const presetModel = useMemo(() => presetRecord
+    ? deliveredRecordPageModel({ record: presetRecord, cfg: { plan, perimeterOnly: coverage === 'perimeter' }, settings: { protectionPaddingMM: protectionPadding } })
+    : null, [presetRecord, plan, coverage, protectionPadding])
+  useEffect(() => { if (src === 'preset') setPerf((x) => ({ ...x, genMs: undefined, solveMs: undefined })) }, [src])
   // a record's legal area is KNOWN — the exact inset — drawn the way the Library draws it, not measured
-  const presetSegments = useMemo(() => src === 'preset' && model ? librarySegmentsOf(model) : [], [src, model])
+  const presetSegments = useMemo(() => presetModel ? librarySegmentsOf(presetModel) : [], [presetModel])
+  /** What the bench shows: the delivered record, or the solver's answer. */
+  const view = src === 'preset' ? presetModel : model
 
-  const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
+  const scale = view ? (VP * FIT) / Math.max(dim(view.contour, 0), dim(view.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
   const vectorGen = VECTOR_GENS.find((g) => g.k === gen) ?? null
 
@@ -531,13 +527,13 @@ export default function GridLab() {
             <span className="gl-eye">Grid Lab · v4</span>
             <span className="gl-eye">
               {tab === 'library' ? 'LIBRARY DRAFT · CANDIDATE REVIEW'
-                : model ? `1mm = ${scale.toFixed(2)} px` : '—'}
+                : view ? `1mm = ${scale.toFixed(2)} px` : '—'}
             </span>
           </div>
           <div className="gl-vp">
             {showSolving && src !== 'preset' && <div className="gl-solving"><span className="gl-spin" />solving…</div>}
             {(() => {
-              if (!libraryModel && !model) return null
+              if (!libraryModel && !view) return null
               const stageProps = libraryModel
                 ? { contour: libraryModel.contour, grid: libraryModel.grid, lattice: showLattice, box: showBox,
                     // the record's own legal area, dimensioned like the bench's
@@ -550,12 +546,12 @@ export default function GridLab() {
                       ? (pMM: Pt) => setEdit((d) => (d ? toggleNodeAt(librarySel, drafts, d, pMM, pitch) : d))
                       : undefined }
                 : src === 'preset'
-                ? { contour: model!.contour, grid: model!.grid, lattice: showLattice, box: showBox,
+                ? { contour: presetModel!.contour, grid: presetModel!.grid, lattice: showLattice, box: showBox,
                     viewport: { panMM: [0, 0] as Pt, zoom: camZoom * CAM_BASE },
                     // the record's own legal area, dimensioned like the bench's; the record is as
                     // published — no manual registration or scale to gesture
                     segments: showSegs ? presetSegments : [], segFill: segFillN !== 0,
-                    unprotected: showUnheld ? model!.unprotected ?? null : null,
+                    unprotected: showUnheld ? presetModel!.unprotected ?? null : null,
                     onPan: () => { }, onZoom: () => { }, onReset: () => { } }
                 : { contour: model!.contour, grid: model!.grid, lattice: showLattice, box: showBox,
                     // 100% = the shape at half the board, so there is room around it (Dan).
@@ -571,7 +567,7 @@ export default function GridLab() {
                     onReset: () => setManual(null) }
               return <Stage {...stageProps} />
             })()}
-            {!libraryModel && !model && (src === 'magic'
+            {!libraryModel && !view && (src === 'magic'
               ? <Empty text={magStatus.startsWith('error') ? magStatus.slice(6) : magStatus === 'downloading-model' ? 'Downloading the cut-out model…' : magStatus.startsWith('cutting') ? 'Cutting out the shape…' : 'Upload an image to cut its outline'} spin={magStatus === 'downloading-model' || magStatus.startsWith('cutting')} />
               : src === 'cut'
                 ? <Empty text={cutStatus.startsWith('error') ? cutStatus.slice(6) : cutStatus === 'tracing' ? 'Tracing the outline…' : 'Pick a cutout from the library'} spin={cutStatus === 'tracing'} />

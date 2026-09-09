@@ -76,7 +76,7 @@ describe('the sealed profile', () => {
   }, 180_000)
 
   it('THE RECORD DOOR: a delivered record wears the sealed coverage, not the caller\'s', async () => {
-    const { deliverRecord } = await import('../pipeline/solve')
+    const { deliverRecord } = await import('../pipeline')
     const { catalogue } = await import('../library')
     const circle = catalogue(48).find((e) => e.classId === 'circle' && e.frameCols === 3 && e.frameRows === 3 && e.nodesMM.length === 9)!
     const delivered = deliverRecord({ record: circle, cfg: { plan: 'all6', perimeterOnly: true }, settings: { protectionPaddingMM: PROTECTION_PADDING_MM } })
