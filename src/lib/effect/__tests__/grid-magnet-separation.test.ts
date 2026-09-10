@@ -15,16 +15,17 @@ import ts from 'typescript'
 import { describe, expect, it, vi } from 'vitest'
 import { bandOuterMM, classifyBands, computeGrid } from '../grid-magnet'
 import { canonLayoutForFrame, optimalLayoutForBox } from '../grid-magnet-library-catalogue'
-import { solveCanonExperiment } from '../grid-magnet-canon-experiment'
+import { slimOnAxisMM, solveCanonExperiment } from '../grid-magnet-canon-experiment'
 import { anchorFnFor, solveGrid } from '../pipeline/solve'
 import { canonPriorityOf, frameOfMasses, positionsAcross } from '../units/classifier'
 import type { BBox, SafeMass, SafeSegment } from '../types'
 import { BANDS, BAND_STEP_MM, PADDING_CEIL_MM, PADDING_FLOOR_MM, PHASE_STEP_MM, PROTECTION_PADDING_MM, RELEASED_PADDING_MM } from '../grid-magnet-spec'
 import { bandRangeForControl } from '../adapters/gridViewModel'
 import { librarySegments } from '../adapters/libraryViewModel'
-import { spotRadiusOf } from '../grid-magnet'
+import { insetOffsetPath, pathFromAnchors, spotRadiusOf } from '../grid-magnet'
+import { offsetConvexRingPath } from '../foundation/path'
 import { scaleContour } from '../grid-magnet-compute'
-import { applyCoverage, enumerateCanonPhaseWindows, enumerateFreePhaseMax, fallbackRevealSizes, makeCircleSeatPredicate, makeContourSeatPredicate, priorityTupleOf, symmetricCores } from '../units/layout'
+import { applyCoverage, enumerateCanonPhaseWindows, enumerateFreePhaseMax, fallbackRevealSizes, makeCircleSeatPredicate, makeContourSeatPredicate, priorityTupleOf, symmetricCores, tupleCmp } from '../units/layout'
 import { wrapGroup } from '../units/wrap'
 import { wrapBandLadder } from '../grid-magnet-wrap-compute'
 import { contourCentroidOf } from '../units/centring'
@@ -186,7 +187,11 @@ describe('2 — traffic is one-way', () => {
     'grid-magnet-class.ts': [/^\.\/types$/, /^\.\/grid-magnet-spec$/, /^\.\/foundation\/[a-z-]+$/, /^\.\/units\/[a-z-]+$/],
     'grid-magnet-library-bridge.ts': [/^\.\/types$/, /^\.\/grid-magnet[a-z-]*$/, /^\.\/library[/a-z-]*$/, /^\.\/foundation\/[a-z-]+$/],
     'grid-magnet-library-catalogue.ts': [/^\.\/types$/, /^\.\/grid-magnet[a-z-]*$/, /^\.\/library[/a-z-]*$/],
-    'grid-magnet-bridge.ts': [/^\.\/types$/, /^\.\/geometry-truth$/, /^\.\/contour$/, /^\.\/offset$/, /^\.\/grid-magnet$/, /^\.\/grid-magnet-compute$/, /^@\/lib\/vector-core$/],
+    // + outline-core/math (2026-09-05): the bridge fits a traced cutout into a curve, and an outline
+    // that crosses itself is not an outline — every measurement downstream reads it by crossing count.
+    // The repo's own self-intersection check is what refuses such a fit; growing a second one here
+    // would be the duplication these lists exist to prevent.
+    'grid-magnet-bridge.ts': [/^\.\/types$/, /^\.\/geometry-truth$/, /^\.\/contour$/, /^\.\/offset$/, /^\.\/grid-magnet$/, /^\.\/grid-magnet-compute$/, /^@\/lib\/vector-core$/, /^@\/lib\/outline-core\/math$/],
   }
 
   it('every module file imports only from its allow-list', () => {
@@ -257,7 +262,7 @@ describe('2b — the units are self-sufficient', () => {
           && n.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) names.push(n.name.text)
     })
     expect(names.sort(), 'the foundation export set is pinned: placement policy lives in its unit')
-      .toEqual(['bbox', 'edgeDistMM', 'edgeDistToContourMM', 'pointInContour', 'pointInOuter'])
+      .toEqual(['bbox', 'contourAreaCentroidMM', 'edgeDistMM', 'edgeDistToContourMM', 'pointInContour', 'pointInOuter'])
   })
 
   it('no unit imports another unit', () => {
@@ -318,7 +323,12 @@ describe('2c — the foundation holds primitives only', () => {
   const FOUNDATION = join(LIB, 'foundation')
   const foundationFiles = (): string[] =>
     existsSync(FOUNDATION) ? readdirSync(FOUNDATION).filter((f) => f.endsWith('.ts')) : []
-  const FOUNDATION_ALLOWED = [/^\.\.\/types$/, /^\.\.\/grid-magnet-spec$/, /^@\/lib\/grid-engine\/compute\/geometry$/]
+  // a foundation primitive may stand on another foundation primitive (geometry reads the path
+  // for a ring that carries one); it still may not reach a unit or an aggregate
+  // + the repo's ONE curve fitter (vector-core/fit, the Schneider fit behind the Studio's Simplify and
+  //   its generators): foundation/path builds the drawn curve through exact edge samples with it, so the
+  //   engine and the Studio draw the same kind of curve rather than the engine growing a second fitter.
+  const FOUNDATION_ALLOWED = [/^\.\.\/types$/, /^\.\.\/grid-magnet-spec$/, /^@\/lib\/grid-engine\/compute\/geometry$/, /^\.\/path$/, /^@\/lib\/vector-core\/fit$/]
 
   it('imports nothing but shared types, spec and the repo-wide geometry kernel', () => {
     for (const f of foundationFiles()) {
@@ -387,15 +397,22 @@ describe('2e — the pipeline is the one sequencer the shells reach; adapters on
   const ADAPTER = join(LIB, 'adapters/gridViewModel.ts')
   const WORKER = join(process.cwd(), 'src/app/(dev)/effect-creator/grid-centre/solve.worker.ts')
 
-  it('pipeline/solve.ts imports engine modules only — never the app, never a framework', () => {
-    const refs = moduleRefsOf(readFileSync(PIPELINE, 'utf8'))
-    const bad = refs.filter((i) => !/^@\/lib\/effect\/|^\.\/types$/.test(i))
-    expect(bad, 'pipeline reaches outside the engine: ' + bad.join(' · ')).toEqual([])
+  it('pipeline/solve.ts and deliver-record.ts import engine modules only — never the app, never a framework', () => {
+    for (const file of [PIPELINE, join(LIB, 'pipeline/deliver-record.ts')]) {
+      const refs = moduleRefsOf(readFileSync(file, 'utf8'))
+      const bad = refs.filter((i) => !/^@\/lib\/effect\/|^\.\/types$/.test(i))
+      expect(bad, 'pipeline reaches outside the engine: ' + bad.join(' · ')).toEqual([])
+    }
   })
 
   it('pipeline/solve.ts holds exactly the unit edges the worker body carried — pinned, so a new one is deliberate', () => {
     const edges = [...new Set(moduleRefsOf(readFileSync(PIPELINE, 'utf8')).filter((i) => /\/units\//.test(i)))].sort()
-    expect(edges).toEqual(['@/lib/effect/units/centring', '@/lib/effect/units/classifier', '@/lib/effect/units/judge', '@/lib/effect/units/protection'])
+    // + units/layout (2026-09-05): the delivered OPTIMAL row is the canon frame plus every remaining
+    // seat on its own lattice that layout's seat test accepts. Asking layout whether a seat is legal
+    // is sequencing — the pipeline decides nothing about legality, it takes layout's answer — and the
+    // edge is pinned here rather than arriving quietly, because the alternative was a second seat
+    // test in the pipeline, which is exactly what these pins exist to prevent.
+    expect(edges).toEqual(['@/lib/effect/units/centring', '@/lib/effect/units/classifier', '@/lib/effect/units/judge', '@/lib/effect/units/layout', '@/lib/effect/units/protection'])
   })
 
   const runtimeImportsOf = (text: string) => {
@@ -411,16 +428,30 @@ describe('2e — the pipeline is the one sequencer the shells reach; adapters on
 
   it('gridViewModel projects only: its sole runtime edge is the door\'s band-range conversion (T2)', () => {
     const text = readFileSync(ADAPTER, 'utf8')
-    expect(runtimeImportsOf(text)).toEqual([{ from: '../grid-magnet', names: ['bandOuterMM'] }])
+    // + pathToSvgD (2026-09-05): the adapter turns the engine's measured outline into what the screen
+    // strokes. It is the engine's own serialiser reached through the door — the adapter still decides
+    // nothing — and the alternative was a second serialiser in the shell, which is exactly how the
+    // drawn outline stayed a polygon while the measured one was a path (Dan: "all lines here are wobbly").
+    // + deliverRecord (2026-09-09): a released record is delivered on the calling thread through the
+    // adapter — coverage, plan, protection and the seal are the pipeline's; the adapter still decides
+    // nothing. Reached by file so the adapter never loads the search half and its caches.
+    expect(runtimeImportsOf(text)).toEqual([
+      { from: '../grid-magnet', names: ['bandOuterMM', 'pathToSvgD'] },
+      { from: '../pipeline/deliver-record', names: ['deliverRecord'] },
+    ])
     expect(text, 'adapter must never re-run a decision').not.toMatch(/defaultLanding|classFrameNodes|shapeFamilyOf|solveGrid|computeGrid|safeSegments/)
   })
 
   it('libraryViewModel asks the engine for one measurement: runtime edges are the door and the spec (T2)', () => {
     const text = readFileSync(join(LIB, 'adapters/libraryViewModel.ts'), 'utf8')
+    // the legal area of a record is KNOWN — the outline shrunk by the rim — so the adapter reaches the
+    // exact inset through the door, and no measurement at all (2026-09-07: the mesh here was the
+    // Library paying the solver's price for a fact it already held)
     expect(runtimeImportsOf(text)).toEqual([
-      { from: '../grid-magnet', names: ['safeSegments', 'spotRadiusOf'] },
+      { from: '../grid-magnet', names: ['insetOffsetPath', 'pathBoundsMM', 'pathFromAnchors'] },
       { from: '../grid-magnet-spec', names: ['RELEASED_PADDING_MM'] },
     ])
+    expect(text).not.toMatch(/safeSegments|spotRadiusOf/)
     for (const f of ['adapters/gridViewModel.ts', 'adapters/libraryViewModel.ts']) {
       // gridViewModel's GridSolve type import from pipeline/types is the projection's input — type-only, by design
       const refs = moduleRefsOf(readFileSync(join(LIB, f), 'utf8')).filter((i) => /\/units\/|\/foundation\/|^@\/app\//.test(i))
@@ -428,9 +459,22 @@ describe('2e — the pipeline is the one sequencer the shells reach; adapters on
     }
   })
 
-  it('the moved measurements answer exactly what the page computed before (T2)', () => {
-    const sq: Contour = { outer: { pts: [[0, 0], [120, 0], [120, 120], [0, 120]] as Pt[] }, holes: [] }
-    expect(librarySegments({ contour: sq })).toEqual(safeSegments(sq, spotRadiusOf(RELEASED_PADDING_MM), 'full'))
+  it('the Library draws the SAME legal line the measurement drew — without measuring (T2)', () => {
+    // a library record carries its outline as an exact path; the mesh's own drawn edge for such a
+    // shape is the exact inset, so the two lines must be identical, and the adapter's must be free
+    const ring: Pt[] = [[0, 0], [120, 0], [120, 120], [0, 120]]
+    const path = pathFromAnchors(ring.map(([x, y]) => ({ p: { x, y } })), (v) => [v.x, v.y])
+    const sq: Contour = { outer: { pts: ring, path }, holes: [] }
+    const drawn = librarySegments({ contour: sq })
+    const measured = safeSegments(sq, spotRadiusOf(RELEASED_PADDING_MM), 'full')
+    expect(drawn).toHaveLength(1)
+    expect(drawn[0].paths).toEqual(measured[0].paths)
+    expect(drawn[0].paths[0]).toEqual(insetOffsetPath(path, RELEASED_PADDING_MM))
+    // a points-only outline (no path) is carried as lines and shrunk the same way
+    expect(librarySegments({ contour: { outer: { pts: ring }, holes: [] } })[0].paths).toEqual(drawn[0].paths)
+    // a single disc shrunk past its centre has no legal area — and says so rather than inventing one
+    const disc = offsetConvexRingPath([[0, 0]], RELEASED_PADDING_MM)
+    expect(librarySegments({ contour: { outer: { pts: [], path: disc }, holes: [] } })).toEqual([])
     for (const band of BANDS) for (const pad of [PADDING_FLOOR_MM, RELEASED_PADDING_MM, PADDING_CEIL_MM])
       expect(bandRangeForControl(band, pad)).toEqual(bandOuterMM(band, pad))
   })
@@ -674,13 +718,13 @@ describe('1b — the frame comes from the usable material', () => {
   const mass = (bbox: BBox): SafeMass => ({
     areaMM2: (bbox.maxX - bbox.minX) * (bbox.maxY - bbox.minY),
     centreMM: [(bbox.minX + bbox.maxX) / 2, (bbox.minY + bbox.maxY) / 2],
-    peakClearMM: 48, bbox, rings: [],
+    peakClearMM: 48, bbox, rings: [], paths: [],
   })
   const segment = (bbox: BBox, masses: SafeMass[]): SafeSegment => ({
     areaMM2: (bbox.maxX - bbox.minX) * (bbox.maxY - bbox.minY),
     centreMM: [(bbox.minX + bbox.maxX) / 2, (bbox.minY + bbox.maxY) / 2],
     meanMM: [(bbox.minX + bbox.maxX) / 2, (bbox.minY + bbox.maxY) / 2],
-    peakClearMM: 3, bbox, rings: [], masses,
+    peakClearMM: 3, bbox, rings: [], paths: [], masses,
   })
 
   it('COUNTEREXAMPLE: a dead limb never enlarges the frame', () => {
@@ -1309,7 +1353,7 @@ describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside
     expect(Math.abs(optimal.at.originMM[0] - optimal.at.anchorMM[0]))
       .toBeLessThanOrEqual(Math.abs(canon.at.originMM[0] - canon.at.anchorMM[0]))
     // the blind row IS the parent's Optimal, byte-for-behaviour
-    expect(canon.at.sizeMM).toBeCloseTo(143.84, 2); expect(canon.at.count).toBe(4)
+    expect(canon.at.sizeMM).toBeCloseTo(143.80, 2); expect(canon.at.count).toBe(4)
     expect(blindOnly.offers).toHaveLength(1)
     expect(blindOnly.offers[0].at.sizeMM).toBe(canon.at.sizeMM)
     expect(blindOnly.offers[0].at.points).toEqual(canon.at.points)
@@ -1322,7 +1366,7 @@ describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside
     const canon = withPriority.offers.find((o) => o.roles.includes('canon'))!
     expect(priorityTupleOf(nodesOf(optimal), priority).slice(0, 4)).toEqual([1, 1, 1, 0])
     expect(priorityTupleOf(nodesOf(canon), priority)[3], 'the blind row must still carry its orphans — that is the comparison').toBeLessThan(0)
-    expect(canon.at.sizeMM).toBeCloseTo(204.99, 2); expect(canon.at.count).toBe(9)
+    expect(canon.at.sizeMM).toBeCloseTo(204.93, 2); expect(canon.at.count).toBe(9)
     // Non-slim invariant (QA): a 3x4 frame is not slim, so no size ladder runs. Control: the same
     // solve with slim forced on must do MORE wraps; the real solve must not. Mutating the production
     // guard to run the ladder unconditionally makes the two traces equal and fails this.
@@ -1338,13 +1382,15 @@ describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside
     expect(withPriority.offers).toHaveLength(1)
     expect(withPriority.offers[0].roles).toEqual(['optimal', 'canon'])
     expect(priorityTupleOf(nodesOf(withPriority.offers[0]), priority).slice(0, 4)).toEqual([1, 1, 1, 0])
-    expect(withPriority.offers[0].at.sizeMM).toBeCloseTo(140.97, 2)
+    expect(withPriority.offers[0].at.sizeMM).toBeCloseTo(140.96, 2)
   }, 120_000)
 
-  it('dual accumulator: a lower-count phase wins priority while the blind result is byte-identical (QA F2)', async () => {
-    // Duck B4 at 213 mm: the blind maximum is an 8-seat lopsided set; the best priority set is a
-    // 6-seat symmetric one that lives in a phase with fewer free seats. The blind output must not
-    // move when a priority is supplied, and the priority output must be the lower-count identity.
+  it('dual accumulator: count leads, priorities break the tie, and the blind result is byte-identical (QA F2 · 2026-09-08)', async () => {
+    // Duck B4 at 213 mm. Under the 1 Sep rule the priority winner was a 6-seat symmetric set beating
+    // the blind maximum of 7–8 — symmetry bought with support, which is what cost circle B5 three
+    // magnets and the blob six (Dan, 2026-09-08: count first). Now the priority winner holds AS MANY
+    // seats as the blind maximum, and the priorities only choose among sets of that count. The blind
+    // output must still not move when a priority is supplied.
     const sized = makeSizer(cutout('public/grid-engine/cutouts/DUCK.png'), 0)
     const anchorAt = await workerAnchor(sized, cfg, 'gate2-dual-accumulator')
     const row = classifyBands(sized, cfg, anchorAt, [BANDS.find((b) => b.id === 4)!]).find((r) => r.bandId === 4)!
@@ -1359,9 +1405,16 @@ describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside
     expect(both.priorityCandidates.length).toBeGreaterThan(0)
     const blindMax = Math.max(...blind.candidates.map((c) => c.points.length))
     const priorityCount = both.priorityCandidates[0].points.length
-    expect(priorityCount, 'the proof needs a LOWER-count priority winner').toBeLessThan(blindMax)
-    for (const c of both.priorityCandidates)
-      expect(priorityTupleOf(c.id.split(',').map(Number), priority).slice(0, 4)).toEqual([1, 1, 1, 0])
+    expect(priorityCount, 'count leads: the priority winner holds the blind maximum').toBe(blindMax)
+    // among the maximum-count sets, the winners are the best-ranked by the priority tuple — no
+    // max-count candidate anywhere in the enumeration outranks them
+    const best = priorityTupleOf(both.priorityCandidates[0].id.split(',').map(Number), priority)
+    for (const c of both.priorityCandidates) {
+      expect(c.points.length).toBe(blindMax)
+      expect(tupleCmp(priorityTupleOf(c.id.split(',').map(Number), priority), best)).toBe(0)
+    }
+    for (const c of blind.candidates)
+      expect(tupleCmp(priorityTupleOf(c.id.split(',').map(Number), priority), best), c.id).toBeLessThanOrEqual(0)
     expect(blind.priorityCandidates).toEqual([])
   }, 120_000)
 
@@ -1370,7 +1423,7 @@ describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside
     const optimal = withPriority.offers.find((o) => o.roles.includes('optimal'))!
     const canon = withPriority.offers.find((o) => o.roles.includes('canon'))!
     expect(sortedPairs(nodesOf(optimal).map((i) => colRow[i]))).toEqual(sortedPairs(fx.deliveredCanonNodes))
-    expect(canon.at.sizeMM).toBeCloseTo(87.46, 2)
+    expect(canon.at.sizeMM).toBeCloseTo(87.41, 2)
     expect(optimal.at.sizeMM).toBeGreaterThan(canon.at.sizeMM)
     const dx = (o: typeof optimal) => Math.abs(o.at.originMM[0] - o.at.anchorMM[0])
     expect(dx(optimal), 'relevantAxisCentreOffMM < canon (frozen comparator)').toBeLessThan(dx(canon))
@@ -1382,7 +1435,7 @@ describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside
     const { priority, withPriority } = await solveFixture('duck-b3')
     expect(priority.slim).toBe(false)
     const optimal = withPriority.offers.find((o) => o.roles.includes('optimal'))!
-    expect(optimal.at.sizeMM).toBeCloseTo(146.11, 2)
+    expect(optimal.at.sizeMM).toBeCloseTo(146.01, 2)
     expect(Math.abs(optimal.at.originMM[0] - optimal.at.anchorMM[0])).toBeLessThan(3)
   }, 120_000)
 
@@ -1438,9 +1491,22 @@ describe('10 — Optimal is the priority-max Canon; the blind Canon stays beside
       const optimal = solve.offers.find((o) => o.roles.includes('optimal'))!
       results[plan] = { sizeMM: optimal.at.sizeMM, dx: Math.abs(optimal.at.originMM[0] - optimal.at.anchorMM[0]) }
     }
-    expect(results.all6.sizeMM).toBeCloseTo(156.89, 2); expect(results.all6.dx).toBeLessThanOrEqual(3)
-    expect(results.all8.sizeMM).toBeCloseTo(155.89, 2); expect(results.all8.dx).toBeLessThanOrEqual(4)
-    expect(results.corners8.sizeMM).toBeCloseTo(156.89, 2); expect(results.corners8.dx).toBeLessThanOrEqual(3)
+    // The rule is that the SOLVER supplies the plan's radius; the ranker test above proves the ranker
+    // honours it. This arm used to prove the wiring through an emergent size, because BOT's winning
+    // offer happened to sit in the 1 mm window between the 6 mm and 8 mm thresholds. It no longer
+    // does: with cutouts fitted as curves the winner is 1.90 mm off-axis, inside BOTH thresholds, so
+    // every plan agrees — correct behaviour, and no longer a counterexample. Nor is one available:
+    // no cutout, pitch or band in the fixture set now separates the two (swept 2026-09-05). So the
+    // wiring is proven where it lives, by `slimOnAxisMM`, and this arm keeps what it can still show —
+    // that all three plans solve, and agree, on a slim frame.
+    expect(slimOnAxisMM({ plan: 'all6' })).toBe(3)
+    expect(slimOnAxisMM({ plan: 'all8' })).toBe(4)
+    expect(slimOnAxisMM({ plan: 'corners8' })).toBe(3)
+    expect(slimOnAxisMM({})).toBe(3)
+    for (const plan of ['all6', 'all8', 'corners8'] as const) {
+      expect(results[plan].sizeMM, plan).toBeCloseTo(156.84, 2)
+      expect(results[plan].dx, plan).toBeLessThanOrEqual(3)
+    }
   }, 300_000)
 
   it('a one-column placement is not a base: the triangle keeps its two corners (Batwoman B2, Deepest)', async () => {

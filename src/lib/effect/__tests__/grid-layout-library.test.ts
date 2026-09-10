@@ -20,8 +20,11 @@ import { materializeSelection, materializeResolved } from '../library/materializ
 import { librarySurface } from '../library/surface'
 import { catalogue } from '../library/catalogue'
 
-import { CANON_LAYOUT } from '../library/canon'
-import { boardPositions } from '../library/geometry'
+import { CANON_LAYOUT, diamondMask, frameOf } from '../library/canon'
+import { releasedRecords, releaseIdOf, withBandShown, withReleased, type LibraryReleaseState } from '../library/release'
+import { unsound } from '@/app/api/dev/library-release/validate'
+import { boardPositions, fitsBoardMM, placeMM } from '../library/geometry'
+import { outlineFromLayout } from '../library/outline'
 import { bandOfFrame } from '../library/rules'
 import type { LibraryFrame, LibrarySelection } from '../library/types'
 import { libraryStageModel } from '../grid-magnet-library-bridge'
@@ -438,12 +441,22 @@ describe('rectangle class', () => {
 })
 
 describe('diamond class', () => {
-  it('carries every odd patch the board holds at that lattice', () => {
+  it('carries every odd patch the board holds at that lattice — whose shape the board can make', () => {
+    // the magnets of the largest odd patch fit the board, but a diamond's corners reach rim·√2 past
+    // them: 17x17 at 24mm is a 418mm shape on a 408mm board. The board rule is one rule for every
+    // class (2026-09-08), so the expected set is the odd patches minus those it refuses.
+    const none = { transpose: false, flipX: false, flipY: false }
     for (const pitch of [24, 48, 96]) {
       const { cols, rows } = boardPositions(pitch)
       const side = Math.min(cols, rows)
       const want: string[] = []
-      for (let n = 1; (n - 1) * 2 + 1 <= side; n++) { const p = (n - 1) * 2 + 1; want.push(`${p}x${p}`) }
+      for (let n = 1; (n - 1) * 2 + 1 <= side; n++) {
+        const p = (n - 1) * 2 + 1
+        const frame = frameOf(p, p, (nodes) => diamondMask(p, nodes))
+        const outline = outlineFromLayout(placeMM(frame, frame.layouts[0], none, pitch).nodesMM, { corners: 'sharp', pointRotationDeg: 45 })
+        if (fitsBoardMM(outline.widthMM, outline.heightMM)) want.push(`${p}x${p}`)
+      }
+      expect(want.length, `diamond @${pitch} keeps most patches`).toBeGreaterThan(0)
       expect(framesAt('diamond', pitch).map(frameKeyOf).sort(), `diamond @${pitch}`).toEqual(want.sort())
     }
   })
@@ -1228,7 +1241,7 @@ describe('the class spec is portable, and nothing outside it knows a class by na
       const spec = specOf(fam)
       const opened = spec.open(sel(), 48)
       const variant = spec.variantOf(opened, 48)
-      expect(variant.outline.corners, fam).toMatch(/sharp|round|bevel/)
+      expect(variant.outline.corners, fam).toMatch(/sharp|round|bevel|stadium|disc|regular|ellipse/)
     }
   })
 
@@ -1382,5 +1395,67 @@ describe('authoring transitions — the five the page used to spell out itself',
     expect(after.drafts.map((d) => d.geometryId)).toEqual([pair[1].id])
     // and the surviving one is still reachable from its own selection
     expect(resolveSelection(b.s, after.drafts, 48).draft?.name).toBe('same-name')
+  })
+})
+
+describe('release — what the Library shows and what it lets out to presets', () => {
+  const EMPTY: LibraryReleaseState = { version: 1, classes: {} }
+  const pitches = [24, 48, 96]
+  it('a released frame ships every layout and view of that frame, at every pitch it is published — the triangle included', () => {
+    // QA F1 (2026-09-08): the Frame toggle stores the class's RAW variant id (`tri:0,0;0,2;2,1`), the
+    // catalogue id carries it URL-encoded; comparing the two shipped no triangle preset at all.
+    for (const [classId, rawId] of [['square', '3x3'], ['pill', '3x5'], ['triangle', 'tri:0,0;0,2;2,1']] as const) {
+      const state = withReleased(EMPTY, classId, rawId, true)
+      let seen = 0
+      for (const pitch of pitches) {
+        const published = catalogue(pitch).filter((e) => e.classId === classId && releaseIdOf(e) === rawId)
+        const released = releasedRecords(pitch, state)
+        expect(released.map((e) => e.id).sort(), `${classId} ${rawId} @${pitch}`).toEqual(published.map((e) => e.id).sort())
+        seen += published.length
+      }
+      expect(seen, `${rawId} is a real record somewhere`).toBeGreaterThan(0)
+    }
+  })
+  it('a hidden band is not shippable — presets come FROM the sizes the Library displays', () => {
+    // QA F2: released while shown, then hidden → must leave the presets; shown again → back
+    const b3 = catalogue(48).find((e) => e.classId === 'square' && releaseIdOf(e) === '3x3')!
+    expect(b3.bandId).toBe(3)
+    const released = withReleased(EMPTY, 'square', '3x3', true)
+    expect(releasedRecords(48, released).map((e) => e.id)).toEqual([b3.id])
+    const reach = [...new Set(catalogue(48).filter((e) => e.classId === 'square').map((e) => e.bandId))]
+    const hidden = withBandShown(released, 'square', 3, false, reach)
+    expect(releasedRecords(48, hidden)).toEqual([])
+    const shown = withBandShown(hidden, 'square', 3, true, reach)
+    expect(shown.classes.square.shownBands, 'every band back → null, not a list').toBeNull()
+    expect(releasedRecords(48, shown).map((e) => e.id)).toEqual([b3.id])
+  })
+  it('the dev route refuses a state the library cannot mean, and accepts one it can (QA F3)', () => {
+    expect(unsound({ version: 1, classes: { triangle: { shownBands: [-999], released: [] } } })).toMatch(/unknown band/)
+    expect(unsound({ version: 1, classes: { triangle: { shownBands: null, released: ['not-a-variant'] } } })).toMatch(/unknown release id/)
+    expect(unsound({ version: 1, classes: { nope: { shownBands: null, released: [] } } })).toMatch(/unknown class/)
+    expect(unsound({ version: 1, classes: { pill: { shownBands: [3, 3], released: [] } } })).toMatch(/duplicate/)
+    expect(unsound({ version: 2, classes: {} })).toMatch(/version/)
+    expect(unsound({ version: 1, classes: { square: { shownBands: [1, 2, 3], released: ['3x3'] } } })).toBeNull()
+    expect(unsound({ version: 1, classes: { triangle: { shownBands: null, released: ['tri:0,0;0,2;2,1'] } } })).toBeNull()
+    expect(unsound(EMPTY)).toBeNull()
+  })
+  it('a released record is DELIVERED, never searched — coverage, plan and protection still apply to it (QA F1, 2026-09-09)', async () => {
+    const { deliverRecord } = await import('../pipeline')
+    const circle = catalogue(48).find((e) => e.classId === 'circle' && releaseIdOf(e) === '3x3-9')!
+    const settings = { protectionPaddingMM: 24 }
+    const full6 = deliverRecord({ record: circle, cfg: { plan: 'all6', perimeterOnly: false }, settings })
+    expect(full6.grid.anchors.map((a) => a.p), 'the record\'s own magnets, exactly').toEqual(circle.nodesMM.map(([x, y]) => [x, y]))
+    expect(full6.grid.anchors.every((a) => a.dia === 6)).toBe(true)
+    expect(full6.rungs, 'nothing was solved').toEqual([])
+    expect(full6.contour.outer.path, 'the exact published outline').toEqual(circle.outlinePath ?? undefined)
+    const belt = deliverRecord({ record: circle, cfg: { plan: 'all6', perimeterOnly: true }, settings })
+    expect(belt.grid.anchors, 'perimeter belt drops the surrounded centre').toHaveLength(8)
+    const full8 = deliverRecord({ record: circle, cfg: { plan: 'all8', perimeterOnly: false }, settings })
+    expect(full8.grid.anchors).toHaveLength(9)
+    expect(full8.grid.anchors.every((a) => a.dia === 8)).toBe(true)
+    const wider = deliverRecord({ record: circle, cfg: { plan: 'all6', perimeterOnly: false }, settings: { protectionPaddingMM: 48 } })
+    expect(wider.grid.anchors, 'protection padding changes the evidence only').toEqual(full6.grid.anchors)
+    expect(wider.unprotected!.areaMM2).toBeLessThanOrEqual(full6.unprotected!.areaMM2)
+    expect(full6.unprotected!.areaMM2, 'a 3x3 disc at 24mm padding has unsupported material to report').toBeGreaterThan(0)
   })
 })

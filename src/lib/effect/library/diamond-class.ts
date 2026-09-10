@@ -20,6 +20,7 @@ function diamondFrames(pitchMM: number): readonly LibraryFrame[] {
 export const diamondClass = registryClass({
   classId: 'diamond',
   catalogueRole: 'preset',
+  bothOrdersPublished: false,
   types: [{ id: 'rhomb', label: 'rhomb' }],
   frames: (pitchMM) => diamondFrames(pitchMM),
   typeOfFrame: () => 'rhomb',

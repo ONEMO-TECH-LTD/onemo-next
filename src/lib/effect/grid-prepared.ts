@@ -1,4 +1,6 @@
 import type { Contour, Pt } from './types'
+import { distanceToPathMM, pathBoundsMM, pointInPath } from './foundation/path'
+import { contourAreaCentroidMM } from './foundation/geometry'
 
 export interface GridBBox {
   minX: number
@@ -64,47 +66,6 @@ function ringBBox(pts: ReadonlyArray<Pt>): GridBBox {
     if (y > maxY) maxY = y
   }
   return { minX, minY, maxX, maxY }
-}
-
-/** Area centroid of a polygon ring. Falls back to bbox centre when degenerate. */
-function ringCentroid(ring: ReadonlyArray<Pt>): Pt {
-  let a = 0, cx = 0, cy = 0
-  for (let i = 0, n = ring.length; i < n; i++) {
-    const [x0, y0] = ring[i], [x1, y1] = ring[(i + 1) % n]
-    const cross = x0 * y1 - x1 * y0
-    a += cross
-    cx += (x0 + x1) * cross
-    cy += (y0 + y1) * cross
-  }
-  a *= 0.5
-  if (Math.abs(a) < 1e-6) {
-    const bbox = ringBBox(ring)
-    return [(bbox.minX + bbox.maxX) / 2, (bbox.minY + bbox.maxY) / 2]
-  }
-  return [cx / (6 * a), cy / (6 * a)]
-}
-
-function ringArea(ring: ReadonlyArray<Pt>): number {
-  let twice = 0
-  for (let i = 0; i < ring.length; i++) {
-    const [x0, y0] = ring[i], [x1, y1] = ring[(i + 1) % ring.length]
-    twice += x0 * y1 - x1 * y0
-  }
-  return Math.abs(twice / 2)
-}
-
-/** Material centroid: hole area is removed regardless of ring winding. */
-function contourCentroid(contour: Contour): Pt {
-  const outerC = ringCentroid(contour.outer.pts)
-  const outerA = ringArea(contour.outer.pts)
-  let area = outerA, x = outerC[0] * outerA, y = outerC[1] * outerA
-  for (const hole of contour.holes) {
-    const holeA = ringArea(hole.pts), holeC = ringCentroid(hole.pts)
-    area -= holeA
-    x -= holeC[0] * holeA
-    y -= holeC[1] * holeA
-  }
-  return area > 1e-6 ? [x / area, y / area] : outerC
 }
 
 function segmentBBox(a: Pt, b: Pt): GridBBox {
@@ -226,8 +187,12 @@ export function prepareExactContour(contour: Contour): PreparedContour {
     contour,
     segmentRings,
     segments,
-    bbox: ringBBox(contour.outer.pts),
-    centroid: contourCentroid(contour),
+    // bounds and the material centroid come from the PATH where a ring has one — an arc reaches its
+    // extreme exactly and its area integrates exactly; the point view only approaches both, and a
+    // curved shape's centre used to move with how finely it happened to be chopped (QA F4)
+    bbox: contour.outer.path ? pathBoundsMM(contour.outer.path) : ringBBox(contour.outer.pts),
+    // the ONE material-centroid door (foundation/geometry): exact from the path, holes subtracted
+    centroid: contourAreaCentroidMM(contour).centroid,
     distanceBvh: buildDistanceBvh(segments),
   }
 }
@@ -271,10 +236,19 @@ export function pointInPreparedRing(p: Pt, ring: ExactSegmentRing): boolean {
   return inside
 }
 
+/** A ring that carries its PATH is asked exactly — arc or cubic, never the chords standing in for it
+ *  (Dan, 2026-09-04: "no polygons on canon and anywhere"). The prepared segment index answers only for
+ *  a ring born as points. This and `distanceToPreparedContour` are grid-core's whole view of the
+ *  boundary, so honouring the path here honours it for every decision grid-core makes. */
 export function pointInPreparedContour(p: Pt, prepared: PreparedContour): boolean {
-  if (!pointInPreparedRing(p, prepared.segmentRings[0])) return false
+  const rings = [prepared.contour.outer, ...prepared.contour.holes]
+  const inRing = (index: number) => {
+    const path = rings[index]?.path
+    return path ? pointInPath(path, p) : pointInPreparedRing(p, prepared.segmentRings[index])
+  }
+  if (!inRing(0)) return false
   for (let index = 1; index < prepared.segmentRings.length; index += 1) {
-    if (pointInPreparedRing(p, prepared.segmentRings[index])) return false
+    if (inRing(index)) return false
   }
   return true
 }
@@ -347,7 +321,17 @@ export function nearestPreparedSegment(
 }
 
 export function distanceToPreparedContour(p: Pt, prepared: PreparedContour): number {
-  return nearestPreparedSegment(p, prepared).distance
+  const rings = [prepared.contour.outer, ...prepared.contour.holes]
+  // exact against every ring that has a path; the segment index only for rings born as points
+  if (!rings.some((ring) => ring.path)) return nearestPreparedSegment(p, prepared).distance
+  let best = Infinity
+  rings.forEach((ring, index) => {
+    const d = ring.path
+      ? distanceToPathMM(ring.path, p)
+      : Math.min(...prepared.segmentRings[index].segments.map((segment) => distanceToExactSegment(p, segment)))
+    if (d < best) best = d
+  })
+  return best
 }
 
 /**

@@ -2,8 +2,9 @@
 
 // grid-magnet — the v3.5 magnetic-grid bench (2D vector).
 // ALL engine shape sources through contourFromShape → computeGrid, rendered true-to-scale:
-//   • Presets    — shape-library getShape() (baked vector data)
-//   • Generators — generateShapeRing() (blob / clover / daisy / pinwheel)
+//   • Presets    — the layout library's RELEASED records (what the Library admin let out)
+//   • Generators — anything with a dial: generateShapeRing() (blob / clover / daisy / pinwheel) and
+//                  the exact vector polygon (sides) and star (points)
 //   • AI Magic   — image upload → prepareShaped() → u2netp lightweight cut-out → outline
 
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -13,20 +14,22 @@ import {
   DEFAULT_LIBRARY_SELECTION, LIBRARY_FAMILIES, selectionForFamily, librarySurface, DRAFT_STORE_KEY,
   startAdd as libStartAdd, startEdit as libStartEdit, saveEdit as libSaveEdit,
   deleteEdit as libDeleteEdit, toggleNodeAt,
-  DEFAULT_LIBRARY_BROWSE,
-  type LibraryBrowse, type LibraryDraft, type LibraryEdit, type LibrarySelection,
+  DEFAULT_LIBRARY_BROWSE, LIBRARY_RELEASE_STATE, orientationOf, releasedShapes,
+  type CatalogueEntry, type LibraryBrowse, type LibraryDraft, type LibraryEdit, type LibraryReleaseState, type LibrarySelection,
 } from '@/lib/effect/library'
-import { getShape, hasVectorDef, type VectorShapeKind } from '@/lib/shape-library'
+import { getShape, type VectorShapeKind } from '@/lib/shape-library'
 import { type VShape } from '@/lib/vector-core'
-import { generateShapeRing, type ShapeKind } from '../v5.3.1/user/shapes'
+import { type ShapeKind } from '../v5.3.1/user/shapes'
+import { vecFromGenerator } from '../v5.3.1/user/editor/producers'
 import { loadImage, prepareShaped } from '../v5.3.1/core/primitives'
 import type { Contour, Pt, UnprotectedEvidence } from '@/lib/effect/types'
-import type { GridResult, MagnetPlan, SafeSegment } from '@/lib/effect/types'
-import { bandRangeForControl, type GridPageModel } from '@/lib/effect/adapters/gridViewModel'
-import { librarySegments as librarySegmentsOf } from '@/lib/effect/adapters/libraryViewModel'
+import type { GridResult, MagnetPlan } from '@/lib/effect/types'
+import { bandRangeForControl, deliveredRecordPageModel, outlineSvgD, svgDOf, type GridPageModel } from '@/lib/effect/adapters/gridViewModel'
+import { librarySegments as librarySegmentsOf, type LibraryLegalArea } from '@/lib/effect/adapters/libraryViewModel'
 import { createPerfLog, type PerfRow } from './perf-log'
 import { BANDS, CENTRE_MODE, DEFAULT_PITCH_MM, GOVERNOR, PADDING_CEIL_MM, PADDING_FLOOR_MM, PROTECTION_PADDING_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-magnet-spec'
-import { fieldSpots, normBaseContour, normGeneratedRing, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-magnet-bridge'
+import { normBaseContour, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-magnet-bridge'
+import { LOCK_PROFILE, isLocked, withLock, type LockKey, type LockProfile, type LockValues } from '@/lib/effect/locks'
 
 /** Bench test libraries — static assets, listed by a committed manifest. */
 const LIB_MANIFEST = '/grid-engine/library.json'
@@ -46,14 +49,26 @@ const IMG = 1024
 const VP = 640
 const FIT = 0.86
 
-const PRESETS: VectorShapeKind[] = ['squircle', 'square', 'circle', 'pill', 'heart', 'star', 'polygon', 'diamond', 'plus', 'teardrop', 'leaf', 'lens', 'bolt', 'sparkle', 'pinched', 'asterisk', 'bowtie']
+/** The dial shapes: a generator is anything that hangs on a slider (Dan, 2026-09-07). The ring
+ *  generators take two dials; the polygon and the star are exact vector definitions with one. */
+/** WHERE THE BENCH OPENS. Presets are the Library's released records, so with nothing released yet
+ *  the Presets tab is empty — and opening there left the bench with no shape at all ("shape
+ *  unavailable", 2026-09-08). Generators always have one, so that is the opening tab until the admin
+ *  releases something. */
+const OPENING_TAB: Src = releasedShapes(DEFAULT_PITCH_MM, LIBRARY_RELEASE_STATE).length ? 'preset' : 'gen'
+
+const VECTOR_GENS: { k: VectorShapeKind; label: string; dial: 'sides' | 'points' }[] = [
+  { k: 'polygon', label: 'Polygon', dial: 'sides' }, { k: 'star', label: 'Star', dial: 'points' },
+]
 const GENS: { k: ShapeKind; label: string; p1: [string, string]; p2: [string, string]; p2min: number; p2max: number; p2start: number }[] = [
-  { k: 'blob', label: 'Blob', p1: ['Waviness', '%'], p2: ['Seed', ''], p2min: 1, p2max: 40, p2start: 7 },
+  { k: 'blob', label: 'Blob', p1: ['Waviness', '%'], p2: ['Seed', ''], p2min: 1, p2max: 100, p2start: 7 },
   { k: 'form', label: 'Clover', p1: ['Pinch', '%'], p2: ['Lobes', ''], p2min: 1, p2max: 8, p2start: 4 },
   { k: 'daisy', label: 'Daisy', p1: ['Depth', '%'], p2: ['Petals', ''], p2min: 5, p2max: 12, p2start: 8 },
   { k: 'pinwheel', label: 'Pinwheel', p1: ['Swirl', '%'], p2: ['Blades', ''], p2min: 3, p2max: 8, p2start: 5 },
 ]
-const ALL_BAND_IDS = BANDS.map((band) => band.id)
+/** A record's size as the band row says it — one number for a square shape, w×h otherwise. */
+const sizeLabel = (r: { widthMM: number; heightMM: number }): string =>
+  Math.round(r.widthMM) === Math.round(r.heightMM) ? `${Math.round(r.widthMM)}` : `${Math.round(r.widthMM)}×${Math.round(r.heightMM)}`
 
 type Src = 'preset' | 'gen' | 'magic' | 'cut'
 type MagicState = { vshape: VShape; maskH: number; adapter: string; imgUrl: string } | null
@@ -73,9 +88,16 @@ function usePersisted(key: string, initial: number): [number, (n: number) => voi
 }
 
 export default function GridLab() {
-  const [src, setSrc] = useState<Src>('preset')
-  const [preset, setPreset] = useState<VectorShapeKind>('squircle')
-  const [gen, setGen] = useState<ShapeKind>('blob')
+  const [src, setSrc] = useState<Src>(OPENING_TAB)
+  /** The released SHAPE on the bench — a class id; its size is the band row's (Dan, 2026-09-09).
+   *  '' until something is released. */
+  const [preset, setPreset] = useState<string>('')
+  /** Within the shape: which TYPE (slim / banner / frame …) and which way round — the same two rows
+   *  the Library browses by. Orientation null = both. */
+  const [presetType, setPresetType] = useState<string | null>(null)
+  const [presetOrient, setPresetOrient] = useState<'portrait' | 'landscape' | null>(null)
+  /** A ring generator, or one of the vector dial shapes. */
+  const [gen, setGen] = useState<ShapeKind | VectorShapeKind>('blob')
   const [p1, setP1] = useState(55) // waviness / pinch / depth / swirl
   const [p2, setP2] = useState(7)  // seed / lobes / petals / blades
   const [sides, setSides] = useState(6)
@@ -84,7 +106,6 @@ export default function GridLab() {
   /** Free-slider limits — typed, persisted across reloads. */
   const [pitch, setPitch] = useState(DEFAULT_PITCH_MM)
   const [pad, setPad] = usePersisted('pad', RELEASED_PADDING_MM)
-  const [padLock, setPadLock] = usePersisted('padLock', 1)
   /** Centre-mode switch — which centre drives anchoring and balance. */
   /** Engine mode — 1 wrap ladder (band offers) · 2 free + snap (continuous). */
   const [centreMode, setCentreMode] = usePersisted('centreMode', CENTRE_MODE)
@@ -132,10 +153,28 @@ export default function GridLab() {
   }
   // how the library LISTING is browsed — band and orientation. A filter over what is shown, not
   // part of the selection: turning the filter never changes which record is selected.
+  // THE SEALED PROFILE — which dials are locked and at what value. A file in the repo, written back
+  // through the dev route, read by BOTH engine doors: locking here is what stops production changing
+  // a value by accident (Dan, 2026-09-04). Grid Lab is the admin engine; this is the only surface
+  // that can take the action.
+  const [profile, setProfile] = useState<LockProfile>(LOCK_PROFILE)
+  const saveProfile = (next: LockProfile) => {
+    setProfile(next)
+    fetch('/api/dev/lock-profile', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(next) })
+      .catch(() => { /* the live copy stands; the file catches up on the next lock */ })
+  }
   const [libBrowse, setLibBrowse] = useState<LibraryBrowse>(DEFAULT_LIBRARY_BROWSE)
+  // what the Library shows and what it releases — a file in the repo, written back through the dev
+  // route so the admin's toggles are what ships (Dan, 2026-09-07). The page holds the live copy.
+  const [release, setRelease] = useState<LibraryReleaseState>(LIBRARY_RELEASE_STATE)
+  const saveRelease = (next: LibraryReleaseState) => {
+    setRelease(next)
+    fetch('/api/dev/library-release', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(next) })
+      .catch(() => { /* the live copy stands; the file catches up on the next save */ })
+  }
   const libraryState = useMemo(() => tab === 'library'
-    ? librarySurface(librarySel, drafts, edit, pitch, libBrowse) : null,
-  [tab, librarySel, pitch, edit, drafts, libBrowse])
+    ? librarySurface(librarySel, drafts, edit, pitch, libBrowse, release) : null,
+  [tab, librarySel, pitch, edit, drafts, libBrowse, release])
   const libraryModel = useMemo(() => libraryState
     ? libraryStageModel(libraryState.materialized, pitch) : null,
   [libraryState, pitch])
@@ -157,6 +196,41 @@ export default function GridLab() {
   const [manual, setManual] = useState<{ x: number; y: number } | null>(null)
   const [coverage, setCoverage] = useState<'full' | 'perimeter'>('perimeter')
 
+  // THE PRESETS are the Library's released SHAPES at this pitch — nothing baked, nothing else. The
+  // shape is the chip; the band row carries its released sizes; the record under shape+band is what
+  // lands on the canvas, as published — no solve (Dan, 2026-09-09).
+  const presetShapes = useMemo(() => releasedShapes(pitch, release), [pitch, release])
+  const presetShape = presetShapes.find((s) => s.classId === preset) ?? null
+  useEffect(() => {
+    // the bench lands on the first released shape when its own is gone or nothing was chosen yet
+    if (!presetShape && presetShapes.length > 0) setPreset(presetShapes[0].classId)
+  }, [presetShape, presetShapes])
+  // THE BENCH'S BANDS are the released ones and no other — "disable non-release sizes from the
+  // entire grid lab" (Dan, 2026-09-08). A preset offers its own released bands; every other source
+  // solves within the union of what any shape released, narrowed by the admin scope below.
+  const releasedBandIds = useMemo(() => [...new Set(presetShapes.flatMap((s) => s.bands.map((b) => b.bandId)))].sort((a, b) => a - b), [presetShapes])
+  // the shape's types and orientations, as its released records publish them; the type row lands on
+  // the first, orientation is offered only where both ways exist (as the Library does)
+  const shapeRecords = useMemo(() => presetShape?.bands.flatMap((b) => b.records) ?? [], [presetShape])
+  const shapeTypes = useMemo(() => [...new Set(shapeRecords.map((r) => r.typeId))], [shapeRecords])
+  const shapeOrients = useMemo(() => (['portrait', 'landscape'] as const).filter((o) => shapeRecords.some((r) => orientationOf(r) === o)), [shapeRecords])
+  const typeSel = presetType && shapeTypes.includes(presetType) ? presetType : shapeTypes[0] ?? null
+  const orientSel = shapeOrients.length === 2 ? presetOrient : null
+  const inPreset = (r: CatalogueEntry) => r.typeId === typeSel && (orientSel === null || orientationOf(r) === orientSel)
+  const presetBands = useMemo(() => (presetShape?.bands ?? [])
+    .map((b) => ({ bandId: b.bandId, records: b.records.filter(inPreset) })).filter((b) => b.records.length),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [presetShape, typeSel, orientSel])
+  const benchBandIds = useMemo(() => src === 'preset'
+    ? presetBands.map((b) => b.bandId)
+    : releasedBandIds.filter((id) => activeBandIds.includes(id)), [src, presetBands, releasedBandIds, activeBandIds])
+  useEffect(() => {
+    if (benchBandIds.length && !benchBandIds.includes(mode)) { setMode(benchBandIds[0]); setStepSel(null); setManual(null); setBandScale(null) }
+  }, [benchBandIds, mode])
+  const presetBand = presetBands.find((b) => b.bandId === mode) ?? null
+  const presetIdx = presetBand ? Math.min(stepSel ?? 0, presetBand.records.length - 1) : 0
+  const presetRecord = presetBand?.records[presetIdx] ?? null
+
   // On load the bench opens on B1 or the last band you pushed (Dan, 08-25). usePersisted loads
   // in a post-mount effect, so read storage directly for the one decision that must be right on
   // first paint.
@@ -164,12 +238,12 @@ export default function GridLab() {
     try {
       const saved = JSON.parse(localStorage.getItem('grid-centre.activeBands') ?? 'null')
       const active = Array.isArray(saved)
-        ? ALL_BAND_IDS.filter((id) => saved.includes(id)) : ALL_BAND_IDS
-      const next = active.length ? active : ALL_BAND_IDS
+        ? releasedBandIds.filter((id) => saved.includes(id)) : releasedBandIds
+      const next = active.length ? active : releasedBandIds
       setActiveBandIds(next)
       const selected = +(localStorage.getItem('grid-centre.band') ?? '1') || 1
       setMode(next.includes(selected) ? selected : next[0])
-    } catch { setActiveBandIds(ALL_BAND_IDS); setMode(ALL_BAND_IDS[0]) }
+    } catch { setActiveBandIds(releasedBandIds); setMode(releasedBandIds[0]) }
     setBandScopeReady(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -199,7 +273,7 @@ export default function GridLab() {
       pad: RELEASED_PADDING_MM, centreMode: CENTRE_MODE, governor: GOVERNOR,
     }
     try { const raw = localStorage.getItem('grid-centre.defaults'); if (raw) d = { ...d, ...JSON.parse(raw) } } catch { }
-    setPad(d.pad); setPadLock(1); setCentreMode(d.centreMode); setGovernor(d.governor)
+    setPad(d.pad); setCentreMode(d.centreMode); setGovernor(d.governor)
   }
 
   const [magic, setMagic] = useState<MagicState>(null)
@@ -305,18 +379,19 @@ export default function GridLab() {
         if (!magic) return null
         return normBaseContour(magic.vshape, magic.maskH)
       }
-      if (src === 'preset' && hasVectorDef(preset)) {
-        return normBaseContour(getShape(preset, IMG, IMG, { sides, points }), IMG)
-      }
-      const params = gen === 'blob' ? { kind: gen, waviness: p1, seed: p2 }
-        : gen === 'form' ? { kind: gen, pinch: p1, lobes: p2 }
-          : gen === 'daisy' ? { kind: gen, depth: p1, petals: p2 }
-            : { kind: gen, swirl: p1, blades: p2 }
-      const ring = generateShapeRing(params as Parameters<typeof generateShapeRing>[0], IMG, IMG)
-      return normGeneratedRing(ring, IMG)
+      if (src === 'preset') return null   // a released record is delivered, not solved — see the solve effect
+      const vector = VECTOR_GENS.find((g) => g.k === gen)
+      if (vector) return normBaseContour(getShape(vector.k, IMG, IMG, { sides, points }), IMG)
+      const params = gen === 'blob' ? { waviness: p1, seed: p2 }
+        : gen === 'form' ? { pinch: p1, lobes: p2 }
+          : gen === 'daisy' ? { depth: p1, petals: p2 }
+            : { swirl: p1, blades: p2 }
+      // The Studio's own generator: its ring is fitted ONCE into a vector at generation, so a
+      // generated shape is a curve like every preset — the bench used to take the raw ring.
+      return normBaseContour(vecFromGenerator(gen as ShapeKind, params, { widthPx: IMG, heightPx: IMG }), IMG)
     } catch (e) { console.error('[grid-lab] shape build failed', e); return null }
     finally { genMsRef.current = performance.now() - t0 }
-  }, [src, preset, gen, p1, p2, sides, points, magic, cutC])
+  }, [src, gen, p1, p2, sides, points, magic, cutC])
 
   // The solve runs in a worker so the page never freezes; the last result stays up while solving.
   type Model = GridPageModel
@@ -337,7 +412,7 @@ export default function GridLab() {
   const busyRef = useRef(false)
   const queuedRef = useRef<object | null>(null)
   const effSizeRef = useRef(0)
-  const shapeLabel = src === 'preset' ? preset : src === 'gen' ? gen : src === 'cut' ? (cutSel || 'cutout') : src
+  const shapeLabel = src === 'preset' ? (presetRecord ? presetRecord.classId + ' ' + presetRecord.label : 'preset') : src === 'gen' ? gen : src === 'cut' ? (cutSel || 'cutout') : src
   useEffect(() => {
     const w = new Worker(new URL('./solve.worker.ts', import.meta.url))
     workerRef.current = w
@@ -367,8 +442,9 @@ export default function GridLab() {
   useEffect(() => {
     const w = workerRef.current
     if (!w || !bandScopeReady) return
+    if (src === 'preset') return   // a released record is delivered on this thread — see presetModel
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
-    const cfg = { pitchMM: pitch, paddingMM: pad, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: src === 'preset' && preset === 'circle', classifierRuler: ruler }
+    const cfg = { pitchMM: pitch, paddingMM: pad, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: false, classifierRuler: ruler }
     // Manual in a band (forced registration OR manual band scale): the walk is meaningless —
     // solve that size directly, exactly like free mode, band chip stays active.
     const manualBand = manual !== null || bandScale !== null   // manual scale/pan: solved directly at the requested size
@@ -388,10 +464,22 @@ export default function GridLab() {
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, preset, shapeLabel, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler, protectionPadding, activeBandIds, bandScopeReady])
+  }, [base, src, shapeLabel, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler, protectionPadding, activeBandIds, bandScopeReady])
+  // THE RECORD ON THE CANVAS — the released record under shape + band, delivered AT ONCE on this
+  // thread through the adapter (coverage, plan, protection, the seal), never searched and never
+  // queued behind a solve. Not a solve, so no readout and no performance row.
+  const presetModel = useMemo(() => presetRecord
+    ? deliveredRecordPageModel({ record: presetRecord, cfg: { plan, perimeterOnly: coverage === 'perimeter' }, settings: { protectionPaddingMM: protectionPadding } })
+    : null, [presetRecord, plan, coverage, protectionPadding])
+  useEffect(() => { if (src === 'preset') setPerf((x) => ({ ...x, genMs: undefined, solveMs: undefined })) }, [src])
+  // a record's legal area is KNOWN — the exact inset — drawn the way the Library draws it, not measured
+  const presetSegments = useMemo(() => presetModel ? librarySegmentsOf(presetModel) : [], [presetModel])
+  /** What the bench shows: the delivered record, or the solver's answer. */
+  const view = src === 'preset' ? presetModel : model
 
-  const scale = model ? (VP * FIT) / Math.max(dim(model.contour, 0), dim(model.contour, 1)) : 0
+  const scale = view ? (VP * FIT) / Math.max(dim(view.contour, 0), dim(view.contour, 1)) : 0
   const genDef = GENS.find((g) => g.k === gen) ?? GENS[0]
+  const vectorGen = VECTOR_GENS.find((g) => g.k === gen) ?? null
 
   return (
     <div className="gl">
@@ -406,7 +494,7 @@ export default function GridLab() {
             {LIBRARY_FAMILIES.map((fam) => (
               <button key={fam} aria-pressed={libraryState?.classId === fam} onClick={() => {
                 setEdit(null)
-                setLibrarySel((current) => selectionForFamily(current, fam, pitch))
+                setLibrarySel((current) => selectionForFamily(current, fam, pitch, libBrowse, release))
               }}>{fam}</button>
             ))}
           </div>
@@ -419,7 +507,7 @@ export default function GridLab() {
             <button aria-pressed={false} onClick={() => setTab('library')}>Library</button>
           </div>
           <div className="gl-seg gl-libbar-tabs">
-            <button aria-pressed={src === 'preset'} onClick={() => setSrc('preset')}>Presets</button>
+            <button aria-pressed={src === 'preset'} onClick={() => { setSrc('preset'); setBandScopeDraft(null) }}>Presets</button>
             <button aria-pressed={src === 'gen'} onClick={() => setSrc('gen')}>Generators</button>
             <button aria-pressed={src === 'magic'} onClick={() => setSrc('magic')}>AI Magic</button>
             <button aria-pressed={src === 'cut'} onClick={() => setSrc('cut')}>Cutouts</button>
@@ -439,14 +527,13 @@ export default function GridLab() {
             <span className="gl-eye">Grid Lab · v4</span>
             <span className="gl-eye">
               {tab === 'library' ? 'LIBRARY DRAFT · CANDIDATE REVIEW'
-                : model ? `1mm = ${scale.toFixed(2)} px` : '—'}
+                : view ? `1mm = ${scale.toFixed(2)} px` : '—'}
             </span>
           </div>
           <div className="gl-vp">
-            {showSolving && <div className="gl-solving"><span className="gl-spin" />solving…</div>}
+            {showSolving && src !== 'preset' && <div className="gl-solving"><span className="gl-spin" />solving…</div>}
             {(() => {
-              const src2 = libraryModel ?? model
-              if (!src2) return null
+              if (!libraryModel && !view) return null
               const stageProps = libraryModel
                 ? { contour: libraryModel.contour, grid: libraryModel.grid, lattice: showLattice, box: showBox,
                     // the record's own legal area, dimensioned like the bench's
@@ -458,6 +545,14 @@ export default function GridLab() {
                     onPickNode: edit
                       ? (pMM: Pt) => setEdit((d) => (d ? toggleNodeAt(librarySel, drafts, d, pMM, pitch) : d))
                       : undefined }
+                : src === 'preset'
+                ? { contour: presetModel!.contour, grid: presetModel!.grid, lattice: showLattice, box: showBox,
+                    viewport: { panMM: [0, 0] as Pt, zoom: camZoom * CAM_BASE },
+                    // the record's own legal area, dimensioned like the bench's; the record is as
+                    // published — no manual registration or scale to gesture
+                    segments: showSegs ? presetSegments : [], segFill: segFillN !== 0,
+                    unprotected: showUnheld ? presetModel!.unprotected ?? null : null,
+                    onPan: () => { }, onZoom: () => { }, onReset: () => { } }
                 : { contour: model!.contour, grid: model!.grid, lattice: showLattice, box: showBox,
                     // 100% = the shape at half the board, so there is room around it (Dan).
                     viewport: { panMM: [0, 0] as Pt, zoom: camZoom * CAM_BASE },
@@ -472,11 +567,13 @@ export default function GridLab() {
                     onReset: () => setManual(null) }
               return <Stage {...stageProps} />
             })()}
-            {!libraryModel && !model && (src === 'magic'
+            {!libraryModel && !view && (src === 'magic'
               ? <Empty text={magStatus.startsWith('error') ? magStatus.slice(6) : magStatus === 'downloading-model' ? 'Downloading the cut-out model…' : magStatus.startsWith('cutting') ? 'Cutting out the shape…' : 'Upload an image to cut its outline'} spin={magStatus === 'downloading-model' || magStatus.startsWith('cutting')} />
               : src === 'cut'
                 ? <Empty text={cutStatus.startsWith('error') ? cutStatus.slice(6) : cutStatus === 'tracing' ? 'Tracing the outline…' : 'Pick a cutout from the library'} spin={cutStatus === 'tracing'} />
-                : <Empty text="shape unavailable" />)}
+                : src === 'preset'
+                  ? <Empty text="Nothing released yet — Library → Frame → release" />
+                  : <Empty text="shape unavailable" />)}
           </div>
         </section>
 
@@ -495,7 +592,7 @@ export default function GridLab() {
               <button aria-label="zoom in" onClick={() => setLibView((v) => ({ ...v, zoom: camStep(v.zoom, +1) }))}>+</button>
             </div>
           </div>
-          {libraryState ? <LibraryPanel setSel={setLibrarySel} setBrowse={setLibBrowse} Fold={Fold} options={libraryState.options}
+          {libraryState ? <LibraryPanel setSel={setLibrarySel} setBrowse={setLibBrowse} setRelease={saveRelease} Fold={Fold} options={libraryState.options}
             boxMM={{ w: libraryState.materialized.widthMM, h: libraryState.materialized.heightMM }}
             bandId={libraryState.materialized.bandId}
             showBox={showBox} setShowBox={setShowBox} edit={edit} setEdit={setEdit}
@@ -519,29 +616,44 @@ export default function GridLab() {
             }} /> : null}</> : <>
           <Fold title="Grid settings" panel="grid">
             <div className="gl-field gl-bandfield">
-              <div className="gl-fieldhead"><span>Band · available</span>
-                <button className="gl-edit" onClick={() => setBandScopeDraft((draft) => draft ? null : [...activeBandIds])}>Edit</button>
+              <div className="gl-fieldhead"><span>Band · {src === 'preset' ? 'released' : 'available'}{src !== 'preset' && isLocked(profile, 'activeBandIds') ? ' · locked' : ''}</span>
+                <span className="gl-headbtns">
+                  {src !== 'preset' && !isLocked(profile, 'activeBandIds') && <button className="gl-edit" onClick={() => setBandScopeDraft((draft) => draft ? null : [...activeBandIds])}>Edit</button>}
+                  {src !== 'preset' && <LockBtn label="Band · available" k="activeBandIds" v={activeBandIds} profile={profile} setProfile={saveProfile} />}
+                </span>
               </div>
               <div className="gl-seg gl-bandactive">
-                {BANDS.filter((b) => activeBandIds.includes(b.id)).map((b) =>
-                  <button key={b.id} aria-pressed={mode === b.id}
-                    onClick={() => { setMode(b.id); setStepSel(null); setManual(null); setBandScale(null); try { localStorage.setItem('grid-centre.band', String(b.id)) } catch { } }}>B{b.id}</button>)}
+                {benchBandIds.map((id) => {
+                  // a preset's chip carries the record's own size — the sizes live here, not on the shape
+                  const first = presetBands.find((b) => b.bandId === id)?.records[0]
+                  return <button key={id} aria-pressed={mode === id}
+                    onClick={() => { setMode(id); setStepSel(null); setManual(null); setBandScale(null); try { localStorage.setItem('grid-centre.band', String(id)) } catch { } }}>
+                    B{id}{src === 'preset' && first && <small>{sizeLabel(first)}</small>}</button>
+                })}
               </div>
-              {bandScopeDraft && <div className="gl-scope-pop" role="dialog" aria-label="Edit compute scope">
+              {bandScopeDraft && src !== 'preset' && <div className="gl-scope-pop" role="dialog" aria-label="Edit compute scope">
                 <div className="gl-glabel">Compute scope</div>
                 <div className="gl-seg gl-bandrow gl-scope">
-                  {BANDS.map((b) => <button key={b.id} aria-pressed={bandScopeDraft.includes(b.id)}
+                  {releasedBandIds.map((id) => <button key={id} aria-pressed={bandScopeDraft.includes(id)}
                     onClick={() => setBandScopeDraft((draft) => {
                       if (!draft) return null
-                      const enabled = draft.includes(b.id)
+                      const enabled = draft.includes(id)
                       if (enabled && draft.length === 1) return draft
-                      return ALL_BAND_IDS.filter((id) => id === b.id ? !enabled : draft.includes(id))
-                    })}>B{b.id}</button>)}
+                      return releasedBandIds.filter((b) => b === id ? !enabled : draft.includes(b))
+                    })}>B{id}</button>)}
                 </div>
                 <button className="gl-scope-save" onClick={saveBandScope}>Save</button>
               </div>}
             </div>
-            {true && <>
+            {src === 'preset' && presetBand && <div className="gl-steps">
+              {/* the records released in this band — the size and the count, as published */}
+              {presetBand.records.map((r, i) =>
+                <button key={r.id} aria-pressed={i === presetIdx} onClick={() => setStepSel(i)}>
+                  <b>{r.label}</b>
+                  <span>{sizeLabel(r)} mm · {r.nodesMM.length}⌾</span>
+                </button>)}
+            </div>}
+            {src !== 'preset' && <>
               {/* The FIT READOUT is gone (Dan, 2026-08-30: "this panel text I said to remove, there
                   were two plates like that and now 1 — I need it gone"). The offer rows below say
                   the size and the count and which probe found them, so the plate only repeated
@@ -572,33 +684,36 @@ export default function GridLab() {
                   min={b.minMM} max={b.maxMM} />
               })()}
             </>}
-            <div className="gl-field"><span>Grid pitch · released tiers</span>
+            <Lockable label="Grid pitch · released tiers" k="pitchMM" v={pitch} profile={profile} setProfile={saveProfile}>
               <div className="gl-seg">
                 {RELEASED_PITCHES_MM.map(({ mm, label }) =>
                   <button key={mm} aria-pressed={pitch === mm} onClick={() => setPitch(mm)}>{label}</button>)}
               </div>
-            </div>
-            <LockNum label="Magnet padding · per spot" unit="mm" v={pad} set={setPad}
-              min={PADDING_FLOOR_MM} max={PADDING_CEIL_MM} locked={padLock} setLocked={setPadLock}
-              released={RELEASED_PADDING_MM} />
-            <div className="gl-field"><span>Classifier ruler · what the band is measured on</span>
+            </Lockable>
+            {/* search dials — a released record was not searched, so they have nothing to act on */}
+            {src !== 'preset' && <>
+            <Lockable label="Magnet padding · per spot" k="paddingMM" v={pad} profile={profile} setProfile={saveProfile}>
+              <NumIn v={pad} set={setPad} min={PADDING_FLOOR_MM} max={PADDING_CEIL_MM} unit="mm" />
+            </Lockable>
+            <Lockable label="Classifier ruler · what the band is measured on" k="classifierRuler" v={ruler} profile={profile} setProfile={saveProfile}>
               <div className="gl-seg">
                 <button aria-pressed={ruler === 'legal'} onClick={() => setRuler('legal')}>legal area</button>
                 <button aria-pressed={ruler === 'outer'} onClick={() => setRuler('outer')}>outer box</button>
               </div>
-            </div>
-            <div className="gl-field"><span>Coverage</span>
+            </Lockable>
+            </>}
+            <Lockable label="Coverage" k="coverage" v={coverage} profile={profile} setProfile={saveProfile}>
               <div className="gl-seg">
                 {([['full', 'Full grid'], ['perimeter', 'Perimeter belt']] as ['full' | 'perimeter', string][]).map(([c, l]) =>
                   <button key={c} aria-pressed={coverage === c} onClick={() => setCoverage(c)}>{l}</button>)}
               </div>
-            </div>
-            <div className="gl-field"><span>Magnet plan</span>
+            </Lockable>
+            <Lockable label="Magnet plan" k="plan" v={plan} profile={profile} setProfile={saveProfile}>
               <div className="gl-seg">
                 {([['all6', 'All 6mm'], ['all8', 'All 8mm'], ['corners8', 'Corners 8']] as [MagnetPlan, string][]).map(([p, l]) =>
                   <button key={p} aria-pressed={plan === p} onClick={() => setPlan(p)}>{l}</button>)}
               </div>
-            </div>
+            </Lockable>
             <label className="gl-toggle"><span>Show lattice <small style={{ color: 'var(--ink-3)' }}>· every position tried</small></span>
               <input type="checkbox" checked={showLattice} onChange={e => setShowLattice(e.target.checked)} />
             </label>
@@ -632,21 +747,44 @@ export default function GridLab() {
           </div>
           <Fold title="Shape" panel="shape">
             {src === 'preset' && <>
+              {presetShapes.length > 0 ? (
+                <div className="gl-lib">
+                  {presetShapes.map((s) => (
+                    <button key={s.classId} aria-pressed={preset === s.classId} onClick={() => { setPreset(s.classId); setPresetType(null); setPresetOrient(null); setStepSel(null) }}>
+                      <b>{s.classId}</b></button>
+                  ))}
+                </div>
+              ) : (
+                <div className="gl-hint">Nothing released yet — Library → Frame → <b>release</b> puts a record here.</div>
+              )}
+            </>}
+
+            {src === 'preset' && shapeTypes.length > 1 && <>
+              <div className="gl-glabel" style={{ marginTop: 10 }}>Type</div>
               <div className="gl-lib">
-                {PRESETS.map((k) => (
-                  <button key={k} aria-pressed={preset === k} onClick={() => setPreset(k as VectorShapeKind)}><b>{k}</b></button>
-                ))}
+                {shapeTypes.map((t) => <button key={t} aria-pressed={typeSel === t} onClick={() => { setPresetType(t); setStepSel(null) }}><b>{t}</b></button>)}
               </div>
-              {preset === 'polygon' && <Slider label="Sides" v={sides} set={setSides} min={3} max={12} />}
-              {preset === 'star' && <Slider label="Points" v={points} set={setPoints} min={3} max={12} />}
+            </>}
+            {src === 'preset' && shapeOrients.length === 2 && <>
+              <div className="gl-glabel" style={{ marginTop: 10 }}>Orientation</div>
+              <div className="gl-seg gl-wrap">
+                {shapeOrients.map((o) => <button key={o} aria-pressed={orientSel === o} onClick={() => { setPresetOrient((v) => v === o ? null : o); setStepSel(null) }}>{o}</button>)}
+              </div>
             </>}
 
             {src === 'gen' && <>
               <div className="gl-seg gl-wrap">
                 {GENS.map(g => <button key={g.k} aria-pressed={gen === g.k} onClick={() => { setGen(g.k); setP1(50); setP2(g.p2start) }}>{g.label}</button>)}
+                {VECTOR_GENS.map(g => <button key={g.k} aria-pressed={gen === g.k} onClick={() => setGen(g.k)}>{g.label}</button>)}
               </div>
-              <Slider label={genDef.p1[0]} unit={genDef.p1[1]} v={p1} set={setP1} min={0} max={100} />
-              <Slider label={genDef.p2[0]} v={p2} set={setP2} min={genDef.p2min} max={genDef.p2max} />
+              {vectorGen ? (
+                vectorGen.dial === 'sides'
+                  ? <Slider label="Sides" v={sides} set={setSides} min={3} max={12} />
+                  : <Slider label="Points" v={points} set={setPoints} min={3} max={12} />
+              ) : <>
+                <Slider label={genDef.p1[0]} unit={genDef.p1[1]} v={p1} set={setP1} min={0} max={100} />
+                <Slider label={genDef.p2[0]} v={p2} set={setP2} min={genDef.p2min} max={genDef.p2max} />
+              </>}
             </>}
 
             {src === 'cut' && <>
@@ -693,20 +831,20 @@ export default function GridLab() {
           </Fold>
 
 
-          <Fold title="Centering" panel="centre">
-            <div className="gl-field"><span>Centre mode</span>
+          {src !== 'preset' && <Fold title="Centering" panel="centre">
+            <Lockable label="Centre mode" k="centreMode" v={centreMode} profile={profile} setProfile={saveProfile}>
               <div className="gl-seg gl-wrap">
                 {([[0, 'Box'], [1, 'Core'], [2, 'Masses'], [3, 'Weight'], [4, 'Deep'], [5, 'Top']] as [number, string][]).map(([m, l]) =>
                   <button key={m} aria-pressed={centreMode === m} onClick={() => setCentreMode(m)}>{l}</button>)}
               </div>
-            </div>
-            {centreMode === 2 && <div className="gl-field"><span>Governor</span>
+            </Lockable>
+            {centreMode === 2 && <Lockable label="Governor" k="governor" v={governor} profile={profile} setProfile={saveProfile}>
               <div className="gl-seg gl-wrap">
                 {([[0, 'Smallest'], [1, 'Deepest'], [2, 'Top'], [3, 'Top-small']] as [number, string][]).map(([g, l]) =>
                   <button key={g} aria-pressed={governor === g} onClick={() => setGovernor(g)}>{l}</button>)}
               </div>
-            </div>}
-          </Fold>
+            </Lockable>}
+          </Fold>}
           <Fold title={<>Performance <small style={{ color: 'var(--ink-3)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>· this build{buildPort ? ' · :' + buildPort : ''}</small></>} panel="perf">
             <div className="gl-field"><span>Latest</span>
               <div className="gl-snap">load <Sec ms={perf.loadMs} /> · gen <Sec ms={perf.genMs} /> · solve <Sec ms={perf.solveMs} /></div>
@@ -724,8 +862,9 @@ export default function GridLab() {
             </div>}
           </Fold>
           <Fold title="Protection" panel="protect">
-            <Slider label="Protection padding · from magnet edge" unit="mm"
-              v={protectionPadding} set={setProtectionPadding} min={0} max={96} />
+            <Lockable label="Protection padding · from magnet edge" k="protectionPaddingMM" v={protectionPadding} profile={profile} setProfile={saveProfile}>
+              <Slider label="" unit="mm" v={protectionPadding} set={setProtectionPadding} min={0} max={96} />
+            </Lockable>
             {model?.unprotected && <div className="gl-field"><span>Unsupported material</span>
               <div className="gl-snap">{model.unprotected.percent.toFixed(1)}% ·{' '}
                 {Math.round(model.unprotected.areaMM2)} mm² · {model.unprotected.patches.length} patch{model.unprotected.patches.length === 1 ? '' : 'es'} ·{' '}
@@ -758,7 +897,7 @@ function dim(c: Contour, axis: 0 | 1): number {
 const SEG_HUES = ['#e0762f', '#7a4ae0', '#2fa864', '#e04a8f', '#2f9fe0']
 
 function Stage({ contour, grid, lattice, box, segments, segFill, unprotected, onPan, onZoom, onReset, onPickNode, viewport }: {
-  contour: Contour; grid: GridResult; lattice: boolean; box: boolean; segments: SafeSegment[]; segFill: boolean
+  contour: Contour; grid: GridResult; lattice: boolean; box: boolean; segments: LibraryLegalArea[]; segFill: boolean
   unprotected?: UnprotectedEvidence | null
   onPan: (dxMM: number, dyMM: number) => void; onZoom: (f: number) => void; onReset: () => void
   /** Library authoring: a lattice spot was clicked (mm, engine y-up). Display layer only. */
@@ -771,7 +910,7 @@ function Stage({ contour, grid, lattice, box, segments, segFill, unprotected, on
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   for (const [x, y] of pts) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y }
   const w = maxX - minX, h = maxY - minY, S = (VP * FIT) / Math.max(w, h)
-  const d = 'M ' + pts.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(' L ') + ' Z'
+  const d = outlineSvgD(contour)
   const fy = (p: Pt): Pt => [p[0], -p[1]]
   const seat = new Set(grid.anchors.map(a => a.p[0].toFixed(2) + ',' + a.p[1].toFixed(2)))
 
@@ -834,16 +973,33 @@ function Stage({ contour, grid, lattice, box, segments, segFill, unprotected, on
   const vx = cx - spanMM / 2 + (viewport ? viewport.panMM[0] : 0)
   const vy = cy - spanMM / 2 - (viewport ? viewport.panMM[1] : 0)
 
-  // Spots come from the bridge; the toggle picks field vs seated. This file draws circles.
-  // On the free viewport the SVG slices to the element's aspect, so the field must be generated
-  // well past the square viewBox — the lattice is infinite, never a window.
+  // On the free viewport the SVG slices to the element's aspect, so the ground is painted well past
+  // the square viewBox — the lattice is infinite, never a window.
   const fp = viewport ? spanMM : 0
-  const spots: readonly FieldSpot[] = lattice
-    ? fieldSpots(grid, { minX: vx - fp, minY: -(vy + spanMM + fp), maxX: vx + spanMM + fp, maxY: -(vy - fp) })
-    : seatedSpots(grid)
-  // Rule anchor: any spot is on the lattice, so lines cross at the centres.
-  const A0 = spots[0]
-  const Afy: [number, number] = A0 ? [A0.x, -A0.y] : [0, 0]
+  // THE FIELD IS A TILE, NOT A LIST. One <pattern> paints every empty spot at constant cost under any
+  // pan or zoom; listing the visible spots put 2,300 circles in the DOM and re-diffed all of them on
+  // every click — 234 ms, the Library "freezing" (Dan, 2026-09-07). Only the HELD spots are elements.
+  const held: readonly FieldSpot[] = seatedSpots(grid)
+  const A = grid.anchors[0]?.p ?? grid.lattice[0]
+  // Rule anchor: a lattice node, so rule lines cross at the centres and the field tile lands on them.
+  const Afy: [number, number] = A ? [A[0], -A[1]] : [0, 0]
+  const spotR = grid.spotRadiusMM
+  /** Library authoring: the click snaps to the nearest lattice node, and counts only within the spot
+   *  disc — the same target the per-spot hit circles used to give. Anywhere else the svg pans. */
+  const pickAt = (e: React.PointerEvent<SVGRectElement>) => {
+    const svg = svgRef.current
+    if (!svg || !onPickNode || !A) return
+    const m = svg.getScreenCTM()
+    if (!m) return
+    const at = new DOMPoint(e.clientX, e.clientY).matrixTransform(m.inverse())
+    // undo the live-gesture translate, then the y flip
+    const x = at.x - pend.x, y = -(at.y + pend.y)
+    const pitch = grid.pitchCentreMM
+    const nx = A[0] + Math.round((x - A[0]) / pitch) * pitch, ny = A[1] + Math.round((y - A[1]) / pitch) * pitch
+    if (Math.hypot(x - nx, y - ny) > spotR) return
+    e.stopPropagation()
+    onPickNode([nx, ny])
+  }
 
   return (
     <svg ref={svgRef} width={VP} height={VP} viewBox={`${vx} ${vy} ${spanMM} ${spanMM}`}
@@ -914,6 +1070,14 @@ function Stage({ contour, grid, lattice, box, segments, segFill, unprotected, on
         {/* Registration dots on every 12mm cell corner — the board's atom, phase-locked to the
             lattice so 12mm steps and centres are always visible. Dot sits at tile centre; the
             pattern origin is shifted half a tile so dots land on the corners unclipped. */}
+        {/* Every empty spot of the field: one tile per pitch, its disc centred on a lattice node. INNER
+            stroke — the line's outer edge sits exactly on the true spot radius, so a tangent disc
+            never reads past the cut line. */}
+        <pattern id="gl-field" width={grid.pitchCentreMM} height={grid.pitchCentreMM}
+          patternUnits="userSpaceOnUse" x={Afy[0] - grid.pitchCentreMM / 2} y={Afy[1] - grid.pitchCentreMM / 2}>
+          <circle cx={grid.pitchCentreMM / 2} cy={grid.pitchCentreMM / 2} r={spotR - 0.25}
+            fill="var(--ink)" fillOpacity={0.04} stroke="var(--ink)" strokeOpacity={0.25} strokeWidth={0.5} />
+        </pattern>
         <pattern id="gl-dots" width={DEFAULT_PITCH_MM / 4} height={DEFAULT_PITCH_MM / 4}
           patternUnits="userSpaceOnUse" x={Afy[0] - DEFAULT_PITCH_MM / 8} y={Afy[1] - DEFAULT_PITCH_MM / 8}>
           <circle cx={DEFAULT_PITCH_MM / 8} cy={DEFAULT_PITCH_MM / 8} r={0.05} fill="var(--ink)" fillOpacity={0.35} />
@@ -935,18 +1099,17 @@ function Stage({ contour, grid, lattice, box, segments, segFill, unprotected, on
         const hue = SEG_HUES[si % SEG_HUES.length]
         const fs = 11 * spanMM / VP
         return <g key={'sg' + si} style={{ pointerEvents: 'none' }}>
-          {sg.rings.map((ring, ri) => {
-            const d = 'M ' + ring.map(([x, y]) => `${x.toFixed(2)} ${(-y).toFixed(2)}`).join(' L ') + ' Z'
-            return <path key={ri} d={d} fill={hue} fillOpacity={segFill ? 0.12 : 0} stroke={hue} strokeOpacity={0.85}
+          {/* the island's outline as a curve — exact where the engine has a closed form, fitted through the exact edge otherwise */}
+          {sg.paths.map((path, ri) => (
+            <path key={ri} d={svgDOf(path)} fill={hue} fillOpacity={segFill ? 0.12 : 0} stroke={hue} strokeOpacity={0.85}
               strokeWidth={1.2} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-          })}
+          ))}
           {/* Depth masses: the regions surviving the mass-depth probe, each with its own centre. */}
           {sg.masses.map((m, mi) => <g key={'m' + mi}>
-            {m.rings.map((ring, ri) => {
-              const d = 'M ' + ring.map(([x, y]) => `${x.toFixed(2)} ${(-y).toFixed(2)}`).join(' L ') + ' Z'
-              return <path key={ri} d={d} fill={hue} fillOpacity={segFill ? 0.10 : 0} stroke={hue} strokeOpacity={0.6}
+            {m.paths.map((path, ri) => (
+              <path key={ri} d={svgDOf(path)} fill={hue} fillOpacity={segFill ? 0.10 : 0} stroke={hue} strokeOpacity={0.6}
                 strokeWidth={0.9} strokeDasharray="3 3" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-            })}
+            ))}
             <circle cx={m.centreMM[0]} cy={-m.centreMM[1]} r={fs * 0.35} fill={hue} />
           </g>)}
         </g>
@@ -1013,9 +1176,8 @@ function Stage({ contour, grid, lattice, box, segments, segFill, unprotected, on
           <text {...lbl} x={lX + fs * 0.6} y={my} textAnchor="middle" transform={`rotate(90 ${lX + fs * 0.6} ${my})`}>{hTxt}</text>
         </g>)
       })()}
-      {unprotected && unprotected.ringsMM.length > 0 && <path style={{ pointerEvents: 'none' }}
-        d={unprotected.ringsMM.map((ring) =>
-          'M ' + ring.map(([x, y]) => `${x.toFixed(2)} ${(-y).toFixed(2)}`).join(' L ') + ' Z').join(' ')}
+      {unprotected && unprotected.pathsMM.length > 0 && <path style={{ pointerEvents: 'none' }}
+        d={unprotected.pathsMM.map((path) => svgDOf(path)).join(' ')}
         fill="url(#gl-unheld)" stroke="var(--warn, #e0762f)" strokeOpacity={0.65}
         fillRule="evenodd" clipRule="evenodd" strokeWidth={1} vectorEffect="non-scaling-stroke" />}
       {unprotected?.patches.map((patch, index) => patch.witnessMM && <circle key={'patch' + index}
@@ -1026,21 +1188,20 @@ function Stage({ contour, grid, lattice, box, segments, segFill, unprotected, on
           fill="none" stroke="#e5484d" strokeWidth={1.2} vectorEffect="non-scaling-stroke" />
         <circle cx={unprotected.repairTargetMM[0]} cy={-unprotected.repairTargetMM[1]} r={0.7} fill="#e5484d" />
       </g>}
-      {/* Every spot the bridge handed over: faint where empty, accent where a magnet seats. */}
+      {/* The field: faint where empty (the tile), accent where a magnet seats (an element each). */}
       <g transform={pend.x || pend.y ? `translate(${pend.x} ${-pend.y})` : undefined}>
-      {spots.map((sp, i) => {
-        // INNER stroke: the line's outer edge sits exactly on the true spot radius, so a
-        // tangent disc never reads past the cut line.
-        const sw = sp.held ? 0.6 : 0.5
-        return <g key={'f' + i}>
-          <circle cx={sp.x} cy={-sp.y} r={sp.r - sw / 2}
-            fill={sp.held ? 'var(--accent)' : 'var(--ink)'} fillOpacity={sp.held ? 0.10 : 0.04}
-            stroke={sp.held ? 'var(--accent)' : 'var(--ink)'} strokeOpacity={sp.held ? 0.55 : 0.25}
-            strokeWidth={sw} />
+      {lattice && A && <rect x={vx - fp - Math.abs(pend.x)} y={vy - fp - Math.abs(pend.y)}
+        width={spanMM + 2 * fp + 2 * Math.abs(pend.x)} height={spanMM + 2 * fp + 2 * Math.abs(pend.y)}
+        fill="url(#gl-field)" style={onPickNode ? { cursor: 'pointer' } : undefined}
+        onPointerDown={onPickNode ? pickAt : undefined} />}
+      {held.map((sp, i) => (
+        <g key={'f' + i}>
+          <circle cx={sp.x} cy={-sp.y} r={sp.r - 0.3}
+            fill="var(--accent)" fillOpacity={0.10} stroke="var(--accent)" strokeOpacity={0.55} strokeWidth={0.6} />
           {onPickNode && <circle cx={sp.x} cy={-sp.y} r={sp.r} fill="transparent" style={{ cursor: 'pointer' }}
             onPointerDown={(e) => { e.stopPropagation(); onPickNode([sp.x, sp.y]) }} />}
         </g>
-      })}
+      ))}
       {grid.anchors.map((a, i) => {
         const p = fy(a.p)
         // While authoring, a placed magnet must not swallow its own spot's hit target —
@@ -1098,27 +1259,54 @@ function Stepper({ label, v, set }: { label: string; v: number; set: (n: number)
     </div>
   )
 }
-/** Perf value in seconds — green when fast, red past the 2s comfort line. */
-function LockNum({ label, unit, v, set, min, max, locked, setLocked, released }: {
-  label: string; unit?: string; v: number; set: (n: number) => void
-  min: number; max: number; locked: number; setLocked: (n: number) => void; released: number
-}) {
+/** A typed value with its unit — the entry half of what LockNum used to be; the lock half is Lockable,
+ *  because a lock is now one control with one meaning on every dial. */
+function NumIn({ v, set, min, max, unit }: { v: number; set: (n: number) => void; min: number; max: number; unit?: string }) {
   return (
-    <div className="gl-field"><span>{label}{locked ? ' · locked' : ' · unlocked for testing'}</span>
-      <div className="gl-limits">
-        <button className="gl-lock" aria-pressed={locked !== 0} title={locked ? 'locked to the released value' : 'unlocked — typed values allowed'}
-          onClick={() => { const next = locked ? 0 : 1; setLocked(next); if (next) set(released) }}>
-          {locked ? '🔒' : '🔓'}
-        </button>
-        <span className="gl-num"><i>{unit ?? ''}</i>
-          <input key={String(locked) + v} type="number" defaultValue={v} disabled={locked !== 0}
-            onBlur={(e) => { const n = +e.currentTarget.value; if (Number.isFinite(n) && n >= min && n <= max) set(n); else e.currentTarget.value = String(v) }}
-            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} />
-        </span>
-      </div>
+    <div className="gl-limits">
+      <span className="gl-num"><i>{unit ?? ''}</i>
+        <input key={v} type="number" defaultValue={v}
+          onBlur={(e) => { const n = +e.currentTarget.value; if (Number.isFinite(n) && n >= min && n <= max) set(n); else e.currentTarget.value = String(v) }}
+          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} />
+      </span>
     </div>
   )
 }
+
+/** THE ADMIN LOCK, on one dial. Pressing it SEALS the dial's current value into the profile both
+ *  engine doors read — this bench's own solve and production's alike — and writes that profile into
+ *  the repo. Pressing again releases it. Dan, 2026-09-04: "add locks to all configs and make them go
+ *  through into the spec as locked as well so any prod cannot change them by accident unless we
+ *  change it in the admin engine version." Grid Lab IS the admin engine, so this is the only surface
+ *  where the action exists. */
+function LockBtn<K extends LockKey>({ label, k, v, profile, setProfile }: {
+  label: string; k: K; v: LockValues[K]; profile: LockProfile; setProfile: (next: LockProfile) => void
+}) {
+  const locked = isLocked(profile, k)
+  return (
+    <button className="gl-lock" aria-pressed={locked} aria-label={(locked ? 'unlock ' : 'lock ') + label}
+      title={locked ? 'sealed — production reads this value and cannot change it' : 'unlocked — seal the current value'}
+      onClick={() => setProfile(withLock(profile, k, v, !locked))}>{locked ? '\u{1F512}' : '\u{1F513}'}</button>
+  )
+}
+
+/** One dial with its lock. Sealed, the control is inert: the value is the profile's, not the bench's. */
+function Lockable<K extends LockKey>({ label, k, v, profile, setProfile, children }: {
+  label: string; k: K; v: LockValues[K]; profile: LockProfile
+  setProfile: (next: LockProfile) => void; children: React.ReactNode
+}) {
+  const locked = isLocked(profile, k)
+  return (
+    <div className="gl-field">
+      <div className="gl-fieldhead"><span>{label}{locked ? ' \u00b7 locked' : ''}</span>
+        <LockBtn label={label} k={k} v={v} profile={profile} setProfile={setProfile} />
+      </div>
+      <div className={locked ? 'gl-sealed' : undefined} aria-disabled={locked || undefined}>{children}</div>
+    </div>
+  )
+}
+
+/** Perf value in seconds — green when fast, red past the 2s comfort line. */
 
 function Sec({ ms }: { ms?: number }) {
   if (ms == null) return <b>—</b>
@@ -1193,6 +1381,7 @@ const CSS = `
    into one strip (Dan, 2026-08-30). A grid rather than wrap so the break is the same every time. */
 .gl-seg.gl-bandrow{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px}
 .gl-bandactive{display:grid;grid-template-columns:repeat(auto-fit,minmax(48px,1fr))}
+.gl-bandactive button small{display:block;font:600 9px var(--mono);font-variant-numeric:tabular-nums;opacity:.75;margin-top:1px}
 .gl-seg button:hover{color:var(--ink)}
 .gl-seg button[aria-pressed=true]{background:var(--accent);color:#fff;box-shadow:0 1px 2px #0002}
 .gl-seg button:disabled{opacity:.28;cursor:not-allowed}
@@ -1210,6 +1399,8 @@ const CSS = `
 .gl-slider-row{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;color:var(--ink-2)}
 .gl-slider-row b{font:600 12.5px var(--mono);color:var(--ink);font-variant-numeric:tabular-nums}
 .gl-sizerow{display:flex;align-items:flex-end;gap:6px}.gl-sizerow-slider{flex:1;min-width:0}.gl-chev{width:26px;height:26px;margin-bottom:2px;display:grid;place-items:center;font-size:15px;line-height:1;color:var(--ink-2);background:var(--panel-2);border:1px solid var(--line);border-radius:7px;cursor:pointer}.gl-chev:active{background:var(--line)}
+.gl-sealed{pointer-events:none;opacity:.5}
+.gl-headbtns{display:flex;align-items:center;gap:6px}
 .gl-lock{width:30px;height:26px;display:grid;place-items:center;font-size:13px;line-height:1;background:var(--panel-2);border:1px solid var(--line);border-radius:6px;cursor:pointer}
 .gl-num{display:inline-flex;align-items:center;gap:4px}
 .gl-num input{width:54px;font:600 12.5px var(--mono);color:var(--ink);background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:3px 6px;text-align:right;font-variant-numeric:tabular-nums}
@@ -1286,6 +1477,9 @@ const CSS = `
 .gl-camzoom button:active{background:var(--accent);border-color:var(--accent);color:#fff}
 .gl-libadd b{color:var(--ink-3);font-size:16px!important}
 .gl-libedit{display:flex;align-items:center;gap:6px;margin-top:8px}
+.gl-rel{font-style:normal;color:var(--pass);margin-left:5px;font-weight:700}
+.gl-hint{font:500 12px var(--mono);color:var(--ink-3);line-height:1.5;padding:4px 2px}
+.gl-release-pop{position:static;margin-top:2px}
 .gl-libedit input{flex:1;min-width:0;font:600 12px var(--mono);color:var(--ink);background:var(--panel-2);
   border:1px solid var(--line);border-radius:7px;padding:6px 8px}
 .gl-libedit button{font:600 10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);

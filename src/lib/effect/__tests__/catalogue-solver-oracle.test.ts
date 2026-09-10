@@ -19,6 +19,7 @@ import { computeGrid } from '../grid-magnet'
 import { RELEASED_PADDING_MM } from '../grid-magnet-spec'
 import { MANUFACTURING_TOLERANCE_MM } from '../geometry-truth'
 import type { Pt } from '../types'
+import { pathBoundsMM } from '../foundation/path'
 
 /** Agreement is judged at the MANUFACTURING tolerance, not the nearest millimetre. Rounding to
  *  whole mm let a solver anchor sit 0.4mm off and still read as a match — the same class of
@@ -42,9 +43,12 @@ const caseId = (id: string, pitchMM: number) => id + '@' + pitchMM
  *  a diamond's corner sits at 12*sqrt2 = 16.971mm, and rounding it to 17 moves two disks out. */
 const seatedAt = (entry: CatalogueEntry, pitchMM: number, paddingMM = RELEASED_PADDING_MM) => {
   const pts = entry.outlineMM.map(([x, y]) => [x, y] as Pt)
-  const minX = Math.min(...pts.map((p) => p[0])), minY = Math.min(...pts.map((p) => p[1]))
+  // the registration is measured from the outline's true corner — the path's where it has one
+  const box = entry.outlinePath ? pathBoundsMM(entry.outlinePath) : null
+  const minX = box ? box.minX : Math.min(...pts.map((p) => p[0]))
+  const minY = box ? box.minY : Math.min(...pts.map((p) => p[1]))
   const phase = (v: number) => ((v % pitchMM) + pitchMM) % pitchMM
-  const grid = computeGrid({ outer: { pts }, holes: [] }, {
+  const grid = computeGrid({ outer: { pts, path: entry.outlinePath ?? undefined }, holes: [] }, {
     pitchMM, paddingMM, perimeterOnly: false,
     forcePhaseMM: [phase(entry.nodesMM[0][0] - minX), phase(entry.nodesMM[0][1] - minY)] as Pt,
   })
@@ -59,15 +63,34 @@ const seatedAt = (entry: CatalogueEntry, pitchMM: number, paddingMM = RELEASED_P
  *
  *  Their disks and outlines are correct: the library's own caller-equality gate reproduces every
  *  record independently at 24/48/96. What disagrees is where the ENGINE lays its lattice for a
- *  transformed view. Open engine finding, not a library defect. */
+ *  transformed view. Open engine finding, not a library defect.
+ *
+ *  The pill briefly added 63 one-wide records here and that was wrong — QA called it correctly: a
+ *  record whose certified magnets the engine refuses is a false manufacturing record, not a catalogue
+ *  exception. The cause was that the seat test measures against the outline's CHORDS, and a chord of
+ *  a flattened arc sits inside the true edge, so a magnet touching the real curve exactly is refused.
+ *  The library now emits its curved outlines with the chords OUTSIDE the curve, on the same micron
+ *  grid the engine seats on, and all 63 seat at the released 12mm rim with no engine change.
+ *
+ *  The same defect is what these 51 transformed views hit, and relaxing the seat test by the arc
+ *  tolerance closes every one of them — but uniformly, which is wrong: on a straight edge there is no
+ *  approximation to correct, and grid-magnet-separation 5b proves it by refusing a magnet one micron
+ *  inside the rim. Closing them needs a per-edge correction from each edge's own turn. Its own task,
+ *  and until then this set stays exactly as measured. */
 const OPEN: readonly string[] = JSON.parse(
   readFileSync(join(__dirname, 'fixtures/solver-oracle-open.v1.json'), 'utf8')) as string[]
 const isOpen = (entry: CatalogueEntry, pitchMM: number) => OPEN.includes(caseId(entry.id, pitchMM))
 
+// The oracle walks EVERY certified record at every pitch. The catalogue grew from ~500 to 1,247
+// records (circle, pill bodies, oval, polygon families, 2026-09-07..09) and the CI runner is ~2x slower
+// than a laptop, so the 120 s budget that fitted the old corpus times out at 157 s there. Sized for
+// the corpus it walks; a real slowdown still trips it.
+const ORACLE_BUDGET_MS = 400_000
+
 describe('the certified catalogue is the oracle the generator answers to', () => {
   // TARGET INVARIANT: the engine accepts every certified disk at every supported pitch.
   // CURRENT CONFORMANCE: everywhere except the exact open pitch-cases below. The two are stated
-  // separately on purpose — a title that claims the target while the body skips 68 records is
+  // separately on purpose — a title that claims the target while the body skips records is
   // the overclaim this whole oracle exists to stop.
   it('the engine accepts every certified disk outside the exact open pitch-cases', () => {
     const rejected: string[] = []
@@ -79,7 +102,7 @@ describe('the certified catalogue is the oracle the generator answers to', () =>
     // coverage needs no separate count: the next test asserts the open set EXACTLY, so every
     // record at every pitch is either checked here or named there
     expect(rejected).toEqual([])
-  }, 120_000)
+  }, ORACLE_BUDGET_MS)
 
   it('the open set is exactly what still disagrees — no more, and no fewer', () => {
     const failing: string[] = []
@@ -95,7 +118,7 @@ describe('the certified catalogue is the oracle the generator answers to', () =>
       expect(catalogue(pitchMM).some((e) => e.id === id), open).toBe(true)
       expect(id.endsWith('y'), open).toBe(true)
     }
-  }, 120_000)
+  }, ORACLE_BUDGET_MS)
 
   it('the oracle can fail: a certified disk moved off the lattice is rejected', () => {
     const entry = catalogue(48).find((e) => e.id === 'square/box/3x3/full/n/n/n')!

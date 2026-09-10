@@ -17,6 +17,15 @@ export const PADDING_CEIL_MM = 30
 /** Released padding — locked 12mm, measured from the magnet centre. */
 export const RELEASED_PADDING_MM = 12
 
+/** THE OVALS — the three Dan drew (2026-09-09), in millimetres of outline. Authored, not derived: the
+ *  smallest legal ellipse around a 2x2 magnet grid is 92x92, a circle, where the drawn one is 84x120.
+ *  Values only; which magnets each holds is the lattice's answer, computed in the library. */
+export const OVAL_SIZES_MM: ReadonlyArray<{ readonly widthMM: number; readonly heightMM: number }> = Object.freeze([
+  Object.freeze({ widthMM: 72, heightMM: 120 }),
+  Object.freeze({ widthMM: 84, heightMM: 120 }),
+  Object.freeze({ widthMM: 96, heightMM: 168 }),
+])
+
 /** Smallest effect — one 24mm cell. */
 export const MIN_EFFECT_MM = 24
 

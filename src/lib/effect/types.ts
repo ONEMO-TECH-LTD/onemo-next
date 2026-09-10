@@ -3,6 +3,7 @@
 // This lane builds the Draft + preview only (no server canonical / checkout / manufacturing).
 
 import type { VShape } from '@/lib/vector-core'
+import type { OutlinePath } from './foundation/path'
 
 export type Pt = [number, number] // [x, y]
 
@@ -18,6 +19,8 @@ export interface SafeMass {
   peakClearMM: number
   bbox: BBox
   rings: Pt[][]
+  /** The mass's outline as the screen draws it — a curve, see SafeSegment.paths. */
+  paths: OutlinePath[]
 }
 
 /** One connected island of the legal magnet-centre area, measured on a mesh. */
@@ -30,8 +33,14 @@ export interface SafeSegment {
   /** The island's peak clearance, mm — how deep its most buried point sits. */
   peakClearMM: number
   bbox: BBox
-  /** The island's edge-offset outline(s) — smooth closed rings, mm, engine y-up. */
+  /** The island's edge samples — points placed ON the exact clearance curve, mm, engine y-up. The
+   *  measurement's evidence, and what `paths` is fitted through. Never drawn: chords are not the edge. */
   rings: Pt[][]
+  /** The island's outline as the screen draws it — one curve per ring. EXACT where a closed form
+   *  exists (a canon outline's legal area is its own construction shrunk by the rim: lines and arcs, or
+   *  a convex polygon's moved sides); elsewhere a smooth cubic fit through the exact samples, within
+   *  0.01mm of every one. Empty at 'light' detail, which measures and never draws. */
+  paths: OutlinePath[]
   /** Sub-masses at the depth probe: limbs and slivers die shallow, true masses survive. */
   masses: SafeMass[]
 }
@@ -226,7 +235,15 @@ export type Governor = 0 | 1 | 2 | 3
 
 
 export interface Ring {
-  pts: Pt[] // closed ring, no duplicated last point
+  /** A POINT VIEW of the ring, for the two things that cannot hold a curve — Clipper's integer
+   *  booleans and drawing. Where `path` is present this is derived from it and is never the truth:
+   *  nothing measures against it (Dan, 2026-09-04: "no polygons on canon and anywhere"). Closed,
+   *  no duplicated last point. */
+  pts: Pt[]
+  /** THE OUTLINE — lines, circular arcs and cubic Béziers, exact. Every measurement that decides a
+   *  seat, a size or a band reads this when it is present. Absent only on rings born as points (a
+   *  raw trace), and those are the ones still to be given a path. */
+  path?: OutlinePath
 }
 
 export interface Contour {
@@ -307,6 +324,9 @@ export interface UnsupportedBoundaryInterval {
 
 export interface UnprotectedEvidence {
   ringsMM: Pt[][]
+  /** The unprotected regions as the screen draws them — smooth curves fitted through the measured
+   *  region boundary, in place of Clipper's 72-gon discs and chords. */
+  pathsMM: OutlinePath[]
   materialAreaMM2: number
   areaMM2: number
   percent: number

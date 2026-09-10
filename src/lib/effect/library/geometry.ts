@@ -1,6 +1,9 @@
 import { transformLayout } from './transforms'
-import { BOARD_HEIGHT_MM, BOARD_WIDTH_MM } from '../grid-magnet-spec'
+import { BOARD_HEIGHT_MM, BOARD_WIDTH_MM, RELEASED_PADDING_MM } from '../grid-magnet-spec'
 import type { FrameExtent, LibraryLayout, LibraryTransform, PointMM } from './types'
+
+/** THE RIM IN LATTICE UNITS — the released rim, expressed in the units a mask counts in. */
+export const rimLattice = (pitchMM: number): number => RELEASED_PADDING_MM / pitchMM
 
 /** THE BOARD IN POSITIONS, per lattice — the inverse of the flip below: millimetres to a position
  *  count. The board is fixed at 384x480mm of legal area; a coarser pitch reaches it with fewer
@@ -34,11 +37,104 @@ export function placeMM(
   }
 }
 
+/** placeMM for ONE point that is not a magnet — the centre a shape is drawn about, say. The flip is
+ *  the same one placeMM applies, which is the point of it living here: written out a second time in a
+ *  class, the two disagreed and a polygon was drawn about a mirrored centre (2026-09-06). */
+export const placePointMM = (
+  rows: number, point: readonly [number, number], pitchMM: number,
+): PointMM => [point[0] * pitchMM, (rows - 1 - point[1]) * pitchMM]
+
+/** A LATTICE NODE IN MILLIMETRES, at a phase. `off` of 0 puts a node on the origin, 0.5 straddles it
+ *  — which of the two fills an authored shape is the shape's question, but the conversion is this
+ *  file's, like every other (writing it out in a class is what drew a polygon about a mirrored
+ *  centre, 2026-09-06). */
+export const latticeNodeMM = (
+  ix: number, iy: number, offX: number, offY: number, pitchMM: number,
+): PointMM => [(ix + offX) * pitchMM, (iy + offY) * pitchMM]
+
+/** How many lattice steps span a distance — the count a search must reach to cover it. A COUNT, not a
+ *  coordinate, but it is still the pitch dividing millimetres, so it lives with the conversions. */
+export const latticeReach = (spanMM: number, pitchMM: number): number => Math.ceil(spanMM / pitchMM) + 1
+
 /** placeMM inverted for ONE point: where a millimetre click lands on the view's lattice. The
  *  flip is the same one, so it lives beside it rather than being written out at the click site. */
 export const nodeAtMM = (
   pMM: readonly [number, number], rows: number, pitchMM: number,
 ): [number, number] => [Math.round(pMM[0] / pitchMM), rows - 1 - Math.round(pMM[1] / pitchMM)]
+
+/** THE EDGE NORMALS of a regular n-gon with a CORNER AT THE TOP — outward unit vectors, y-up, in the
+ *  orientation the product publishes. ONE definition: the population is selected against these and
+ *  the outline is drawn from them, and those two disagreeing is what drew a pentagon about a
+ *  mirrored centre (2026-09-06). */
+export const regularNormals = (sides: number): readonly (readonly [number, number])[] =>
+  Array.from({ length: sides }, (_, k) => {
+    const a = Math.PI / 2 + Math.PI / sides + (2 * Math.PI * k) / sides
+    return [Math.cos(a), Math.sin(a)] as const
+  })
+
+/** Inradius over circumradius for a regular n-gon: where its edge sits when its corner is at 1. */
+export const regularApothem = (sides: number): number => Math.cos(Math.PI / sides)
+
+/** WILL THE BOARD CARRY IT — the largest shape it can is its legal area plus the rim on each side.
+ *
+ *  A record whose MAGNETS fit is not a record whose SHAPE fits: a polygon reaches half again past its
+ *  population, a diamond's corners and a pill's caps reach past theirs too, and asking only about the
+ *  magnets published records the board cannot make (2026-09-06/08). One rule, every class. */
+export const fitsBoardMM = (widthMM: number, heightMM: number): boolean =>
+  widthMM <= BOARD_WIDTH_MM + 2 * RELEASED_PADDING_MM + 1e-9
+  && heightMM <= BOARD_HEIGHT_MM + 2 * RELEASED_PADDING_MM + 1e-9
+
+const det3 = (a: readonly (readonly number[])[]): number =>
+  a[0][0] * (a[1][1] * a[2][2] - a[1][2] * a[2][1])
+  - a[0][1] * (a[1][0] * a[2][2] - a[1][2] * a[2][0])
+  + a[0][2] * (a[1][0] * a[2][1] - a[1][1] * a[2][0])
+
+/** THE SMALLEST REGULAR n-GON THAT COVERS A POINT SET, corner up, clearing every point by `rim` —
+ *  its CENTRE and its size together.
+ *
+ *  Solving for size alone, about a pinned centre, is what forced a pentagon to 1.6x the square it
+ *  wrapped: a magnet out on one side can only be reached by growing on every side, and all of that
+ *  growth lands as dead material opposite it (Dan, 2026-09-06: "why the size is larger than required
+ *  to wrap the lattice"). Freed, the shape slides to the population instead of swelling around it.
+ *
+ *  It stays deterministic because sliding is solved, not searched. The polygon is the intersection of
+ *  n half-planes whose normals do not move as it grows or slides, so "p clears edge k" is
+ *  `(p - c)·n_k <= u - rim` with u the inradius — linear in the three unknowns (u, cx, cy). Only the
+ *  extreme point per edge can ever bind, so the whole population collapses to n constraints
+ *  `u + c·n_k >= m_k`, and minimising u over them is a three-variable linear program. Its feasible
+ *  region is pointed — a regular polygon's normals sum to zero and span the plane — so the optimum
+ *  sits on a vertex where three of those hold with equality. With n <= 12 every candidate vertex can
+ *  be solved for outright and checked, which is an exact answer in bounded work: no bisection, no
+ *  search over placements, one shape per population. */
+export function smallestRegularCover(
+  points: readonly (readonly [number, number])[], sides: number, rim: number,
+): { centre: readonly [number, number]; inradius: number } {
+  if (!points.length) throw new Error('library: an empty population has no cover')
+  const normals = regularNormals(sides)
+  const m = normals.map(([nx, ny]) => {
+    let far = -Infinity
+    for (const [x, y] of points) { const d = x * nx + y * ny; if (d > far) far = d }
+    return far + rim
+  })
+  const xs = points.map(([x]) => x), ys = points.map(([, y]) => y)
+  const refX = (Math.min(...xs) + Math.max(...xs)) / 2, refY = (Math.min(...ys) + Math.max(...ys)) / 2
+  let best: { centre: readonly [number, number]; inradius: number; ref: number } | null = null
+  for (let i = 0; i < sides; i++) for (let j = i + 1; j < sides; j++) for (let k = j + 1; k < sides; k++) {
+    const rows = [i, j, k].map((q) => [1, normals[q][0], normals[q][1]] as const)
+    const det = det3(rows)
+    if (Math.abs(det) < 1e-12) continue
+    const rhs = [m[i], m[j], m[k]]
+    const at = (c: number) => det3(rows.map((row, r) => row.map((v, q) => (q === c ? rhs[r] : v))))
+    const u = at(0) / det, cx = at(1) / det, cy = at(2) / det
+    if (normals.some(([nx, ny], q) => u + cx * nx + cy * ny < m[q] - 1e-9)) continue
+    // a tie in size is broken towards the population's own middle, so one population has one shape
+    const ref = (cx - refX) ** 2 + (cy - refY) ** 2
+    if (!best || u < best.inradius - 1e-9 || (u < best.inradius + 1e-9 && ref < best.ref - 1e-12))
+      best = { centre: [cx, cy], inradius: u, ref }
+  }
+  if (!best) throw new Error('library: no regular cover for ' + sides + ' sides')
+  return { centre: best.centre, inradius: best.inradius }
+}
 
 export function boundsMM(points: readonly PointMM[]): { widthMM: number; heightMM: number } {
   const xs = points.map(([x]) => x)

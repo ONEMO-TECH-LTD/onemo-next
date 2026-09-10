@@ -3,9 +3,13 @@
 import type { Contour, Pt, UnprotectedEvidence, UnsupportedBoundaryInterval, UnsupportedPatch } from '../types'
 export type { UnprotectedEvidence, UnsupportedBoundaryInterval, UnsupportedPatch } from '../types'
 import { pointInContour } from '../foundation/geometry'
+import { pathFromRingFit } from '../foundation/path'
 import { Clipper, FillRule, PointInPolygonResult, type Path64, type Paths64 } from '@countertype/clipper2-ts'
 
 const HOLD_SCALE = 1000
+/** The drawn boundary of an unprotected region follows Clipper's measured ring this closely — the
+ *  ring is integer microns, its disc facets 72 a turn, so the fit is what the screen shows as the curve. */
+const UNPROTECTED_FIT_MM = 0.02
 const MAX_SUPPORT_SPAN_MM = 96
 
 type SupportSpan = { a: Pt; b: Pt; radiusMM: number }
@@ -254,8 +258,10 @@ export function measureProtection(
   const gaps = boundaryGaps(contour, magnets, protectionRadii, spans)
   const materialAreaMM2 = pathsAreaMM2(material), areaMM2 = pathsAreaMM2(unsupported)
   const targetGap = [...gaps].sort((a, b) => b.lengthMM - a.lengthMM)[0]
+  const ringsMM = ringsOf(unsupported)
   return {
-    ringsMM: ringsOf(unsupported), materialAreaMM2, areaMM2,
+    ringsMM, pathsMM: ringsMM.filter((ring) => ring.length >= 3).map((ring) => pathFromRingFit(ring, UNPROTECTED_FIT_MM)),
+    materialAreaMM2, areaMM2,
     percent: materialAreaMM2 ? areaMM2 / materialAreaMM2 * 100 : 0,
     patches: patchesOf(unsupported), outerBoundary: gaps,
     boundaryMM: gaps.reduce((sum, gap) => sum + gap.lengthMM, 0),

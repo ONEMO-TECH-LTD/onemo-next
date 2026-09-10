@@ -8,6 +8,7 @@ import type { ClassVariant, FrameOrientation, LibraryClass } from './class-contr
 import { frameKeyOf, transformLayout, viewName } from './transforms'
 import { draftLayoutId, selectVariant, type ResolvedSelection } from './selection'
 import type { LibraryDraft } from './drafts'
+import { bandShown, recordReleased, withBandShown, withReleased, type LibraryReleaseState } from './release'
 import type {
   LibraryFamily, LibraryFrame, LibraryLayout, LibrarySelection, LibraryTransform,
 } from './types'
@@ -27,6 +28,17 @@ export interface PanelOption {
   disabled?: boolean
   /** A hand-authored layout rather than a corpus one. */
   custom?: boolean
+  /** A frame released to presets — the admin's cherry-pick. */
+  released?: boolean
+}
+/** A release toggle. Same idiom again: it carries the whole release state it produces, so the view
+ *  never edits state — it hands one back. */
+export interface ReleaseOption {
+  id: string
+  label: string
+  /** Shown (a band) or released (a record) as things stand. */
+  on: boolean
+  next: LibraryReleaseState
 }
 /** HOW THE ADMIN IS BROWSING — which band and which way round, independent of what is selected.
  *  A filter over the listing, never a transform of a record: portrait and landscape are separate
@@ -66,6 +78,12 @@ export interface PanelOptions {
   /** The frame's canon population, plus the admin's own saved ones. The belt, the corners and
    *  the 96mm spacing are not offered here: they are filters the engine applies (Dan, 08-29). */
   layouts: PanelOption[]
+  /** THE RELEASE DIALS (Dan, 2026-09-07: "select what sizes the library is displaying and from them is
+   *  release ready for presets", "per shape so we can cherry pick"). Every block is a list of chips,
+   *  these included: `releaseBands` is every band the class reaches with its shown state — the
+   *  admin's edit view, hidden ones too; `releaseRecord` is the one toggle for the selected frame. */
+  releaseBands: ReleaseOption[]
+  releaseRecord: ReleaseOption[]
 }
 
 /** The eight lattice views, as the library's own transform. */
@@ -130,12 +148,30 @@ function rankOf(view: LibraryTransform, base: LibraryTransform, spec: LibraryCla
   return i >= 0 ? i : 10 + MIRROR_ORDER.indexOf(viewName(base, view))
 }
 
-/** The selection a class tab lands on. The page passes a family; the class decides the rest. */
+/** The selection a class tab lands on. The page passes a family; the class decides the rest.
+ *
+ *  Landing is judged UNDER THE BROWSE FILTER you arrive with. A class opens on its first record —
+ *  the smallest, band 1 — while the band you were browsing carries across, so the FRAME list showed
+ *  one band's records and the canvas a 1x1 that was in none of them (Dan, 2026-09-07: "it also
+ *  loads from B1 ... so it is not showing the true layout"). Same rule as a band chip: the first
+ *  record still visible. A band the class does not reach is not a filter here either. */
 export function selectionForFamily(
   current: LibrarySelection, family: LibraryFamily, pitchMM: number,
+  browse: LibraryBrowse = DEFAULT_LIBRARY_BROWSE, release?: LibraryReleaseState,
 ): LibrarySelection {
-  return specOf(family).open(current, pitchMM)
+  const spec = specOf(family)
+  const opened = spec.open(current, pitchMM)
+  const variants = shownVariants(spec.types.flatMap((t) => spec.variants(t.id, pitchMM)), family, release)
+  const { applied } = browseRows(variants, browse, opened)
+  const first = variants.find((v) => (applied.bandId === null || v.bandId === applied.bandId)
+    && (applied.orientation === null || v.orientation === applied.orientation))
+  return first ? selectVariant(opened, first) : opened
 }
+
+/** WHAT THE LIBRARY DISPLAYS: the class's records in its shown bands. A hidden band's records are not
+ *  offered, not landed on, not counted — the admin said the size is clutter (Dan, 2026-09-07). */
+const shownVariants = (variants: readonly ClassVariant[], classId: LibraryFamily, release?: LibraryReleaseState) =>
+  release ? variants.filter((v) => v.bandId === null || bandShown(release, classId, v.bandId)) : variants
 
 /** The band and orientation rows, and the frames that survive them. Filtering lives HERE and not
  *  in the panel: the view renders options and holds no class logic (Dan, 08-26 "no logic in UI
@@ -153,50 +189,72 @@ function browseRows(
   }
   const chip = (id: string, label: string, active: boolean, next: LibraryBrowse): BrowseOption =>
     ({ id, label, active, next, select: landing(next) })
-  const bands: BrowseOption[] = ids.length > 1 ? [
-    chip('band-all', 'all', browse.bandId === null, { ...browse, bandId: null }),
-    ...ids.map((id) => chip('band' + id, 'B' + id, browse.bandId === id, { ...browse, bandId: id })),
-  ] : []
   // only a class publishing BOTH ways round has a choice to offer
   const ways = new Set(variants.map((v) => v.orientation))
-  const frameOrientations: BrowseOption[] = ways.has('portrait') && ways.has('landscape') ? [
-    chip('o-all', 'all', browse.orientation === null, { ...browse, orientation: null }),
-    chip('o-portrait', 'portrait', browse.orientation === 'portrait', { ...browse, orientation: 'portrait' }),
-    chip('o-landscape', 'landscape', browse.orientation === 'landscape', { ...browse, orientation: 'landscape' }),
-  ] : []
+  const offersOrientation = ways.has('portrait') && ways.has('landscape')
   // A FILTER THAT IS NOT OFFERED MUST NOT FILTER. Carrying "portrait" from the rectangle tab into
   // the square tab emptied the list — squares are neither portrait nor landscape, so every chip
   // was excluded by a control the class never showed. Same for a band this class does not reach.
+  // The chips light from THIS, not from the raw browse: a carried band the class does not reach
+  // otherwise left no chip lit at all.
   const applied: LibraryBrowse = {
     bandId: browse.bandId !== null && ids.includes(browse.bandId) ? browse.bandId : null,
-    orientation: frameOrientations.length ? browse.orientation : null,
+    orientation: offersOrientation ? browse.orientation : null,
   }
+  const bands: BrowseOption[] = ids.length > 1 ? [
+    chip('band-all', 'all', applied.bandId === null, { ...browse, bandId: null }),
+    ...ids.map((id) => chip('band' + id, 'B' + id, applied.bandId === id, { ...browse, bandId: id })),
+  ] : []
+  const frameOrientations: BrowseOption[] = offersOrientation ? [
+    chip('o-all', 'all', applied.orientation === null, { ...browse, orientation: null }),
+    chip('o-portrait', 'portrait', applied.orientation === 'portrait', { ...browse, orientation: 'portrait' }),
+    chip('o-landscape', 'landscape', applied.orientation === 'landscape', { ...browse, orientation: 'landscape' }),
+  ] : []
   return { bands, frameOrientations, applied }
 }
 
 export function panelOptionsResolved(
   sel: LibrarySelection, drafts: readonly LibraryDraft[], pitchMM: number, resolved: ResolvedSelection,
-  browse: LibraryBrowse = DEFAULT_LIBRARY_BROWSE,
+  browse: LibraryBrowse = DEFAULT_LIBRARY_BROWSE, release?: LibraryReleaseState,
 ): PanelOptions {
   const { spec, variant, typeId: type, frame, layout, draft } = resolved
+  const classId = spec.classId
   // a saved custom layout is deduped from ITS OWN population, not from the corpus layout the
   // resolver falls back to for a draft (QA F2)
   const visible: LibraryLayout = draft ? { name: draftLayoutId(draft.name), nodes: draft.nodes } : layout
   const orientations = orientationOptions(sel, frame, visible, spec, spec.baseView(sel, pitchMM))
   const variantId = variant.id
   const layoutSel = (name: string): LibrarySelection => ({ ...sel, layoutId: name })
-  const allVariants = spec.variants(type, pitchMM)
+  const allVariants = shownVariants(spec.variants(type, pitchMM), classId, release)
   const rows = browseRows(allVariants, browse, sel)
+  // the release dials: every band this class reaches at all (hidden ones too — that is the edit view),
+  // and the selected frame's own release
+  const reach = [...new Set(spec.types.flatMap((t) => spec.variants(t.id, pitchMM)).map((v) => v.bandId)
+    .filter((b): b is number => b !== null))].sort((a, b) => a - b)
+  const state: LibraryReleaseState = release ?? { version: 1, classes: {} }
+  const releaseBands: ReleaseOption[] = reach.map((b) => ({
+    id: 'show' + b, label: 'B' + b, on: bandShown(state, classId, b),
+    next: withBandShown(state, classId, b, !bandShown(state, classId, b), reach),
+  }))
+  const releaseRecord: ReleaseOption[] = [{
+    id: 'release', label: 'release', on: recordReleased(state, classId, variant.id),
+    next: withReleased(state, classId, variant.id, !recordReleased(state, classId, variant.id)),
+  }]
 
   return {
     // a class with one type offers no choice, so its chip is inert. WHICH controls are inert is
     // the library's answer; the view counted the options itself and decided (law 14).
-    types: spec.types.map((t) => {
+    // A TYPE WITH NO RECORD IS NOT AN OFFER. Reading variants[0] blind crashed the whole Library the
+    // moment a class declared a type its populations never produce — the oval declares slim/banner/
+    // frame and publishes no slim (2026-09-08). A class may legitimately name a type it does not
+    // reach at every pitch, so the panel drops it rather than the page dying on it.
+    types: spec.types.flatMap((t) => {
       const first = spec.variants(t.id, pitchMM)[0]
-      return {
+      if (!first) return []
+      return [{
         id: t.id, label: t.label, active: t.id === type,
         disabled: spec.types.length === 1, next: selectVariant(sel, first),
-      }
+      }]
     }),
     bands: rows.bands,
     frameOrientations: rows.frameOrientations,
@@ -206,12 +264,13 @@ export function panelOptionsResolved(
       .map((v) => ({
         id: v.id, label: v.label, accessibleLabel: v.accessibleLabel,
         active: v.id === variantId, next: selectVariant(sel, v),
+        released: recordReleased(state, classId, v.id),
       })),
-    // a class with no named views of its own, and no turn that changes the picture, offers none
-    // CANON IS LOCKED: a square or rectangle record's orientation is part of what it is, so the
-    // page offers no turn (Dan, 2026-08-30). Presets keep the transform row — for them a turn
-    // genuinely is a view of one record.
-    orientations: spec.catalogueRole === 'canon' ? []
+    // a class with no named views of its own, and no turn that changes the picture, offers none.
+    // A CLASS THAT PUBLISHES BOTH ORDERS IS LOCKED: the record's orientation is part of what it is,
+    // so the page offers no turn (Dan, 2026-08-30 canon, 2026-09-04 pill). A preset whose layouts
+    // are node subsets of one frame keeps the row — there a turn genuinely is a view of one record.
+    orientations: spec.bothOrdersPublished ? []
       : spec.orientations.length || orientations.length > 1 ? orientations : [],
     layouts: [
       ...frame.layouts.map((l) => ({
@@ -222,5 +281,6 @@ export function panelOptionsResolved(
         active: sel.layoutId === draftLayoutId(d.name), next: layoutSel(draftLayoutId(d.name)),
       })),
     ],
+    releaseBands, releaseRecord,
   }
 }

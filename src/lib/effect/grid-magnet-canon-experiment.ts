@@ -27,6 +27,15 @@ const freeIdentity = (pts: ReadonlyArray<Pt>, pitch: number): string => {
     .sort().join(';')
 }
 
+/** "On the axis" for slim centring = within the physical radius of the smallest seat the active magnet
+ *  plan places (Corners 8 mixes sizes; its interior seats are 6 mm). Read from the plan, never a
+ *  constant. Named and exported so the rule can be proven directly: it used to be provable only
+ *  through an emergent solve, and once the cutouts became curves no fixture's winner sat in the
+ *  1 mm window between the two thresholds any more — an untestable rule is one nobody notices break. */
+export function slimOnAxisMM(cfg: GridConfig): number {
+  return (cfg.plan === 'all8' ? MAGNET_DIA_LARGE_MM : MAGNET_DIA_SMALL_MM) / 2
+}
+
 export function solveCanonExperiment(
   sized: (mm: number) => Contour, cfg: GridConfig, loMM: number, hiMM: number, minMM: number,
   anchorAtMM: (mm: number) => Pt, canonNodesMM: ReadonlyArray<Pt>,
@@ -47,10 +56,7 @@ export function solveCanonExperiment(
     trace.elapsedMs = Date.now() - started
     return result
   }
-  // "On the axis" for slim centring = within the physical radius of the smallest seat the active
-  // magnet plan places (Corners 8 mixes sizes; its interior seats are 6 mm). Read from the plan,
-  // never a constant.
-  const onAxisMM = (cfg.plan === 'all8' ? MAGNET_DIA_LARGE_MM : MAGNET_DIA_SMALL_MM) / 2
+  const onAxisMM = slimOnAxisMM(cfg)
   const attemptCanon = (pts: ReadonlyArray<Pt>): BandRung | null => {
     trace.wraps++
     const at = wrapGroup(sized, wcfg, pts, minMM, hiMM)

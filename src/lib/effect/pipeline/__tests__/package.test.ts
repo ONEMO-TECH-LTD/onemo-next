@@ -70,10 +70,12 @@ describe('the engine is liftable', () => {
     ])
   })
 
-  it('the door exports exactly the call and its two shapes', () => {
+  it('the door exports exactly the two calls and their shapes — the search and the record delivery', () => {
     const names = [...readFileSync(ENTRY, 'utf8').matchAll(/export(?:\s+type)?\s+\{([^}]+)\}/g)]
       .flatMap((m) => m[1].split(',').map((n) => n.trim())).sort()
-    expect(names).toEqual(['GridRequest', 'GridSolve', 'solveGrid'])
+    // + deliverRecord / RecordRequest (2026-09-09): a released record is delivered through the same
+    // door the search answers through — coverage, plan, protection and the seal — never searched
+    expect(names).toEqual(['GridRequest', 'GridSolve', 'RecordRequest', 'deliverRecord', 'solveGrid'])
   })
 
   it('the built package carries no repository alias', () => {

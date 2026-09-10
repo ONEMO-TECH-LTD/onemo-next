@@ -18,8 +18,9 @@
 // this module's surface can't import it as authority.
 
 import { validateSelfIntersection, signedArea, contentHash, stableStringify, type Vec2Px } from '@/lib/outline-core/math'
-import { flattenShape, type VShape } from '@/lib/vector-core'
+import type { VShape } from '@/lib/vector-core'
 import type { Contour, Pt } from './types'
+import { flattenPath, pathBoundsMM, pathFromAnchors } from './foundation/path'
 
 /** Manufacturing flatten tolerance — the cut line's fidelity (sub-kerf; kerf is 0.1–0.3 mm). */
 export const MANUFACTURING_TOLERANCE_MM = 0.05
@@ -43,23 +44,32 @@ const MIN_AREA_PX2 = 1
 const MICRO_PER_PX = 1000
 
 /**
- * The ONE producer of a manufacturing Contour from vector truth: flatten the outer path at
- * manufacturing tolerance, map px → mm with the y-flip, reverse to the mesh's winding.
- * Returns null on degenerate output (caller fails loud).
+ * The ONE producer of a manufacturing Contour from vector truth. The outer path is carried through
+ * EXACTLY — lines and cubics, mapped px → mm with the y-flip on their control points, which is exact
+ * for a Bézier — and the point list beside it is a VIEW flattened from that path at manufacturing
+ * tolerance, for Clipper and for drawing only. Until 2026-09-04 this function flattened first and
+ * kept only the points; the whole path-native product line was turned into chords at this one door,
+ * and every measurement downstream then answered against a polygon (Dan: "no polygons on canon and
+ * anywhere"). Returns null on degenerate output (caller fails loud).
  */
 export function contourFromShape(v: VShape, ctx: { mmPerPx: number; maskHeightPx: number }): Contour | null {
   const k = ctx.mmPerPx || 1
-  const tolPx = MANUFACTURING_TOLERANCE_MM / k
-  const rings = flattenShape(v, tolPx)
   // KAI-9086 (Phase-2 guard): multi-ring shapes (holes / secondary paths) are NOT yet in scope. The mm
   // contour keeps only the OUTER ring while the SVG exporter serializes ALL paths — a silent divergence
   // the moment holes/multi-piece shapes are promoted. Surface it loudly (current producers are single-path).
-  if (rings.length > 1) console.warn(`[geometry-truth] contourFromShape: ${rings.length} rings — dropping ${rings.length - 1} secondary path(s)/hole(s); mm contour is single-path until Phase 2 (KAI-9086).`)
-  const outerRing = rings[0]
-  if (!outerRing || outerRing.length < 3) return null
+  if (v.paths.length > 1) console.warn(`[geometry-truth] contourFromShape: ${v.paths.length} rings — dropping ${v.paths.length - 1} secondary path(s)/hole(s); mm contour is single-path until Phase 2 (KAI-9086).`)
+  const source = v.paths[0]
+  if (!source || source.anchors.length < 3) return null
   const H = ctx.maskHeightPx
-  const outer = outerRing.map((p) => [p.x * k, (H - p.y) * k] as Pt).reverse()
-  return { outer: { pts: outer }, holes: [] }
+  // vector space is y-DOWN px; the engine is y-UP mm. The flip reverses the winding, so the anchors
+  // are walked backwards to keep the mesh's orientation — the same reversal the point list carried.
+  const mapped = pathFromAnchors(
+    [...source.anchors].reverse().map((a) => ({ p: a.p, hIn: a.hOut, hOut: a.hIn })),
+    (p) => [p.x * k, (H - p.y) * k] as Pt,
+  )
+  const pts = flattenPath(mapped, MANUFACTURING_TOLERANCE_MM)
+  if (pts.length < 3) return null
+  return { outer: { pts, path: mapped }, holes: [] }
 }
 
 export interface ContourFeasibility {
@@ -103,4 +113,14 @@ export function vectorShapeHash(v: VShape): string {
     })),
   )
   return contentHash(stableStringify({ vectorShape: body }))
+}
+
+/** The shape's longest side in its own px space, read from the EXACT path — an arc or a cubic reaches
+ *  its extreme exactly, where a flattening only approaches it. This sets the scale every free shape is
+ *  normalised at, so a 1mm-tolerance reading here mis-sized every free shape by up to that much. */
+export function shapeLongestPx(v: VShape): number | null {
+  const source = v.paths[0]
+  if (!source || source.anchors.length < 3) return null
+  const b = pathBoundsMM(pathFromAnchors(source.anchors, (p) => [p.x, p.y] as Pt))
+  return Math.max(b.maxX - b.minX, b.maxY - b.minY, 1)
 }

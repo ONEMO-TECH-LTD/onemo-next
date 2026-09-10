@@ -14,11 +14,13 @@ import { anchorBakeOf, anchorFromBake, applyCoverage, assignSizes, centeringAnch
 import { classFrameNodes, shapeFamilyOf, type ShapeFamily } from '@/lib/effect/grid-magnet-class'
 
 import { defaultLanding } from '@/lib/effect/units/judge'
+import { makeContourSeatPredicate } from '@/lib/effect/units/layout'
 import { canonPriorityOf, positionsAcross } from '@/lib/effect/units/classifier'
 import { DEFAULT_PITCH_MM, PADDING_FLOOR_MM } from '@/lib/effect/grid-magnet-spec'
 import { contourCacheKey, makeSizer, sizeRange } from '@/lib/effect/grid-magnet-bridge'
 import type { Pt } from '@/lib/effect/types'
 import type { GridRequest, GridSolve } from './types'
+import { LOCK_PROFILE, profileSnapshot, sealRequest } from '@/lib/effect/locks'
 
 // Computed once = computed. Per-shape bakes and per-band solves are keyed by shape + config and
 // reused across interactions; a new shape clears everything. The per-size walk cache and the idle
@@ -81,7 +83,10 @@ export function anchorFnFor(
 
 const FITS_CAP = 12
 
-export function solveGrid(req: GridRequest): GridSolve {
+export function solveGrid(rawReq: GridRequest): GridSolve {
+  // THE DOOR APPLIES THE SEALED PROFILE FIRST: a locked dial is what it is sealed at, whatever the
+  // caller sent — the Grid Lab included. The record carries the profile it was made under.
+  const req = sealRequest(rawReq, LOCK_PROFILE)
   const { base, offsetMM, cfg, mode, manualBand, sizeMM, stepSel, settings,
     activeBandIds = BANDS.map((band) => band.id) } = req
   const { protectionPaddingMM } = settings
@@ -102,6 +107,7 @@ export function solveGrid(req: GridRequest): GridSolve {
         cfg.pitchMM ?? DEFAULT_PITCH_MM, protectionPaddingMM, grid.anchors.map((anchor) => anchor.dia / 2))
       return {
         contour, grid, effSize: sizeMM, rungs: [], selectedRungIndex: 0, segments: grid.segments, unprotected: evidence,
+        profile: profileSnapshot(LOCK_PROFILE),
       }
     } else {
       // Coverage is delivery-only. The entire solve and its cache identity stay raw so toggling
@@ -161,7 +167,46 @@ export function solveGrid(req: GridRequest): GridSolve {
           ? rawRungs.indexOf(landing[defaultLanding(landing, pitch)]) : defaultLanding(rawRungs, pitch)
         const idx = Math.min(stepSel ?? ruleIdx, rawRungs.length - 1)
         const perimeterOnly = cfg.perimeterOnly ?? true
-        const rungs = rawRungs.map((rg) => {
+        const padMM = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
+        const seatR = spotRadiusOf(padMM)
+        /** THE FRAME IS THE START OF THE ANSWER, NOT ALL OF IT.
+         *
+         *  Canon delivers whole rectangles. An organic shape's legal area is not a rectangle, so the
+         *  widest rectangle that can be COMPLETED is often much smaller than the area itself, and
+         *  every legal seat outside it was being thrown away: a blob at B5 measured five legal seats
+         *  in two columns the frame did not reach, left them empty, and reported 44.5% of its
+         *  material unsupported with a patch across the whole lobe (Dan, 2026-09-05: "there is clear
+         *  difference here between perimeter and empty space ... those left seats are not
+         *  recognised"). They were recognised — the engine's own seat test passes them — and then
+         *  discarded for not being part of a rectangle.
+         *
+         *  So OPTIMAL takes the canon frame and then every remaining seat on the frame's own lattice
+         *  that the seat test accepts. Nothing about the frame moves: same size, same phase, same
+         *  nodes, same centring. CANON is untouched — it remains the pure rectangle, beside it, for
+         *  comparison. Coverage still applies afterwards, so Belt thins the enlarged population the
+         *  same way it thins any other. */
+        const withLegalExtras = (rg: typeof rawRungs[number]) => {
+          if (!rg.roles.includes('optimal') || rg.at.points.length === 0) return rg
+          const fits = makeContourSeatPredicate(sized(rg.at.sizeMM), seatR)
+          if (!fits) return rg
+          const held = new Set(rg.at.points.map((q) => q[0].toFixed(3) + ',' + q[1].toFixed(3)))
+          // the frame's own lattice, extended over the shape's box — phase comes from a placed node
+          const box = bbox(sized(rg.at.sizeMM).outer.pts)
+          const [ax, ay] = rg.at.points[0]
+          const from = (a: number, lo: number) => a - Math.ceil((a - lo) / pitch) * pitch
+          const extra: Pt[] = []
+          for (let x = from(ax, box.minX); x <= box.maxX; x += pitch)
+            for (let y = from(ay, box.minY); y <= box.maxY; y += pitch) {
+              const p: Pt = [x, y]
+              if (held.has(x.toFixed(3) + ',' + y.toFixed(3))) continue
+              if (fits(p)) extra.push(p)
+            }
+          if (!extra.length) return rg
+          return { ...rg, at: { ...rg.at, points: [...rg.at.points, ...extra],
+            count: rg.at.points.length + extra.length,
+            gapsMM: [...rg.at.gapsMM, ...extra.map(() => 0)] } }
+        }
+        const rungs = rawRungs.map(withLegalExtras).map((rg) => {
           const points = applyCoverage([...rg.at.points], perimeterOnly, pitch).seated
           if (points.length === rg.at.points.length) return rg
           const kept = new Set(points)
@@ -169,8 +214,14 @@ export function solveGrid(req: GridRequest): GridSolve {
             gapsMM: rg.at.gapsMM.filter((_, i) => kept.has(rg.at.points[i])) } }
         })
         const at = rungs[idx].at
-        const wcfg: WrapConfig = { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM, magnetDiaMM: undefined, anchorAtMM: () => at.anchorMM }
-        const drawn = wrapGrid(sized, wcfg, at)
+        // THE EMITTED CENTRE BELONGS TO THE EMITTED CONTOUR. `at.anchorMM` is the centre the search
+        // used at the rung's exact contact size; the contour published is at the rung's SNAPPED size.
+        // A few microns of size apart, and the result's centre no longer sat on its own shape — 2.9um
+        // on a teardrop under Weight centring (QA @ca147429 F8). `at` keeps the search's facts for
+        // ordering and reported contact; only what is drawn takes the anchor for the size it is drawn at.
+        const drawnAt = { ...at, anchorMM: anchorAt(at.sizeMM) }
+        const wcfg: WrapConfig = { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM, magnetDiaMM: undefined, anchorAtMM: () => drawnAt.anchorMM }
+        const drawn = wrapGrid(sized, wcfg, drawnAt)
         const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
         const r = spotRadiusOf(pad)
         const segments = safeSegments(drawn.contour, r, 'full')
@@ -189,6 +240,7 @@ export function solveGrid(req: GridRequest): GridSolve {
           contour: drawn.contour, grid: { ...drawn.grid, anchors, segments },
           effSize: at.sizeMM, rungs: ladder, selectedRungIndex: idx, segments, offMM: at.centreOffMM, classificationDiagnostics: recog,
           bandClass, bandClasses, recommendation, unprotected: deliveredEvidence,
+          profile: profileSnapshot(LOCK_PROFILE),
         }
       }
       // NO LAWFUL OFFER. Judge allowed nothing in this band. The witness comes from LAYOUT's own
@@ -203,7 +255,7 @@ export function solveGrid(req: GridRequest): GridSolve {
       return {
         contour, grid, effSize: bestSeatedMM, rungs: [], selectedRungIndex: 0, segments: grid.segments,
         offers: [], diagnostic: { reason: 'no-lawful-offer', bestSeatedMM },
-        bandClass, bandClasses, recommendation,
+        bandClass, bandClasses, recommendation, profile: profileSnapshot(LOCK_PROFILE),
       }
     }
   }

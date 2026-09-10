@@ -5,6 +5,7 @@ import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 import { CLASS_SPECS, LIBRARY_FAMILIES, specOf } from '../library/class-registry'
 import { outlineFromLayout } from '../library/outline'
+import type { OutlinePath } from '../foundation/path'
 import { CATALOGUE_FORMAT_VERSION, catalogue, type CatalogueEntry } from '../library/catalogue'
 import { canonLayoutForFrame } from '../grid-magnet-library-catalogue'
 import { selectVariant } from '../library/selection'
@@ -59,7 +60,7 @@ const ZONE_FILES: Record<Exclude<Zone, 1 | 3>, readonly string[]> = {
   0: ['types.ts', 'class-contract.ts'],
   2: ['geometry.ts', 'transforms.ts', 'outline.ts', 'rules.ts', 'selection-transition.ts', 'canon.ts'],
   4: ['class-registry.ts'],
-  5: ['selection.ts', 'options.ts', 'authoring.ts', 'materialize.ts', 'catalogue.ts', 'band-ranges.ts', 'drafts.ts', 'integrity.ts'],
+  5: ['selection.ts', 'options.ts', 'authoring.ts', 'materialize.ts', 'catalogue.ts', 'band-ranges.ts', 'drafts.ts', 'integrity.ts', 'release.ts', 'release-state.ts'],
   6: ['surface.ts'],
   7: ['index.ts'],
 }
@@ -155,7 +156,7 @@ const importViolations = (overrides: Record<string, string> = {}): ImportViolati
       const toZones = edge.to.startsWith(LIBRARY + '/') ? zonesOf(edge.to) : []
       if (toZones.length === 0) {
         const approved = fromZone === 2
-          && ['grid-magnet-spec.ts', 'offset.ts'].includes(basename(edge.to))
+          && ['grid-magnet-spec.ts', 'offset.ts', 'path.ts'].includes(basename(edge.to))
         if (!approved) out.push({ ...edge, fromZone, reason: 'external edge is not allowlisted' })
         continue
       }
@@ -365,7 +366,9 @@ const bridgeViolations = (code = source(BRIDGE)): string[] => {
     const exact = (expected: readonly string[]) => names.length === expected.length
       && names.every((name, index) => name === expected[index]) && !clause?.name
     if (specifier === './library') {
-      if (!typeOnly || !exact(['MaterializedLibrary'])) violations.push(specifier)
+      // the two records the bridge puts on the canvas — a materialised selection and a released
+      // catalogue entry — as types only: it wraps data, it never resolves it
+      if (!typeOnly || !exact(['CatalogueEntry', 'MaterializedLibrary'])) violations.push(specifier)
     } else if (specifier === './types' || specifier === './grid-magnet') {
       if (!typeOnly) violations.push(specifier)
     } else if (specifier === './grid-magnet-spec') {
@@ -616,11 +619,13 @@ describe('Shape-Layout Library Law — activation schedule', () => {
       'library/selection.ts': `import { ${classId}Class } from './${classId}-class'; void ${classId}Class`,
     })).toContainEqual(expect.objectContaining({ fromZone: 5, toZone: 3 }))
     expect(importViolations({
-      'library/circle-class.ts': `import { ${classId}Class } from './${classId}-class'; void ${classId}Class`,
+      // a class file that is NOT registered — the probe's whole point. It used to be 'circle', which
+      // became a real registered class on 2026-09-06 and quietly stopped proving anything.
+      'library/hexagon-class.ts': `import { ${classId}Class } from './${classId}-class'; void ${classId}Class`,
     })).toContainEqual(expect.objectContaining({ fromZone: 3, toZone: 3, reason: 'concrete class package edge is forbidden' }))
     expect(unregisteredClassPackages([
-      ...libraryFiles(), join(LIBRARY, 'circle-class.ts'),
-    ])).toContain('circle-class.ts')
+      ...libraryFiles(), join(LIBRARY, 'hexagon-class.ts'),
+    ])).toContain('hexagon-class.ts')
     expect(importViolations({
       'library/surface.ts': source(join(LIBRARY, 'surface.ts')) + `\nimport './triangle-class'`,
     })).toContainEqual(expect.objectContaining({ fromZone: 6, toZone: 3 }))
@@ -700,11 +705,11 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     // The outline is the disks' own hull, offset. Dan, 08-28: a T or an L is a canonical class
     // with disks taken out, not a shape of its own — so there is no stated-boundary path and
     // nothing concave to draw.
-    const round = outlineFromLayout([[0, 0]], { corners: 'round' })
-    const square = outlineFromLayout([[0, 0]], { corners: 'sharp', pointRotationDeg: 0 })
-    const diamond = outlineFromLayout([[0, 0]], { corners: 'sharp', pointRotationDeg: 45 })
-    const pill = outlineFromLayout([[0, 0], [48, 0]], { corners: 'round' })
-    const convex = outlineFromLayout([[0, 0], [48, 0], [0, 48]], { corners: 'sharp' })
+    const round = outlineFromLayout([[0, 0]], { corners: 'round' }).pts
+    const square = outlineFromLayout([[0, 0]], { corners: 'sharp', pointRotationDeg: 0 }).pts
+    const diamond = outlineFromLayout([[0, 0]], { corners: 'sharp', pointRotationDeg: 45 }).pts
+    const pill = outlineFromLayout([[0, 0], [48, 0]], { corners: 'round' }).pts
+    const convex = outlineFromLayout([[0, 0], [48, 0], [0, 48]], { corners: 'sharp' }).pts
     expect(round.length).toBeGreaterThan(3)
     expect(square).not.toEqual(diamond)
     expect(pill.length).toBeGreaterThan(2)
@@ -713,9 +718,9 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     // L is a triangle-class piece with disks taken out — which is why the library already carries
     // it as Wedge 159x79 (●·· / ●●●). An H keeps its corners, so an H stays square.
     const l = [[0, 0], [0, 48], [0, 96], [48, 96], [96, 96]] as const
-    expect(outlineFromLayout(l, { corners: 'sharp' })).toHaveLength(3)
+    expect(outlineFromLayout(l, { corners: 'sharp' }).pts).toHaveLength(3)
     const h = [[0, 0], [0, 48], [0, 96], [48, 48], [96, 0], [96, 48], [96, 96]] as const
-    expect(outlineFromLayout(h, { corners: 'sharp' })).toHaveLength(4)
+    expect(outlineFromLayout(h, { corners: 'sharp' }).pts).toHaveLength(4)
   })
   it('STEP 3: one outline and hull implementation own production', () => {
     const declarations: Record<string, string[]> = { outlineFromLayout: [], convexHull: [] }
@@ -804,8 +809,9 @@ describe('Shape-Layout Library Law — activation schedule', () => {
   it('STEP 4: catalogue V4 has exact readonly data-only records and frozen identity', () => {
     type Exact = Readonly<{
       classId: string; catalogueRole: 'canon' | 'preset'
-      typeId: string; id: string; label: string; pitchMM: number; corners: 'sharp' | 'bevel' | 'round'
+      typeId: string; id: string; label: string; pitchMM: number; corners: 'sharp' | 'bevel' | 'round' | 'stadium' | 'disc' | 'regular' | 'ellipse'
       nodesMM: readonly (readonly [number, number])[]; outlineMM: readonly (readonly [number, number])[]
+      outlinePath: OutlinePath | null
       widthMM: number; heightMM: number; frameCols: number; frameRows: number
       bandId: number; legalWidthMM: number; legalHeightMM: number
     }>
@@ -813,7 +819,7 @@ describe('Shape-Layout Library Law — activation schedule', () => {
     const exact: Equal<CatalogueEntry, Exact> = true
     expect(exact).toBe(true)
     expect(CATALOGUE_FORMAT_VERSION).toBe(4)
-    const keys = ['classId', 'catalogueRole', 'typeId', 'id', 'label', 'pitchMM', 'corners', 'nodesMM', 'outlineMM', 'widthMM', 'heightMM', 'frameCols', 'frameRows', 'bandId', 'legalWidthMM', 'legalHeightMM'].sort()
+    const keys = ['classId', 'catalogueRole', 'typeId', 'id', 'label', 'pitchMM', 'corners', 'nodesMM', 'outlineMM', 'outlinePath', 'widthMM', 'heightMM', 'frameCols', 'frameRows', 'bandId', 'legalWidthMM', 'legalHeightMM'].sort()
     for (const pitchMM of [24, 48, 96]) for (const entry of catalogue(pitchMM)) {
       expect(Object.keys(entry).sort()).toEqual(keys)
       assertDataOnly(entry)
@@ -828,7 +834,7 @@ describe('Shape-Layout Library Law — activation schedule', () => {
       const ids = catalogue(pitchMM).map((entry) => entry.id)
       expect(new Set(ids).size, 'unique ids @' + pitchMM).toBe(ids.length)
     }
-    type CatalogueIdentity = { id: string; classId: string; catalogueRole: string; typeId: string; corners: 'sharp' | 'bevel' | 'round'; frameCols: number; frameRows: number; nodesMM: readonly (readonly [number, number])[] }
+    type CatalogueIdentity = { id: string; classId: string; catalogueRole: string; typeId: string; corners: 'sharp' | 'bevel' | 'round' | 'stadium' | 'disc' | 'regular' | 'ellipse'; frameCols: number; frameRows: number; nodesMM: readonly (readonly [number, number])[] }
     const identityAt = (pitchMM: number): CatalogueIdentity[] => catalogue(pitchMM).map((entry) => ({ id: entry.id, classId: entry.classId, catalogueRole: entry.catalogueRole, typeId: entry.typeId, corners: entry.corners, frameCols: entry.frameCols, frameRows: entry.frameRows, nodesMM: [...entry.nodesMM].sort((a, b) => a[0] - b[0] || a[1] - b[1]) }))
     const manifest = JSON.parse(source(join(TESTS, 'fixtures/catalogue-identity.v4.json'))) as Record<string, CatalogueIdentity[]>
     const byId = (a: CatalogueIdentity, b: CatalogueIdentity) => a.id.localeCompare(b.id)
@@ -886,8 +892,8 @@ describe('Shape-Layout Library Law — activation schedule', () => {
   }, 20_000)
   it('STEP 5: surface, bridge, barrel, and shell use the contract boundary', () => {
     expect(barrelExports()).toEqual({
-      types: ['BrowseOption', 'CatalogueEntry', 'ClassBandRange', 'CornerMode', 'LibraryBrowse', 'LibraryDraft', 'LibraryEdit', 'LibraryFamily', 'LibrarySelection', 'LibrarySurface', 'MaterializedLibrary', 'PanelOption', 'PanelOptions'],
-      values: ['CATALOGUE_FORMAT_VERSION', 'DEFAULT_LIBRARY_BROWSE', 'DEFAULT_LIBRARY_SELECTION', 'DRAFT_STORE_KEY', 'LIBRARY_FAMILIES', 'bandIdOfMM', 'canonCatalogue', 'catalogue', 'classBandRanges', 'deleteEdit', 'librarySurface', 'saveEdit', 'selectionForFamily', 'sizeRangeForBand', 'startAdd', 'startEdit', 'toggleNodeAt'],
+      types: ['BrowseOption', 'CatalogueEntry', 'ClassBandRange', 'CornerMode', 'LibraryBrowse', 'LibraryDraft', 'LibraryEdit', 'LibraryFamily', 'LibraryReleaseState', 'LibrarySelection', 'LibrarySurface', 'MaterializedLibrary', 'PanelOption', 'PanelOptions', 'ReleaseOption', 'ReleasedShape'],
+      values: ['CATALOGUE_FORMAT_VERSION', 'DEFAULT_LIBRARY_BROWSE', 'DEFAULT_LIBRARY_SELECTION', 'DRAFT_STORE_KEY', 'LIBRARY_FAMILIES', 'LIBRARY_RELEASE_STATE', 'bandIdOfMM', 'canonCatalogue', 'catalogue', 'classBandRanges', 'deleteEdit', 'knownReleaseIds', 'librarySurface', 'orientationOf', 'releasedRecords', 'releasedShapes', 'saveEdit', 'selectionForFamily', 'sizeRangeForBand', 'startAdd', 'startEdit', 'toggleNodeAt'],
       wildcards: [],
       aliases: [],
     })

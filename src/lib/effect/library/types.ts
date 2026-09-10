@@ -4,7 +4,15 @@ export interface FrameExtent { readonly cols: number; readonly rows: number }
 
 export interface LibraryLayout { readonly name: string; readonly nodes: ReadonlyArray<readonly [number, number]>; readonly note?: string }
 
-export interface LibraryFrame extends FrameExtent { readonly layouts: readonly LibraryLayout[] }
+export interface LibraryFrame extends FrameExtent {
+  readonly layouts: readonly LibraryLayout[]
+  /** A RECORD'S IDENTITY IS ITS EXTENT — unless the class publishes more than one population at the
+   *  same extent, which the circle does: a 3x3 box holds both the nine-magnet disc and the five, and
+   *  they are two products, not one product with two settings. Such a class states its own key here
+   *  and every other class is untouched (Dan, 2026-09-06: "layouts are actually part of the layout
+   *  selection we dont need to have separate panels"). */
+  readonly key?: string
+}
 
 /** A display transform over a canonical (tall) layout. Pure; closed over the frame. */
 export interface LibraryTransform { transpose: boolean; flipX: boolean; flipY: boolean }

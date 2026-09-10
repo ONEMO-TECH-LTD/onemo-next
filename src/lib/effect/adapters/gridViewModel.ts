@@ -4,9 +4,10 @@
 // classificationDiagnostics are engine decisions carried through, not recomputed.
 
 import type { Contour, GridResult, SafeSegment, UnprotectedEvidence } from '../types'
-import type { GridSolve } from '../pipeline/types'
+import type { GridSolve, RecordRequest } from '../pipeline/types'
 import type { Band } from '../grid-magnet-spec'
-import { bandOuterMM } from '../grid-magnet'
+import { bandOuterMM, pathToSvgD, type OutlinePath } from '../grid-magnet'
+import { deliverRecord } from '../pipeline/deliver-record'
 
 /** The bench model exactly as the page consumes it. */
 export interface GridPageModel {
@@ -36,8 +37,29 @@ export function toPageModel(solve: GridSolve): GridPageModel {
   }
 }
 
+/** A RELEASED RECORD as the bench model — delivered on the calling thread, at once: a record is
+ *  precomputed, so it never waits behind a solve in the worker's queue (QA, 2026-09-09). The adapter
+ *  still decides nothing; delivery (coverage, plan, protection, seal) is the pipeline's. */
+export function deliveredRecordPageModel(req: RecordRequest): GridPageModel {
+  return toPageModel(deliverRecord(req))
+}
+
 /** The outline range a band spans for the shell's manual-size controls — a delegate to the engine's
  *  own conversion (units/layout), so the page holds no engine arithmetic (T2). */
 export function bandRangeForControl(band: Band, paddingMM: number): { minMM: number; maxMM: number } {
   return bandOuterMM(band, paddingMM)
+}
+
+/** THE OUTLINE AS THE SCREEN SHOULD DRAW IT: the exact path where the ring has one — arcs as `A`,
+ *  cubics as `C` — and the point view only for a ring born as points. The shell stroked the flattened
+ *  view and at zoom it read as a polygon, because it was one (Dan, 2026-09-05: "it is absolute
+ *  polygonal line"). Engine millimetres are y-up; the screen is y-down, so the path is flipped here. */
+export function outlineSvgD(contour: Contour): string {
+  if (contour.outer.path) return pathToSvgD(contour.outer.path, { flipY: true })
+  return 'M ' + contour.outer.pts.map(([x, y]) => `${x.toFixed(2)} ${(-y).toFixed(2)}`).join(' L ') + ' Z'
+}
+
+/** Any exact path, as the screen draws it — same flip as the outline. */
+export function svgDOf(path: OutlinePath): string {
+  return pathToSvgD(path, { flipY: true })
 }

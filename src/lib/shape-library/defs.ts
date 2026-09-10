@@ -210,6 +210,21 @@ export function hasVectorDef(kind: string): kind is VectorShapeKind {
   return kind in DEFS
 }
 
+/** IS THIS PRESET AN EXACT CIRCLE? The engine can seat a true circle analytically instead of against
+ *  its outline, and the shell used to decide that by comparing the preset name — which reads as a
+ *  shell branching on a name once the layout library publishes a class of the same word. The fact
+ *  belongs here, with the definitions: this kind IS the kappa circle. */
+export const isExactCircle = (kind: VectorShapeKind): boolean => kind === CIRCLE_KIND
+const CIRCLE_KIND: VectorShapeKind = 'circle'
+
+/** WHICH DIAL A PRESET ANSWERS TO, if any — the polygon counts sides, the star counts points, and
+ *  the rest take no parameter. The shell used to ask by name; those names are now published layout
+ *  classes too, and a shell comparing against one reads as a shell that knows the library's classes.
+ *  What it actually needs is what the shape offers, which is this. */
+export type ShapeDial = 'sides' | 'points' | null
+export const dialOf = (kind: VectorShapeKind): ShapeDial =>
+  kind === 'polygon' ? 'sides' : kind === 'star' ? 'points' : null
+
 export function unitShape(kind: VectorShapeKind, params: VectorShapeParams = {}): VShape {
   return DEFS[kind](params)
 }

@@ -6,11 +6,11 @@ import { frameKeyOf } from './transforms'
 /** Every violation named; an empty list means the corpus is sound. */
 export function registryIntegrity(): string[] {
   const out: string[] = []
-  for (const classId of LIBRARY_FAMILIES) {
+  for (const pitchMM of [24, 48, 96]) for (const classId of LIBRARY_FAMILIES) {
     const spec = specOf(classId)
-    for (const pitchMM of [24, 48, 96]) for (const type of spec.types) {
+    for (const type of spec.types) {
       const variants = spec.variants(type.id, pitchMM)
-      if (!variants.length) out.push(classId + ' ' + type.id + ' @' + pitchMM + ': no variants')
+      if (!variants.length) { out.push(classId + ' ' + type.id + ' @' + pitchMM + ': no variants'); continue }
       const variantIds = new Set<string>()
       for (const variant of variants) {
         if (variantIds.has(variant.id)) out.push(classId + ' ' + type.id + ' @' + pitchMM + ': duplicate variant id ' + variant.id)

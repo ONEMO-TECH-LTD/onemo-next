@@ -1,6 +1,7 @@
 import { LIBRARY_FAMILIES, specOf } from './class-registry'
 import { selectVariant } from './selection'
 import { materializeSelection } from './materialize'
+import type { OutlinePath } from './outline'
 import type { CatalogueRole, CornerMode } from './class-contract'
 import type { LibraryFamily, PointMM } from './types'
 import { bandIdOfMM, legalBoxMM } from './rules'
@@ -27,7 +28,12 @@ export type CatalogueEntry = Readonly<{
   pitchMM: number
   corners: CornerMode
   nodesMM: readonly PointMM[]
+  /** The outline as points — a VIEW for Clipper and drawing, flattened from `outlinePath` where
+   *  that exists. Nothing measures against it. */
   outlineMM: readonly PointMM[]
+  /** THE OUTLINE, exact — lines and arcs of the rim radius — wherever it bends; null for a sharp or
+   *  bevelled finish, whose offset polygon is already exact as points. Plain data, JSON-safe. */
+  outlinePath: OutlinePath | null
   widthMM: number
   heightMM: number
   frameCols: number
@@ -60,7 +66,7 @@ export function catalogue(pitchMM: number): readonly CatalogueEntry[] {
           id: [classId, type.id, variant.id, layout.name, selection.view.transpose ? 't' : 'n', selection.view.flipX ? 'x' : 'n', selection.view.flipY ? 'y' : 'n'].map(encodeURIComponent).join('/'),
           label: variant.label + ' · ' + layout.name,
           pitchMM, corners: variant.outline.corners,
-          nodesMM: materialized.nodesMM, outlineMM: materialized.outlineMM,
+          nodesMM: materialized.nodesMM, outlineMM: materialized.outlineMM, outlinePath: materialized.outlinePath,
           widthMM: materialized.widthMM, heightMM: materialized.heightMM,
           frameCols: materialized.frameCols, frameRows: materialized.frameRows,
           bandId,

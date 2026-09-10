@@ -9,6 +9,7 @@ import type { Contour, Pt } from './types'
 import type { GridResult } from './grid-magnet'
 import { MAGNET_DIA_SMALL_MM, RELEASED_PADDING_MM } from './grid-magnet-spec'
 import {
+  type CatalogueEntry,
   type MaterializedLibrary,
 } from './library'
 
@@ -24,22 +25,40 @@ const pts = (ps: MaterializedLibrary['nodesMM']): Pt[] => ps.map((p) => [p[0], p
 /** The engine's picture of a materialised library record. The lattice field is seeded only when
  *  nothing is drawn, so an empty canvas still has somewhere to click. */
 export function libraryStageModel(materialized: MaterializedLibrary, pitchMM: number): LibraryStageModel {
-  const nodesMM = pts(materialized.nodesMM)
-  const contour: Contour = { outer: { pts: pts(materialized.outlineMM) } , holes: [] }
+  return { ...stageOf(materialized, materialized.legalBoxMM, materialized.seedMM, pitchMM), error: materialized.error }
+}
+
+/** A RELEASED RECORD on the bench — the catalogue entry itself, put on the canvas as it was
+ *  published: its magnets, its exact outline, its size. Nothing is solved; the Library already
+ *  answered (Dan, 2026-09-09: "the grid settings display the sizes … without solving"). The legal box
+ *  is the magnets' own extent, as the library materialises it. */
+export function recordStageModel(record: CatalogueEntry, pitchMM: number): LibraryStageModel {
+  const xs = record.nodesMM.map(([x]) => x), ys = record.nodesMM.map(([, y]) => y)
+  const legalBoxMM = record.nodesMM.length
+    ? { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) } : null
+  return stageOf(record, legalBoxMM, null, pitchMM)
+}
+
+function stageOf(
+  rec: Pick<MaterializedLibrary, 'nodesMM' | 'outlineMM' | 'outlinePath' | 'frameCols' | 'frameRows'>,
+  legalBoxMM: MaterializedLibrary['legalBoxMM'], seedMM: MaterializedLibrary['seedMM'], pitchMM: number,
+): LibraryStageModel {
+  const nodesMM = pts(rec.nodesMM)
+  const contour: Contour = { outer: { pts: pts(rec.outlineMM), path: rec.outlinePath ?? undefined }, holes: [] }
   const grid: GridResult = {
     anchors: nodesMM.map((p) => ({ p, dia: MAGNET_DIA_SMALL_MM })),
     pitchCentreMM: pitchMM,
-    lattice: materialized.seedMM ? [[materialized.seedMM[0], materialized.seedMM[1]] as Pt] : [],
+    lattice: seedMM ? [[seedMM[0], seedMM[1]] as Pt] : [],
     phaseMM: [0, 0],
     panMM: [0, 0],
     spotRadiusMM: RELEASED_PADDING_MM,
     contactsMM: [],
     segments: [],
-    legalBoxMM: materialized.legalBoxMM,
+    legalBoxMM,
     centresMM: [],
-    centreMainMM: [(materialized.frameCols - 1) * pitchMM / 2, (materialized.frameRows - 1) * pitchMM / 2],
+    centreMainMM: [(rec.frameCols - 1) * pitchMM / 2, (rec.frameRows - 1) * pitchMM / 2],
     seatings: [],   // a library record is one authored population; nothing was registered
     canonSeatings: [],
   }
-  return { contour, grid, error: materialized.error }
+  return { contour, grid }
 }

@@ -12,6 +12,7 @@ function squareFrames(pitchMM: number): readonly LibraryFrame[] {
 export const squareClass = registryClass({
   classId: 'square',
   catalogueRole: 'canon',
+  bothOrdersPublished: true,
   types: [{ id: 'box', label: 'box' }],
   frames: (pitchMM) => squareFrames(pitchMM),
   typeOfFrame: () => 'box',

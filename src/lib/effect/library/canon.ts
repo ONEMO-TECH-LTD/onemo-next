@@ -19,6 +19,10 @@
 // was mine on 2026-08-25 and it read "no generation AT SOLVE TIME", which is a different claim —
 // what was rejected then was a solve-time generator filtering patterns per family.
 
+import { boardPositions, latticeNodeMM, latticeReach, regularApothem, regularNormals, smallestRegularCover } from './geometry'
+import { outlineFromLayout } from './outline'
+import { clearsPathBy, pointInPath } from '../foundation/path'
+import { OVAL_SIZES_MM, RELEASED_PADDING_MM } from '../grid-magnet-spec'
 import type { LibraryFrame } from './types'
 
 type Pt = readonly [number, number]
@@ -36,6 +40,38 @@ export function diamondMask(cols: number, nodes: readonly Pt[]): Pt[] {
   return nodes.filter(([x, y]) => Math.abs(x - r) + Math.abs(y - r) <= r)
 }
 
+/** AN APPROVED SHAPE — the magnets a pill's rounded ends can hold BEYOND the rectangle it wraps.
+ *
+ *  A pill grows along its length by half its width so the corner magnets keep their rim, and that new
+ *  material is not empty: it is lattice like everything else. Dan, 2026-09-04: "frame can naturally
+ *  hold single top magnet". A three-wide frame gains one at the centre of each end; a four-wide gains
+ *  two; a banner or a slim gains none, because neither grew far enough to hold one.
+ *
+ *  Lattice arithmetic, pitch cancelled: the end cap is a circle of radius r + rim about the end of the
+ *  population's centre line, so a position is held exactly when it lies within r of that line. */
+export function pillCapNodes(cols: number, rows: number, across?: PillAxis): Pt[] {
+  const spanX = cols - 1, spanY = rows - 1
+  // which side is the WIDTH — the caps are drawn about the other. Left unsaid, the shorter side; said,
+  // a body may be wider than it is long (Dan, 2026-09-07: a 3x4 pill is two rows of three plus a
+  // magnet at each end)
+  const tall = across ? across === 'x' : spanX <= spanY
+  const r = (tall ? spanX : spanY) / 2
+  const reach = Math.ceil(r)
+  // the population's centre line: the axis the end caps are drawn about
+  const held = (across: number, along: number, alongSpan: number) =>
+    Math.hypot(across, Math.max(0, -along, along - alongSpan)) <= r + 1e-9
+  const out: Pt[] = []
+  const [wide, long] = tall ? [cols, rows] : [rows, cols]
+  const longSpan = tall ? spanY : spanX
+  for (let across = 0; across < wide; across++) for (let k = 1; k <= reach; k++) {
+    for (const along of [-k, long - 1 + k]) {
+      if (!held(Math.abs(across - (wide - 1) / 2), along, longSpan)) continue
+      out.push(tall ? [across, along] : [along, across])
+    }
+  }
+  return out
+}
+
 /** The name a population carries. One frame, one population — `single` is kept for a one-magnet
  *  frame because catalogue ids are built from it and it is the existing identity. */
 export const CANON_LAYOUT = 'full'
@@ -46,3 +82,258 @@ export function frameOf(cols: number, rows: number, mask?: (nodes: readonly Pt[]
   const nodes = mask ? mask(fullNodes(cols, rows)) : fullNodes(cols, rows)
   return { cols, rows, layouts: [{ name: nodes.length === 1 ? SINGLE_LAYOUT : CANON_LAYOUT, nodes }] }
 }
+
+/** THE RECTANGULAR FRAME SET — every ordered frame the board holds, both ways round.
+ *
+ *  It lives in the canon because more than one class publishes it: the rectangle (sharp) and the
+ *  pill (round ends) offer the SAME frames and differ only at the edge. A class may not import
+ *  another class, and two copies of this loop would be one edit away from disagreeing, so the
+ *  arithmetic has one home (2026-09-04).
+ *
+ *  Portrait and landscape are separate frames, published separately: a 9-wide board carries 3×10
+ *  and cannot carry 10×3 (Dan, 2026-08-30). */
+function rectangularFrameSizes(pitchMM: number): ReadonlyArray<readonly [number, number]> {
+  const { cols, rows } = boardPositions(pitchMM)
+  const out: Array<readonly [number, number]> = []
+  for (let c = 1; c <= cols; c++) for (let r = c + 1; r <= rows; r++) {
+    out.push([c, r])
+    if (r <= cols) out.push([r, c])
+  }
+  return out
+}
+
+export function rectangularFrames(pitchMM: number): readonly LibraryFrame[] {
+  return rectangularFrameSizes(pitchMM).map(([c, r]) => frameOf(c, r))
+}
+
+/** Which side of a pill's body is its width: the caps are drawn about the other. */
+type PillAxis = 'x' | 'y'
+
+/** The axis a pill frame's key carries, where it carries one. A square extent hides which way the
+ *  pill lies — a 2x2 body is a 72x120 stadium one way and 120x72 the other — so those keys say. */
+export const pillAxisOfKey = (key: string): PillAxis | undefined =>
+  key.endsWith('-x') ? 'x' : key.endsWith('-y') ? 'y' : undefined
+
+/** WHAT KIND OF PILL a frame is — read off its population, so the record and its category cannot
+ *  disagree. Width is the side the caps are drawn about; the body is the run of full lines across it.
+ *  Fatter with each step (Dan, 2026-09-07: "after frame make it 'stadium' and 'o-shape'"):
+ *    slim    — one wide            banner  — two wide
+ *    frame   — body longer than wide (3x6, 4x7)      stadium — a square body plus its caps (3x5, 4x6)
+ *    o-shape — body wider than long (3x4, 4x4, 4x5) */
+export function pillTypeOf(frame: LibraryFrame): string {
+  const nodes = frame.layouts[0].nodes
+  // a square extent says which way it lies; otherwise the caps run along the longer side
+  const across = pillAxisOfKey(frame.key ?? '') ?? (frame.cols <= frame.rows ? 'x' : 'y')
+  const wide = across === 'x' ? frame.cols : frame.rows
+  if (wide <= 1) return 'slim'
+  if (wide === 2) return 'banner'
+  const perLine = new Map<number, number>()
+  for (const [x, y] of nodes) { const k = across === 'x' ? y : x; perLine.set(k, (perLine.get(k) ?? 0) + 1) }
+  let long = 0
+  for (const n of perLine.values()) if (n === wide) long++
+  return long > wide ? 'frame' : long === wide ? 'stadium' : 'o-shape'
+}
+
+/** THE PILL'S FRAMES — a body's population plus the magnets its rounded ends hold, published at the
+ *  extent that population actually occupies. A three-wide pill reaches one lattice row past the body
+ *  at each end, so its frame is that much taller: nodes outside their own frame would break transform
+ *  closure, and the frame is the truthful extent either way.
+ *
+ *  THE BODY IS ANY RECTANGLE, SQUARES INCLUDED, AND EITHER SIDE MAY BE THE WIDTH. Wrapping only the
+ *  rectangle's frames, shorter side as width, left whole bands empty: no 2x2 (the B2 banner), no
+ *  3x4 (two rows of three plus one at each end, B4), no 3x5 (the 3x3 square plus one at each end,
+ *  B5) — Dan, 2026-09-07: "B5 has place there for sure it is 3x3 square with single magnets on each
+ *  end like in B6", "it can be 3x4 and 3x5". The one body NOT a pill is one a single row deep along
+ *  its length: its straight section is zero and the shape is a disc, which is the circle's. */
+export function pillFrames(pitchMM: number): readonly LibraryFrame[] {
+  const board = boardPositions(pitchMM)
+  const out: LibraryFrame[] = []
+  const byKey = new Map<string, string>()
+  for (let c = 1; c <= board.cols; c++) for (let r = 1; r <= board.rows; r++) for (const across of ['x', 'y'] as const) {
+    const long = across === 'x' ? r : c
+    if (long < 2) continue
+    const nodes = [...fullNodes(c, r), ...pillCapNodes(c, r, across)]
+    const xs = nodes.map(([x]) => x), ys = nodes.map(([, y]) => y)
+    const [ox, oy] = [Math.min(...xs), Math.min(...ys)]
+    const cols = Math.max(...xs) - ox + 1, rows = Math.max(...ys) - oy + 1
+    // grown out of the board is not a frame the board can carry
+    if (cols > board.cols || rows > board.rows) continue
+    const placed = nodes.map(([x, y]) => [x - ox, y - oy] as Pt).sort((a, b) => a[0] - b[0] || a[1] - b[1])
+    const key = cols + 'x' + rows + (cols === rows ? '-' + across : '')
+    const population = placed.map((n) => n.join(',')).join(';') + '|' + across
+    const prior = byKey.get(key)
+    if (prior === population) continue
+    if (prior !== undefined) throw new Error('library: pill ' + key + ' at ' + pitchMM + 'mm names two populations')
+    byKey.set(key, population)
+    out.push({ cols, rows, key, layouts: [{ name: CANON_LAYOUT, nodes: placed }] })
+  }
+  return out.sort((a, b) => Math.max(a.cols, a.rows) - Math.max(b.cols, b.rows) || a.cols - b.cols || a.rows - b.rows)
+}
+
+/** THE OVALS — AUTHORED SHAPES, LATTICE-DECIDED POPULATIONS.
+ *
+ *  Dan drew three in Figma (2026-09-09) and the SIZES are his: 72x120, 84x120, 96x168 millimetres. A
+ *  generator cannot reproduce them and should not try — the smallest legal ellipse around a 2x2 grid
+ *  is 92x92, a circle, where he drew 84x120, a portrait oval. That is judgement (Dan: "feed the preset
+ *  canon hand made with layouts").
+ *
+ *  The POPULATION is not authored. Each shape holds whatever the lattice puts inside it with the rim
+ *  clear, which is the library's own doctrine everywhere else — the grid dictates the layout. So one
+ *  drawn oval is one product at every released lattice, carrying 3 magnets at 48mm and more at 24.
+ *  The sizes live in the SPEC with every other millimetre. */
+export function ovalFrames(pitchMM: number): readonly LibraryFrame[] {
+  const board = boardPositions(pitchMM)
+  const out: LibraryFrame[] = []
+  const seen = new Set<string>()
+  for (const size of OVAL_SIZES_MM) {
+    const nodes = ellipseHolds(size.widthMM, size.heightMM, pitchMM)
+    if (!nodes.length) continue
+    const cols = Math.max(...nodes.map(([x]) => x)) + 1, rows = Math.max(...nodes.map(([, y]) => y)) + 1
+    if (cols > board.cols || rows > board.rows) continue
+    // the record's identity is the drawn shape AND the grid that lattice puts in it: the same 72x120
+    // oval carries three magnets at 48mm and two at 96, and those are two products, not one wearing
+    // two frames — a catalogue id must mean the same thing at every pitch (gate STEP 4)
+    const key = size.widthMM + 'x' + size.heightMM + '-' + cols + 'x' + rows
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push({ cols, rows, key, layouts: [{ name: nodes.length === 1 ? SINGLE_LAYOUT : CANON_LAYOUT, nodes }] })
+  }
+  return out
+}
+
+/** The authored size a frame carries, by its key. */
+export const ovalSizeMM = (key: string): { widthMM: number; heightMM: number } | null =>
+  OVAL_SIZES_MM.find((o) => key.startsWith(o.widthMM + 'x' + o.heightMM + '-')) ?? null
+
+/** Every lattice node an authored oval holds with the rim clear — at the PHASE that fills it best.
+ *
+ *  The lattice may sit on the shape's centre or straddle it, per axis, and which one fills an oval is
+ *  not the same on both: Dan's 84x120 carries four magnets around its centre (straddling on both
+ *  axes) while his 96x168 carries six — straddling across, centred along. Phasing on a node alone gave
+ *  three magnets to all three ovals and lost his layouts entirely; the fullest of the four phases
+ *  returns each of them exactly. The disc makes the same choice, one axis at a time. */
+function ellipseHolds(widthMM: number, heightMM: number, pitchMM: number): Pt[] {
+  const { path } = outlineFromLayout([[0, 0]], { corners: 'ellipse', ellipseMM: { widthMM, heightMM } })
+  if (!path) return []
+  const reach = latticeReach(Math.max(widthMM, heightMM), pitchMM)
+  let best: Pt[] = []
+  for (const offX of [0, 0.5]) for (const offY of [0, 0.5]) {
+    const held: Array<readonly [number, number]> = []
+    for (let ix = -reach; ix <= reach; ix++) for (let iy = -reach; iy <= reach; iy++) {
+      const [px, py] = latticeNodeMM(ix, iy, offX, offY, pitchMM)
+      const p: [number, number] = [px, py]
+      if (pointInPath(path, p) && clearsPathBy(path, p, RELEASED_PADDING_MM)) held.push([ix, iy])
+    }
+    if (held.length <= best.length) continue
+    const ox = Math.min(...held.map(([x]) => x)), maxY = Math.max(...held.map(([, y]) => y))
+    best = held.map(([x, y]) => [x - ox, maxY - y] as Pt).sort((p, q) => p[0] - q[0] || p[1] - q[1])
+  }
+  return best
+}
+
+/** THE CIRCLE'S POPULATIONS — what a round shape can actually hold, which is not what a square box
+ *  of the same width holds. A circle of 216mm classifies as a 5x5 box and cannot seat one: the corner
+ *  node of a full 5x5 sits 96*sqrt(2) = 135.8mm from the centre and needs 147.8mm of radius, so the
+ *  solver was left to discover a partial frame by search and delivered 18 of 25 with the gaps wherever
+ *  the phase happened to fall (Dan, 2026-09-06: "add to the library circle so we do not guess it").
+ *
+ *  Published as arithmetic, like every other canon: grow a radius from the centre and take every
+ *  lattice node inside it. Each distinct radius that admits a new node is a distinct population. Two
+ *  centres exist on a lattice and both are real products — ON a node (odd counts: 1, 5, 9, 13, 21) and
+ *  on a cell centre, halfway between four (even counts: 4, 12, 16). Nothing is masked or chosen; the
+ *  lattice and the circle decide together.
+ *
+ *  The outline is then the circle these nodes fit in — max node distance plus the rim — which the
+ *  outline recipe draws exactly rather than as a rounded polygon. */
+function circleLayouts(pitchMM: number): ReadonlyArray<{ nodes: Pt[]; cols: number; rows: number }> {
+  const board = boardPositions(pitchMM)
+  const reach = Math.max(board.cols, board.rows)
+  const out: Array<{ nodes: Pt[]; cols: number; rows: number }> = []
+  const seen = new Set<string>()
+  for (const onNode of [true, false]) {
+    // candidate nodes about the centre, in lattice units; a cell centre sits at (0.5, 0.5)
+    const off = onNode ? 0 : 0.5
+    const grid: Array<{ x: number; y: number; d: number }> = []
+    for (let x = -reach; x <= reach; x++) for (let y = -reach; y <= reach; y++)
+      grid.push({ x, y, d: Math.hypot(x - off, y - off) })
+    const radii = [...new Set(grid.map((g) => +g.d.toFixed(9)))].sort((a, b) => a - b)
+    for (const r of radii) {
+      const held = grid.filter((g) => g.d <= r + 1e-9)
+      const xs = held.map((g) => g.x), ys = held.map((g) => g.y)
+      const cols = Math.max(...xs) - Math.min(...xs) + 1, rows = Math.max(...ys) - Math.min(...ys) + 1
+      if (cols > board.cols || rows > board.rows) break
+      const ox = Math.min(...xs), oy = Math.min(...ys)
+      const nodes = held.map((g) => [g.x - ox, g.y - oy] as Pt)
+        .sort((a, b) => a[0] - b[0] || a[1] - b[1])
+      const key = nodes.map((n) => n.join(',')).join(';')
+      if (seen.has(key)) continue
+      seen.add(key)
+      out.push({ nodes, cols, rows })
+    }
+  }
+  return out.sort((a, b) => a.nodes.length - b.nodes.length)
+}
+
+/** A POLYGON'S POPULATION — the square canon decides how big the shape is, and the shape then holds
+ *  EVERY seat it legally can.
+ *
+ *  Both halves matter and I shipped only the first. A published record is a complete population: the
+ *  square is fully populated, the diamond is its whole mask, the pill takes the magnets its ends grew
+ *  room for. A pentagon drawn around a 4x4 square is much bigger than that square, so it has seats to
+ *  spare — and a record that leaves them empty is not a vetted layout (Dan, 2026-09-06: "no empty
+ *  seats how do you even let it be?").
+ *
+ *  Both halves are arithmetic. The shape is the SMALLEST regular n-gon covering the square canon by
+ *  the rim — centre and size solved together, see smallestRegularCover; pinning the centre and
+ *  solving size alone made every record far bigger than its magnets need. The population is then
+ *  every lattice node that shape clears. Admitting them cannot make it grow — they were chosen for
+ *  fitting inside it — so it is one solve and one pass, and the outline recomputes the same size
+ *  from the finished population. */
+export function polygonPopulation(
+  sides: number, cols: number, rows: number, rimLattice: number,
+): { nodes: Pt[]; centre: Pt; inradius: number } {
+  // The lattice counts rows DOWNWARD and the finished record is laid out y-UP (placeMM flips it), so
+  // the shape is solved in the placed orientation: w = -y. Selecting against the unflipped one chose
+  // the population of a pentagon pointing the other way, and the shape drawn around them then had to
+  // grow to cover magnets it was never sized for.
+  const seed = fullNodes(cols, rows).map(([x, y]) => [x, -y] as const)
+  const { centre: [cx, cw], inradius } = smallestRegularCover(seed, sides, rimLattice)
+  const normals = regularNormals(sides)
+  const clear = inradius - rimLattice
+  const reach = Math.ceil(inradius / regularApothem(sides)) + 1
+  const held: Pt[] = []
+  for (let x = Math.floor(cx) - reach; x <= Math.ceil(cx) + reach; x++)
+    for (let w = Math.floor(cw) - reach; w <= Math.ceil(cw) + reach; w++)
+      if (normals.every(([nx, ny]) => (x - cx) * nx + (w - cw) * ny <= clear + 1e-9)) held.push([x, -w])
+  const xs = held.map(([x]) => x), ys = held.map(([, y]) => y)
+  const ox = Math.min(...xs), oy = Math.min(...ys)
+  return {
+    nodes: held.map(([x, y]) => [x - ox, y - oy] as Pt).sort((a, b) => a[0] - b[0] || a[1] - b[1]),
+    // An odd-sided polygon's complete population is NOT symmetric about its centre, and the solved
+    // centre is not the population's middle either, so it cannot be read off the bounding box — the
+    // record states it, exactly as the stadium takes the frame rather than the magnets.
+    centre: [cx - ox, -cw - oy],
+    inradius,
+  }
+}
+
+/** The circle's frames. ONE POPULATION PER RECORD, like every other class — a 3x3 box holds both the
+ *  nine-magnet disc and the five-magnet cross, and those are two products rather than one product
+ *  with a second panel of settings. They share an extent, so each states its own key. */
+export function circleFrames(pitchMM: number): readonly LibraryFrame[] {
+  return circleLayouts(pitchMM)
+    .map((layout) => ({
+      cols: layout.cols, rows: layout.rows,
+      key: layout.cols + 'x' + layout.rows + '-' + layout.nodes.length,
+      layouts: [{ name: CANON_LAYOUT, nodes: layout.nodes }],
+    }))
+    // fullest first within an extent, so a 3x3 opens on the square's own population and the sparser
+    // disc stands beside it (Dan: "we must follow square add the 9 points but also add alternative
+    // layouts like band 3 current 5 points")
+    .sort((a, b) => a.cols - b.cols || a.rows - b.rows
+      || b.layouts[0].nodes.length - a.layouts[0].nodes.length)
+}
+/** How narrow a rectangular frame is on its minor axis — independent of which way round it sits:
+ *  a 2×5 and a 5×2 are both banners. Shared for the same reason as the frame set. */
+export const rectangularTypeOf = (cols: number, rows: number): string =>
+  Math.min(cols, rows) <= 1 ? 'slim' : Math.min(cols, rows) === 2 ? 'banner' : 'frame'

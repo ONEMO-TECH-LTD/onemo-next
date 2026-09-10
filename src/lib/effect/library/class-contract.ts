@@ -1,10 +1,24 @@
 import type { LibraryFamily, LibraryFrame, LibrarySelection, LibraryTransform } from './types'
 
-export type CornerMode = 'sharp' | 'bevel' | 'round'
+/** How a population's outline finishes. The first three are offset joins on the population's own hull;
+ *  `stadium` is not a join at all — it is the frame's box carried out to the largest circular radius
+ *  the lattice allows, which is why it needs the frame rather than the surviving magnets. `disc` is
+ *  the circle the population fits in: its own centre, its furthest magnet, plus the rim. */
+export type CornerMode = 'sharp' | 'bevel' | 'round' | 'stadium' | 'disc' | 'regular' | 'ellipse'
 
 export interface OutlineRecipe {
   corners: CornerMode
   pointRotationDeg?: number
+  /** `regular` only: how many sides the boundary has, and the centre it is drawn about, in the same
+   *  millimetres as the magnets. Its size is then arithmetic over the magnets it holds. */
+  sides?: number
+  centreMM?: readonly [number, number]
+  /** `ellipse` only: the AUTHORED outline size in millimetres. The oval's sizes are Dan's own, drawn
+   *  rather than derived, so the record states them; without one the ellipse is fitted to the magnets. */
+  ellipseMM?: { readonly widthMM: number; readonly heightMM: number }
+  /** `stadium` only: which side of the population is the width. Read off the extent when unsaid; a
+   *  square extent cannot say, and the same four magnets are a 72x120 pill one way and 120x72 the other. */
+  across?: 'x' | 'y'
 }
 
 /** Which way round a frame sits. A fact of the record, not a transform of it: a 3x4 and a 4x3
@@ -48,6 +62,13 @@ export interface ClassSpec {
   classId: LibraryFamily
   /** May the engine offer this class automatically, or only on request? */
   catalogueRole: CatalogueRole
+  /** Are portrait and landscape PUBLISHED AS SEPARATE RECORDS? Then the page offers no turn: the
+   *  orientation is part of what the record IS, and a control that turned one into the other would
+   *  offer a transform over an identity the record already fixed (Dan, 2026-08-30 for canon, and
+   *  2026-09-04 for the pill: "you reintroduced rotation which is not needed with portrait/landscape
+   *  in place already"). Canon has always worked this way; this states it as a fact of the class
+   *  rather than a consequence of its role, so a preset that publishes both orders is locked too. */
+  bothOrdersPublished: boolean
   types: readonly ClassType[]
   variants(typeId: string, pitchMM: number): readonly ClassVariant[]
   variantOf(sel: LibrarySelection, pitchMM: number): ClassVariant
