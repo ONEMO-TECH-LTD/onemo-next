@@ -81,6 +81,12 @@ const OPEN: readonly string[] = JSON.parse(
   readFileSync(join(__dirname, 'fixtures/solver-oracle-open.v1.json'), 'utf8')) as string[]
 const isOpen = (entry: CatalogueEntry, pitchMM: number) => OPEN.includes(caseId(entry.id, pitchMM))
 
+// The oracle walks EVERY certified record at every pitch. The catalogue grew from ~500 to 1,247
+// records (circle, pill bodies, oval, polygon families, 2026-09-07..09) and the CI runner is ~2x slower
+// than a laptop, so the 120 s budget that fitted the old corpus times out at 157 s there. Sized for
+// the corpus it walks; a real slowdown still trips it.
+const ORACLE_BUDGET_MS = 400_000
+
 describe('the certified catalogue is the oracle the generator answers to', () => {
   // TARGET INVARIANT: the engine accepts every certified disk at every supported pitch.
   // CURRENT CONFORMANCE: everywhere except the exact open pitch-cases below. The two are stated
@@ -96,7 +102,7 @@ describe('the certified catalogue is the oracle the generator answers to', () =>
     // coverage needs no separate count: the next test asserts the open set EXACTLY, so every
     // record at every pitch is either checked here or named there
     expect(rejected).toEqual([])
-  }, 120_000)
+  }, ORACLE_BUDGET_MS)
 
   it('the open set is exactly what still disagrees — no more, and no fewer', () => {
     const failing: string[] = []
@@ -112,7 +118,7 @@ describe('the certified catalogue is the oracle the generator answers to', () =>
       expect(catalogue(pitchMM).some((e) => e.id === id), open).toBe(true)
       expect(id.endsWith('y'), open).toBe(true)
     }
-  }, 120_000)
+  }, ORACLE_BUDGET_MS)
 
   it('the oracle can fail: a certified disk moved off the lattice is rejected', () => {
     const entry = catalogue(48).find((e) => e.id === 'square/box/3x3/full/n/n/n')!
