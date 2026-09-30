@@ -88,6 +88,20 @@ describe('renderThermal', () => {
     expect(renderThermal({ source: { kind: 'image', href: 'data:image/png;base64,AAAA' } }).svg).toContain('<image href="data:image/png;base64,AAAA"')
   })
 
+  it('embeds supplied fonts inside the SVG, so exported text keeps the brand font anywhere', () => {
+    const { svg } = renderThermal({}, { fontCss: "@font-face{font-family:'Chillax';src:url(data:font/woff2;base64,AA)}</style><script>" })
+    expect(svg).toContain("<style>@font-face{font-family:'Chillax'")
+    expect(svg).not.toMatch(/<\/style><script>/)
+  })
+
+  it('field layer is a still frame for the GPU view: no stripe, no animation, no palette lookup', () => {
+    const { svg } = renderThermal({ stripe: { playing: true } }, { layer: 'field', pixelWidth: 200, pixelHeight: 100 })
+    expect(svg).not.toContain('<animateTransform')
+    expect(svg).not.toContain('linearGradient')
+    expect(svg).not.toContain('feComponentTransfer')
+    expect(svg).toContain('width="200" height="100"')
+  })
+
   it('stays small — the reference claims about 3 KB for the whole file', () => {
     expect(renderThermal({ palette: { steps: 32 } }).svg.length).toBeLessThan(4096)
   })

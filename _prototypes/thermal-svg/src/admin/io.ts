@@ -2,6 +2,7 @@
 // downloaded or copied, and the config exported or imported as JSON.
 
 import { DEFAULT_SOURCES, renderThermal } from '../engine'
+import { fontCss } from './fonts'
 import { getConfig, setConfig } from './state'
 
 function readAs(file: File, as: 'text' | 'dataURL'): Promise<string> {
@@ -46,8 +47,15 @@ function download(name: string, body: string, type: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
-export function downloadSvg(): void {
-  download('thermal.svg', renderThermal(getConfig()).svg, 'image/svg+xml')
+/** The final SVG with the text's font embedded, so it looks right wherever the file goes. */
+async function exportSvg(): Promise<string> {
+  const c = getConfig()
+  const css = c.source.kind === 'text' ? await fontCss(c.source.fontFamily, c.source.fontWeight) : ''
+  return renderThermal(c, { fontCss: css }).svg
+}
+
+export async function downloadSvg(): Promise<void> {
+  download('thermal.svg', await exportSvg(), 'image/svg+xml')
 }
 
 export function downloadConfig(): void {
@@ -55,7 +63,7 @@ export function downloadConfig(): void {
 }
 
 export async function copy(what: 'svg' | 'config'): Promise<string> {
-  const text = what === 'svg' ? renderThermal(getConfig()).svg : JSON.stringify(getConfig(), null, 2)
+  const text = what === 'svg' ? await exportSvg() : JSON.stringify(getConfig(), null, 2)
   try {
     await navigator.clipboard.writeText(text)
     return `${what === 'svg' ? 'SVG' : 'Config'} copied (${(text.length / 1024).toFixed(1)} KB)`

@@ -32,7 +32,7 @@ export const PALETTES: Record<string, ColorStop[]> = {
 }
 
 export const DEFAULT_SOURCES: { [K in Source['kind']]: Extract<Source, { kind: K }> } = {
-  text: { kind: 'text', text: 'PRO', fontFamily: 'Arial Black, Helvetica Neue, Arial, sans-serif', fontWeight: 900, fontSize: 120, letterSpacing: -4, fitWidth: true },
+  text: { kind: 'text', text: 'PRO', fontFamily: "Chillax, 'Arial Black', sans-serif", fontWeight: 700, fontSize: 120, letterSpacing: -4, fitWidth: true },
   svg: { kind: 'svg', markup: '<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40"/></svg>' },
   image: { kind: 'image', href: '', mode: 'alpha' },
 }

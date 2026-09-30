@@ -95,6 +95,17 @@ export type ThermalConfigInput = DeepPartial<Omit<ThermalConfig, 'source'>> & { 
 export interface RenderOptions {
   /** Prefix for every internal id, so several renders can share one page. */
   id?: string
+  /**
+   * 'final' (default) — the finished effect.
+   * 'field' — the still data a GPU view animates: R = heat without the stripe, G = where the stripe
+   *   applies (shape coverage, softened like the heat), B = the glow alpha. No palette, no animation.
+   */
+  layer?: 'final' | 'field'
+  /** Pixel size written on the root <svg> (the drawing size). Defaults to the output size. */
+  pixelWidth?: number
+  pixelHeight?: number
+  /** @font-face rules placed inside the SVG, so text uses the real font wherever the file goes. */
+  fontCss?: string
 }
 
 export interface RenderResult {

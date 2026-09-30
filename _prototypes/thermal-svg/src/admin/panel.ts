@@ -2,6 +2,7 @@
 
 import { DEFAULT_CONFIG, DEFAULT_SOURCES, PALETTES, type ColorStop, type Source } from '../engine'
 import { button, el, section, select, slider, textInput, toggle } from './controls'
+import { FONTS, familyOf, nearestWeight, weightsOf } from './fonts'
 import { copy, downloadConfig, downloadSvg, loadFile } from './io'
 import { getConfig, read, setConfig, subscribe, update } from './state'
 
@@ -20,6 +21,38 @@ function filePicker(label: string, accept: string, status: (m: string) => void):
   return wrap
 }
 
+/** Font family (brand fonts by token role) and the weights that family actually has. */
+function fontControls(): HTMLElement {
+  const wrap = el('div', 'group')
+  const family = el('select')
+  family.append(...FONTS.map((f) => new Option(f.label, f.css)))
+  const weight = el('select')
+  const sync = () => {
+    const src = getConfig().source
+    if (src.kind !== 'text') return
+    // A family not in the catalogue (e.g. from an imported config) is shown as-is.
+    if (!familyOf(src.fontFamily) && ![...family.options].some((o) => o.value === src.fontFamily)) family.append(new Option(src.fontFamily, src.fontFamily))
+    family.value = src.fontFamily
+    const ws = weightsOf(src.fontFamily)
+    if (weight.options.length !== ws.length || [...weight.options].some((o, i) => Number(o.value) !== ws[i])) weight.replaceChildren(...ws.map((w) => new Option(String(w), String(w))))
+    weight.value = String(src.fontWeight)
+  }
+  family.addEventListener('change', () => {
+    const src = getConfig().source
+    const w = src.kind === 'text' ? src.fontWeight : 700
+    update('source', { ...src, fontFamily: family.value, fontWeight: nearestWeight(family.value, w) })
+  })
+  weight.addEventListener('change', () => update('source.fontWeight', Number(weight.value)))
+  subscribe(sync)
+  sync()
+  const r1 = el('label', 'row')
+  r1.append(el('span', 'lbl', 'Font'), family)
+  const r2 = el('label', 'row')
+  r2.append(el('span', 'lbl', 'Weight'), weight)
+  wrap.append(r1, r2)
+  return wrap
+}
+
 /** Only the fields of the current source kind are shown. */
 function sourceSection(status: (m: string) => void): HTMLElement {
   // Changing the kind replaces the whole source with that kind's defaults.
@@ -34,8 +67,7 @@ function sourceSection(status: (m: string) => void): HTMLElement {
   const text = el('div', 'group')
   text.append(
     textInput('source.text', 'Text'),
-    textInput('source.fontFamily', 'Font'),
-    slider({ path: 'source.fontWeight', label: 'Weight', min: 100, max: 900, step: 100 }),
+    fontControls(),
     toggle('source.fitWidth', 'Fit width'),
     slider({ path: 'source.fontSize', label: 'Size', min: 8, max: 600, step: 1 }),
     slider({ path: 'source.letterSpacing', label: 'Tracking', min: -40, max: 60, step: 1 }),

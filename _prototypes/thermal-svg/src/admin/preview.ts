@@ -1,9 +1,10 @@
-// The stage: shows the engine's SVG, pauses/plays its animation, and accepts dropped files.
+// The stage: a live GPU view of the current config, play/pause, and file drop.
 
-import { renderThermal } from '../engine'
+import { createThermalView } from '../runtime/view'
 import { el } from './controls'
-import { getConfig, subscribe, update } from './state'
+import { fontCss } from './fonts'
 import { loadFile } from './io'
+import { getConfig, subscribe, update } from './state'
 
 export function preview(status: (msg: string) => void): HTMLElement {
   const stage = el('div', 'stage')
@@ -12,15 +13,25 @@ export function preview(status: (msg: string) => void): HTMLElement {
   const meta = el('div', 'meta')
   stage.append(frame, hint, meta)
 
-  const draw = () => {
+  const view = createThermalView(frame)
+  let fontReq = 0
+  const draw = async () => {
     const c = getConfig()
-    const { svg } = renderThermal(c, { id: 'stage' })
-    frame.innerHTML = svg
     frame.style.aspectRatio = `${c.output.width} / ${c.output.height}`
-    meta.textContent = `${c.output.width} × ${c.output.height} · ${(svg.length / 1024).toFixed(1)} KB · ${c.stripe.playing ? 'playing' : 'paused'}`
+    const mine = ++fontReq
+    const css = c.source.kind === 'text' ? await fontCss(c.source.fontFamily, c.source.fontWeight) : ''
+    if (mine === fontReq) view.update(getConfig(), css)
   }
-  subscribe(draw)
-  draw()
+  subscribe(() => void draw())
+  void draw()
+
+  const showMeta = () => {
+    const c = getConfig()
+    const state = c.stripe.playing && c.stripe.enabled ? `${view.fps} fps` : 'paused'
+    meta.textContent = `${c.output.width} × ${c.output.height} · ${view.gpu ? 'GPU' : 'SVG'} · ${state}`
+  }
+  setInterval(showMeta, 500)
+  showMeta()
 
   // Space toggles play/pause, unless typing in a field.
   window.addEventListener('keydown', (e) => {

@@ -1,7 +1,10 @@
 import './styles.css'
 import { el } from './controls'
+import { installPageFonts } from './fonts'
 import { panel } from './panel'
 import { preview } from './preview'
+
+installPageFonts()
 
 const statusLine = el('div', 'status')
 let timer = 0

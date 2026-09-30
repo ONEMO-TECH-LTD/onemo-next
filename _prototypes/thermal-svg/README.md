@@ -26,6 +26,8 @@ src/engine/          THE MODULE. Pure TypeScript, no DOM, no framework.
   source.ts          text / SVG / image → SVG content; sanitises dropped SVG (no script, handlers, links)
   palette.ts         colour stops → lookup tables
   render.ts          config → SVG string (the filter pipeline)
+src/runtime/view.ts  Live GPU view (browser). Animates the engine's still "field" on WebGL at 60 fps;
+                     falls back to the animated SVG without WebGL.
 src/admin/           THE SHELL. Dashboard only; renders nothing itself — it calls the engine.
 scripts/render.ts    CLI proof that the engine runs without a browser
 ```
@@ -59,8 +61,21 @@ clamping). Drop an SVG, PNG/JPG, text file or a saved config `.json` anywhere on
 markup. **Space** plays/pauses. Export: download/copy SVG, download/copy config. The config persists in
 the browser.
 
+## Why the preview uses the GPU
+
+An animated SVG filter is recomputed on the CPU every frame; on an iPhone that is ~2 fps. The live view
+asks the engine for a still "field" (heat, stripe coverage, glow packed into R/G/B) once per change, and the
+GPU adds the moving stripe and the palette lookup per frame — 60 fps, same look. Exported SVGs are still the
+engine's full animated SVG (fine on desktop, slow on phones for the same reason).
+
+## Fonts
+
+The font dropdown follows the design-token roles (`tokens.css`): Brand/Primary = Chillax, Secondary = Satoshi,
+plus Nippo. Web fonts come from `asset-library/fonts` (copied to `public/fonts`). Exports embed the used
+font inside the SVG.
+
 ## Known limits
 
 - Text can't be measured without a browser, so "Fit width" estimates the size and stretches to the exact
   width with `textLength`.
-- Blur + grain + a moving gradient repaint every frame; check on a real iPhone before shipping to the app.
+- The exported animated SVG is CPU-heavy on phones; use the runtime view (or a still export) on mobile.
