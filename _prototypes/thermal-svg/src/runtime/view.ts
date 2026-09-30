@@ -2,8 +2,8 @@
 //
 // SVG filters are recomputed on the CPU every frame the stripe moves, which on an iPhone runs at a
 // couple of frames per second. This view splits the work:
-//   once per change  — the engine renders the still "field" (edge, blur, grain) as an SVG image
-//   every frame      — the GPU adds the moving stripe and looks up the palette colour
+//   once per change  — the engine renders the still "field" (edge, blur) and the grain noise as images
+//   every frame      — the GPU adds the moving stripe, looks up the palette colour, overlays the grain
 // The look matches the engine's SVG output; exports still come from the engine.
 //
 // Browser-only (canvas + WebGL). Falls back to the plain animated SVG if WebGL is unavailable.
@@ -33,8 +33,9 @@ precision mediump float;
 varying vec2 vUv;
 uniform sampler2D uField;
 uniform sampler2D uLut;
+uniform sampler2D uNoise;
 uniform vec2 uSize;
-uniform float uCos, uSin, uPeriod, uShift, uBase, uHalf, uStripe, uLum, uTransparent;
+uniform float uCos, uSin, uPeriod, uShift, uBase, uHalf, uStripe, uLum, uTransparent, uGrain;
 void main() {
   vec4 f = texture2D(uField, vUv);
   vec2 p = vUv * uSize;
@@ -51,7 +52,11 @@ void main() {
   }
   float h = clamp(f.r + uStripe * delta * f.g, 0.0, 1.0);
   vec3 col = texture2D(uLut, vec2(h * (255.0 / 256.0) + 0.5 / 256.0, 0.5)).rgb;
-  gl_FragColor = vec4(col, uTransparent > 0.5 ? f.b : 1.0);
+  // Film grain: grey noise overlaid (same formula as SVG feBlend overlay) in the blurred band only.
+  vec3 n = texture2D(uNoise, vUv).rgb;
+  vec3 ov = mix(2.0 * col * n, 1.0 - 2.0 * (1.0 - col) * (1.0 - n), step(0.5, col));
+  col = mix(col, ov, uGrain * 4.0 * f.b * (1.0 - f.b));
+  gl_FragColor = vec4(col, uTransparent > 0.5 ? min(1.0, 2.5 * f.b) : 1.0);
 }`
 
 function shader(gl: WebGLRenderingContext, type: number, src: string): WebGLShader {
@@ -136,13 +141,16 @@ export function createThermalView(host: HTMLElement): ThermalView {
   const u = (name: string) => gl.getUniformLocation(prog, name)
   const fieldTex = texture(gl)
   const lutTex = texture(gl)
+  const noiseTex = texture(gl)
   gl.uniform1i(u('uField'), 0)
   gl.uniform1i(u('uLut'), 1)
+  gl.uniform1i(u('uNoise'), 2)
   gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false)
 
   let config: ThermalConfig | null = null
   let fonts = ''
   let fieldKey = ''
+  let noiseKey = ''
   let lutKey = ''
   let hasField = false
   let seq = 0
@@ -174,6 +182,9 @@ export function createThermalView(host: HTMLElement): ThermalView {
     gl.uniform1f(u('uStripe'), s.enabled ? 1 : 0)
     gl.uniform1f(u('uLum'), config.source.kind === 'image' && config.source.mode === 'luminance' ? 1 : 0)
     gl.uniform1f(u('uTransparent'), config.output.background === 'transparent' ? 1 : 0)
+    gl.uniform1f(u('uGrain'), config.finish.grain)
+    gl.activeTexture(gl.TEXTURE2)
+    gl.bindTexture(gl.TEXTURE_2D, noiseTex)
     gl.activeTexture(gl.TEXTURE0)
     gl.bindTexture(gl.TEXTURE_2D, fieldTex)
     gl.activeTexture(gl.TEXTURE1)
@@ -214,7 +225,20 @@ export function createThermalView(host: HTMLElement): ThermalView {
     if (!config) return
     const c = config
     const [w, h] = pixelSize()
-    const key = JSON.stringify([c.source, c.output, c.material, c.finish, w, h, fonts.length])
+    const key = JSON.stringify([c.source, c.output, c.material, c.finish.blur, w, h, fonts.length])
+    // The grain noise is its own texture: re-made only when its size, seed or the frame size changes.
+    const nk = JSON.stringify([c.finish.grainSize, c.finish.seed, c.output.width, c.output.height, w, h])
+    if (nk !== noiseKey) {
+      noiseKey = nk
+      const { svg: noiseSvg } = renderThermal(c, { id: 'grain', layer: 'grain', pixelWidth: w, pixelHeight: h })
+      rasterize(noiseSvg, w, h)
+        .then((cv) => {
+          gl.bindTexture(gl.TEXTURE_2D, noiseTex)
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cv)
+          schedule()
+        })
+        .catch(() => {})
+    }
     if (key === fieldKey) return
     fieldKey = key
     const mine = ++seq

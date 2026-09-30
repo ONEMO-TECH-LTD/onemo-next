@@ -194,7 +194,7 @@ export function panel(status: (m: string) => void): HTMLElement {
       'Finish',
       slider({ path: 'finish.blur', label: 'Blur / glow', min: 0, max: 60, step: 0.5 }),
       slider({ path: 'finish.grain', label: 'Grain', min: 0, max: 1, step: 0.01 }),
-      slider({ path: 'finish.grainFrequency', label: 'Grain size', min: 0.05, max: 6, step: 0.05 }),
+      slider({ path: 'finish.grainSize', label: 'Grain size', min: 0.1, max: 6, step: 0.05 }),
       slider({ path: 'finish.seed', label: 'Grain seed', min: 0, max: 999, step: 1 }),
     ),
     actionsSection(status),

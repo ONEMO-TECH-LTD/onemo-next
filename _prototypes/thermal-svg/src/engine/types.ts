@@ -81,10 +81,10 @@ export interface ThermalConfig {
   finish: {
     /** Overall softness and the size of the outer glow, in output units. */
     blur: number
-    /** Film grain strength. 0..1 */
+    /** Film grain strength, in the blurred zone around the edge only. 0..1 */
     grain: number
-    /** Grain size — higher is finer. */
-    grainFrequency: number
+    /** Size of one grain speck, in output units. Bigger = coarser grain. */
+    grainSize: number
     seed: number
   }
 }
@@ -98,9 +98,10 @@ export interface RenderOptions {
   /**
    * 'final' (default) — the finished effect.
    * 'field' — the still data a GPU view animates: R = heat without the stripe, G = where the stripe
-   *   applies (shape coverage, softened like the heat), B = the glow alpha. No palette, no animation.
+   *   applies (shape coverage, softened like the heat), B = the blurred coverage a (glow = min(1, 2.5a), grain band = 4a(1 − a)). No palette, no grain.
+   * 'grain' — the film-grain noise alone (grey, opaque), for a GPU view to overlay.
    */
-  layer?: 'final' | 'field'
+  layer?: 'final' | 'field' | 'grain'
   /** Pixel size written on the root <svg> (the drawing size). Defaults to the output size. */
   pixelWidth?: number
   pixelHeight?: number

@@ -19,6 +19,17 @@ describe('normalizeConfig', () => {
     expect(c.palette.stops).toEqual([{ offset: 0, color: '#fff' }, { offset: 1, color: '#000' }])
   })
 
+  it('grain size is a real size: a bigger value gives coarser grain (lower noise frequency)', () => {
+    const fine = renderThermal({ finish: { grain: 0.1, grainSize: 0.2 } }).svg
+    const coarse = renderThermal({ finish: { grain: 0.1, grainSize: 4 } }).svg
+    expect(fine).toContain('baseFrequency="5"')
+    expect(coarse).toContain('baseFrequency="0.25"')
+  })
+
+  it('reads an older config that stored grain as a frequency', () => {
+    expect(normalizeConfig({ finish: { grainFrequency: 2 } } as never).finish.grainSize).toBe(0.5)
+  })
+
   it('switching source kind starts from that kind’s defaults', () => {
     const c = normalizeConfig({ source: { kind: 'image' } })
     expect(c.source).toEqual({ kind: 'image', href: '', mode: 'alpha' })

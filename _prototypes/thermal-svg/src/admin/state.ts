@@ -3,7 +3,7 @@
 
 import { normalizeConfig, type ThermalConfig } from '../engine'
 
-const KEY = 'thermal-svg:config:v2'
+const KEY = 'thermal-svg:config:v3'
 
 type Listener = (c: ThermalConfig) => void
 

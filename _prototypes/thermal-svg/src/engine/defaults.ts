@@ -43,7 +43,7 @@ export const DEFAULT_CONFIG: ThermalConfig = {
   material: { depth: 10, edgeStrength: 0.9, baseLevel: 0.9 },
   stripe: { enabled: true, contrast: 0.3, period: 480, angle: 20, duration: 4, playing: true },
   palette: { stops: PALETTES.thermal, steps: 64 },
-  finish: { blur: 6, grain: 0.05, grainFrequency: 2.2, seed: 3 },
+  finish: { blur: 6, grain: 0.4, grainSize: 0.45, seed: 3 },
 }
 
 /** Hard limits. Values outside are clamped, never rejected, so a bad API call still renders. */
@@ -58,7 +58,7 @@ export const LIMITS = {
   duration: [0.1, 120],
   steps: [2, 256],
   blur: [0, 200],
-  grainFrequency: [0.01, 20],
+  grainSize: [0.05, 50],
   seed: [0, 99999],
   fontSize: [1, 4096],
   fontWeight: [100, 900],

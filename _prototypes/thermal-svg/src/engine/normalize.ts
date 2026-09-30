@@ -86,7 +86,8 @@ export function normalizeConfig(input: ThermalConfigInput = {}): ThermalConfig {
     finish: {
       blur: clamp(f.blur, LIMITS.blur, d.finish.blur),
       grain: clamp(f.grain, LIMITS.unit, d.finish.grain),
-      grainFrequency: clamp(f.grainFrequency, LIMITS.grainFrequency, d.finish.grainFrequency),
+      // Older configs stored a noise frequency; a speck's size is its inverse.
+      grainSize: clamp(f.grainSize ?? (typeof (f as { grainFrequency?: unknown }).grainFrequency === 'number' ? 1 / (f as { grainFrequency: number }).grainFrequency : undefined), LIMITS.grainSize, d.finish.grainSize),
       seed: Math.round(clamp(f.seed, LIMITS.seed, d.finish.seed)),
     },
   }
