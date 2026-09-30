@@ -84,6 +84,8 @@ input[type='range'] { width: 100%; accent-color: var(--accent); }
 .inline { display: flex; }
 .note { margin: 0; color: var(--muted); font-size: 12px; }
 
+.row input.swatch { width: 44px; height: 28px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: none; justify-self: start; }
+.row[hidden] { display: none; }
 .gradient-bar { height: 16px; border-radius: 4px; border: 1px solid var(--line); }
 .stops { display: grid; gap: 6px; }
 .stop { display: grid; grid-template-columns: 32px 1fr auto; gap: 8px; align-items: center; }

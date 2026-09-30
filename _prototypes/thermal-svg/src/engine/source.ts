@@ -48,15 +48,14 @@ function safeHref(href: string): string | null {
 function textContent(src: TextSource, box: Box): string {
   const cx = box.x + box.width / 2
   const cy = box.y + box.height / 2
-  // Without a DOM the text can't be measured, so fit estimates the size from an average bold glyph
-  // (~0.66 em) and lets textLength absorb the remainder — close to natural proportions, exact width.
+  // Without a DOM the text can't be measured, so fitWidth estimates the size from an average bold glyph
+  // (~0.66 em). Letters are never stretched; a host that can measure (the admin) sets fontSize exactly.
   const glyphs = Math.max(1, [...src.text].length)
   const size = src.fitWidth ? Math.min(box.height, box.width / (glyphs * 0.66)) : src.fontSize
-  const fit = src.fitWidth ? ` textLength="${box.width}" lengthAdjust="spacingAndGlyphs"` : ''
   return (
     `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central"` +
     ` font-family="${escapeXml(src.fontFamily)}" font-weight="${src.fontWeight}" font-size="${size}"` +
-    ` letter-spacing="${src.letterSpacing}"${fit}>${escapeXml(src.text)}</text>`
+    ` letter-spacing="${src.letterSpacing}">${escapeXml(src.text)}</text>`
   )
 }
 

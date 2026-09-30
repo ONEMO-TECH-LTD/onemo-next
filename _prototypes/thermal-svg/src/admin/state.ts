@@ -36,6 +36,7 @@ export function setConfig(next: unknown): void {
 
 /** Set one value by dotted path, e.g. update('stripe.period', 300). */
 export function update(path: string, value: unknown): void {
+  if (!path) return setConfig(value)
   const next = structuredClone(config) as unknown as Record<string, unknown>
   const keys = path.split('.')
   let node = next

@@ -26,8 +26,10 @@ src/engine/          THE MODULE. Pure TypeScript, no DOM, no framework.
   source.ts          text / SVG / image → SVG content; sanitises dropped SVG (no script, handlers, links)
   palette.ts         colour stops → lookup tables
   render.ts          config → SVG string (the filter pipeline)
-src/runtime/view.ts  Live GPU view (browser). Animates the engine's still "field" on WebGL at 60 fps;
-                     falls back to the animated SVG without WebGL.
+src/runtime/         Browser-side helpers, separate from the engine:
+  view.ts            live GPU view — animates the engine's still "field" on WebGL at 60 fps
+  measure.ts         measures the real visible outline (for exact fit and centring)
+  raster.ts          SVG → canvas, waiting for embedded fonts
 src/admin/           THE SHELL. Dashboard only; renders nothing itself — it calls the engine.
 scripts/render.ts    CLI proof that the engine runs without a browser
 ```
@@ -76,6 +78,7 @@ font inside the SVG.
 
 ## Known limits
 
-- Text can't be measured without a browser, so "Fit width" estimates the size and stretches to the exact
-  width with `textLength`.
+- Text can't be measured without a browser: the engine's `fitWidth` only estimates the size (never
+  stretches letters). The admin measures the real outline and writes the exact font size and centring
+  offsets into the config, so exports match the preview.
 - The exported animated SVG is CPU-heavy on phones; use the runtime view (or a still export) on mobile.

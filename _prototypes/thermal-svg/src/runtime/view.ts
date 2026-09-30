@@ -9,6 +9,7 @@
 // Browser-only (canvas + WebGL). Falls back to the plain animated SVG if WebGL is unavailable.
 
 import { renderThermal, sampleStops, type ThermalConfig } from '../engine'
+import { rasterize } from './raster'
 
 export interface ThermalView {
   update(config: ThermalConfig, fontCss?: string): void
@@ -35,7 +36,8 @@ uniform sampler2D uField;
 uniform sampler2D uLut;
 uniform sampler2D uNoise;
 uniform vec2 uSize;
-uniform float uCos, uSin, uPeriod, uShift, uBase, uHalf, uStripe, uLum, uTransparent, uGrain;
+uniform float uCos, uSin, uPeriod, uShift, uBase, uHalf, uStripe, uLum, uBgMode, uGrain;
+uniform vec3 uBg;
 void main() {
   vec4 f = texture2D(uField, vUv);
   vec2 p = vUv * uSize;
@@ -56,7 +58,10 @@ void main() {
   vec3 n = texture2D(uNoise, vUv).rgb;
   vec3 ov = mix(2.0 * col * n, 1.0 - 2.0 * (1.0 - col) * (1.0 - n), step(0.5, col));
   col = mix(col, ov, uGrain * 4.0 * f.b * (1.0 - f.b));
-  gl_FragColor = vec4(col, uTransparent > 0.5 ? min(1.0, 2.5 * f.b) : 1.0);
+  // Background: 0 = palette (opaque), 1 = transparent (glow alpha), 2 = colour under the glow.
+  float glow = min(1.0, 2.5 * f.b);
+  if (uBgMode > 1.5) gl_FragColor = vec4(mix(uBg, col, glow), 1.0);
+  else gl_FragColor = vec4(col, uBgMode > 0.5 ? glow : 1.0);
 }`
 
 function shader(gl: WebGLRenderingContext, type: number, src: string): WebGLShader {
@@ -84,22 +89,6 @@ function lutPixels(config: ThermalConfig): Uint8Array {
     px.set([r * 255, g * 255, b * 255, 255], i * 4)
   }
   return px
-}
-
-async function rasterize(svg: string, w: number, h: number): Promise<HTMLCanvasElement> {
-  const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }))
-  try {
-    const img = new Image()
-    img.src = url
-    await img.decode()
-    const cv = document.createElement('canvas')
-    cv.width = w
-    cv.height = h
-    cv.getContext('2d')!.drawImage(img, 0, 0, w, h)
-    return cv
-  } finally {
-    URL.revokeObjectURL(url)
-  }
 }
 
 /** Mount a live view into `host` (it fills the host). */
@@ -181,7 +170,10 @@ export function createThermalView(host: HTMLElement): ThermalView {
     gl.uniform1f(u('uHalf'), s.contrast / 2)
     gl.uniform1f(u('uStripe'), s.enabled ? 1 : 0)
     gl.uniform1f(u('uLum'), config.source.kind === 'image' && config.source.mode === 'luminance' ? 1 : 0)
-    gl.uniform1f(u('uTransparent'), config.output.background === 'transparent' ? 1 : 0)
+    const bg = config.output.background
+    gl.uniform1f(u('uBgMode'), bg === 'transparent' ? 1 : bg === 'color' ? 2 : 0)
+    const hex = parseInt(config.output.backgroundColor.slice(1).replace(/^(.)(.)(.)$/, '$1$1$2$2$3$3'), 16)
+    gl.uniform3f(u('uBg'), ((hex >> 16) & 255) / 255, ((hex >> 8) & 255) / 255, (hex & 255) / 255)
     gl.uniform1f(u('uGrain'), config.finish.grain)
     gl.activeTexture(gl.TEXTURE2)
     gl.bindTexture(gl.TEXTURE_2D, noiseTex)

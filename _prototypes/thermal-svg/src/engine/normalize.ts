@@ -64,7 +64,10 @@ export function normalizeConfig(input: ThermalConfigInput = {}): ThermalConfig {
       width: clamp(o.width, LIMITS.size, d.output.width),
       height: clamp(o.height, LIMITS.size, d.output.height),
       padding: clamp(o.padding, LIMITS.padding, d.output.padding),
-      background: o.background === 'transparent' ? 'transparent' : 'palette',
+      background: o.background === 'transparent' || o.background === 'color' ? o.background : 'palette',
+      backgroundColor: typeof o.backgroundColor === 'string' && HEX.test(o.backgroundColor) ? o.backgroundColor.toLowerCase() : d.output.backgroundColor,
+      offsetX: clamp(o.offsetX, LIMITS.offset, d.output.offsetX),
+      offsetY: clamp(o.offsetY, LIMITS.offset, d.output.offsetY),
     },
     material: {
       depth: clamp(m.depth, LIMITS.depth, d.material.depth),

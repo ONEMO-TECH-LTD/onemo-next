@@ -39,7 +39,7 @@ export const DEFAULT_SOURCES: { [K in Source['kind']]: Extract<Source, { kind: K
 
 export const DEFAULT_CONFIG: ThermalConfig = {
   source: DEFAULT_SOURCES.text,
-  output: { width: 640, height: 360, padding: 48, background: 'palette' },
+  output: { width: 640, height: 360, padding: 48, background: 'palette', backgroundColor: '#ffffff', offsetX: 0, offsetY: 0 },
   material: { depth: 10, edgeStrength: 0.9, baseLevel: 0.9 },
   stripe: { enabled: true, contrast: 0.3, period: 480, angle: 20, duration: 4, playing: true },
   palette: { stops: PALETTES.thermal, steps: 64 },
@@ -50,6 +50,7 @@ export const DEFAULT_CONFIG: ThermalConfig = {
 export const LIMITS = {
   size: [16, 4096],
   padding: [0, 2048],
+  offset: [-2048, 2048],
   depth: [0, 200],
   edgeStrength: [0, 2],
   unit: [0, 1],

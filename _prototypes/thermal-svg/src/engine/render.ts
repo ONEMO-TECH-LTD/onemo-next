@@ -101,10 +101,14 @@ function heatFilter(id: string, c: ThermalConfig, layer: 'final' | 'field'): str
       p.push(`<feBlend in="grainLayer" in2="colour" mode="overlay" result="grained"/>`)
       out = 'grained'
     }
-    // 7. Transparent background: keep only the shape and its glow.
-    if (background === 'transparent') {
+    // 7. Transparent or coloured background: keep only the shape and its glow (then lay it over the colour).
+    if (background !== 'palette') {
       p.push(`<feComponentTransfer in="glowSoft" result="glow"><feFuncA type="linear" slope="2.5"/></feComponentTransfer>`)
-      p.push(`<feComposite in="${out}" in2="glow" operator="in"/>`)
+      p.push(`<feComposite in="${out}" in2="glow" operator="in" result="cut"/>`)
+      if (background === 'color') {
+        p.push(`<feFlood flood-color="${c.output.backgroundColor}" result="bg"/>`)
+        p.push(`<feComposite in="cut" in2="bg" operator="over"/>`)
+      }
     }
   }
   return (
@@ -121,13 +125,24 @@ export function renderThermal(input: ThermalConfigInput = {}, options: RenderOpt
   const { width, height, padding } = c.output
   const pad = Math.min(padding, width / 2 - 1, height / 2 - 1)
   const box: Box = { x: pad, y: pad, width: width - pad * 2, height: height - pad * 2 }
-  const content = sourceContent(c.source, box)
+  const layer = options.layer ?? 'final'
+  const raw = sourceContent(c.source, box)
+  const { offsetX, offsetY } = c.output
+  const moved = layer !== 'mask' && (offsetX !== 0 || offsetY !== 0)
+  const content = moved ? `<g transform="translate(${n(offsetX)} ${n(offsetY)})">${raw}</g>` : raw
   const ids = { white: `${id}-white`, shape: `${id}-shape`, stripe: `${id}-stripe`, heat: `${id}-heat` }
 
   const base = c.material.baseLevel
   const half = c.stripe.contrast / 2
   const luminance = c.source.kind === 'image' && c.source.mode === 'luminance'
-  const layer = options.layer ?? 'final'
+  if (layer === 'mask') {
+    const svg =
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${n(options.pixelWidth ?? width)}" height="${n(options.pixelHeight ?? height)}" preserveAspectRatio="none">` +
+      `<defs>${options.fontCss ? `<style>${options.fontCss.replace(/<\/?style/gi, '')}</style>` : ''}` +
+      `<filter id="${id}-white" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0"/></filter></defs>` +
+      `<g filter="url(#${id}-white)">${content}</g></svg>`
+    return { svg, width, height, config: c }
+  }
   if (layer === 'grain') {
     const pw = n(options.pixelWidth ?? width)
     const ph = n(options.pixelHeight ?? height)

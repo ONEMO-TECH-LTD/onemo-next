@@ -113,6 +113,21 @@ describe('renderThermal', () => {
     expect(svg).toContain('width="200" height="100"')
   })
 
+  it('a colour background lays the shape and glow over the chosen colour', () => {
+    const { svg } = renderThermal({ output: { background: 'color', backgroundColor: '#1B1B1F' } })
+    expect(svg).toContain('flood-color="#1b1b1f"')
+    expect(normalizeConfig({ output: { background: 'color', backgroundColor: 'red' } }).output.backgroundColor).toBe('#ffffff')
+  })
+
+  it('offsets move the content (so a measured outline can be centred), but not the measuring mask', () => {
+    expect(renderThermal({ output: { offsetX: -6.5, offsetY: 3 } }).svg).toContain('translate(-6.5 3)')
+    expect(renderThermal({ output: { offsetX: -6.5, offsetY: 3 } }, { layer: 'mask' }).svg).not.toContain('translate(')
+  })
+
+  it('never stretches letters: text has no textLength distortion', () => {
+    expect(renderThermal({ source: { kind: 'text', fitWidth: true } }).svg).not.toContain('textLength')
+  })
+
   it('stays small — the reference claims about 3 KB for the whole file', () => {
     expect(renderThermal({ palette: { steps: 32 } }).svg.length).toBeLessThan(4096)
   })

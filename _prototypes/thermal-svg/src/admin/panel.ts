@@ -1,7 +1,8 @@
 // The admin control panel. Every control writes one config path; nothing here renders.
 
 import { DEFAULT_CONFIG, DEFAULT_SOURCES, PALETTES, type ColorStop, type Source } from '../engine'
-import { button, el, section, select, slider, textInput, toggle } from './controls'
+import { isOn, onPrefChange, setOn } from './layout'
+import { button, colorInput, el, section, select, slider, textInput, toggle } from './controls'
 import { FONTS, familyOf, nearestWeight, weightsOf } from './fonts'
 import { copy, downloadConfig, downloadSvg, loadFile } from './io'
 import { getConfig, read, setConfig, subscribe, update } from './state'
@@ -53,6 +54,58 @@ function fontControls(): HTMLElement {
   return wrap
 }
 
+function backgroundControls(): HTMLElement {
+  const wrap = el('div', 'group')
+  const colour = colorInput('output.backgroundColor', 'Colour')
+  const sync = () => (colour.hidden = getConfig().output.background !== 'color')
+  subscribe(sync)
+  sync()
+  wrap.append(select('output.background', 'Background', [['palette', 'Palette cold end'], ['color', 'Colour'], ['transparent', 'Transparent']]), colour)
+  return wrap
+}
+
+/** Fit the text to the frame by its real outline (never stretched), or set the size by hand. */
+function fitControls(): HTMLElement {
+  const wrap = el('div', 'group')
+  const fit = el('input')
+  fit.type = 'checkbox'
+  fit.addEventListener('change', () => setOn('fit', fit.checked))
+  const r = el('label', 'row')
+  r.append(el('span', 'lbl', 'Fit to frame'), fit)
+  const size = slider({ path: 'source.fontSize', label: 'Size', min: 8, max: 600, step: 1 })
+  const sync = () => {
+    fit.checked = isOn('fit')
+    size.querySelectorAll('input').forEach((i) => (i.disabled = fit.checked))
+  }
+  onPrefChange(sync)
+  sync()
+  wrap.append(r, size)
+  return wrap
+}
+
+/** Auto-centre on the visible outline, or nudge by hand. */
+function centreControls(): HTMLElement {
+  const wrap = el('div', 'group')
+  const auto = el('input')
+  auto.type = 'checkbox'
+  auto.checked = isOn('centre')
+  auto.addEventListener('change', () => setOn('centre', auto.checked))
+  const r = el('label', 'row')
+  r.append(el('span', 'lbl', 'Auto-centre'), auto)
+  const x = slider({ path: 'output.offsetX', label: 'Offset X', min: -200, max: 200, step: 0.5 })
+  const y = slider({ path: 'output.offsetY', label: 'Offset Y', min: -200, max: 200, step: 0.5 })
+  // Manual offsets only while auto-centre is off, so a hand nudge isn't overwritten.
+  const sync = () => {
+    const on = isOn('centre')
+    auto.checked = on
+    for (const row of [x, y]) row.querySelectorAll('input').forEach((i) => (i.disabled = on))
+  }
+  onPrefChange(sync)
+  sync()
+  wrap.append(r, x, y)
+  return wrap
+}
+
 /** Only the fields of the current source kind are shown. */
 function sourceSection(status: (m: string) => void): HTMLElement {
   // Changing the kind replaces the whole source with that kind's defaults.
@@ -68,8 +121,7 @@ function sourceSection(status: (m: string) => void): HTMLElement {
   text.append(
     textInput('source.text', 'Text'),
     fontControls(),
-    toggle('source.fitWidth', 'Fit width'),
-    slider({ path: 'source.fontSize', label: 'Size', min: 8, max: 600, step: 1 }),
+    fitControls(),
     slider({ path: 'source.letterSpacing', label: 'Tracking', min: -40, max: 60, step: 1 }),
   )
   const svg = el('div', 'group')
@@ -172,7 +224,8 @@ export function panel(status: (m: string) => void): HTMLElement {
       slider({ path: 'output.width', label: 'Width', min: 64, max: 2048, step: 1 }),
       slider({ path: 'output.height', label: 'Height', min: 64, max: 2048, step: 1 }),
       slider({ path: 'output.padding', label: 'Padding', min: 0, max: 400, step: 1 }),
-      select('output.background', 'Background', [['palette', 'Palette cold end'], ['transparent', 'Transparent']]),
+      backgroundControls(),
+      centreControls(),
     ),
     section(
       'Material — inflated edge',

@@ -1,4 +1,5 @@
 import './styles.css'
+import { startAutoLayout } from './layout'
 import { el } from './controls'
 import { installPageFonts } from './fonts'
 import { panel } from './panel'
@@ -20,3 +21,4 @@ header.append(el('h1', '', 'Thermal SVG'), el('span', 'sub', 'engine + admin · 
 
 const app = document.getElementById('app')!
 app.append(header, preview(status), panel(status), statusLine)
+startAutoLayout()

@@ -16,7 +16,7 @@ export interface TextSource {
   /** Font size in output units. Ignored when fitWidth is on. */
   fontSize: number
   letterSpacing: number
-  /** Stretch the text to the output width minus padding (SVG textLength). */
+  /** Estimate a size that fits the width (no DOM, so approximate; letters are never stretched). */
   fitWidth: boolean
 }
 
@@ -46,8 +46,20 @@ export interface ThermalConfig {
     height: number
     /** Space kept free around the content, in output units. */
     padding: number
-    /** 'palette' fills the background with the palette's cold end; 'transparent' keeps only the glow. */
-    background: 'palette' | 'transparent'
+    /**
+     * 'palette'     — the background is the palette's cold end
+     * 'transparent' — only the shape and its glow, nothing behind
+     * 'color'       — the shape and glow over backgroundColor
+     */
+    background: 'palette' | 'transparent' | 'color'
+    backgroundColor: string
+    /**
+     * Moves the content inside the output, in output units. Text is laid out by its font box and dropped
+     * files can carry empty margins, so a host that can measure the visible outline (see the runtime's
+     * measureInk) sets these to centre it exactly.
+     */
+    offsetX: number
+    offsetY: number
   }
   /** The inner shadow that makes the shape look inflated. */
   material: {
@@ -100,8 +112,9 @@ export interface RenderOptions {
    * 'field' — the still data a GPU view animates: R = heat without the stripe, G = where the stripe
    *   applies (shape coverage, softened like the heat), B = the blurred coverage a (glow = min(1, 2.5a), grain band = 4a(1 − a)). No palette, no grain.
    * 'grain' — the film-grain noise alone (grey, opaque), for a GPU view to overlay.
+   * 'mask'  — the content alone, white on transparent, with no offset — for measuring its outline.
    */
-  layer?: 'final' | 'field' | 'grain'
+  layer?: 'final' | 'field' | 'grain' | 'mask'
   /** Pixel size written on the root <svg> (the drawing size). Defaults to the output size. */
   pixelWidth?: number
   pixelHeight?: number

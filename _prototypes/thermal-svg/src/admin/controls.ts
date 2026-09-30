@@ -94,3 +94,14 @@ export function button(label: string, onClick: () => void, cls = ''): HTMLButton
   b.addEventListener('click', onClick)
   return b
 }
+
+export function colorInput(path: string, label: string): HTMLElement {
+  const input = el('input')
+  input.type = 'color'
+  input.className = 'swatch'
+  const sync = () => (input.value = String(read(path)))
+  input.addEventListener('input', () => update(path, input.value))
+  subscribe(sync)
+  sync()
+  return row(label, input)
+}
