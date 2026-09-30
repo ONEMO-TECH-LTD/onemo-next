@@ -58,21 +58,28 @@ function heatFilter(id: string, c: ThermalConfig, layer: 'final' | 'field'): str
     p.push(`<feGaussianBlur in="${last}" stdDeviation="${n(blur)}" result="heat2"/>`)
     last = 'heat2'
   }
-  // 4. Grain, centred on zero so it does not shift the overall heat.
+  // The glow: the shape's coverage, softened and widened. Grain lives only inside it, and the
+  // transparent background and the GPU field use it as their alpha.
+  const soft = n(Math.max(blur, 0.5))
+  p.push(`<feGaussianBlur in="SourceAlpha" stdDeviation="${soft}" result="glowSoft"/>`)
+  // 4. Grain, clipped to the glow and centred on zero so it does not shift the heat:
+  //    heat + g·noise·glow − (g/2)·glow, done as two steps because every primitive clamps to 0..1.
   if (grain > 0) {
+    p.push(`<feColorMatrix in="glowSoft" type="matrix" values="0 0 0 2.5 0 0 0 0 2.5 0 0 0 0 2.5 0 0 0 0 0 1" result="glowGrey"/>`)
+    p.push(`<feColorMatrix in="glowSoft" type="matrix" values="0 0 0 -2.5 1 0 0 0 -2.5 1 0 0 0 -2.5 1 0 0 0 0 1" result="glowInv"/>`)
     p.push(`<feTurbulence type="fractalNoise" baseFrequency="${n(grainFrequency)}" numOctaves="2" seed="${seed}" stitchTiles="stitch" result="noise"/>`)
     p.push(`<feColorMatrix in="noise" type="matrix" values="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 0 0 0 0 1" result="noiseGrey"/>`)
-    p.push(`<feComposite in="${last}" in2="noiseGrey" operator="arithmetic" k2="1" k3="${n(grain)}" k4="${n(-grain / 2)}" result="heat3"/>`)
+    p.push(`<feComposite in="noiseGrey" in2="glowGrey" operator="arithmetic" k1="1" result="noiseClip"/>`)
+    p.push(`<feComposite in="${last}" in2="noiseClip" operator="arithmetic" k2="1" k3="${n(grain)}" result="heatG"/>`)
+    p.push(`<feComposite in="heatG" in2="glowInv" operator="arithmetic" k2="1" k3="${n(grain / 2)}" k4="${n(-grain / 2)}" result="heat3"/>`)
     last = 'heat3'
   }
   if (layer === 'field') {
     // GPU field: pack heat, stripe coverage and glow into R, G, B (opaque). The GPU adds the moving
     // stripe and does the palette lookup per frame; everything expensive above is computed once.
-    const soft = n(Math.max(blur, 0.5))
     p.push(`<feColorMatrix in="${last}" type="matrix" values="1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1" result="fR"/>`)
     p.push(blur > 0 ? `<feGaussianBlur in="SourceAlpha" stdDeviation="${n(blur)}" result="cover"/>` : `<feOffset in="SourceAlpha" result="cover"/>`)
     p.push(`<feColorMatrix in="cover" type="matrix" values="0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 1" result="fG"/>`)
-    p.push(`<feGaussianBlur in="SourceAlpha" stdDeviation="${soft}" result="glowSoft"/>`)
     p.push(`<feColorMatrix in="glowSoft" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 2.5 0 0 0 0 0 1" result="fB"/>`)
     p.push(`<feComposite in="fR" in2="fG" operator="arithmetic" k2="1" k3="1" result="fRG"/>`)
     p.push(`<feComposite in="fRG" in2="fB" operator="arithmetic" k2="1" k3="1"/>`)
@@ -87,7 +94,6 @@ function heatFilter(id: string, c: ThermalConfig, layer: 'final' | 'field'): str
     )
     // 6. Transparent background: keep only the shape and its glow.
     if (background === 'transparent') {
-      p.push(`<feGaussianBlur in="SourceAlpha" stdDeviation="${n(Math.max(blur, 0.5))}" result="glowSoft"/>`)
       p.push(`<feComponentTransfer in="glowSoft" result="glow"><feFuncA type="linear" slope="2.5"/></feComponentTransfer>`)
       p.push(`<feComposite in="colour" in2="glow" operator="in"/>`)
     }
