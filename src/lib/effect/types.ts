@@ -1,3 +1,5 @@
+import type { PaddingDiscSpec } from './foundation/padding-disc'
+import type { PaddingShape } from './grid-magnet-spec'
 // Shaped-effect engine — shared types (Lane A / Kai)
 // EffectSpecDraft = the browser-side draft per FINAL-SPEC §"Canonical artifact".
 // This lane builds the Draft + preview only (no server canonical / checkout / manufacturing).
@@ -101,9 +103,21 @@ export interface WrapConfig {
   frameMidMM?: Pt
   /** Delivery-only perimeter flag. `wrapGroup` ignores it: search, wrap and selection stay raw. */
   perimeterOnly?: boolean
-  // NO flap dial. In this engine it would be `radius = padding + flap` — one number behind two
-  // controls — and it would also shrink the legal seating area, which is exactly the job T1 says
-  // an allowance must never do. The padding IS the reach here.
+  /** EDGE PADDING — grows the wrapped outline outward by this much, AFTER the wrap has found it
+   *  (wrapGrid), exactly as a canon record's outline is grown. Dan, 2026-09-22: "the line that wraps
+   *  the grid must be padded = edge padding" and "the canon expands out by that number as well as
+   *  other shapes". It never enters the wrap's clearance or the seat predicate: inside the
+   *  band-bounded search it traded magnets for room instead of padding the line. */
+  edgePaddingMM?: number
+  /** The padding's shape and corner radius — the wrap presses against the disc these describe AS
+   *  THAT SHAPE: a squircle is cleared along its flats and across its corners, never as a circle. */
+  paddingShape?: PaddingShape
+  paddingRadiusMM?: number
+  /** The corner of the padded line — `null` follows the padding. Read only where the wrapped
+   *  outline is grown by the edge padding, never by the search. */
+  shapeRadiusMM?: number | null
+  /** The disc's own offset — the cell, not the line. */
+  discOffsetMM?: number
 }
 
 export interface WrapAt {
@@ -183,6 +197,21 @@ export interface GridConfig {
   classifierRuler?: 'legal' | 'outer'
   pitchMM?: number
   paddingMM?: number
+  /** EDGE PADDING — the shape's stand-off, added to the rim when the outline WRAPS. Spec-owned,
+   *  admin-dialled. It never reaches registration or the seat predicate, so the legal area and the
+   *  band are unchanged by it (see EDGE_PADDING_MM in grid-magnet-spec.ts). */
+  edgePaddingMM?: number
+  /** THE PADDING'S SHAPE — a spec variant the engine reacts to, not a drawing option. It decides the
+   *  disc's REACH, which is what the outline must clear (see padding-disc.ts). */
+  paddingShape?: PaddingShape
+  /** Corner radius for the squircle modes; the mode's spec default when unsaid. */
+  paddingRadiusMM?: number
+  /** THE DISC'S OWN OFFSET — grows the cosmetic cell (24 -> 32mm). Separate from `edgePaddingMM`,
+   *  which grows the wrapping line. Two categories, never one number (Dan, 2026-09-22). */
+  discOffsetMM?: number
+  /** THE SHAPE'S CORNER RADIUS on the wrapping line. `null`/undefined follows the padding, which is
+   *  the released behaviour; a number chooses the corner independently of the stand-off. */
+  shapeRadiusMM?: number | null
   /** Manual calibration: force this registration (mm phase) instead of searching. */
   forcePhaseMM?: Pt
   /** Centre mode — 0 box · 1 core · 2 masses · 3 weight · 4 deep · 5 top. */
@@ -211,6 +240,10 @@ export interface GridResult {
   panMM: Pt
   /** The spot radius the erosion used — the padding, centre-measured. */
   spotRadiusMM: number
+  /** THE PADDING DISC the answer was made with — its shape, cell and corner radius, so every surface
+   *  draws the SAME disc. A radius alone could only ever be drawn as a circle, which is why the
+   *  bench had `<circle>` written into it; the shape is the engine's to state (Dan, 2026-09-22). */
+  paddingDisc?: PaddingDiscSpec
   /** Outline points where a disc touches (within one snap step of its margined edge). */
   contactsMM: Pt[]
   /** The legal area's islands with depth masses — what centring anchored on. */

@@ -7,7 +7,7 @@
 
 import { Clipper, JoinType, EndType } from '@countertype/clipper2-ts'
 import { MANUFACTURING_TOLERANCE_MM } from './geometry-truth'
-import type { Pt } from './types'
+import type { Contour, Pt } from './types'
 
 // mm → integer microns. Clipper64 is integer-robust; 1000 = micron precision, far below the 0.05 mm
 // manufacturing tolerance.
@@ -53,4 +53,31 @@ export function insetRingMM(ringMM: ReadonlyArray<Pt>, deltaMM: number, joinStyl
   if (ringMM.length < 3) return null
   const result = offset(ringMM, deltaMM, joinStyle, 'polygon', 2)
   return result && result.length >= 3 ? result : null
+}
+
+/** THE RECORD'S OUTLINE, GROWN BY THE EDGE PADDING. The magnets are untouched — only the material
+ *  around them grows, so the legal area and therefore the record's band are exactly what was
+ *  published. The outer ring outsets and every hole insets, because both add material. */
+export function grownContour(contour: Contour, edgePaddingMM: number, shapeRadiusMM: number | null): Contour {
+  if (edgePaddingMM <= 0) return contour
+  // THE DISTANCE AND THE CORNER ARE TWO THINGS. A single round-join offset ties them together —
+  // corner radius always equals the stand-off — which is why a 24mm padding gave 24mm corners
+  // nobody chose. Offsetting `(d - r)` sharp and then `r` round lands the same distance with the
+  // corner Dan set. `null` keeps the released behaviour: one round pass, corner follows padding.
+  const grow = (ring: ReadonlyArray<Pt>, sign: 1 | -1): Pt[] | null => {
+    const d = edgePaddingMM
+    if (shapeRadiusMM === null || shapeRadiusMM === undefined) return insetRingMM(ring, sign * d, 'round')
+    const r = Math.max(0, Math.min(shapeRadiusMM, d))
+    const straight = d - r
+    const first = straight > 0 ? insetRingMM(ring, sign * straight, 'sharp') : [...ring]
+    if (!first) return null
+    return r > 0 ? insetRingMM(first, sign * r, 'round') : first
+  }
+  const outer = grow(contour.outer.pts, 1)
+  if (!outer) return contour
+  const holes = contour.holes
+    .map((hole) => grow(hole.pts, -1))
+    .filter((ring): ring is NonNullable<typeof ring> => !!ring)
+    .map((pts) => ({ pts }))
+  return { outer: { pts: outer }, holes }
 }

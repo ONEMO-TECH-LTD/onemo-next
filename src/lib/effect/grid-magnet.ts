@@ -14,6 +14,7 @@ import { centeringAnchors, governMass } from './units/centring'
 import { bbox } from './foundation/geometry'
 import { contourCentroidOf } from './units/centring'
 import { latticeAt, spotRadiusOf } from './units/layout'
+import { paddingDiscSpec, paddingDiscRingMM } from './foundation/padding-disc'
 import {
   BANDS,
   CENTRE_MODE,
@@ -28,6 +29,8 @@ import { assignSizes } from './grid-magnet-logic'
 import type { CentreMode, Governor } from './types'
 
 export * from './grid-magnet-spec'
+export { paddingDiscRingMM, paddingDiscSpec }
+export type { PaddingDiscSpec } from './foundation/padding-disc'
 export {
   fieldSpanMM,
   latticeOver,
@@ -158,6 +161,7 @@ export function computeGrid(
     phaseMM: [bestOx, bestOy],
     panMM: [bestKx, bestKy],
     spotRadiusMM: reach,
+    paddingDisc: paddingDiscSpec(pad0, { shape: cfg.paddingShape, radiusMM: cfg.paddingRadiusMM, discOffsetMM: cfg.discOffsetMM }),
     segments,
     legalBoxMM: legalRegionBoxMM(contourMM, r0),
     centresMM: [ruleTarget],

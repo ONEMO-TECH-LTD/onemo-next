@@ -1,3 +1,4 @@
+import type { PaddingShape } from './grid-magnet-spec'
 // locks.ts — THE SEALED PROFILE: which configs are locked, at what value, and how a locked value
 // overrides a caller.
 //
@@ -16,6 +17,11 @@ import type { GridConfig, MagnetPlan } from './types'
  *  coverage, magnet plan, released bands), plus the protection padding beside them. */
 export interface LockValues {
   paddingMM: number
+  edgePaddingMM: number
+  paddingShape: PaddingShape
+  paddingRadiusMM: number
+  discOffsetMM: number
+  shapeRadiusMM: number | null
   pitchMM: number
   centreMode: number
   governor: number
@@ -26,7 +32,7 @@ export interface LockValues {
   classifierRuler: 'legal' | 'outer'
 }
 export type LockKey = keyof LockValues
-export const LOCK_KEYS: readonly LockKey[] = ['paddingMM', 'pitchMM', 'centreMode', 'governor', 'coverage', 'plan', 'protectionPaddingMM', 'activeBandIds', 'classifierRuler']
+export const LOCK_KEYS: readonly LockKey[] = ['paddingMM', 'edgePaddingMM', 'paddingShape', 'paddingRadiusMM', 'discOffsetMM', 'shapeRadiusMM', 'pitchMM', 'centreMode', 'governor', 'coverage', 'plan', 'protectionPaddingMM', 'activeBandIds', 'classifierRuler']
 
 export interface Lock<K extends LockKey = LockKey> { value: LockValues[K]; locked: boolean }
 

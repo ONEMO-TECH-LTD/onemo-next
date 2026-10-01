@@ -1594,3 +1594,44 @@ describe('11 — the protector padding is Spec-owned and travels in the request 
     expect(a.unprotected!.percent, 'a wider hold must change the evidence').not.toBe(b.unprotected!.percent)
   })
 })
+
+describe('12 — edge padding pads the WRAPPED LINE and nothing else (Dan, 2026-09-22)', () => {
+  // "the line that wraps the grid must be padded = edge padding" / "the canon expands out by that
+  // number as well as other shapes". It grows the outline the wrap found. It must NOT reach the
+  // search: inside the band-bounded wrap it traded magnets for clearance (QA: a blob 4 -> 3 -> 1).
+  // Nor registration: the legal area is what a band is measured on.
+  const sq = (mm: number): Contour => ({ outer: { pts: [[0, 0], [mm, 0], [mm, mm], [0, mm]] as Pt[] }, holes: [] })
+  const at = (edgePaddingMM: number) => solveGrid({
+    base: sq(1), offsetMM: 0,
+    cfg: { pitchMM: 48, paddingMM: 12, edgePaddingMM, centreMode: 2, governor: 0, perimeterOnly: false },
+    mode: 3, sizeMM: 0, stepSel: null, settings: { protectionPaddingMM: PROTECTION_PADDING_MM },
+  })
+  const legalSpan = (r: ReturnType<typeof at>) => {
+    const xs = r.grid.anchors.map((a) => a.p[0]), ys = r.grid.anchors.map((a) => a.p[1])
+    return [Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)]
+  }
+
+  const outerSpan = (r: ReturnType<typeof at>) => {
+    const xs = r.contour.outer.pts.map((p) => p[0]), ys = r.contour.outer.pts.map((p) => p[1])
+    return [Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)]
+  }
+
+  it('the drawn outline grows by exactly twice the dial, at every setting up to the ceiling', () => {
+    const [w0, h0] = outerSpan(at(0))
+    for (const e of [4, 12, 24]) {
+      const [w, h] = outerSpan(at(e))
+      expect(w - w0, 'width grows 2 x ' + e).toBeCloseTo(2 * e, 1)
+      expect(h - h0, 'height grows 2 x ' + e).toBeCloseTo(2 * e, 1)
+    }
+  })
+
+  it('the wrap itself does not move — the same size is found, then padded', () => {
+    expect(at(24).effSize).toBe(at(0).effSize)
+  })
+
+  it('it moves neither the population nor the legal area — so the band cannot drift', () => {
+    const bare = at(0), grown = at(24)
+    expect(grown.grid.anchors.length, 'the same magnets must seat').toBe(bare.grid.anchors.length)
+    expect(legalSpan(grown), 'the legal area is what the band is measured on').toEqual(legalSpan(bare))
+  })
+})

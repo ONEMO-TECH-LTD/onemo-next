@@ -46,7 +46,8 @@ export function solveCanonExperiment(
   const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
   const canonLocal = localise(canonNodesMM)
   const wcfg: WrapConfig = { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM,
-    anchorAtMM, frameMidMM: [0, 0] }
+    edgePaddingMM: cfg.edgePaddingMM, paddingShape: cfg.paddingShape,
+    paddingRadiusMM: cfg.paddingRadiusMM, discOffsetMM: cfg.discOffsetMM, anchorAtMM, frameMidMM: [0, 0] }
   const trace: CanonExperimentTrace = {
     source: 'none', canonSeats: canonNodesMM.length, populations: 0, wraps: 0,
     retained: 0, readded: 0, phasePairs: 0, windows: 0, fitsCalls: 0,
@@ -200,7 +201,9 @@ export function solveCanonExperiment(
   }
   trace.populations = free.size
   const ordered = [...free.values()].sort((a, b) => b.points.length - a.points.length || a.id.localeCompare(b.id))
-  const freeWcfg: WrapConfig = { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM, anchorAtMM }
+  const freeWcfg: WrapConfig = { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM,
+    edgePaddingMM: cfg.edgePaddingMM, paddingShape: cfg.paddingShape,
+    paddingRadiusMM: cfg.paddingRadiusMM, discOffsetMM: cfg.discOffsetMM, anchorAtMM }
   const settleFree = (first: BandRung): BandRung => {
     let rung = first
     for (;;) {

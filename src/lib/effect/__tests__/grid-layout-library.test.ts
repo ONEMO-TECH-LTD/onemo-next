@@ -1458,4 +1458,46 @@ describe('release — what the Library shows and what it lets out to presets', (
     expect(wider.unprotected!.areaMM2).toBeLessThanOrEqual(full6.unprotected!.areaMM2)
     expect(full6.unprotected!.areaMM2, 'a 3x3 disc at 24mm padding has unsupported material to report').toBeGreaterThan(0)
   })
+
+  it('edge padding overrides the wrap of a CANON record too — outline grows, magnets and band do not', async () => {
+    // Dan, 2026-09-22: "it is override for all wrap exposed and canon shapes - that is the point".
+    // A released effect must be able to envelope the panel beneath it, and the panel is built on the
+    // same formula as the effect, so without this they are the same size and sit edge to edge.
+    const { deliverRecord } = await import('../pipeline')
+    const square = catalogue(48).find((e) => e.classId === 'square' && releaseIdOf(e) === '3x3')!
+    const settings = { protectionPaddingMM: 24 }
+    const bare = deliverRecord({ record: square, cfg: { plan: 'all6', perimeterOnly: false }, settings })
+    const grown = deliverRecord({ record: square, cfg: { plan: 'all6', perimeterOnly: false, edgePaddingMM: 6 }, settings })
+
+    // 120mm published + 6mm a side = the 132mm envelope Dan measured against the panel
+    expect(bare.effSize).toBe(120)
+    expect(grown.effSize, 'the delivered size must carry the padding').toBe(132)
+
+    const span = (r: typeof bare) => {
+      const pts = r.contour.outer.pts
+      return Math.max(...pts.map((p) => p[0])) - Math.min(...pts.map((p) => p[0]))
+    }
+    expect(span(grown), 'the drawn outline must actually grow').toBeGreaterThan(span(bare))
+    expect(grown.grid.anchors, 'the record\'s magnets are its own and never move').toEqual(bare.grid.anchors)
+  })
+
+  it('a canon record gets the padding VARIANT too, not just its offset', async () => {
+    // "the edge padding applies to all shapes canon and wrapped" — and so does the disc it belongs
+    // to. A released record drawing circles while its outline had been grown around a squircle was
+    // the same class of bug as the page choosing the shape.
+    const { deliverRecord } = await import('../pipeline')
+    const square = catalogue(48).find((e) => e.classId === 'square' && releaseIdOf(e) === '3x3')!
+    const settings = { protectionPaddingMM: 24 }
+    const at = (cfg: object) => deliverRecord({ record: square, cfg: { plan: 'all6', perimeterOnly: false, ...cfg }, settings })
+
+    expect(at({}).grid.paddingDisc, 'the default is the circle drawn today')
+      .toMatchObject({ shape: 'circle', halfMM: 12, radiusMM: 12 })
+    expect(at({ paddingShape: 'squircle' }).grid.paddingDisc)
+      .toMatchObject({ shape: 'squircle', halfMM: 12, radiusMM: 11 })
+    expect(at({ paddingShape: 'offset' }).grid.paddingDisc, 'the 32mm sparse cell')
+      .toMatchObject({ shape: 'offset', halfMM: 16, radiusMM: 12.8 })
+    // the spot radius stays the rim — a surface draws the disc from its own shape, never from a
+    // circle round it (Dan, 2026-09-22: "why with the radius set the circles expand")
+    expect(at({ paddingShape: 'offset' }).grid.spotRadiusMM).toBe(at({}).grid.spotRadiusMM)
+  })
 })

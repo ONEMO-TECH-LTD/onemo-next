@@ -17,6 +17,101 @@ export const PADDING_CEIL_MM = 30
 /** Released padding — locked 12mm, measured from the magnet centre. */
 export const RELEASED_PADDING_MM = 12
 
+/** EDGE PADDING — the shape's own stand-off, added to the magnet's rim when the outline wraps
+ *  (Dan, 2026-09-22: "wrap will use the offset - aka edge padding of the shape").
+ *
+ *  It is the brand pattern's reach: the cosmetic disc is the magnet's rim grown by this much, and
+ *  the outline presses against the GROWN disc instead of the bare rim. Two controls, because they
+ *  are two different facts — the rim is the magnet's own physical clearance and is locked at 12;
+ *  the edge padding is the covering footprint and differs per pitch (the sparse 96 lattice needs a
+ *  larger cell than the granular 48 before the double-offset join reads as fluid).
+ *
+ *  It reaches the WRAP only. Registration, the seat predicate, the legal area and therefore every
+ *  band are measured on the bare rim exactly as before, so raising this grows the outline and moves
+ *  nothing else — node-to-node stays 48/96 and a released record keeps its band.
+ *
+ *  UNITS — PER SIDE. It pads THE LINE THAT WRAPS THE GRID and nothing else: the outline stands off
+ *  this much further, the effect grows by twice it (120 -> 132 at 6, -> 144 at 12), and the disc is
+ *  untouched. The cell is the DISC's business — see DISC_OFFSET_MM.
+ *
+ *  SUPERSEDES the 2026-08-25 flap deletion (`afa67ccd`), which removed `flapMM`/`seatMarginMM` as a
+ *  duplicate of the padding disc. The duplicate part of that ruling stands — `seatMarginMM` is NOT
+ *  coming back, because an allowance may never shrink the legal seating area. */
+export const EDGE_PADDING_MM = 0
+export const EDGE_PADDING_FLOOR_MM = 0
+export const EDGE_PADDING_CEIL_MM = 24
+
+/** THE PADDING'S SHAPE — what the 12mm padding LOOKS like, per seated magnet (Dan, 2026-09-22).
+ *
+ *  The 24mm magnetic lattice is invisible; what is visible is the padding disc the shape contains.
+ *  Until now that disc could only be a circle, because the page drew `<circle>` and the engine only
+ *  ever stated a radius. The disc is a SQUARE of `2 * padding` with a corner radius, so:
+ *
+ *    circle   — 24mm square at FULL radius (12). Geometrically the circle drawn today; the default,
+ *               so nothing changes until a mode is chosen.
+ *    squircle — 24mm square, radius exposed, 11mm by default.
+ *    offset   — the 24mm square grown by EDGE padding (4mm a side by default, making 32mm), radius
+ *               exposed, 12.8mm by default. The sparse 96 lattice needs the larger cell before the
+ *               double-offset join between neighbours reads as fluid, and a 24mm cell is too small
+ *               to hold an 8mm magnet on a garment.
+ *
+ *  Values only. The disc's geometry is built in `padding-disc.ts` from these; nothing is drawn from
+ *  a literal in a component. */
+export type PaddingShape = 'circle' | 'squircle' | 'offset'
+export const PADDING_SHAPE: PaddingShape = 'circle'
+/** Corner radius defaults, per mode. `circle` takes no dial: its radius IS half the cell, which is
+ *  what makes it a circle, so exposing it would offer a control that can only make it wrong. */
+export const SQUIRCLE_RADIUS_MM = 11
+export const OFFSET_SQUIRCLE_RADIUS_MM = 12.8
+export const SQUIRCLE_RADIUS_FLOOR_MM = 0
+export const SQUIRCLE_RADIUS_CEIL_MM = 16
+
+/** THE DISC'S OWN OFFSET — how far the `offset` mode grows its cell past the rim. 4mm a side over
+ *  the 12mm rim is the 32mm sparse cell Dan draws.
+ *
+ *  This is NOT the edge padding. Dan, 2026-09-22: "the discs are 1 category of the additions the
+ *  edge padding is another", and "the line that wraps the grid must be padded = edge padding".
+ *  The disc offset grows the CELL; the edge padding grows the LINE. Feeding one number to both is
+ *  what made a 24mm edge padding inflate every disc to 72mm across and draw a released square as a
+ *  four-petal blob. */
+export const DISC_OFFSET_MM = 4
+export const DISC_OFFSET_FLOOR_MM = 0
+export const DISC_OFFSET_CEIL_MM = 24
+
+/** THE SHAPE'S CORNER RADIUS — how round the wrapping line's corners are, as a value Dan sets and
+ *  locks rather than a side effect of the padding (Dan, 2026-09-22: "why by default it adds radius
+ *  i need the controls for that for me to set and lock shape radius").
+ *
+ *  Growing an outline with ROUND joins produces corner arcs equal to the offset distance, so a 24mm
+ *  edge padding silently gave 24mm corners and a padded square read soft. The two are separated the
+ *  exact way: offset by `(padding - radius)` with SHARP joins, then by `radius` with round ones. The
+ *  total stand-off is unchanged; only the corner is chosen.
+ *
+ *  `null` means FOLLOW THE PADDING — the released behaviour, so nothing moves until Dan sets a
+ *  value. 0 is a genuine setting: square corners. */
+export const SHAPE_RADIUS_MM: number | null = null
+export const SHAPE_RADIUS_FLOOR_MM = 0
+export const SHAPE_RADIUS_CEIL_MM = 48
+
+export const PADDING_SHAPES: ReadonlyArray<{
+  id: PaddingShape; label: string
+  /** Does this variant carry a corner-radius dial? `circle` does not: its radius IS half the cell,
+   *  which is what makes it a circle, so a dial could only make it wrong. Stated here so no surface
+   *  has to ask WHICH mode it is looking at — a surface that branches on a mode id is deciding. */
+  exposesRadius: boolean
+  /** ...and a disc-offset dial. The EDGE padding is not a disc dial at all — it belongs to the
+   *  wrapping line and is offered in every mode. */
+  exposesDiscOffset: boolean
+  /** The values this variant starts at when chosen. */
+  radiusMM: number
+  discOffsetMM: number
+}> = Object.freeze([
+  Object.freeze({ id: 'circle' as PaddingShape, label: 'circle', exposesRadius: false, exposesDiscOffset: false, radiusMM: 0, discOffsetMM: 0 }),
+  Object.freeze({ id: 'squircle' as PaddingShape, label: 'squircle', exposesRadius: true, exposesDiscOffset: false, radiusMM: SQUIRCLE_RADIUS_MM, discOffsetMM: 0 }),
+  Object.freeze({ id: 'offset' as PaddingShape, label: 'offset', exposesRadius: true, exposesDiscOffset: true, radiusMM: OFFSET_SQUIRCLE_RADIUS_MM, discOffsetMM: DISC_OFFSET_MM }),
+])
+
+
 /** THE OVALS — the three Dan drew (2026-09-09), in millimetres of outline. Authored, not derived: the
  *  smallest legal ellipse around a 2x2 magnet grid is 92x92, a circle, where the drawn one is 84x120.
  *  Values only; which magnets each holds is the lattice's answer, computed in the library. */

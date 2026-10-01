@@ -11,8 +11,12 @@ import type { Contour, Pt } from './types'
 import {
   fieldSpanMM,
   MIN_EFFECT_MM,
+  paddingDiscRingMM,
+  paddingDiscSpec,
   SIZE_CEIL_MARGIN_MM,
   type GridResult,
+  type PaddingDiscSpec,
+  type PaddingShape,
 } from './grid-magnet'
 
 /** Flatten reference: curves are flattened as if cut at this size, THEN normalized, so the 0.05mm
@@ -119,10 +123,29 @@ export interface FieldSpot {
   readonly y: number
   readonly r: number
   readonly held: boolean
+  /** THE DISC'S OWN OUTLINE about this spot, in mm. A surface draws this; it does not get to decide
+   *  what a disc looks like, which is what `<circle r={r}>` in the bench amounted to. */
+  readonly ringMM: ReadonlyArray<Pt>
 }
 
 /** The seated spots alone — what a surface draws when the full field is off. */
 export function seatedSpots(grid: GridResult): FieldSpot[] {
-  return grid.anchors.map((a) => ({ x: a.p[0], y: a.p[1], r: grid.spotRadiusMM, held: true }))
+  const ringMM = discRingOf(grid)
+  return grid.anchors.map((a) => ({ x: a.p[0], y: a.p[1], r: grid.spotRadiusMM, held: true, ringMM }))
+}
+
+/** The padding disc a set of padding dials asks for at a rim, resolved by the engine — so a surface
+ *  that only wraps records (the Library) can wear the same disc as Presets without resolving anything
+ *  itself. */
+export function paddingDiscOf(
+  rimMM: number, dials: { shape?: PaddingShape; radiusMM?: number; discOffsetMM?: number },
+): PaddingDiscSpec {
+  return paddingDiscSpec(rimMM, dials)
+}
+
+/** The disc every spot of the field wears, about its own centre — the empty ones too, so the field
+ *  shows the shape the wrap actually cleared and never a circle round it. */
+export function discRingOf(grid: GridResult): ReadonlyArray<Pt> {
+  return paddingDiscRingMM(grid.paddingDisc ?? paddingDiscSpec(grid.spotRadiusMM, { shape: 'circle' }))
 }
 

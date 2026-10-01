@@ -35,8 +35,9 @@ describe('the sealed profile', () => {
     const { LOCK_KEYS } = await import('../locks')
     // the dials Grid Lab offers, by the key each writes; a new dial without a lock fails here
     expect([...LOCK_KEYS].sort()).toEqual([
-      'activeBandIds', 'centreMode', 'classifierRuler', 'coverage', 'governor',
-      'paddingMM', 'pitchMM', 'plan', 'protectionPaddingMM',
+      'activeBandIds', 'centreMode', 'classifierRuler', 'coverage', 'discOffsetMM', 'edgePaddingMM',
+      'governor', 'paddingMM', 'paddingRadiusMM', 'paddingShape', 'pitchMM', 'plan',
+      'protectionPaddingMM', 'shapeRadiusMM',
     ])
   })
 

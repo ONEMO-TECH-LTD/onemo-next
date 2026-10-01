@@ -27,8 +27,8 @@ import type { GridResult, MagnetPlan } from '@/lib/effect/types'
 import { bandRangeForControl, deliveredRecordPageModel, outlineSvgD, svgDOf, type GridPageModel } from '@/lib/effect/adapters/gridViewModel'
 import { librarySegments as librarySegmentsOf, type LibraryLegalArea } from '@/lib/effect/adapters/libraryViewModel'
 import { createPerfLog, type PerfRow } from './perf-log'
-import { BANDS, CENTRE_MODE, DEFAULT_PITCH_MM, GOVERNOR, PADDING_CEIL_MM, PADDING_FLOOR_MM, PROTECTION_PADDING_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-magnet-spec'
-import { normBaseContour, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-magnet-bridge'
+import { BANDS, CENTRE_MODE, DEFAULT_PITCH_MM, EDGE_PADDING_CEIL_MM, EDGE_PADDING_FLOOR_MM, EDGE_PADDING_MM, GOVERNOR, DISC_OFFSET_CEIL_MM, DISC_OFFSET_FLOOR_MM, SHAPE_RADIUS_CEIL_MM, SHAPE_RADIUS_FLOOR_MM, SHAPE_RADIUS_MM, OFFSET_SQUIRCLE_RADIUS_MM, PADDING_SHAPE, PADDING_SHAPES, SQUIRCLE_RADIUS_CEIL_MM, SQUIRCLE_RADIUS_FLOOR_MM, SQUIRCLE_RADIUS_MM, type PaddingShape, PADDING_CEIL_MM, PADDING_FLOOR_MM, PROTECTION_PADDING_MM, RELEASED_PADDING_MM, RELEASED_PITCHES_MM } from '@/lib/effect/grid-magnet-spec'
+import { discRingOf, paddingDiscOf, normBaseContour, normMaskContour, seatedSpots, sizeRange, type FieldSpot } from '@/lib/effect/grid-magnet-bridge'
 import { LOCK_PROFILE, isLocked, withLock, type LockKey, type LockProfile, type LockValues } from '@/lib/effect/locks'
 
 /** Bench test libraries — static assets, listed by a committed manifest. */
@@ -87,6 +87,51 @@ function usePersisted(key: string, initial: number): [number, (n: number) => voi
   return [v, set]
 }
 
+/** THE PADDING DISC'S STATE, PERSISTED AS ONE RECORD — mode plus the two values the mode governs.
+ *
+ *  Three independent keys cannot be made safe. Validating the mode id alone still lets a stale
+ *  `edgePad`/`padRadius` survive a fallback, so the control reads "circle" while the geometry draws
+ *  31.4mm — the label and the shape disagreeing is worse than either being wrong (QA T14 round 2,
+ *  2026-09-22). Storing the triple together means there is no combination to mismatch: the record
+ *  either validates whole or is replaced whole by a variant's own declared values.
+ *
+ *  That also closes F7's open half by construction rather than by a clamp — a state no variant
+ *  declares cannot be reached through persistence.
+ *
+ *  A deliberately dialled radius still survives: an admin's edit writes the whole record, so it is
+ *  kept as long as its mode is one the engine publishes. */
+interface DiscState { shape: PaddingShape; radiusMM: number; discOffsetMM: number }
+
+function usePersistedDisc(
+  key: string, variants: readonly { id: PaddingShape; radiusMM: number; discOffsetMM: number }[],
+): [DiscState, (next: DiscState) => void] {
+  const fallback = (): DiscState => {
+    const v = variants.find((x) => x.id === PADDING_SHAPE) ?? variants[0]
+    return { shape: v.id, radiusMM: v.radiusMM, discOffsetMM: v.discOffsetMM }
+  }
+  const [v, setV] = useState<DiscState>(fallback)
+  useEffect(() => {
+    let stored: unknown = null
+    try { stored = JSON.parse(localStorage.getItem('grid-centre.' + key) ?? 'null') } catch { stored = null }
+    const r = stored as Partial<DiscState> | null
+    const variant = r && variants.find((x) => x.id === r.shape)
+    // the WHOLE record must be sound — an unpublished mode, or a value outside the spec's own
+    // bounds, discards all three rather than keeping the orphans
+    const sound = !!variant
+      && typeof r?.radiusMM === 'number' && r.radiusMM >= SQUIRCLE_RADIUS_FLOOR_MM && r.radiusMM <= SQUIRCLE_RADIUS_CEIL_MM
+      && typeof r?.discOffsetMM === 'number' && r.discOffsetMM >= DISC_OFFSET_FLOOR_MM && r.discOffsetMM <= DISC_OFFSET_CEIL_MM
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (sound) setV({ shape: variant!.id, radiusMM: r!.radiusMM!, discOffsetMM: r!.discOffsetMM! })
+    // the variant roster is spec-derived and stable; re-running on its identity would fight hydration
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key])
+  const set = (next: DiscState) => {
+    setV(next)
+    try { localStorage.setItem('grid-centre.' + key, JSON.stringify(next)) } catch { }
+  }
+  return [v, set]
+}
+
 export default function GridLab() {
   const [src, setSrc] = useState<Src>(OPENING_TAB)
   /** The released SHAPE on the bench — a class id; its size is the band row's (Dan, 2026-09-09).
@@ -106,6 +151,23 @@ export default function GridLab() {
   /** Free-slider limits — typed, persisted across reloads. */
   const [pitch, setPitch] = useState(DEFAULT_PITCH_MM)
   const [pad, setPad] = usePersisted('pad', RELEASED_PADDING_MM)
+  const [disc, setDisc] = usePersistedDisc('disc', PADDING_SHAPES)
+  const { shape: padShape, radiusMM: padRadius, discOffsetMM: discOffset } = disc
+  const setPadRadius = (radiusMM: number) => setDisc({ ...disc, radiusMM })
+  const setDiscOffset = (discOffsetMM: number) => setDisc({ ...disc, discOffsetMM })
+  /** THE LINE'S PADDING — its own number, in every mode, never part of the disc record. */
+  const [edgePad, setEdgePad] = usePersisted('edgePad', EDGE_PADDING_MM)
+  /** THE SHAPE'S CORNER — Dan's to set and lock, not a by-product of the padding. -1 is the stored
+   *  form of "follow the padding", since the dial carries numbers. */
+  const [shapeRadiusRaw, setShapeRadiusRaw] = usePersisted('shapeRadius', SHAPE_RADIUS_MM ?? -1)
+  const shapeRadius = shapeRadiusRaw < 0 ? null : shapeRadiusRaw
+  /** The variant in play, as the SPEC describes it — which dials it carries is its fact, not this
+   *  surface's to decide (Dan, 2026-09-22: "nothing can be hardcoded into page"). */
+  /** The disc variants the SPEC publishes — the disc is an internal visual guide, not a shape
+   *  (Dan, 2026-09-22), so it is spec-stated rather than a library citizen. This surface still
+   *  decides nothing: which dials a variant carries is the variant's own fact. */
+  const padVariants = PADDING_SHAPES
+  const padVariant = padVariants.find((v) => v.id === padShape) ?? padVariants[0]
   /** Centre-mode switch — which centre drives anchoring and balance. */
   /** Engine mode — 1 wrap ladder (band offers) · 2 free + snap (continuous). */
   const [centreMode, setCentreMode] = usePersisted('centreMode', CENTRE_MODE)
@@ -176,8 +238,8 @@ export default function GridLab() {
     ? librarySurface(librarySel, drafts, edit, pitch, libBrowse, release) : null,
   [tab, librarySel, pitch, edit, drafts, libBrowse, release])
   const libraryModel = useMemo(() => libraryState
-    ? libraryStageModel(libraryState.materialized, pitch) : null,
-  [libraryState, pitch])
+    ? libraryStageModel(libraryState.materialized, pitch, paddingDiscOf(RELEASED_PADDING_MM, { shape: padShape, radiusMM: padRadius, discOffsetMM: discOffset })) : null,
+  [libraryState, pitch, padShape, padRadius, discOffset])
   // THE RECORD'S OWN LEGAL AREA, measured exactly as the bench measures a shape's (Dan,
   // 2026-08-30: "can we add the same to the library canon clone legal area measurements").
   // Worth seeing here more than anywhere: a canon outline is GENERATED from its disks plus their
@@ -266,14 +328,23 @@ export default function GridLab() {
   /** Baseline handling: "save" stamps the current dials as the working default; "reset" restores
    *  the saved baseline, or spec defaults when none was saved. */
   const saveDefaults = () => {
-    try { localStorage.setItem('grid-centre.defaults', JSON.stringify({ pad, centreMode, governor })) } catch { }
+    try { localStorage.setItem('grid-centre.defaults', JSON.stringify({ pad, disc, edgePad, centreMode, governor })) } catch { }
   }
   const resetDefaults = () => {
-    let d = {
-      pad: RELEASED_PADDING_MM, centreMode: CENTRE_MODE, governor: GOVERNOR,
+    let d: { pad: number; disc: Partial<DiscState> | null; edgePad: number; centreMode: number; governor: number } = {
+      pad: RELEASED_PADDING_MM, disc: null, edgePad: EDGE_PADDING_MM, centreMode: CENTRE_MODE, governor: GOVERNOR,
     }
     try { const raw = localStorage.getItem('grid-centre.defaults'); if (raw) d = { ...d, ...JSON.parse(raw) } } catch { }
-    setPad(d.pad); setCentreMode(d.centreMode); setGovernor(d.governor)
+    setPad(d.pad); setEdgePad(d.edgePad ?? EDGE_PADDING_MM)
+    // the stored record is adopted only if its mode is one the engine publishes; otherwise the
+    // spec's own variant, values and all — never a saved mode wearing another's numbers
+    const saved = d.disc
+    const variant = (saved && PADDING_SHAPES.find((x) => x.id === saved.shape)) ?? null
+    setDisc(variant && typeof saved?.radiusMM === 'number' && typeof saved?.discOffsetMM === 'number'
+      ? { shape: variant.id, radiusMM: saved.radiusMM, discOffsetMM: saved.discOffsetMM }
+      : (() => { const v = PADDING_SHAPES.find((x) => x.id === PADDING_SHAPE) ?? PADDING_SHAPES[0]
+                 return { shape: v.id, radiusMM: v.radiusMM, discOffsetMM: v.discOffsetMM } })())
+    setCentreMode(d.centreMode); setGovernor(d.governor)
   }
 
   const [magic, setMagic] = useState<MagicState>(null)
@@ -444,7 +515,7 @@ export default function GridLab() {
     if (!w || !bandScopeReady) return
     if (src === 'preset') return   // a released record is delivered on this thread — see presetModel
     if (!base || base.outer.pts.length < 3) { setModel(null); return }
-    const cfg = { pitchMM: pitch, paddingMM: pad, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: false, classifierRuler: ruler }
+    const cfg = { pitchMM: pitch, paddingMM: pad, edgePaddingMM: edgePad, paddingShape: padShape, paddingRadiusMM: padRadius, discOffsetMM: discOffset, shapeRadiusMM: shapeRadius, centreMode, governor, forcePhaseMM: manual ? [manual.x, manual.y] as Pt : undefined, plan, perimeterOnly: coverage === 'perimeter', circle: false, classifierRuler: ruler }
     // Manual in a band (forced registration OR manual band scale): the walk is meaningless —
     // solve that size directly, exactly like free mode, band chip stays active.
     const manualBand = manual !== null || bandScale !== null   // manual scale/pan: solved directly at the requested size
@@ -464,13 +535,13 @@ export default function GridLab() {
     setSolving(true)
     solveSentAt.current = performance.now()
     w.postMessage(msg)
-  }, [base, src, shapeLabel, pitch, pad, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler, protectionPadding, activeBandIds, bandScopeReady])
+  }, [base, src, shapeLabel, pitch, pad, edgePad, padShape, padRadius, discOffset, shapeRadius, centreMode, governor, manual, bandScale, plan, mode, stepSel, coverage, ruler, protectionPadding, activeBandIds, bandScopeReady])
   // THE RECORD ON THE CANVAS — the released record under shape + band, delivered AT ONCE on this
   // thread through the adapter (coverage, plan, protection, the seal), never searched and never
   // queued behind a solve. Not a solve, so no readout and no performance row.
   const presetModel = useMemo(() => presetRecord
-    ? deliveredRecordPageModel({ record: presetRecord, cfg: { plan, perimeterOnly: coverage === 'perimeter' }, settings: { protectionPaddingMM: protectionPadding } })
-    : null, [presetRecord, plan, coverage, protectionPadding])
+    ? deliveredRecordPageModel({ record: presetRecord, cfg: { plan, perimeterOnly: coverage === 'perimeter', edgePaddingMM: edgePad, paddingShape: padShape, paddingRadiusMM: padRadius, discOffsetMM: discOffset, shapeRadiusMM: shapeRadius }, settings: { protectionPaddingMM: protectionPadding } })
+    : null, [presetRecord, plan, coverage, protectionPadding, edgePad, padShape, padRadius, discOffset, shapeRadius])
   useEffect(() => { if (src === 'preset') setPerf((x) => ({ ...x, genMs: undefined, solveMs: undefined })) }, [src])
   // a record's legal area is KNOWN — the exact inset — drawn the way the Library draws it, not measured
   const presetSegments = useMemo(() => presetModel ? librarySegmentsOf(presetModel) : [], [presetModel])
@@ -689,6 +760,32 @@ export default function GridLab() {
                 {RELEASED_PITCHES_MM.map(({ mm, label }) =>
                   <button key={mm} aria-pressed={pitch === mm} onClick={() => setPitch(mm)}>{label}</button>)}
               </div>
+            </Lockable>
+            <Lockable label="Padding shape · what a disc IS" k="paddingShape" v={padShape} profile={profile} setProfile={saveProfile}>
+              <div className="gl-seg">
+                {padVariants.map((variant) => (
+                  <button key={variant.id} aria-pressed={padShape === variant.id} onClick={() =>
+                    // the variant carries its own values; the record moves as a whole, never in parts
+                    setDisc({ shape: variant.id, radiusMM: variant.radiusMM, discOffsetMM: variant.discOffsetMM })
+                  }>{variant.label}</button>
+                ))}
+              </div>
+            </Lockable>
+            {padVariant.exposesRadius && <Lockable label="Corner radius · of the padding disc" k="paddingRadiusMM" v={padRadius} profile={profile} setProfile={saveProfile}>
+              <NumIn v={padRadius} set={setPadRadius} min={SQUIRCLE_RADIUS_FLOOR_MM} max={SQUIRCLE_RADIUS_CEIL_MM} unit="mm" />
+            </Lockable>}
+            {padVariant.exposesDiscOffset && <Lockable label="Disc offset · grows the cell, not the line" k="discOffsetMM" v={discOffset} profile={profile} setProfile={saveProfile}>
+              <NumIn v={discOffset} set={setDiscOffset} min={DISC_OFFSET_FLOOR_MM} max={DISC_OFFSET_CEIL_MM} unit="mm" />
+            </Lockable>}
+            <Lockable label="Shape radius · the corner of the wrapping line" k="shapeRadiusMM" v={shapeRadius} profile={profile} setProfile={saveProfile}>
+              <div className="gl-seg">
+                <button aria-pressed={shapeRadius === null} onClick={() => setShapeRadiusRaw(-1)}>follow padding</button>
+                <button aria-pressed={shapeRadius !== null} onClick={() => setShapeRadiusRaw(shapeRadiusRaw < 0 ? 0 : shapeRadiusRaw)}>set</button>
+              </div>
+              {shapeRadius !== null && <NumIn v={shapeRadius} set={setShapeRadiusRaw} min={SHAPE_RADIUS_FLOOR_MM} max={SHAPE_RADIUS_CEIL_MM} unit="mm" />}
+            </Lockable>
+            <Lockable label="Edge padding · pads the wrapping line" k="edgePaddingMM" v={edgePad} profile={profile} setProfile={saveProfile}>
+              <NumIn v={edgePad} set={setEdgePad} min={EDGE_PADDING_FLOOR_MM} max={EDGE_PADDING_CEIL_MM} unit="mm" />
             </Lockable>
             {/* search dials — a released record was not searched, so they have nothing to act on */}
             {src !== 'preset' && <>
@@ -1075,7 +1172,7 @@ function Stage({ contour, grid, lattice, box, segments, segFill, unprotected, on
             never reads past the cut line. */}
         <pattern id="gl-field" width={grid.pitchCentreMM} height={grid.pitchCentreMM}
           patternUnits="userSpaceOnUse" x={Afy[0] - grid.pitchCentreMM / 2} y={Afy[1] - grid.pitchCentreMM / 2}>
-          <circle cx={grid.pitchCentreMM / 2} cy={grid.pitchCentreMM / 2} r={spotR - 0.25}
+          <path d={discPath({ x: grid.pitchCentreMM / 2, y: -grid.pitchCentreMM / 2, r: spotR, held: false, ringMM: discRingOf(grid) }, -0.25)}
             fill="var(--ink)" fillOpacity={0.04} stroke="var(--ink)" strokeOpacity={0.25} strokeWidth={0.5} />
         </pattern>
         <pattern id="gl-dots" width={DEFAULT_PITCH_MM / 4} height={DEFAULT_PITCH_MM / 4}
@@ -1196,9 +1293,12 @@ function Stage({ contour, grid, lattice, box, segments, segFill, unprotected, on
         onPointerDown={onPickNode ? pickAt : undefined} />}
       {held.map((sp, i) => (
         <g key={'f' + i}>
-          <circle cx={sp.x} cy={-sp.y} r={sp.r - 0.3}
+          {/* THE PADDING DISC — the engine states its shape; this draws what it was handed. A
+              `<circle>` here was the bench deciding the disc was round, which is why no other shape
+              could exist (Dan, 2026-09-22: "nothing can be hardcoded into page"). */}
+          <path d={discPath(sp, -0.3)}
             fill="var(--accent)" fillOpacity={0.10} stroke="var(--accent)" strokeOpacity={0.55} strokeWidth={0.6} />
-          {onPickNode && <circle cx={sp.x} cy={-sp.y} r={sp.r} fill="transparent" style={{ cursor: 'pointer' }}
+          {onPickNode && <path d={discPath(sp, 0)} fill="transparent" style={{ cursor: 'pointer' }}
             onPointerDown={(e) => { e.stopPropagation(); onPickNode([sp.x, sp.y]) }} />}
         </g>
       ))}
@@ -1261,6 +1361,14 @@ function Stepper({ label, v, set }: { label: string; v: number; set: (n: number)
 }
 /** A typed value with its unit — the entry half of what LockNum used to be; the lock half is Lockable,
  *  because a lock is now one control with one meaning on every dial. */
+/** The disc the ENGINE handed this spot, as an svg path in the canvas's y-down frame. Projection
+ *  only — the shape was decided upstream. `grow` trims the drawn edge so the stroke sits inside. */
+function discPath(sp: FieldSpot, grow: number): string {
+  const scale = sp.r > 0 ? (sp.r + grow) / sp.r : 1
+  return sp.ringMM.map(([dx, dy], i) =>
+    `${i ? 'L' : 'M'}${(sp.x + dx * scale).toFixed(3)} ${(-sp.y - dy * scale).toFixed(3)}`).join('') + 'Z'
+}
+
 function NumIn({ v, set, min, max, unit }: { v: number; set: (n: number) => void; min: number; max: number; unit?: string }) {
   return (
     <div className="gl-limits">
@@ -1375,7 +1483,7 @@ const CSS = `
 .gl-controls{display:flex;flex-direction:column;gap:16px}
 .gl-glabel{font:600 10.5px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3)}
 .gl-seg{display:flex;gap:4px;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:3px}
-.gl-seg3 button,.gl-seg button{flex:1;min-width:0;font:550 12px var(--sans);color:var(--ink-2);background:none;border:0;border-radius:7px;padding:8px 4px;cursor:pointer;transition:.12s;white-space:nowrap}
+.gl-seg3 button,.gl-seg button{flex:1;min-width:0;font:550 12px var(--sans);color:var(--ink-2);background:none;border:0;border-radius:7px;padding:8px 4px;cursor:pointer;transition:.12s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gl-seg.gl-wrap{flex-wrap:wrap}.gl-seg.gl-wrap button{min-width:64px}
 /* BAND ROW — six per row, so eleven bands read 6 + 5 on two lines instead of eleven squashed
    into one strip (Dan, 2026-08-30). A grid rather than wrap so the break is the same every time. */

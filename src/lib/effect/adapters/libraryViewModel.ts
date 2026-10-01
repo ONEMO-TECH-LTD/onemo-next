@@ -15,8 +15,10 @@ export type LibraryLegalArea = Pick<SafeSegment, 'paths' | 'masses' | 'bbox'>
  *  rim: lines and arcs, exact, in microseconds. This adapter ran the mesh anyway and the Library paid
  *  the solver's price for a fact it already held (Dan, 2026-09-07: "these are precomputed must be
  *  instant" / "solver for what?"). Empty when the shrink leaves nothing — a one-magnet disc. */
-export function librarySegments(stage: { contour: Contour }): LibraryLegalArea[] {
-  const outer = stage.contour.outer
+export function librarySegments(stage: { contour: Contour; legalContour?: Contour }): LibraryLegalArea[] {
+  // the legal area belongs to the outline BEFORE the edge padding grew it — insetting the grown one
+  // drew a legal area that doubled with the dial and vanished at small corner radii
+  const outer = (stage.legalContour ?? stage.contour).outer
   const path = outer.path ?? (outer.pts.length >= 3
     ? pathFromAnchors(outer.pts.map(([x, y]) => ({ p: { x, y } })), (v) => [v.x, v.y]) : null)
   if (!path) return []

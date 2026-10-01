@@ -5,5 +5,14 @@ import type { LockProfile } from './locks'
 
 export const LOCK_PROFILE: LockProfile = {
   "version": 1,
-  "locks": {}
+  "locks": {
+    "edgePaddingMM": {
+      "value": 0,
+      "locked": false
+    },
+    "paddingRadiusMM": {
+      "value": 11,
+      "locked": false
+    }
+  }
 }

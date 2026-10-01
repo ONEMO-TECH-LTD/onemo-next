@@ -12,6 +12,7 @@ import { deliverRecord } from '../pipeline/deliver-record'
 /** The bench model exactly as the page consumes it. */
 export interface GridPageModel {
   contour: Contour
+  legalContour?: Contour
   grid: GridResult
   effSize: number
   ladder: Array<{ sizeMM: number; count: number; offMM: number; roles: string[] }>

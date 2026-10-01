@@ -11,7 +11,8 @@
  */
 
 import type { BandRung, BandSolve, Contour, GridConfig, GridResult, Pt, RungRole, WrapAt, WrapConfig } from './types'
-import { DEFAULT_PITCH_MM, MAGNET_DIA_SMALL_MM, MAGNET_DIA_LARGE_MM, PADDING_FLOOR_MM } from './grid-magnet-spec'
+import { DEFAULT_PITCH_MM, EDGE_PADDING_MM, MAGNET_DIA_SMALL_MM, MAGNET_DIA_LARGE_MM, PADDING_FLOOR_MM, SHAPE_RADIUS_MM } from './grid-magnet-spec'
+import { grownContour } from './offset'
 import { computeGrid } from './grid-magnet'
 import { bbox } from './foundation/geometry'
 import { contourCentroidOf } from './units/centring'
@@ -21,6 +22,7 @@ import { centeringAnchors, governMass } from './units/centring'
 import { CENTRE_MODE, GOVERNOR } from './grid-magnet-spec'
 import type { CentreMode, Governor } from './types'
 import { wrapGroup } from './units/wrap'
+import { paddingDiscSpec } from './foundation/padding-disc'
 import { inBand, orderOffers } from './units/judge'
 import { bestSeatedCandidate, fallbackRevealSizes } from './units/layout'
 import { legalRegionBoxMM } from './units/classifier'
@@ -38,11 +40,20 @@ export type { BandRung, BandSolve, WrapAt, WrapConfig } from './types'
 /** The wrapped answer as the canvas draws it. Display only — nothing is decided here. */
 export function wrapGrid(
   sized: (mm: number) => Contour, cfg: WrapConfig, at: WrapAt,
-): { contour: Contour; grid: GridResult } {
+): { contour: Contour; legalContour: Contour; grid: GridResult } {
   const pitch = cfg.pitchMM ?? DEFAULT_PITCH_MM
   const radius = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
+  // The disc travels as its own shape; the spot radius stays the rim, so no surface can mistake a
+  // circle round the disc for the disc itself.
+  const disc = paddingDiscSpec(radius, {
+    shape: cfg.paddingShape, radiusMM: cfg.paddingRadiusMM, discOffsetMM: cfg.discOffsetMM,
+  })
   const dia = cfg.magnetDiaMM === MAGNET_DIA_LARGE_MM ? MAGNET_DIA_LARGE_MM : MAGNET_DIA_SMALL_MM
-  const contour = sized(at.sizeMM)
+  // THE LINE, PADDED. The wrap found the tightest outline for these magnets; the edge padding grows
+  // exactly that outline outward — the same grow a canon record gets, so every shape expands by the
+  // dial with its magnets untouched and the shape radius reaches wrapped shapes too.
+  const legalContour = sized(at.sizeMM)
+  const contour = grownContour(legalContour, Math.max(0, cfg.edgePaddingMM ?? EDGE_PADDING_MM), cfg.shapeRadiusMM ?? SHAPE_RADIUS_MM)
   const bb = bbox(contour.outer.pts)
   const seed = at.points[0] ?? at.originMM
   const reach = Math.ceil(Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY) / pitch) + 2
@@ -52,6 +63,7 @@ export function wrapGrid(
   const mod = (v: number, m: number) => ((v % m) + m) % m
   return {
     contour,
+    legalContour,
     grid: {
       anchors: at.points.map((p) => ({ p, dia })),
       pitchCentreMM: pitch,
@@ -59,9 +71,10 @@ export function wrapGrid(
       phaseMM: [mod(seed[0] - bb.minX, pitch), mod(seed[1] - bb.minY, pitch)],
       panMM: [0, 0],
       spotRadiusMM: radius,
+      paddingDisc: disc,
       contactsMM: at.points.filter((_, i) => (at.gapsMM[i] ?? Infinity) <= 0.6),
       segments: [],
-      legalBoxMM: legalRegionBoxMM(contour, radius),
+      legalBoxMM: legalRegionBoxMM(legalContour, radius),
       centresMM: [at.anchorMM],
       centreMainMM: at.anchorMM,
       seatings: [],   // display of a settled answer; the registrations were spent upstream
@@ -115,7 +128,8 @@ export function wrapBandLadder(
     return governMass(masses, (cfg.governor ?? GOVERNOR) as Governor, (bb.minY + bb.maxY) / 2)?.centreMM ?? cands[0] ?? boxC
   })
   const wcfg: WrapConfig = {
-    pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM,
+    pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM, edgePaddingMM: cfg.edgePaddingMM,
+    paddingShape: cfg.paddingShape, paddingRadiusMM: cfg.paddingRadiusMM, discOffsetMM: cfg.discOffsetMM,
     centreMode: cfg.centreMode, governor: cfg.governor,
     anchorAtMM: anchorFn,
   }

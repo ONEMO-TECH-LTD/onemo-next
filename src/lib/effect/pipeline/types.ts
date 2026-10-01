@@ -24,7 +24,11 @@ export interface GridRequest {
  *  have nothing to act on here (QA F1, 2026-09-09). */
 export interface RecordRequest {
   record: CatalogueEntry
-  cfg: Pick<GridConfig, 'plan' | 'perimeterOnly'>
+  /** `edgePaddingMM` is NOT a search dial — it is an override on every wrap, canon records included
+   *  (Dan, 2026-09-22: "it is override for all wrap exposed and canon shapes, that is the point").
+   *  A record's magnets are its own and never move; its OUTLINE is grown by the padding, which is
+   *  what lets a released effect envelope the panel beneath it. */
+  cfg: Pick<GridConfig, 'plan' | 'perimeterOnly' | 'edgePaddingMM' | 'paddingShape' | 'paddingRadiusMM' | 'discOffsetMM' | 'shapeRadiusMM'>
   settings: { protectionPaddingMM: number }
 }
 
@@ -33,6 +37,10 @@ export interface RecordRequest {
  *  Rule-4 / manual selection the engine made, `classificationDiagnostics` the classifier's readout. */
 export interface GridSolve {
   contour: Contour
+  /** The outline the LEGAL AREA is measured on — the published record, or the wrapped outline —
+   *  before the edge padding grows it. Padding adds material, never seats, so the legal area is
+   *  read from here and never from `contour`. Absent when the two are the same outline. */
+  legalContour?: Contour
   grid: GridResult
   effSize: number
   rungs: Array<{ sizeMM: number; count: number; offMM: number; roles: string[] }>

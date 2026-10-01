@@ -220,11 +220,16 @@ export function solveGrid(rawReq: GridRequest): GridSolve {
         // on a teardrop under Weight centring (QA @ca147429 F8). `at` keeps the search's facts for
         // ordering and reported contact; only what is drawn takes the anchor for the size it is drawn at.
         const drawnAt = { ...at, anchorMM: anchorAt(at.sizeMM) }
-        const wcfg: WrapConfig = { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM, magnetDiaMM: undefined, anchorAtMM: () => drawnAt.anchorMM }
+        // the DRAWN wrap carries the same padding variant the search used — dropping it here left the
+        // canvas showing a circle while the outline had already been wrapped around a squircle
+        const wcfg: WrapConfig = { pitchMM: cfg.pitchMM, paddingMM: cfg.paddingMM, magnetDiaMM: undefined,
+          edgePaddingMM: cfg.edgePaddingMM, paddingShape: cfg.paddingShape, paddingRadiusMM: cfg.paddingRadiusMM,
+          discOffsetMM: cfg.discOffsetMM, shapeRadiusMM: cfg.shapeRadiusMM,
+          anchorAtMM: () => drawnAt.anchorMM }
         const drawn = wrapGrid(sized, wcfg, drawnAt)
         const pad = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
         const r = spotRadiusOf(pad)
-        const segments = safeSegments(drawn.contour, r, 'full')
+        const segments = safeSegments(drawn.legalContour, r, 'full')
         const anchors = assignSizes(at.points, (cfg.plan ?? 'all6') as MagnetPlan)
         const deliveredEvidence = measureProtection(drawn.contour, at.points,
           pitch, protectionPaddingMM, anchors.map((anchor) => anchor.dia / 2))
@@ -237,7 +242,7 @@ export function solveGrid(rawReq: GridRequest): GridSolve {
           segWmm: bk.segW * at.sizeMM / refMM, segHmm: bk.segH * at.sizeMM / refMM,
         }
         return {
-          contour: drawn.contour, grid: { ...drawn.grid, anchors, segments },
+          contour: drawn.contour, legalContour: drawn.legalContour, grid: { ...drawn.grid, anchors, segments },
           effSize: at.sizeMM, rungs: ladder, selectedRungIndex: idx, segments, offMM: at.centreOffMM, classificationDiagnostics: recog,
           bandClass, bandClasses, recommendation, unprotected: deliveredEvidence,
           profile: profileSnapshot(LOCK_PROFILE),

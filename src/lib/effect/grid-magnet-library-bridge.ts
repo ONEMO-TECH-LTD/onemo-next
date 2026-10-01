@@ -6,7 +6,7 @@
 // shape yet — those are the library's, and it must not import its resolvers to do them.
 
 import type { Contour, Pt } from './types'
-import type { GridResult } from './grid-magnet'
+import type { GridResult, PaddingDiscSpec } from './grid-magnet'
 import { MAGNET_DIA_SMALL_MM, RELEASED_PADDING_MM } from './grid-magnet-spec'
 import {
   type CatalogueEntry,
@@ -23,9 +23,16 @@ interface LibraryStageModel {
 const pts = (ps: MaterializedLibrary['nodesMM']): Pt[] => ps.map((p) => [p[0], p[1]] as Pt)
 
 /** The engine's picture of a materialised library record. The lattice field is seeded only when
- *  nothing is drawn, so an empty canvas still has somewhere to click. */
-export function libraryStageModel(materialized: MaterializedLibrary, pitchMM: number): LibraryStageModel {
-  return { ...stageOf(materialized, materialized.legalBoxMM, materialized.seedMM, pitchMM), error: materialized.error }
+ *  nothing is drawn, so an empty canvas still has somewhere to click.
+ *
+ *  It wears the PADDING DISC in play, as Presets does — the disc is the visual guide on every surface
+ *  (Dan, 2026-09-22: "disc is not shape it is internal visual guide"). The outline stays as published:
+ *  this is the record being authored, and the edge padding is applied when a record is delivered. */
+export function libraryStageModel(
+  materialized: MaterializedLibrary, pitchMM: number, paddingDisc?: PaddingDiscSpec,
+): LibraryStageModel {
+  const stage = stageOf(materialized, materialized.legalBoxMM, materialized.seedMM, pitchMM)
+  return { ...stage, grid: { ...stage.grid, paddingDisc }, error: materialized.error }
 }
 
 /** A RELEASED RECORD on the bench — the catalogue entry itself, put on the canvas as it was

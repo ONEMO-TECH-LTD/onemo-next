@@ -12,6 +12,7 @@ import type { Contour, Pt, WrapAt, WrapConfig } from '../types'
 import { edgeDistToContourMM, pointInContour } from '../foundation/geometry'
 import { MANUFACTURING_OFFSET_ARC_TOLERANCE_MM } from '../offset'
 import { PADDING_FLOOR_MM } from '../grid-magnet-spec'
+import { paddingDiscParts, paddingDiscSpec } from '../foundation/padding-disc'
 
 /** Micron scale — private to wrap. */
 const S = 1000
@@ -36,6 +37,41 @@ function seatRegion(contour: Contour, radiusMM: number): Paths64 | null {
   if (!blocked.length) return region
   const left = Clipper.difference(region, blocked, FillRule.NonZero)
   return left && left.length ? left : null
+}
+
+/** THE SQUARE HALF OF THE DISC. The centres a square of half `halfMM` can sit at are the region minus
+ *  every point within that square of its boundary — the boundary swept by the square. The sweep of a
+ *  closed path covers every such point except when a whole path fits inside one square, so the square
+ *  is also stamped once at each path's first vertex. Exact for any outline, holes included, because
+ *  the region's hole paths are swept like its outer ones. */
+function erodeBySquare(region: Paths64, halfMM: number): Paths64 | null {
+  const h = Math.round(halfMM * S)
+  const square = [{ x: -h, y: -h }, { x: h, y: -h }, { x: h, y: h }, { x: -h, y: h }]
+  const band: Paths64 = []
+  for (const path of region) {
+    band.push(...Clipper.minkowskiSum(square, path, true))
+    const { x, y } = path[0]
+    band.push(square.map((q) => ({ x: q.x + Number(x), y: q.y + Number(y) })))
+  }
+  const left = Clipper.difference(region, band, FillRule.NonZero)
+  return left && left.length ? left : null
+}
+
+/** How far a seated centre is from leaving the region — the gap between its disc and the line. */
+function depthInRegionMM(region: Paths64, p: Pt): number {
+  let best = Infinity
+  for (const path of region) {
+    for (let i = 0; i < path.length; i++) {
+      const a = path[i], b = path[(i + 1) % path.length]
+      const ax = Number(a.x) / S, ay = Number(a.y) / S, bx = Number(b.x) / S, by = Number(b.y) / S
+      const dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy
+      let t = len2 > 0 ? ((p[0] - ax) * dx + (p[1] - ay) * dy) / len2 : 0
+      t = t < 0 ? 0 : t > 1 ? 1 : t
+      const d = Math.hypot(ax + t * dx - p[0], ay + t * dy - p[1])
+      if (d < best) best = d
+    }
+  }
+  return best
 }
 
 /** Every grid origin at which the whole rigid group is seated — empty when it cannot fit. */
@@ -96,7 +132,28 @@ export function wrapGroup(
   sized: (mm: number) => Contour, cfg: WrapConfig, group: ReadonlyArray<Pt>, minMM: number, maxMM: number,
   ): WrapAt | null {
   if (!group.length) return null
-  const radius = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
+  // The wrap presses against the PADDING DISC — the spec variant in play, AS ITS TRUE SHAPE. A
+  // squircle is its square core grown by its round margin, and the outline is eroded by exactly
+  // those two: along a flat the squircle needs only its half-width, across a corner its full corner.
+  // A circle round it would be refused where the squircle fits and — at a different corner — let
+  // through where it does not (Dan, 2026-09-22: "true shapes and wrap engine to react to that shape
+  // not circle").
+  // Registration never sees this — the seat predicate still uses the bare rim — so the legal area,
+  // and every band measured on it, are unchanged by the disc's shape (Dan, 2026-09-22).
+  const rim = Math.max(PADDING_FLOOR_MM, cfg.paddingMM ?? PADDING_FLOOR_MM)
+  // THE EDGE PADDING IS NOT HERE. It pads the line AFTER the wrap has found it (wrapGrid); put into
+  // this clearance it sat inside a band-bounded search, which traded magnets for room — a blob went
+  // 4 magnets -> 3 -> 1 as the dial rose instead of growing (QA, 2026-09-22). Dan: "the line that
+  // wraps the grid must be padded = edge padding".
+  const disc = paddingDiscSpec(rim, {
+    shape: cfg.paddingShape, radiusMM: cfg.paddingRadiusMM, discOffsetMM: cfg.discOffsetMM,
+  })
+  const { squareHalfMM, roundMM } = paddingDiscParts(disc)
+  const radius = roundMM
+  const regionAt = (c: Contour): Paths64 | null => {
+    const round = seatRegion(c, radius)
+    return round && squareHalfMM > 0 ? erodeBySquare(round, squareHalfMM) : round
+  }
   const g = group.map((p) => [p[0], p[1]] as Pt)
   const xs = g.map((p) => p[0]), ys = g.map((p) => p[1])
   const mid: Pt = cfg.frameMidMM
@@ -107,13 +164,17 @@ export function wrapGroup(
     const c = sized(mm)
     const anchor = anchorAt(mm)
     const centred: Pt = [anchor[0] - mid[0], anchor[1] - mid[1]]
-    let ok = true
-    for (const [lx, ly] of g) {
-      const px = centred[0] + lx, py = centred[1] + ly
-      if (!pointInContour([px, py], c) || edgeDistToContourMM(c, [px, py]) < radius) { ok = false; break }
+    // The circle's quick answer is the exact one only when there is no square core; a squircle is
+    // judged on its region alone, where pickOrigin keeps the centred placement whenever it is lawful.
+    if (squareHalfMM === 0) {
+      let ok = true
+      for (const [lx, ly] of g) {
+        const px = centred[0] + lx, py = centred[1] + ly
+        if (!pointInContour([px, py], c) || edgeDistToContourMM(c, [px, py]) < radius) { ok = false; break }
+      }
+      if (ok) return centred
     }
-    if (ok) return centred
-    const region = seatRegion(c, radius)
+    const region = regionAt(c)
     if (!region) return null
     const valid = validOrigins(region, g)
     if (!valid) return null
@@ -132,6 +193,7 @@ export function wrapGroup(
   const anchor = anchorAt(hi)
   const pts = g.map(([lx, ly]) => [origin[0] + lx, origin[1] + ly] as Pt)
   const finalMid: Pt = [origin[0] + mid[0], origin[1] + mid[1]]
+  const finalRegion = squareHalfMM > 0 ? regionAt(sized(hi)) : null
   return {
     count: pts.length,
     sizeMM: Math.round(hi * 100) / 100,
@@ -139,6 +201,8 @@ export function wrapGroup(
     points: pts,
     originMM: origin,
     anchorMM: anchor,
-    gapsMM: pts.map((q) => Math.max(0, edgeDistToContourMM(sized(hi), q) - radius)),
+    gapsMM: pts.map((q) => finalRegion
+      ? depthInRegionMM(finalRegion, q)
+      : Math.max(0, edgeDistToContourMM(sized(hi), q) - radius)),
   }
 }
