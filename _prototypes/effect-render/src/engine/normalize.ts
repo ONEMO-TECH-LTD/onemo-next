@@ -1,14 +1,17 @@
 import type { ImageRef, RenderConfig, RenderInput } from './types'
 
 export const DEFAULTS: RenderConfig = {
+  mode: 'patch',
+  photoLight: 0.45,
+  rim: 0.12,
   base: { href: '', width: 2048, height: 2048 },
   effect: { href: '', width: 1024, height: 1024 },
-  place: { x: 1024, y: 820, size: 520, rotation: -4, tiltX: 0, tiltY: 0 },
+  place: { x: 1024, y: 820, size: 520, rotation: 0, tiltX: 0, tiltY: 0 },
   light: { angle: 225, elevation: 48 },
   shadow: { distance: 18, blur: 16, opacity: 0.45 },
   contact: { blur: 3, opacity: 0.6 },
   thickness: { depth: 9, shade: 0.55 },
-  bevel: { size: 7, strength: 4, gloss: 22, shine: 0.45 },
+  bevel: { size: 7, strength: 2.5, gloss: 30, shine: 0.18 },
   texture: { href: '', width: 1024, height: 1024, scale: 0.6, strength: 1.2 },
   tone: { brightness: 0, contrast: 0, saturation: 0, warmth: 0 },
 }
@@ -39,6 +42,9 @@ export function normalize(i: RenderInput = {}): RenderConfig {
   const t = i.thickness ?? {}, b = i.bevel ?? {}, x = i.texture ?? {}, o = i.tone ?? {}
   const base = image(i.base, d.base)
   return {
+    mode: i.mode === 'print' ? 'print' : 'patch',
+    photoLight: num(i.photoLight, LIMITS.unit, d.photoLight),
+    rim: num(i.rim, LIMITS.unit, d.rim),
     base,
     effect: image(i.effect, d.effect),
     place: {

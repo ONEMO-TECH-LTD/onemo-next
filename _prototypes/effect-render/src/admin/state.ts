@@ -3,7 +3,7 @@
 
 import { normalize, type RenderConfig } from '../engine'
 
-const KEY = 'effect-render:v1'
+const KEY = 'effect-render:v2'
 
 export interface Picks {
   stock: string

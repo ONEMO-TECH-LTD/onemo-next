@@ -10,6 +10,15 @@ export interface ImageRef {
 }
 
 export interface RenderConfig {
+  /**
+   * 'patch' — the Effect as a physical piece on the garment: shadow, thickness, rounded lit edge.
+   * 'print' — the Effect as ink in the fabric: flat, the garment's folds and weave show through it.
+   */
+  mode: 'patch' | 'print'
+  /** How much of the photo's own light and folds carry onto the Effect. 0..1 */
+  photoLight: number
+  /** Faint light rim around the Effect, so it reads on dark fabric where shadows vanish. 0..1 */
+  rim: number
   /** The garment photo (stock or uploaded). Defines the output size. */
   base: ImageRef
   /** The Effect, already cut out (transparent background). */

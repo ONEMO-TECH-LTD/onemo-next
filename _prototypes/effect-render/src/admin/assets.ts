@@ -20,7 +20,9 @@ export const STOCK: Asset[] = [
 ]
 
 export const EFFECTS: Asset[] = [
-  { id: 'effect-tv', label: 'Sample · TV shape', url: '/effects/effect-tv.png' },
+  { id: 'effect-pro', label: 'Sample · thermal PRO', url: '/effects/effect-pro.png' },
+  { id: 'effect-lime-clover', label: 'Sample · lime clover', url: '/effects/effect-lime-clover.png' },
+  { id: 'effect-tv', label: 'Sample · TV shape (photo)', url: '/effects/effect-tv.png' },
   { id: 'effect-clover', label: 'Sample · clover', url: '/effects/effect-clover.png' },
   { id: 'effect-round', label: 'Sample · round', url: '/effects/effect-round.png' },
 ]
@@ -85,6 +87,34 @@ export function load(url: string): Promise<Loaded | null> {
     cache.set(url, p)
   }
   return p
+}
+
+/**
+ * Where the garment is in the photo: its bounding box in photo pixels. Uses the photo's transparency when
+ * it is a cut-out, otherwise everything that differs from the background colour in the corners.
+ */
+export async function garmentBox(img: Loaded): Promise<{ x0: number; y0: number; x1: number; y1: number; shoulder: number }> {
+  const im = new Image(); im.src = img.href; await im.decode()
+  const S = 256, k = S / Math.max(img.width, img.height)
+  const w = Math.max(1, Math.round(img.width * k)), h = Math.max(1, Math.round(img.height * k))
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h
+  const ctx = cv.getContext('2d', { willReadFrequently: true })!; ctx.drawImage(im, 0, 0, w, h)
+  const px = ctx.getImageData(0, 0, w, h).data
+  const at = (x: number, y: number) => (y * w + x) * 4
+  const cut = px[at(0, 0) + 3] < 20 && px[at(w - 1, h - 1) + 3] < 20
+  const bg = [px[0], px[1], px[2]]
+  let x0 = w, y0 = h, x1 = -1, y1 = -1
+  const rowWidth = new Array(h).fill(0)
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = at(x, y)
+    const on = cut ? px[i + 3] > 40 : Math.abs(px[i] - bg[0]) + Math.abs(px[i + 1] - bg[1]) + Math.abs(px[i + 2] - bg[2]) > 36
+    if (on) { rowWidth[y]++; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y }
+  }
+  if (x1 < 0) return { x0: 0, y0: 0, x1: img.width, y1: img.height, shoulder: img.height * 0.3 }
+  // shoulder line: the first row (from the top) where the garment reaches half its widest — below any hood or collar
+  const widest = Math.max(...rowWidth)
+  const shoulder = rowWidth.findIndex((v) => v >= widest * 0.5)
+  return { x0: x0 / k, y0: y0 / k, x1: (x1 + 1) / k, y1: (y1 + 1) / k, shoulder: shoulder / k }
 }
 
 /** Which of the listed assets actually exist on disk — generated stock may still be on its way. */

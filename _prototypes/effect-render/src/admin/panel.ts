@@ -1,8 +1,8 @@
 // Control panel. Every control writes one setting; nothing here renders.
 
 import { DEFAULTS, renderEffect } from '../engine'
-import { EFFECTS, MATERIALS, STOCK, addUpload, available, type Asset } from './assets'
-import { button, el, section, slider } from './controls'
+import { EFFECTS, MATERIALS, STOCK, addUpload, available, garmentBox, load, type Asset } from './assets'
+import { button, el, section, select, slider } from './controls'
 import { resolvedInput } from './preview'
 import { getConfig, getPicks, setConfig, setPick, subscribe, type Picks } from './state'
 
@@ -54,17 +54,21 @@ function copyConfig(status: (m: string) => void): void {
 
 export function panel(status: (m: string) => void): HTMLElement {
   const root = el('aside', 'panel')
-  // centre the Effect on a new photo at a sensible default size
+  // centre the Effect on the garment's chest at a sensible size whenever the photo changes
+  const centre = async () => {
+    const url = STOCK.find((a) => a.id === getPicks().stock)?.url
+    const img = url ? await load(url) : null
+    if (!img) return
+    const b = await garmentBox(img), gw = b.x1 - b.x0, gh = b.y1 - b.y0
+    const c = getConfig(), size = Math.round(gw * 0.2)
+    // chest: just below the shoulder line, where a chest print or patch sits
+    const y = Math.round(b.shoulder + gh * 0.13 + size * 0.25)
+    setConfig({ ...c, base: { ...c.base, width: img.width, height: img.height }, place: { ...c.place, x: Math.round(b.x0 + gw / 2), y, size, rotation: 0, tiltX: 0, tiltY: 0 } })
+    status('Centred on the garment')
+  }
   let lastStock = getPicks().stock
   subscribe(() => {
-    const p = getPicks()
-    if (p.stock !== lastStock) {
-      lastStock = p.stock
-      setTimeout(() => {
-        const c = getConfig()
-        setConfig({ ...c, place: { ...c.place, x: c.base.width / 2, y: c.base.height * 0.4, size: Math.round(c.base.width * 0.25) } })
-      }, 300)
-    }
+    if (getPicks().stock !== lastStock) { lastStock = getPicks().stock; void centre() }
   })
   root.append(
     section('Images',
@@ -72,7 +76,13 @@ export function panel(status: (m: string) => void): HTMLElement {
       picker('effect', 'Effect', () => EFFECTS, 'effect', status),
       picker('material', 'Material', () => MATERIALS),
     ),
+    section('Look',
+      select('mode', 'Shown as', [['patch', 'Patch — a 3D piece on the garment'], ['print', 'Print — ink in the fabric']]),
+      slider({ path: 'photoLight', label: 'Photo light', min: 0, max: 1, step: 0.01 }),
+      slider({ path: 'rim', label: 'Rim on dark', min: 0, max: 0.6, step: 0.01 }),
+    ),
     section('Placement — or drag on the photo',
+      button('Centre on garment', () => void centre()),
       slider({ path: 'place.size', label: 'Size', min: 40, max: 1400, step: 1, unit: 'px' }),
       slider({ path: 'place.rotation', label: 'Rotation', min: -45, max: 45, step: 0.5, unit: '°' }),
       slider({ path: 'place.tiltX', label: 'Tilt ↔', min: -25, max: 25, step: 0.5, unit: '°' }),

@@ -31,9 +31,6 @@ export function preview(): HTMLElement {
     if (mine !== seq) return
     const { svg, config } = renderEffect(input, { id: 'stage' })
     frame.innerHTML = svg
-    const s = frame.querySelector('svg')
-    if (s) s.style.cssText = 'display:block;width:100%;height:auto'
-    frame.style.aspectRatio = `${config.base.width} / ${config.base.height}`
     meta.textContent = config.base.href
       ? `${config.base.width} × ${config.base.height} · drag the Effect to move it`
       : 'Pick a stock photo — generated T-shirts appear here as soon as they are saved'
@@ -54,7 +51,9 @@ export function preview(): HTMLElement {
   })
   frame.addEventListener('pointermove', (e) => {
     if (!drag) return
-    const k = getConfig().base.width / frame.getBoundingClientRect().width
+    // the photo is fitted (contain) inside the frame: one screen pixel = the larger of the two ratios
+    const b = getConfig().base, r = frame.getBoundingClientRect()
+    const k = Math.max(b.width / r.width, b.height / r.height)
     update('place', { ...getConfig().place, x: Math.round(drag.px + (e.clientX - drag.x) * k), y: Math.round(drag.py + (e.clientY - drag.y) * k) })
   })
   const end = () => (drag = null)

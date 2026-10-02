@@ -36,7 +36,14 @@ function toneMatrix(t: RenderConfig['tone']): string {
 export function renderEffect(input: RenderInput = {}, options: RenderOptions = {}): { svg: string; config: RenderConfig } {
   const c = normalize(input)
   const id = (options.id ?? 'er').replace(/[^a-zA-Z0-9_-]/g, '') || 'er'
-  const { base, effect, place, light, shadow, contact, thickness, bevel, texture, tone } = c
+  const { base, effect, place, light, tone } = c
+  const print = c.mode === 'print'
+  const contact = print ? { ...c.contact, opacity: 0 } : c.contact
+  // a print is flat ink: no shadow, no thickness, no lit edge — its realism comes from the fabric showing through
+  const shadow = print ? { ...c.shadow, opacity: 0 } : c.shadow
+  const thickness = print ? { ...c.thickness, depth: 0 } : c.thickness
+  const bevel = print ? { ...c.bevel, size: 0 } : c.bevel
+  const texture = print ? { ...c.texture, strength: 0 } : c.texture
   const w = place.size, h = (place.size * effect.height) / effect.width
   // light direction in the Effect's own (rotated) frame
   const az = light.angle - place.rotation
@@ -45,7 +52,7 @@ export function renderEffect(input: RenderInput = {}, options: RenderOptions = {
   const [sdx, sdy] = away(shadow.distance)
   const [cdx, cdy] = away(Math.min(2, shadow.distance * 0.15))
   const region = 'x="-60%" y="-60%" width="220%" height="220%"'
-  const f = { shadow: `${id}-shadow`, contact: `${id}-contact`, side: `${id}-side`, face: `${id}-face` }
+  const f = { shadow: `${id}-shadow`, contact: `${id}-contact`, side: `${id}-side`, face: `${id}-face`, white: `${id}-white`, mask: `${id}-mask`, detail: `${id}-detail`, rim: `${id}-rim` }
 
   const defs: string[] = []
   defs.push(
@@ -101,6 +108,18 @@ export function renderEffect(input: RenderInput = {}, options: RenderOptions = {
   face.push(`<feComposite in="${lit}" in2="SourceAlpha" operator="in"/>`)
   defs.push(`<filter id="${f.face}" ${region} color-interpolation-filters="sRGB">${face.join('')}</filter>`)
 
+  // the photo's own light and folds, as grey detail around mid-grey (a high-pass), laid over the Effect
+  const detailBlur = Math.max(4, base.width / 160)
+  defs.push(
+    `<filter id="${f.white}" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0"/></filter>`,
+    `<filter id="${f.detail}" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">` +
+      `<feColorMatrix in="SourceGraphic" type="saturate" values="0" result="g"/><feGaussianBlur in="g" stdDeviation="${n(detailBlur)}" result="b"/>` +
+      `<feComponentTransfer in="b" result="bi"><feFuncR type="table" tableValues="1 0"/><feFuncG type="table" tableValues="1 0"/><feFuncB type="table" tableValues="1 0"/></feComponentTransfer>` +
+      `<feComposite in="g" in2="bi" operator="arithmetic" k2="1" k3="1" k4="-0.5"/></filter>`,
+    `<filter id="${f.rim}" ${region} color-interpolation-filters="sRGB">` +
+      `<feMorphology in="SourceAlpha" operator="dilate" radius="${n(Math.max(1, place.size / 260))}" result="d"/><feGaussianBlur in="d" stdDeviation="${n(Math.max(1, place.size / 200))}" result="s"/>` +
+      `<feComposite in="s" in2="SourceAlpha" operator="out" result="ring"/><feFlood flood-color="#ffffff"/><feComposite in2="ring" operator="in"/></filter>`,
+  )
   const img = (filter: string) =>
     `<image href="${esc(effect.href)}" x="${n(-w / 2)}" y="${n(-h / 2)}" width="${n(w)}" height="${n(h)}" preserveAspectRatio="none" filter="url(#${filter})"/>`
   const t = `translate(${n(place.x)} ${n(place.y)}) rotate(${n(place.rotation)}) skewX(${n(place.tiltX)}) skewY(${n(place.tiltY)})`
@@ -109,11 +128,17 @@ export function renderEffect(input: RenderInput = {}, options: RenderOptions = {
     `<defs>${defs.join('')}</defs>` +
     (base.href ? `<image href="${esc(base.href)}" width="${base.width}" height="${base.height}" preserveAspectRatio="xMidYMid slice"/>` : '') +
     (effect.href
-      ? `<g transform="${t}">` +
+      ? `<mask id="${f.mask}" maskUnits="userSpaceOnUse" x="0" y="0" width="${base.width}" height="${base.height}"><g transform="${t}" filter="url(#${f.white})">` +
+        `<image href="${esc(effect.href)}" x="${n(-w / 2)}" y="${n(-h / 2)}" width="${n(w)}" height="${n(h)}" preserveAspectRatio="none"/></g></mask>` +
+        `<g transform="${t}">` +
+        (c.rim > 0 && !print ? `<g style="mix-blend-mode:screen" opacity="${n(c.rim)}">${img(f.rim)}</g>` : '') +
         `<g style="mix-blend-mode:multiply">${img(f.shadow)}${img(f.contact)}</g>` +
         (thickness.depth > 0 ? img(f.side) : '') +
         img(f.face) +
-        `</g>`
+        `</g>` +
+        (c.photoLight > 0 && base.href
+          ? `<g mask="url(#${f.mask})"><image href="${esc(base.href)}" width="${base.width}" height="${base.height}" preserveAspectRatio="xMidYMid slice" filter="url(#${f.detail})" style="mix-blend-mode:overlay" opacity="${n(c.photoLight)}"/></g>`
+          : '')
       : '') +
     `</svg>`
   return { svg, config: c }
