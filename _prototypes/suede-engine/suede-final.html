@@ -232,7 +232,7 @@ bgRes.onclick=()=>{ const two=!bgRes.classList.contains('on'); bgRes.classList.t
 const sheet=document.getElementById('sheet');
 const CTL=[
   ['Print on suede',[['print','print on suede','toggle'],['soften','soften',0,.4,.01],['lift','black lift',0,.2,.005],['blur','blur px',0,1.5,.05]]],
-  ['Material (physically based)',[['pbr','material','toggle'],['pnsrc','surface','seg',['suede','leather','ink','flat']],['ptile','fineness',1,10,.25],['pnorm','surface depth',0,1,.01],
+  ['Material (physically based)',[['pbr','material lighting','toggle'],['pnsrc','surface','seg',['suede','leather','ink','flat']],['ptile','fineness',1,10,.25],['pnorm','surface depth',0,1,.01],
     ['psheen','sheen (fabric glow)',0,1.5,.01],['pshrough','sheen softness',.3,1,.01],['pshtint','sheen tint',0,1,.01],['pspec','highlight',0,2,.01],['prough','roughness',.05,1,.01],
     ['pcoat','gloss coat',0,1,.01],['pcoatr','coat sharpness',.02,.4,.005],['penv','coat reflection',0,2,.01],['pkey','key light',0,2,.01],['pamb','ambient',0,1.5,.01],['pexpo','exposure',.5,2.5,.01]]],
   ['Shader suede (generated per pixel)',[['proc','shader suede','toggle'],['ndens','nap fineness',10,200,1],['nstretch','fibre length',1,8,.1],['ndir','nap direction °',0,180,1],['nrelief','nap relief',0,2,.01],['namt','nap strength',0,1,.01],['wscale','wash size',.3,4,.05],['wamt','wash depth',0,1,.01],['tips','fibre tips',0,1,.01],['seed','seed',0,50,1]]],
