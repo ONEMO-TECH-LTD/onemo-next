@@ -78,12 +78,14 @@ const PRESETS={
   B:{print:1,soften:.12,lift:.06,blur:.5, fibres:0,fscale:1,relief:.45,fmix:.85,fsheen:.11, layer:'grain',lamt:1,lscale:1, az:46,el:63,live:0, sheen:.12},
   'B+fine fibres':{print:1,soften:.12,lift:.06,blur:.5, fibres:1,fscale:4,relief:.2,fmix:.5,fsheen:.06, layer:'grain',lamt:1,lscale:1, az:46,el:63,live:0, sheen:.12},
   E:{print:1,soften:.12,lift:.06,blur:.5, fibres:0,fscale:1,relief:.45,fmix:.85,fsheen:.11, layer:'archive',lamt:1,lscale:1, az:46,el:63,live:0, sheen:.12},
+  '3D viewer suede':{print:1,soften:.12,lift:.06,blur:.5, fibres:0,fscale:4,relief:.2,fmix:.5,fsheen:.06, layer:'none',lamt:1,lscale:1, az:46,el:63,live:0, sheen:0,
+    proc:0, pbr:1,ptile:3,pnorm:.15,psheen:.1,pshrough:.8,pamb:.5,pkey:1,pexpo:1.43},
   'Shader suede':{print:1,soften:.12,lift:.06,blur:.5, fibres:0,fscale:4,relief:.2,fmix:.5,fsheen:.06, layer:'none',lamt:1,lscale:1, az:46,el:63,live:0, sheen:.12,
     proc:1,ndens:60,nstretch:3,ndir:35,nrelief:.45,namt:1,wscale:1,wamt:.35,tips:.1,seed:7},
 };
-const KEY='onemo-suede-cards-v2';
+const KEY='onemo-suede-cards-v3';
 let cards; try{ cards=JSON.parse(localStorage.getItem(KEY)); }catch(_){}
-if(!Array.isArray(cards)||cards.length!==ARTS.length) cards=ARTS.map(()=>({...PRESETS['Shader suede']}));
+if(!Array.isArray(cards)||cards.length!==ARTS.length) cards=ARTS.map(()=>({...PRESETS['3D viewer suede']}));
 const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(cards)); }catch(_){} };
 const st={ live:null };
 
@@ -101,6 +103,12 @@ float sn(vec2 v){ const vec4 C=vec4(.211324865405187,.366025403784439,-.57735026
   vec3 p=perm(perm(i.y+vec3(0.,i1.y,1.))+i.x+vec3(0.,i1.x,1.)); vec3 m=max(.5-vec3(dot(x0,x0),dot(x12.xy,x12.xy),dot(x12.zw,x12.zw)),0.); m=m*m; m=m*m;
   vec3 x=2.*fract(p*C.www)-1.; vec3 h=abs(x)-.5; vec3 ox=floor(x+.5); vec3 a0=x-ox; m*=1.79284291400159-.85373472095314*(a0*a0+h*h);
   vec3 g; g.x=a0.x*x0.x+h.x*x0.y; g.yz=a0.yz*x12.xz+h.yz*x12.yw; return 130.*dot(m,g); }
+uniform float PBR,PNSCALE,PNORM,PSHEEN,PSHROUGH,PAMB,PKEY,PEXPO,PTILE;
+float D_Charlie(float r,float nh){ float a=r*r, ia=1./a, c2=nh*nh, s2=max(1.-c2,.0078125); return (2.+ia)*pow(s2,ia*.5)/6.2831853; }
+float V_Neubelt(float nv,float nl){ return clamp(1./(4.*(nl+nv-nl*nv)),0.,1.); }
+vec3 neutralTM(vec3 c){ const float sc=.8-.04, ds=.15; float x=min(c.r,min(c.g,c.b)); float off=x<.08?x-6.25*x*x:.04; c-=off; float pk=max(c.r,max(c.g,c.b)); if(pk<sc) return c;
+  float d=1.-sc; float np=1.-d*d/(pk+d-sc); c*=np/pk; float g=1.-1./(ds*(pk-np)+1.); return mix(c,vec3(np),g); }
+vec3 srgb2lin(vec3 c){ return pow(c,vec3(2.2)); } vec3 lin2srgb(vec3 c){ return pow(max(c,0.),vec3(1./2.2)); }
 float hash(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7))+SEED)*43758.5453); }
 /* nap height: fibres = fine noise stretched along the nap direction, 3 octaves */
 float nap(vec2 px){ float c=cos(NDIR),s=sin(NDIR); vec2 q=mat2(c,-s,s,c)*px; q.x/=max(NSTRETCH,1.); q*=NDENS/100.; q+=SEED*7.;
@@ -112,6 +120,13 @@ void main(){ vec3 c;
   if(PRINT>.5 && BACK<.5){ float l=dot(c,vec3(.299,.587,.114)); c=mix(c,vec3(l),SOFT); c=LIFT+(1.-LIFT)*c; }
   if(FIB>.5){ vec3 n=texture2D(NRM,v*FSCALE).rgb*2.-1.; n=normalize(vec3(n.xy*RELIEF*6.,n.z)); vec3 Ld=normalize(L);
     float d=max(dot(n,Ld),0.)/max(Ld.z,.05); c*=mix(1.,d,FMIX); c+=FSHEEN*pow(1.-n.z,1.2)*max(dot(normalize(n.xy+1e-4),normalize(Ld.xy+1e-4)),0.); }
+  if(PBR>.5){ vec3 nt=texture2D(NRM,v*PTILE).rgb*2.-1.; vec3 n=normalize(vec3(nt.xy*PNORM,nt.z));
+    vec3 Ld=normalize(L), V=vec3(0.,0.,1.), H=normalize(Ld+V);
+    float nl=max(dot(n,Ld),0.), nv=max(dot(n,V),1e-3), nh=max(dot(n,H),0.);
+    vec3 alb=srgb2lin(c);
+    vec3 col=alb*nl*PKEY + alb*PAMB                                  // Lambert key light + ambient (viewer: ambient .5, studio env)
+            + vec3(PSHEEN)*D_Charlie(PSHROUGH,nh)*V_Neubelt(nv,nl)*nl*PKEY*3.14159; // Charlie sheen — the suede fuzz
+    c=lin2srgb(neutralTM(col*PEXPO)); }
   if(PROC>.5){ vec2 px=v*SZPX; float e=1.;
     float h=nap(px), hx=nap(px+vec2(e,0.)), hy=nap(px+vec2(0.,e));
     vec3 n=normalize(vec3((h-hx)*NRELIEF*4.,(h-hy)*NRELIEF*4.,1.)); vec3 Ld=normalize(L);
@@ -147,6 +162,8 @@ const R3=(()=>{ const cv=document.createElement('canvas'); cv.width=cv.height=SZ
     gl.uniform1f(u('PROC'),s.proc||0); gl.uniform1f(u('NDENS'),s.ndens??60); gl.uniform1f(u('NSTRETCH'),s.nstretch??3); gl.uniform1f(u('NDIR'),(s.ndir??35)*deg);
     gl.uniform1f(u('NRELIEF'),s.nrelief??.6); gl.uniform1f(u('NAMT'),s.namt??1); gl.uniform1f(u('WSCALE'),s.wscale??1); gl.uniform1f(u('WAMT'),s.wamt??.35);
     gl.uniform1f(u('TIPS'),s.tips??.3); gl.uniform1f(u('SEED'),s.seed??7); gl.uniform1f(u('SZPX'),SZ);
+    gl.uniform1f(u('PBR'),s.pbr||0); gl.uniform1f(u('PTILE'),s.ptile??3); gl.uniform1f(u('PNORM'),s.pnorm??.15); gl.uniform1f(u('PSHEEN'),s.psheen??.1);
+    gl.uniform1f(u('PSHROUGH'),s.pshrough??.8); gl.uniform1f(u('PAMB'),s.pamb??.5); gl.uniform1f(u('PKEY'),s.pkey??1.); gl.uniform1f(u('PEXPO'),s.pexpo??1.43);
     const fix={x:Math.cos(s.az*deg)*Math.cos(s.el*deg), y:Math.sin(s.az*deg)*Math.cos(s.el*deg)}; const li=(s.live&&st.live)||fix;
     const z=Math.sqrt(Math.max(.05,1-li.x*li.x-li.y*li.y)); gl.uniform3f(u('L'),li.x,li.y,z); gl.drawArrays(gl.TRIANGLE_STRIP,0,4); } };
 })();
@@ -185,6 +202,7 @@ bgRes.onclick=()=>{ const two=!bgRes.classList.contains('on'); bgRes.classList.t
 const sheet=document.getElementById('sheet');
 const CTL=[
   ['Print on suede',[['print','print on','toggle'],['soften','soften',0,.4,.01],['lift','black lift',0,.2,.005],['blur','blur px',0,1.5,.05]]],
+  ['3D viewer suede (three.js sheen material, ported)',[['pbr','3D viewer suede on','toggle'],['ptile','fibre fineness',1,10,.25],['pnorm','normal scale',0,1,.01],['psheen','sheen colour',0,1,.01],['pshrough','sheen roughness',.3,1,.01],['pkey','key light',0,2,.01],['pamb','ambient',0,1.5,.01],['pexpo','exposure',.5,2.5,.01]]],
   ['Shader suede (generated per pixel)',[['proc','shader suede on','toggle'],['ndens','nap fineness',10,200,1],['nstretch','fibre length',1,8,.1],['ndir','nap direction °',0,180,1],['nrelief','nap relief',0,2,.01],['namt','nap strength',0,1,.01],['wscale','wash size',.3,4,.05],['wamt','wash depth',0,1,.01],['tips','fibre tips',0,1,.01],['seed','seed',0,50,1]]],
   ['Real suede fibres (GSG scan)',[['fibres','fibres on','toggle'],['fscale','fibre scale',1,10,.25],['relief','relief',0,1,.01],['fmix','light mix',0,1,.01],['fsheen','fibre sheen',0,.3,.005]]],
   ['Suede layer (overlay)',[['layer','layer','seg',['none','grain','archive']],['lamt','strength',0,1,.01],['lscale','scale',1,6,.25]]],
