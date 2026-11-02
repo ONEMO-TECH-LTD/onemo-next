@@ -67,6 +67,8 @@ export function createThreeCard(size) {
   camera.position.set(0, 0, 1 / (2 * Math.tan(15 * Math.PI / 180)));   // the card exactly fills the frame
   const key = new THREE.PointLight(0xffffff, 1, 0, 2);   // physical fall-off: closer = brighter, tighter hotspot
   scene.add(key);
+  const fill = new THREE.AmbientLight(0xffffff, 0);   // ambient fill: lifts the shadow side evenly, no direction
+  scene.add(fill);
   /* the softbox: a rectangular area light near the card — a smooth, resolution-free light spot on matte,
      a satin glow on leather, a clean rectangular reflection on gloss */
   const box = new THREE.RectAreaLight(0xffffff, 6, .55, .38);
@@ -209,6 +211,7 @@ export function createThreeCard(size) {
       const lx = (s.live && s.liveL) ? s.liveL.x : Math.cos(az) * Math.cos(el), ly = (s.live && s.liveL) ? s.liveL.y : Math.sin(az) * Math.cos(el);
       const dist = s.dist ?? 1.5, dir = new THREE.Vector3(lx, ly, Math.sqrt(Math.max(.05, 1 - lx * lx - ly * ly))).normalize();
       key.position.copy(dir).multiplyScalar(dist);
+      fill.intensity = m.amb ?? .6;
       key.intensity = m.key * 2.25; fall.uKsL.value.copy(dir);   // = the old directional brightness at the default distance 1.5
       box.position.copy(dir).multiplyScalar(dist); box.lookAt(0, 0, 0); box.intensity = m.box ?? 0;   // the softbox sits with the lamp, aimed at the card
       scene.environmentRotation.set(-ly * .9, lx * .9 + m.envRot * Math.PI / 180, 0);

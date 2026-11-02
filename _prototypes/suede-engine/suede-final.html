@@ -125,10 +125,11 @@ const PRESETS={
 };
 const MATS=['Suede','Velvet','Faux leather','UV matte','UV gloss'];
 const BACKS=MATS.filter(m=>m!=='Velvet');   // the back is never velvet
-for(const n of [...MATS,'Suede · scan','Velvet · scan']){ const t={}; for(const k in M3[n]) if(k!=='scan'&&k!=='studio') t['t_'+k]=M3[n][k]; if(M3[n].studio) t.studio=M3[n].studio; PRESETS[n]={engine:'three',mat3:n,az:40,el:50,live:0,dist:1.5,...t}; }   // fabrics + gloss read through moving light   // proven: three.js + Poly Haven
-const KEY='onemo-materials-v19';
-let cards; try{ cards=JSON.parse(localStorage.getItem(KEY)); }catch(_){}
-if(!Array.isArray(cards)||cards.length!==ARTS.length) cards=ARTS.map((_,i)=>{ const m=MATS[i%MATS.length]; return {...PRESETS[m],mat:m,backMat:'Suede'}; });   // one material per card to start
+for(const n of [...MATS,'Suede · scan','Velvet · scan']){ const t={}; for(const k in M3[n]) if(k!=='scan'&&k!=='studio') t['t_'+k]=M3[n][k]; if(M3[n].studio) t.studio=M3[n].studio; t.t_amb??=.6; PRESETS[n]={engine:'three',mat3:n,az:40,el:50,live:0,dist:1.5,...t}; }   // fabrics + gloss read through moving light   // proven: three.js + Poly Haven
+const KEY='onemo-materials';   // stable: never renamed again, so your settings survive page updates
+let cards; try{ cards=JSON.parse(localStorage.getItem(KEY)); if(!cards) for(let v=20;v>=11&&!cards;v--) cards=JSON.parse(localStorage.getItem('onemo-materials-v'+v)); }catch(_){}
+const fresh=i=>{ const m=MATS[i%MATS.length]; return {...PRESETS[m],mat:m,backMat:'Suede'}; };   // one material per card to start
+cards=ARTS.map((_,i)=>{ const c=Array.isArray(cards)&&cards[i]; return c&&c.mat&&PRESETS[c.mat] ? {...PRESETS[c.mat],backMat:'Suede',...c} : c||fresh(i); });   // new controls get preset values, yours win
 const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(cards)); }catch(_){} };
 const st={ live:null };
 
@@ -244,7 +245,9 @@ const T3=createThreeCard(SZ);
 function face(canvas, i, back){ canvas.width=canvas.height=SZ; const ctx=canvas.getContext('2d');
   return { draw(){ chain=chain.then(async()=>{ const s=cards[i];
     if(s.engine==='three'){ const bs=back&&s.backMat?{...PRESETS[s.backMat],live:s.live,az:s.az,el:s.el,studio:s.studio}:s;   // the back has its own material, never velvet
-      await T3.render(ARTS[i],{...bs,liveL:st.live},back); ctx.drawImage(T3.canvas,0,0); }
+      let L=null, live=bs.live; if(st.tiltOn&&st.tilt){ const d=Math.PI/180, az=(bs.az??40)*d, el=(bs.el??50)*d, cl=v=>Math.max(-.95,Math.min(.95,v));
+        L={x:cl(Math.cos(az)*Math.cos(el)+st.tilt.x), y:cl(Math.sin(az)*Math.cos(el)+st.tilt.y)}; live=1; } else if(bs.live) L=st.live;
+      await T3.render(ARTS[i],{...bs,live,liveL:L},back); ctx.drawImage(T3.canvas,0,0); }
     else { await R3.render(ARTS[i],back,s); ctx.drawImage(R3.cv,0,0); } }); return chain; } }; }
 
 /* ── reel ───────────────────────────────────────────────────────────── */
@@ -278,13 +281,13 @@ bgRes.onclick=()=>{ const two=!bgRes.classList.contains('on'); bgRes.classList.t
 const sheet=document.getElementById('sheet');
 /* panel: current controls in sections; [title, controls, open by default]. Legacy sections only appear on an earlier version. */
 const CTL=[
-  ['Light',[['studio','studio','seg',Object.keys(STUDIOS)],['t_envRot','studio rotation °',0,360,1],['az','light angle °',0,360,1],['dist','light distance',.5,4,.05],['el','light height °',5,85,1],['live','light follows mouse/tilt','toggle'],['t_key','key light',0,4,.01],['t_expo','exposure',.3,2.5,.01]],1],
+  ['Light',[['t_key','light strength',0,6,.01],['t_amb','ambient fill',0,3,.01],['dist','light distance',.5,4,.05],['az','light angle °',0,360,1],['el','light height °',5,85,1],['t_expo','exposure',.3,2.5,.01],['studio','studio','seg',Object.keys(STUDIOS)],['t_env','studio light & reflections',0,3,.01],['t_envRot','studio rotation °',0,360,1],['live','light follows mouse/tilt','toggle']],1],
   ['Print',[['t_soft','print softening',0,.5,.01],['t_lift','black lift',0,.25,.005],['t_punch','colour punch',-.3,.4,.01],['t_blurPx','dye bleed (blur px)',0,4,.05]],0],
   ['Nap, wash & highlights',[['t_ksSheen','highlights',0,1,.01],['t_ksGrainSize','nap size (px)',.6,6,.05],['t_ksGrain','nap strength',0,1,.01],['t_wash','wash (nap / crush patches)',0,1,.01],['t_washScale','wash size',1,12,.1],['t_washSeed','wash layout (reseed)',0,99,1],
     ['t_ksBack','backscatter (milky veil)',0,1,.01],['t_ks','velvet lobe',0,2,.01],['t_ksBump','noise bump',0,3,.01],['t_ksEdge','edginess',1,20,.1],['t_rim','velvet edge glow',0,.8,.01],['t_haze','fuzz haze',0,.4,.005],
     ['t_detail','fibre detail (scan colour)',0,1,.01],['t_detailGain','fibre visibility',1,30,.1],['t_detailTile','fibre size',.25,6,.05,'inv'],['t_fall','pile fall-off glow',0,1.5,.01],['t_fallPow','fall-off softness',1,6,.1,'inv'],['t_fallTint','fall-off colour from print',0,1,.01]],0],
   ['Surface & reflections',[['t_depth','grain depth',0,2,.01],['t_rough','reflection softness',.02,1,.01],['t_spec','highlight strength',0,2,.01],['t_box','softbox (light spot)',0,15,.1],['t_tile','grain fineness',1,8,.25],['t_ao','grain shadows (AO)',0,1,.01],
-    ['t_sheen','sheen (fabric glow)',0,1,.01],['t_sheenRough','sheen softness',.1,1,.01],['t_sheenTint','sheen colour from print',0,1,.01],['t_coat','clear coat',0,1,.01],['t_coatRough','coat sharpness',0,.5,.005,'inv'],['t_env','studio reflections',0,3,.01]],0],
+    ['t_sheen','sheen (fabric glow)',0,1,.01],['t_sheenRough','sheen softness',.1,1,.01],['t_sheenTint','sheen colour from print',0,1,.01],['t_coat','clear coat',0,1,.01],['t_coatRough','coat sharpness',0,.5,.005,'inv']],0],
   ['Print on suede',[['print','print on suede','toggle'],['soften','soften',0,.4,.01],['lift','black lift',0,.2,.005],['blur','blur px',0,1.5,.05]],1],
   ['Material (physically based)',[['pbr','material lighting','toggle'],['pnsrc','surface','seg',['suede','leather','ink','flat']],['ptile','fineness',1,10,.25],['pnorm','surface depth',0,1,.01],
     ['psheen','sheen (fabric glow)',0,1.5,.01],['pshrough','sheen softness',.3,1,.01],['pshtint','sheen tint',0,1,.01],['pspec','highlight',0,2,.01],['prough','roughness',.05,1,.01],
@@ -295,7 +298,7 @@ const CTL=[
   ['Sheen',[['sheen','sheen',0,.3,.005]],1],
 ];
 /* the controls that shape each material most (measured min→max on the card), shown first */
-const KEYCTL={ fabric:['t_ksSheen','t_ksGrainSize','t_ksGrain','t_wash','t_washScale'], surface:['t_rough','t_spec','t_env','t_box','t_depth'] };
+const KEYCTL={ fabric:['t_ksSheen','t_ksGrainSize','t_ksGrain','t_wash','t_washScale'], surface:['t_rough','t_spec','t_box','t_depth'] };
 const DEF={}; for(const [,list] of CTL) for(const c of list) DEF[c[0]]=c;
 /* versions: newest first; earlier presets keep working but live in one dropdown */
 const VNAME={ 'Suede · scan':'v4 · Suede on ambientCG scan', 'Velvet · scan':'v4 · Velvet on Poly Haven scan',
@@ -353,10 +356,14 @@ renderSheet();
 window.__dev={ cards:()=>cards, set:(i,o)=>{ Object.assign(cards[i],o); save(); paintCard(i); return chain; }, preset:(i,m)=>{ cards[i]={...PRESETS[m],mat:m}; save(); paintCard(i); return chain; }, idx };
 
 /* ── live light (only cards whose setting says so) ──────────────────── */
-let raf=0; const relight=()=>{ if(raf) return; raf=requestAnimationFrame(()=>{ raf=0; const i=idx(); if(cards[i].live) faces[i*2].draw(); }); };
+let raf=0; const relight=()=>{ if(raf) return; raf=requestAnimationFrame(()=>{ raf=0; const i=idx(); if(cards[i].live||st.tiltOn) faces[i*2].draw(); }); };
 addEventListener('pointermove',e=>{ st.live={x:(e.clientX/innerWidth-.5)*1.4, y:-(e.clientY/innerHeight-.5)*1.4}; relight(); });
 document.getElementById('tilt').onclick=async e=>{ try{ if(typeof DeviceOrientationEvent!=='undefined'&&DeviceOrientationEvent.requestPermission) await DeviceOrientationEvent.requestPermission(); }catch(_){}
-  e.target.classList.add('on'); e.target.textContent='phone tilt: ON'; addEventListener('deviceorientation',ev=>{ st.live={x:Math.max(-.7,Math.min(.7,(ev.gamma||0)/45)), y:Math.max(-.7,Math.min(.7,((ev.beta||45)-45)/45))}; relight(); }); };
+  if(st.tiltOn){ st.tiltOn=false; st.tilt=null; e.target.classList.remove('on'); e.target.textContent='phone tilt: OFF'; paintCard(idx()); return; }
+  if(!window.isSecureContext){ e.target.textContent='phone tilt: needs https'; return; }   // iPhone only gives motion to secure pages
+  st.tiltOn=true; st.tilt0=null; e.target.classList.add('on'); e.target.textContent='phone tilt: ON';
+  if(!st.tiltBound){ st.tiltBound=true; addEventListener('deviceorientation',ev=>{ if(!st.tiltOn||ev.beta==null) return; st.tilt0??={b:ev.beta,g:ev.gamma};   // zero = how you hold it now
+    const cl=v=>Math.max(-.6,Math.min(.6,v)); st.tilt={x:cl((ev.gamma-st.tilt0.g)/30), y:cl(-(ev.beta-st.tilt0.b)/30)}; relight(); }); } };
 
 /* ── light handle ───────────────────────────────────────────────────── */
 const lamp=document.createElement('div'); lamp.className='lamp'; const lline=document.createElement('div'); lline.className='lampline'; document.body.append(lline,lamp);
