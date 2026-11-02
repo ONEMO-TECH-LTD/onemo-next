@@ -12,7 +12,8 @@
   },
   "dependencies": {
     "@paper-design/shaders": "^0.0.46",
-    "stats.js": "^0.17.0"
+    "stats.js": "^0.17.0",
+    "three": "^0.183.2"
   },
   "allowScripts": {
     "esbuild@0.25.12": true,
