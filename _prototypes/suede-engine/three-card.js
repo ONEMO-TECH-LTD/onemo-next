@@ -139,6 +139,15 @@ export function createThreeCard(size) {
   const art = url => artCache[url] || (artCache[url] = tex(url, true));
   const img = url => new Promise(res => { const i = new Image(); i.onload = () => res(i); i.src = url; });
 
+  /* filter-free image ops — iPhone Safari ignores canvas ctx.filter, so blur/saturate/contrast are done by hand */
+  const blurInto = (g, src, px, w, h) => {   // running average of offset copies (soft disc), works everywhere
+    if (px <= .05) { g.drawImage(src, 0, 0, w, h); return; }
+    const taps = [[0, 0]]; for (let a = 0; a < 8; a++) taps.push([Math.cos(a * Math.PI / 4) * px, Math.sin(a * Math.PI / 4) * px], [Math.cos(a * Math.PI / 4 + .4) * px * .5, Math.sin(a * Math.PI / 4 + .4) * px * .5]);
+    const ga = g.globalAlpha; taps.forEach(([x, y], i) => { g.globalAlpha = ga / (i + 1); g.drawImage(src, x, y, w, h); }); g.globalAlpha = ga; };
+  const tone = (g, w, h, sat, con) => { if (sat === 1 && con === 1) return; const im = g.getImageData(0, 0, w, h), d = im.data;
+    for (let i = 0; i < d.length; i += 4) { const L = .299 * d[i] + .587 * d[i + 1] + .114 * d[i + 2];
+      for (let c = 0; c < 3; c++) d[i + c] = ((L + (d[i + c] - L) * sat) - 128) * con + 128; }   // Uint8Clamped clamps
+    g.putImageData(im, 0, 0); };
   /* scan colour map → neutral grey detail (mean 50% grey), contrast multiplied by `gain` */
   const lumCache = {};
   const lum = name => lumCache[name] || (lumCache[name] = img(P + SCANS[name].diff).then(im => {
@@ -151,7 +160,7 @@ export function createThreeCard(size) {
     const L = await lum(name); const c = document.createElement('canvas'); c.width = c.height = 512; const g = c.getContext('2d');
     const d = g.createImageData(512, 512); for (let i = 0; i < L.length; i++) { const v = Math.max(0, Math.min(255, 128 + L[i] * gain)); d.data[i * 4] = d.data[i * 4 + 1] = d.data[i * 4 + 2] = v; d.data[i * 4 + 3] = 255; }
     g.putImageData(d, 0, 0); const c2 = document.createElement('canvas'); c2.width = c2.height = 512; const g2 = c2.getContext('2d');
-    g2.filter = 'blur(1.2px)'; g2.drawImage(c, 0, 0); return (greyCache[k] = c2); };   // soft fibres, not speckle
+    blurInto(g2, c, 1.2, 512, 512); return (greyCache[k] = c2); };   // soft fibres, not speckle
   /* nap / crush patches: the scan's own large-scale variation, blown up and smoothed */
   const washCache = {};
   const wash = async (name, scale, seed = 0) => { const k = name + scale + '|' + seed; if (washCache[k]) return washCache[k];
@@ -160,20 +169,28 @@ export function createThreeCard(size) {
     const pat = sg.createPattern(src, 'repeat');   // seed → where in the scan the patches come from, and their rotation
     pat.setTransform(new DOMMatrix().translate(n / 2, n / 2).rotate(rnd(1) * 360).translate(-rnd(2) * n, -rnd(3) * n).scale(n / 512));
     sg.fillStyle = pat; sg.fillRect(0, 0, n, n); const c = document.createElement('canvas'); c.width = c.height = size; const g = c.getContext('2d');
-    g.imageSmoothingQuality = 'high'; g.filter = `blur(${size / n * .6}px) contrast(2.2)`; g.drawImage(small, -size * .1, -size * .1, size * 1.2, size * 1.2); return (washCache[k] = c); };
+    const mid = document.createElement('canvas'); mid.width = mid.height = n * 6; const mg = mid.getContext('2d'); mg.imageSmoothingQuality = 'high'; mg.drawImage(small, 0, 0, n * 6, n * 6);
+    g.imageSmoothingQuality = 'high'; blurInto(g, mid, size / n * .35, size, size); tone(g, size, size, 1, 2.2); return (washCache[k] = c); };   // two-step upscale = soft patches
 
   const composed = new THREE.CanvasTexture(document.createElement('canvas')); composed.colorSpace = THREE.SRGBColorSpace;
+  const printCache = new Map();   // print treatment depends only on art + print settings: relighting (handle, tilt) reuses it
   async function stylisePrint(a, m) {
-    const cv = composed.image; cv.width = cv.height = size; const g = cv.getContext('2d');
+    const key = [a.image.src, m.soft, m.punch, m.blurPx, m.lift, m.scan, m.washSrc, m.detail, m.detailGain, m.detailTile, m.wash, m.washScale, m.seed].join('|');
+    const cv = composed.image; if (cv.width !== size) cv.width = cv.height = size; const g = cv.getContext('2d');
+    const hit = printCache.get(key); if (hit) { g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; g.drawImage(hit, 0, 0); composed.needsUpdate = true; return composed; }
     const sat = 1 - m.soft + m.punch, con = 1 - m.soft * .35 + m.punch * .6;
-    g.filter = `saturate(${sat}) contrast(${con}) blur(${m.blurPx}px)`; g.drawImage(a.image, 0, 0, size, size); g.filter = 'none';
+    g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; g.clearRect(0, 0, size, size);
+    blurInto(g, a.image, m.blurPx, size, size); tone(g, size, size, sat, con);
     if (m.lift > 0) { g.globalCompositeOperation = 'screen'; g.fillStyle = `rgb(${m.lift * 255},${m.lift * 255},${m.lift * 255})`; g.fillRect(0, 0, size, size); }
     const ds = DETAIL_SRC[m.scan];
     if (ds && SCANS[ds].diff && m.detail > 0) { const pat = g.createPattern(await grey(ds, m.detailGain), 'repeat'); pat.setTransform(new DOMMatrix().scale(size / 512 / m.detailTile));
       g.globalCompositeOperation = 'overlay'; g.globalAlpha = m.detail; g.fillStyle = pat; g.fillRect(0, 0, size, size); g.globalAlpha = 1; }
     const wsrc = m.washSrc || ds;
     if (wsrc && SCANS[wsrc].diff && m.wash > 0) { g.globalCompositeOperation = 'soft-light'; g.globalAlpha = m.wash; g.drawImage(await wash(wsrc, m.washScale, m.seed), 0, 0); g.globalAlpha = 1; }
-    g.globalCompositeOperation = 'source-over'; composed.needsUpdate = true; return composed; }
+    g.globalCompositeOperation = 'source-over';
+    const copy = document.createElement('canvas'); copy.width = copy.height = size; copy.getContext('2d').drawImage(cv, 0, 0);
+    printCache.set(key, copy); if (printCache.size > 16) printCache.delete(printCache.keys().next().value);
+    composed.needsUpdate = true; return composed; }
 
   async function stylisePost(m, back) {   // after lighting: fuzz veil and velvet edge glow
     og.globalCompositeOperation = 'source-over'; og.globalAlpha = 1; og.drawImage(glCanvas, 0, 0);
@@ -182,6 +199,7 @@ export function createThreeCard(size) {
       og.globalCompositeOperation = 'screen'; og.globalAlpha = m.haze * 1.6; og.fillStyle = pat; og.fillRect(0, 0, size, size); }   // screen lifts darks most: the fuzz veil
     if (m.rim > 0 && !back) { const avg = averageColour(); const rg = og.createRadialGradient(size * .5, size * .5, size * .25, size * .5, size * .5, size * .78);
       rg.addColorStop(0, 'rgba(0,0,0,0)'); rg.addColorStop(1, `rgba(${avg},${m.rim})`); og.globalCompositeOperation = 'screen'; og.globalAlpha = 1; og.fillStyle = rg; og.fillRect(0, 0, size, size); }
+    og.globalCompositeOperation = 'destination-in'; og.globalAlpha = 1; og.fillStyle = '#000'; og.beginPath(); og.roundRect(0, 0, size, size, size * 52 / 304); og.fill();   // rounded card shape
     og.globalCompositeOperation = 'source-over'; og.globalAlpha = 1; }
   const tiny = document.createElement('canvas'); tiny.width = tiny.height = 1;
   function averageColour() { const t = tiny.getContext('2d', { willReadFrequently: true }); t.drawImage(composed.image, 0, 0, 1, 1); const d = t.getImageData(0, 0, 1, 1).data;
