@@ -77,21 +77,27 @@ void main(){ vec3 c;
 const cache={}; const img=s=>cache[s]||(cache[s]=new Promise(r=>{ const i=new Image(); i.onload=()=>r(i); i.src=s; }));
 const fit=(im,s)=>{ const c=document.createElement('canvas'); c.width=c.height=s; const g=c.getContext('2d'); g.imageSmoothingQuality='high'; g.drawImage(im,0,0,s,s); return c; };
 
-function face(canvas, art, back){
-  const dpr=Math.min(2,devicePixelRatio||1), s=Math.round(304*dpr); canvas.width=canvas.height=s;
-  const gl=canvas.getContext('webgl'); const sh=(t,src)=>{ const o=gl.createShader(t); gl.shaderSource(o,src); gl.compileShader(o); return o; };
+// ONE shared WebGL renderer paints every card face into a plain 2D canvas (12 live GL contexts was the fps cost)
+const DPR=Math.min(2,devicePixelRatio||1), SZ=Math.round(304*DPR);
+const R3=(()=>{ const cv=document.createElement('canvas'); cv.width=cv.height=SZ; const gl=cv.getContext('webgl',{preserveDrawingBuffer:true});
+  const sh=(t,src)=>{ const o=gl.createShader(t); gl.shaderSource(o,src); gl.compileShader(o); return o; };
   const p=gl.createProgram(); gl.attachShader(p,sh(gl.VERTEX_SHADER,VS)); gl.attachShader(p,sh(gl.FRAGMENT_SHADER,FS)); gl.linkProgram(p); gl.useProgram(p);
   gl.bindBuffer(gl.ARRAY_BUFFER,gl.createBuffer()); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
   const a=gl.getAttribLocation(p,'a'); gl.enableVertexAttribArray(a); gl.vertexAttribPointer(a,2,gl.FLOAT,false,0,0);
-  const U=n=>gl.getUniformLocation(p,n);
-  const tex=(u,n,src)=>{ const t=gl.createTexture(); gl.activeTexture(gl.TEXTURE0+u); gl.bindTexture(gl.TEXTURE_2D,t);
-    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,gl.RGB,gl.UNSIGNED_BYTE,src);
-    [[gl.TEXTURE_MIN_FILTER,gl.LINEAR],[gl.TEXTURE_MAG_FILTER,gl.LINEAR],[gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE],[gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE]].forEach(([k,v])=>gl.texParameteri(gl.TEXTURE_2D,k,v)); gl.uniform1i(U(n),u); };
-  let ready=Promise.all([img(art),img('public/recipes/grain-dan-spec.png'),img('public/recipes/suede-normal.png'),img('public/recipes/suede-archive-render.png')]).then(([ai,gi,ni,g2])=>{ tex(0,'ART',fit(ai,s)); tex(1,'GRAIN',fit(gi,s)); tex(2,'NRM',fit(ni,s)); tex(3,'G2',fit(g2,s)); });
-  return { async draw(){ await ready; const r=R[st.recipe]; gl.viewport(0,0,s,s); gl.uniform2f(U('PX'),1/s,1/s);
-    gl.uniform1f(U('PRINT'),r.print); gl.uniform1f(U('REAL'),r.real); gl.uniform1f(U('BACK'),back?1:0); gl.uniform1f(U('ARCH'),r.arch?1:0);
+  const U=n=>gl.getUniformLocation(p,n); const T={};
+  const mk=src=>{ const t=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,t); gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,gl.RGB,gl.UNSIGNED_BYTE,src);
+    [[gl.TEXTURE_MIN_FILTER,gl.LINEAR],[gl.TEXTURE_MAG_FILTER,gl.LINEAR],[gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE],[gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE]].forEach(([k,v])=>gl.texParameteri(gl.TEXTURE_2D,k,v)); return t; };
+  const bind=(u,n,t)=>{ gl.activeTexture(gl.TEXTURE0+u); gl.bindTexture(gl.TEXTURE_2D,t); gl.uniform1i(U(n),u); };
+  const shared=Promise.all([img('public/recipes/grain-dan-spec.png'),img('public/recipes/suede-normal.png'),img('public/recipes/suede-archive-render.png')]).then(([g,n,g2])=>{ T.g=mk(fit(g,SZ)); T.n=mk(fit(n,SZ)); T.g2=mk(fit(g2,SZ)); });
+  const art=src=>T[src]||(T[src]=img(src).then(i=>mk(fit(i,SZ))));
+  return { cv, async render(src,back){ await shared; const at=await art(src); const r=R[st.recipe];
+    gl.useProgram(p); gl.viewport(0,0,SZ,SZ); bind(0,'ART',at); bind(1,'GRAIN',T.g); bind(2,'NRM',T.n); bind(3,'G2',T.g2);
+    gl.uniform2f(U('PX'),1/SZ,1/SZ); gl.uniform1f(U('PRINT'),r.print); gl.uniform1f(U('REAL'),r.real); gl.uniform1f(U('BACK'),back?1:0); gl.uniform1f(U('ARCH'),r.arch?1:0);
     const li=(r.live&&st.live)||st.light; const z=Math.sqrt(Math.max(.05,1-li.x*li.x-li.y*li.y)); gl.uniform3f(U('L'),li.x,li.y,z); gl.drawArrays(gl.TRIANGLE_STRIP,0,4); } };
-}
+})();
+let chain=Promise.resolve();   // one renderer → paint faces one after another
+function face(canvas, art, back){ canvas.width=canvas.height=SZ; const ctx=canvas.getContext('2d');
+  return { draw(){ chain=chain.then(async()=>{ await R3.render(art,back); ctx.drawImage(R3.cv,0,0); }); return chain; } }; }
 
 const reel=document.getElementById('reel'); const faces=[];
 ARTS.forEach((src,i)=>{ const el=document.createElement('section'); el.className='slide'; el.innerHTML=`
@@ -105,7 +111,7 @@ ARTS.forEach((src,i)=>{ const el=document.createElement('section'); el.className
 const drawAll=()=>faces.forEach(f=>f.draw()); drawAll();
 
 // the shop background — the build's own engine, adapting to the Effect on screen
-const surface=createSurface({ canvas:document.getElementById('surface'), mode:'adaptive' });
+const surface=createSurface({ canvas:document.getElementById('surface'), mode:'adaptive', maxPixelRatio:1 });
 const idx=()=>Math.round(reel.scrollTop/reel.clientHeight);
 surface?.adoptImage(ARTS[0]);
 reel.addEventListener('scroll',()=>{ const t=reel.scrollTop/reel.clientHeight, i=Math.floor(t); surface?.blendImages(ARTS[Math.max(0,Math.min(5,i))],ARTS[Math.min(5,i+1)],t-i); },{passive:true});
@@ -113,7 +119,7 @@ addEventListener('resize',()=>surface?.resize());
 
 // look switch + light
 document.querySelectorAll('#look [data-r]').forEach(b=>b.onclick=()=>{ st.recipe=b.dataset.r; document.querySelectorAll('#look [data-r]').forEach(x=>x.classList.toggle('on',x===b)); drawAll(); });
-const near=()=>faces.slice(idx()*2, idx()*2+2);
+const near=()=>[faces[idx()*2]];   // live light repaints only the card on screen
 let raf=0; const relight=()=>{ if(raf) return; raf=requestAnimationFrame(()=>{ raf=0; near().forEach(f=>f.draw()); }); };
 addEventListener('pointermove',e=>{ if(st.recipe!=='D') return; st.live={x:(e.clientX/innerWidth-.5)*1.4, y:-(e.clientY/innerHeight-.5)*1.4}; relight(); });
 document.getElementById('tilt').onclick=async e=>{ try{ if(typeof DeviceOrientationEvent!=='undefined'&&DeviceOrientationEvent.requestPermission) await DeviceOrientationEvent.requestPermission(); }catch(_){}
