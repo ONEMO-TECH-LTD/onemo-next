@@ -1,7 +1,8 @@
 /* Material card renderer — proven base, stylised to read at card size.
    Base: three.js MeshPhysicalMaterial (sheen, clearcoat, normal/roughness/AO maps) on a flat card,
    lit by a real photographed studio (Poly Haven studio_small_08, CC0) plus one key light.
-   Material scans: ambientCG Leather039 (fine suede), Poly Haven velour_velvet, leather_red_02 (CC0, 1K).
+   Suede / Velvet: Dan's KeyShot materials (lux_velvet lobe + noise bump), velvet surface = Dan's fabric pack Fabric_valvet_01.
+   Comparison scans: ambientCG Leather039 (fine suede), Poly Haven velour_velvet, leather_red_02 (CC0, 1K).
    Stylisation (Dan, 2 Nov: "make it all stylised so it reads as suede and correct material"):
    before lighting the print is treated per material (soften, lift, punch, fibre detail, nap/crush patches);
    after lighting a fuzz haze and a velvet edge glow are added. Real fibres are sub-pixel at 304 px, so
@@ -16,18 +17,28 @@ const P = 'public/pbr/';
 const SCANS = {
   suede:   { nor: 'acg_suede_Leather039_nor_gl_1k.jpg', rough: 'acg_suede_Leather039_rough_1k.jpg', ao: null, diff: 'acg_suede_Leather039_diff_1k.jpg' },   // ambientCG Leather039: photogrammetry fine suede (CC0)
   velvet:  { nor: 'velour_velvet_nor_gl_1k.jpg',     rough: 'velour_velvet_rough_1k.jpg',     ao: 'velour_velvet_ao_1k.jpg', diff: 'velour_velvet_diff_1k.jpg' },
+  velvetTB:{ nor: 'twinbru_black_velvet_normal_1k.jpg', rough: 'twinbru_black_velvet_rough_1k.jpg', ao: null, diff: 'twinbru_black_velvet_diffuse_1k.jpg' },   // Twinbru Plain Black Velvet (manufacturer scan shipped with KeyShot)
+  fabVelvet:{ nor: 'fab_velvet_01_normal_1k.jpg', rough: 'fab_velvet_01_roughness_1k.jpg', ao: 'fab_velvet_01_ambientocclusion_1k.jpg', diff: 'fab_velvet_01_basecolor_1k.jpg' },   // Dan's fabric pack (juliosillet Materials_Fabric) Fabric_valvet_01
   leather: { nor: 'leather_red_02_nor_gl_1k.jpg',    rough: 'leather_red_02_rough_1k.jpg',    ao: 'leather_red_02_ao_1k.jpg' },   // even fine pebble grain, no seams or creases
 };
-const DETAIL_SRC = { suede: 'suede', velvet: 'velvet', leather: 'suede' };   // leather has no colour map; its grain comes from the normal map
+const DETAIL_SRC = { suede: 'suede', velvet: 'velvet', velvetTB: 'velvetTB', fabVelvet: 'fabVelvet', leather: 'suede' };   // leather has no colour map; its grain comes from the normal map
 
 /* Physical base + stylisation, per material.
    soft: print softening · lift: raises the darkest ink · blurPx: dye bleed · punch: + richer / - flatter colour
    detail/detailGain/detailTile: scan fibres over the print · wash/washScale: nap or crush patches
    haze: fuzz veil (after light) · rim: velvet edge glow (after light) */
 export const MATERIALS = {
-  'Suede':        { fall: .55, fallPow: 2.5, fallTint: .35, scan: 'suede',   tile: 2, depth: 1.0, rough: 1,   spec: .3, sheen: 1, sheenRough: .8,  sheenTint: .25, coat: 0, coatRough: .05, env: 1,   key: 1.2, box: 2.5, expo: 1,    ao: .4,  envRot: 90,
+  /* Dan's own KeyShot materials ("!!! --- DS"): MOD BACK SUEDE and MOD Velvet Black BRUSHED —
+     lux_velvet (roughness .1, backscatter .2, edginess 10) over a noise bump; ks* = that velvet lobe, ksHeights = its noise layers */
+  'Suede':        { ks: 1, ksSheen: .22, ksEdge: 10, ksBack: .2, ksBump: .6, ksScales: [.5, .06, .0045, .0028], ksHeights: [.05, .08, 1, .4],
+                    scan: null, tile: 1, depth: 0, rough: 1, spec: .15, sheen: 0, sheenRough: .8, sheenTint: 0, coat: 0, coatRough: .05, env: 1, key: 1.2, box: 2, expo: 1, ao: 0, envRot: 90,
+                    soft: .12, lift: .06, blurPx: .4, punch: 0, detail: 0, detailGain: 3, detailTile: 1, wash: 0, washScale: 3, haze: 0, rim: 0 },
+  'Velvet':       { ks: 1, ksSheen: .3, ksEdge: 10, ksBack: .2, ksBump: .5, ksScales: [.35, .08, .006, .003], ksHeights: [.6, .2, 0, 0],
+                    scan: 'fabVelvet', tile: 2, depth: .8, rough: 1, spec: .1, sheen: 1, sheenRough: .35, sheenTint: .8, coat: 0, coatRough: .05, env: 1, key: 1.2, box: 2.5, expo: 1, ao: .5, envRot: 90,
+                    soft: 0, lift: .02, blurPx: .3, punch: .12, detail: .2, detailGain: 3, detailTile: 1, wash: .25, washScale: 2, haze: 0, rim: .12 },
+  'Suede · scan': { fall: .55, fallPow: 2.5, fallTint: .35, scan: 'suede',   tile: 2, depth: 1.0, rough: 1,   spec: .3, sheen: 1, sheenRough: .8,  sheenTint: .25, coat: 0, coatRough: .05, env: 1,   key: 1.2, box: 2.5, expo: 1,    ao: .4,  envRot: 90,
                     soft: .15, lift: .06, blurPx: .5, punch: 0,   detail: .35, detailGain: 3, detailTile: 1, wash: .4, washScale: 3, haze: .08, rim: 0 },
-  'Velvet':       { fall: .9, fallPow: 2, fallTint: .8, scan: 'velvet',  tile: 4, depth: .8,  rough: 1,   spec: .2, sheen: 1, sheenRough: .35, sheenTint: 1,   coat: 0, coatRough: .05, env: 1,   key: 1.2, box: 3,   expo: .95,  ao: .4,  envRot: 90,
+  'Velvet · scan': { fall: .9, fallPow: 2, fallTint: .8, scan: 'velvet',  tile: 4, depth: .8,  rough: 1,   spec: .2, sheen: 1, sheenRough: .35, sheenTint: 1,   coat: 0, coatRough: .05, env: 1,   key: 1.2, box: 3,   expo: .95,  ao: .4,  envRot: 90,
                     soft: 0,   lift: .02, blurPx: .4, punch: .12, detail: 0,   detailGain: 2.5, detailTile: 1.5, wash: .6, washScale: 2, haze: 0,   rim: .2 },
   'Faux leather': { scan: 'leather', tile: 3, depth: 1.1, rough: .5,  spec: .8, sheen: 0, sheenRough: .5,  sheenTint: 0,   coat: 0, coatRough: .05, env: .8,  key: 1.1, box: 5,   expo: 1,    ao: 0,   envRot: 90,
                     soft: .05, lift: .03, blurPx: 0,  punch: .04, detail: 0,   detailGain: 4, detailTile: 2,  wash: 0, washScale: 2.5, haze: 0, rim: 0 },
@@ -57,10 +68,33 @@ export function createThreeCard(size) {
   const box = new THREE.RectAreaLight(0xffffff, 6, .55, .38);
   scene.add(box);
   const mat = new THREE.MeshPhysicalMaterial();
-  const fall = { uFall: { value: 0 }, uFallPow: { value: 3 }, uFallTint: { value: .5 } };
+  const fall = { uFall: { value: 0 }, uFallPow: { value: 3 }, uFallTint: { value: .5 },
+    uKs: { value: 0 }, uKsSheen: { value: new THREE.Color(.13, .13, .13) }, uKsEdge: { value: 10 }, uKsBack: { value: .2 }, uKsBump: { value: 0 },
+    uKsScales: { value: new THREE.Vector4(.5, .05, .006, .003) }, uKsHeights: { value: new THREE.Vector4(.1, .1, 1., .1) }, uKsL: { value: new THREE.Vector3(0, 0, 1) }, uKsSeed: { value: 3 } };
   mat.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, fall);
-    sh.fragmentShader = 'uniform float uFall, uFallPow, uFallTint;\n' + sh.fragmentShader.replace('#include <opaque_fragment>',
+    const noise = `
+      vec3 ksm289(vec3 x){return x-floor(x*(1./289.))*289.;} vec2 ksm289(vec2 x){return x-floor(x*(1./289.))*289.;} vec3 ksperm(vec3 x){return ksm289(((x*34.)+1.)*x);}
+      float kssn(vec2 v){ const vec4 C=vec4(.211324865405187,.366025403784439,-.577350269189626,.024390243902439);
+        vec2 i=floor(v+dot(v,C.yy)); vec2 x0=v-i+dot(i,C.xx); vec2 i1=(x0.x>x0.y)?vec2(1.,0.):vec2(0.,1.); vec4 x12=x0.xyxy+C.xxzz; x12.xy-=i1; i=ksm289(i);
+        vec3 p=ksperm(ksperm(i.y+vec3(0.,i1.y,1.))+i.x+vec3(0.,i1.x,1.)); vec3 m=max(.5-vec3(dot(x0,x0),dot(x12.xy,x12.xy),dot(x12.zw,x12.zw)),0.); m=m*m; m=m*m;
+        vec3 x=2.*fract(p*C.www)-1.; vec3 h=abs(x)-.5; vec3 ox=floor(x+.5); vec3 a0=x-ox; m*=1.79284291400159-.85373472095314*(a0*a0+h*h);
+        vec3 g; g.x=a0.x*x0.x+h.x*x0.y; g.yz=a0.yz*x12.xz+h.yz*x12.yw; return 130.*dot(m,g); }
+      // KeyShot-style noise bump: 4 layers; a layer's 'scale' is its feature size as a fraction of the card (68 mm)
+      float ksH(vec2 uv){ float h=0.; for(int k=0;k<4;k++){ float f=1./max(uKsScales[k],.001); h+=uKsHeights[k]*smoothstep(260.,140.,f)*kssn(uv*f+uKsSeed*float(k+1)*17.)/f; } return h; }`;
+    sh.vertexShader = 'varying vec2 vKsUv;\n' + sh.vertexShader.replace('#include <uv_vertex>', '#include <uv_vertex>\n vKsUv = uv;');
+    sh.fragmentShader = 'varying vec2 vKsUv; uniform float uFall, uFallPow, uFallTint, uKs, uKsEdge, uKsBack, uKsBump, uKsSeed; uniform vec3 uKsSheen, uKsL; uniform vec4 uKsScales, uKsHeights;\n' + noise + '\n' + sh.fragmentShader
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+       if (uKsBump > 0.0) { vec2 uv = vKsUv; float e = 1. / 608.; float h0 = ksH(uv), hx = ksH(uv + vec2(e, 0.)), hy = ksH(uv + vec2(0., e));
+         normal = normalize(normal + vec3(-(hx - h0), -(hy - h0), 0.) / e * uKsBump * .15); }`)
+      .replace('#include <opaque_fragment>', `{ if (uKs > 0.0) { vec3 Vv = normalize(vViewPosition); float nv = clamp(dot(normal, Vv), 0., 1.);
+           vec3 Lv = normalize((viewMatrix * vec4(uKsL, 0.)).xyz); vec2 tn = normal.xy; float tilt = length(tn);
+           float edge = 1. - exp(-tilt * uKsEdge * .8);                                  // edginess: how fast pile tilt turns into sheen
+           float toward = tilt > 1e-4 ? dot(tn / tilt, normalize(Lv.xy + 1e-4)) : 0.;     // pile leaning toward the light catches it
+           float sheenAmt = edge * (.5 + .5 * toward) + uKsBack * .6;                    // backscatter: the soft milky veil over the whole pile
+           outgoingLight += uKs * uKsSheen * sheenAmt * (outgoingLight * 1.5 + .25); } }
+       #include <opaque_fragment>`)
+      .replace('#include <opaque_fragment>',
       `{ vec3 Vv = normalize(vViewPosition); float fo = pow(1.0 - clamp(dot(normal, Vv), 0.0, 1.0), uFallPow);   // piled-fabric fall-off
          vec3 pile = mix(vec3(1.0), diffuseColor.rgb * 1.6 + 0.15, uFallTint);
          outgoingLight = mix(outgoingLight, pile * (outgoingLight + 0.12), clamp(fo * uFall, 0.0, 1.0)); }
@@ -147,12 +181,14 @@ export function createThreeCard(size) {
       mat.sheenColor.setScalar(mat.sheenColorMap ? m.sheenTint : 1);
       mat.clearcoat = m.coat; mat.clearcoatRoughness = m.coatRough;
       scene.environmentIntensity = m.env;
+      fall.uKs.value = m.ks ?? 0; fall.uKsSheen.value.setScalar(m.ksSheen ?? .13); fall.uKsEdge.value = m.ksEdge ?? 10; fall.uKsBack.value = m.ksBack ?? .2;
+      fall.uKsBump.value = m.ksBump ?? 0; if (m.ksHeights) fall.uKsHeights.value.set(...m.ksHeights); if (m.ksScales) fall.uKsScales.value.set(...m.ksScales);
       fall.uFall.value = m.fall ?? 0; fall.uFallPow.value = m.fallPow ?? 3; fall.uFallTint.value = m.fallTint ?? .5;
       mat.needsUpdate = true;
       const az = (s.az ?? 40) * Math.PI / 180, el = (s.el ?? 50) * Math.PI / 180;
       const lx = (s.live && s.liveL) ? s.liveL.x : Math.cos(az) * Math.cos(el), ly = (s.live && s.liveL) ? s.liveL.y : Math.sin(az) * Math.cos(el);
       key.position.set(lx, ly, Math.sqrt(Math.max(.05, 1 - lx * lx - ly * ly)));
-      key.intensity = m.key;
+      key.intensity = m.key; fall.uKsL.value.copy(key.position).normalize();
       box.position.set(lx * 1.1, ly * 1.1, .9); box.lookAt(0, 0, 0); box.intensity = m.box ?? 0;
       scene.environmentRotation.set(-ly * .9, lx * .9 + m.envRot * Math.PI / 180, 0);
       renderer.toneMappingExposure = m.expo;
