@@ -28,6 +28,9 @@
   .matbar button.on { background:var(--ink); color:#fff; border-color:var(--ink); }
   .cardwrap { position:relative; width:304px; height:304px; }   /* shadow layers sit outside the 3D flip, always underneath */
   .turn { position:relative; z-index:1; width:304px; height:304px; perspective:1200px; cursor:pointer; border-radius:52px; }
+  .shwrap { position:absolute; inset:0; z-index:0; pointer-events:none; }
+  .shwrap.turning { animation:shturn .7s cubic-bezier(.45,0,.55,1); }   /* the shadow narrows with the card as it turns edge-on (same timing as .flip) */
+  @keyframes shturn { 0% { transform:scaleX(1); } 50% { transform:scaleX(.04); } 100% { transform:scaleX(1); } }
   .cardwrap .sh { position:absolute; z-index:0; inset:0; border-radius:52px; background:#0a0d12; pointer-events:none; opacity:0; will-change:transform,filter,opacity; }
   .flip { position:relative; z-index:1; width:100%; height:100%; transition:transform .7s cubic-bezier(.45,0,.55,1); }
   .flip.d3 { transform-style:preserve-3d; }
@@ -273,14 +276,15 @@ function floatShadow(k,lx,ly){ const s=cards[k], el=cells[k]; if(!el) return; co
 /* ── reel ───────────────────────────────────────────────────────────── */
 const reel=document.getElementById('reel'); const faces=[], cells=[], tracks=[];
 ARTS.forEach((src,i)=>{ const el=document.createElement('section'); el.className='slide'; el.innerHTML=`
-  <div class="stage"><div class="track">${MATS.map(m=>`<div class="cell"><div class="cardwrap"><div class="sh sh2"></div><div class="sh sh1"></div><div class="turn"><div class="flip"><div class="face f"><canvas></canvas></div><div class="face b"><canvas></canvas></div></div></div></div>
+  <div class="stage"><div class="track">${MATS.map(m=>`<div class="cell"><div class="cardwrap"><div class="shwrap"><div class="sh sh2"></div><div class="sh sh1"></div></div><div class="turn"><div class="flip"><div class="face f"><canvas></canvas></div><div class="face b"><canvas></canvas></div></div></div></div>
     <div class="dots"><b class="on"></b><b></b></div></div>`).join('')}</div>
     <div class="matbar">${MATS.map((m,j)=>`<button data-col="${j}" class="${j?'':'on'}">${m}</button>`).join('')}</div></div>
   <div class="info"><div class="name">${NAMES[i]}</div><span class="chip" data-mat>${MATS[0]} · made to order</span><div class="row"><span>Mini · 68 mm</span><b>£ —</b></div></div>`;
   reel.appendChild(el); const track=el.querySelector('.track'); tracks.push(track);
   el.querySelectorAll('.cell').forEach((cell,j)=>{ const k=i*NM+j; cells[k]=cell; const [cf,cb]=cell.querySelectorAll('canvas'); faces[k*2]=face(cf,k,false); faces[k*2+1]=face(cb,k,true);
     const flip=cell.querySelector('.flip'), dots=cell.querySelectorAll('.dots b');
-    cell.querySelector('.turn').onclick=()=>{ flip.classList.add('d3'); requestAnimationFrame(()=>{ const on=flip.classList.toggle('back'); dots[0].classList.toggle('on',!on); dots[1].classList.toggle('on',on); }); };
+    const shw=cell.querySelector('.shwrap'); shw.addEventListener('animationend',()=>shw.classList.remove('turning'));
+    cell.querySelector('.turn').onclick=()=>{ shw.classList.remove('turning'); void shw.offsetWidth; shw.classList.add('turning'); flip.classList.add('d3'); requestAnimationFrame(()=>{ const on=flip.classList.toggle('back'); dots[0].classList.toggle('on',!on); dots[1].classList.toggle('on',on); }); };
     flip.addEventListener('transitionend',()=>{ if(!flip.classList.contains('back')) flip.classList.remove('d3'); }); });
   el.querySelectorAll('.matbar button').forEach(b=>b.onclick=()=>track.scrollTo({left:+b.dataset.col*track.clientWidth,behavior:'smooth'}));
   let traf=0; track.addEventListener('scroll',()=>{ if(traf) return; traf=requestAnimationFrame(()=>{ traf=0; onCol(i); }); },{passive:true});
