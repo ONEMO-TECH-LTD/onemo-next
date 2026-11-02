@@ -80,11 +80,10 @@ export function createThreeCard(size) {
         vec3 p=ksperm(ksperm(i.y+vec3(0.,i1.y,1.))+i.x+vec3(0.,i1.x,1.)); vec3 m=max(.5-vec3(dot(x0,x0),dot(x12.xy,x12.xy),dot(x12.zw,x12.zw)),0.); m=m*m; m=m*m;
         vec3 x=2.*fract(p*C.www)-1.; vec3 h=abs(x)-.5; vec3 ox=floor(x+.5); vec3 a0=x-ox; m*=1.79284291400159-.85373472095314*(a0*a0+h*h);
         vec3 g; g.x=a0.x*x0.x+h.x*x0.y; g.yz=a0.yz*x12.xz+h.yz*x12.yw; return 130.*dot(m,g); }
-      // nap grain: soft value noise at fibre scale (about one card pixel) — sandy, not bumpy
-      float ksHash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-      float ksVn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f);
-        return mix(mix(ksHash(i), ksHash(i + vec2(1., 0.)), f.x), mix(ksHash(i + vec2(0., 1.)), ksHash(i + 1.), f.x), f.y); }
-      float ksGrainAt(vec2 uv){ vec2 q = uv * 608. / uKsGrainSize; return ksVn(q) * .65 + ksVn(q * .5 + 31.) * .35; }
+      // nap grain at fibre scale (about one card pixel) — sandy, not bumpy
+      // simplex (no grid, no sine hash → no line patterns on any GPU), rotated off the pixel axes
+      float ksGrainAt(vec2 uv){ vec2 q = mat2(.8, .6, -.6, .8) * uv * 608. / uKsGrainSize;
+        return .5 + .5 * (kssn(q) * .65 + kssn(q * .5 + 31.) * .35); }
       // KeyShot-style noise bump: 4 layers; a layer's 'scale' is its feature size as a fraction of the card (68 mm)
       float ksH(vec2 uv){ float h=0.; for(int k=0;k<4;k++){ float f=1./max(uKsScales[k],.001); h+=uKsHeights[k]*smoothstep(260.,140.,f)*kssn(uv*f+uKsSeed*float(k+1)*17.)/f; } return h; }`;
     sh.vertexShader = 'varying vec2 vKsUv;\n' + sh.vertexShader.replace('#include <uv_vertex>', '#include <uv_vertex>\n vKsUv = uv;');
