@@ -30,10 +30,10 @@ const DETAIL_SRC = { suede: 'suede', velvet: 'velvet', velvetTB: 'velvetTB', fab
 export const MATERIALS = {
   /* Dan's own KeyShot materials ("!!! --- DS"): MOD BACK SUEDE and MOD Velvet Black BRUSHED —
      lux_velvet (roughness .1, backscatter .2, edginess 10) over a noise bump; ks* = that velvet lobe, ksHeights = its noise layers */
-  'Suede':        { ks: 1, ksSheen: .22, ksEdge: 10, ksBack: .2, ksBump: .6, ksScales: [.5, .06, .0045, .0028], ksHeights: [.05, .08, 1, .4],
+  'Suede':        { ks: 1, ksSheen: .22, ksEdge: 10, ksBack: .5, ksGrain: .35, ksGrainSize: 1.2, ksBump: 0, ksScales: [.5, .06, .0045, .0028], ksHeights: [.05, .08, 1, .4],
                     scan: null, tile: 1, depth: 0, rough: 1, spec: .15, sheen: 0, sheenRough: .8, sheenTint: 0, coat: 0, coatRough: .05, env: 1, key: 1.2, box: 2, expo: 1, ao: 0, envRot: 90,
                     soft: .12, lift: .06, blurPx: .4, punch: 0, detail: 0, detailGain: 3, detailTile: 1, wash: 0, washScale: 3, haze: 0, rim: 0 },
-  'Velvet':       { ks: 1, ksSheen: .3, ksEdge: 10, ksBack: .2, ksBump: .5, ksScales: [.35, .08, .006, .003], ksHeights: [.6, .2, 0, 0],
+  'Velvet':       { ks: 1, ksSheen: .3, ksEdge: 10, ksBack: .2, ksGrain: .12, ksGrainSize: 1.2, ksBump: .5, ksScales: [.35, .08, .006, .003], ksHeights: [.6, .2, 0, 0],
                     scan: 'fabVelvet', tile: 2, depth: .8, rough: 1, spec: .1, sheen: 1, sheenRough: .35, sheenTint: .8, coat: 0, coatRough: .05, env: 1, key: 1.2, box: 2.5, expo: 1, ao: .5, envRot: 90,
                     soft: 0, lift: .02, blurPx: .3, punch: .12, detail: .2, detailGain: 3, detailTile: 1, wash: .25, washScale: 2, haze: 0, rim: .12 },
   'Suede · scan': { fall: .55, fallPow: 2.5, fallTint: .35, scan: 'suede',   tile: 2, depth: 1.0, rough: 1,   spec: .3, sheen: 1, sheenRough: .8,  sheenTint: .25, coat: 0, coatRough: .05, env: 1,   key: 1.2, box: 2.5, expo: 1,    ao: .4,  envRot: 90,
@@ -70,7 +70,7 @@ export function createThreeCard(size) {
   const mat = new THREE.MeshPhysicalMaterial();
   const fall = { uFall: { value: 0 }, uFallPow: { value: 3 }, uFallTint: { value: .5 },
     uKs: { value: 0 }, uKsSheen: { value: new THREE.Color(.13, .13, .13) }, uKsEdge: { value: 10 }, uKsBack: { value: .2 }, uKsBump: { value: 0 },
-    uKsScales: { value: new THREE.Vector4(.5, .05, .006, .003) }, uKsHeights: { value: new THREE.Vector4(.1, .1, 1., .1) }, uKsL: { value: new THREE.Vector3(0, 0, 1) }, uKsSeed: { value: 3 } };
+    uKsScales: { value: new THREE.Vector4(.5, .05, .006, .003) }, uKsHeights: { value: new THREE.Vector4(.1, .1, 1., .1) }, uKsL: { value: new THREE.Vector3(0, 0, 1) }, uKsSeed: { value: 3 }, uKsGrain: { value: 0 }, uKsGrainSize: { value: 1.2 } };
   mat.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, fall);
     const noise = `
@@ -80,10 +80,15 @@ export function createThreeCard(size) {
         vec3 p=ksperm(ksperm(i.y+vec3(0.,i1.y,1.))+i.x+vec3(0.,i1.x,1.)); vec3 m=max(.5-vec3(dot(x0,x0),dot(x12.xy,x12.xy),dot(x12.zw,x12.zw)),0.); m=m*m; m=m*m;
         vec3 x=2.*fract(p*C.www)-1.; vec3 h=abs(x)-.5; vec3 ox=floor(x+.5); vec3 a0=x-ox; m*=1.79284291400159-.85373472095314*(a0*a0+h*h);
         vec3 g; g.x=a0.x*x0.x+h.x*x0.y; g.yz=a0.yz*x12.xz+h.yz*x12.yw; return 130.*dot(m,g); }
+      // nap grain: soft value noise at fibre scale (about one card pixel) — sandy, not bumpy
+      float ksHash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float ksVn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f);
+        return mix(mix(ksHash(i), ksHash(i + vec2(1., 0.)), f.x), mix(ksHash(i + vec2(0., 1.)), ksHash(i + 1.), f.x), f.y); }
+      float ksGrainAt(vec2 uv){ vec2 q = uv * 608. / uKsGrainSize; return ksVn(q) * .65 + ksVn(q * .5 + 31.) * .35; }
       // KeyShot-style noise bump: 4 layers; a layer's 'scale' is its feature size as a fraction of the card (68 mm)
       float ksH(vec2 uv){ float h=0.; for(int k=0;k<4;k++){ float f=1./max(uKsScales[k],.001); h+=uKsHeights[k]*smoothstep(260.,140.,f)*kssn(uv*f+uKsSeed*float(k+1)*17.)/f; } return h; }`;
     sh.vertexShader = 'varying vec2 vKsUv;\n' + sh.vertexShader.replace('#include <uv_vertex>', '#include <uv_vertex>\n vKsUv = uv;');
-    sh.fragmentShader = 'varying vec2 vKsUv; uniform float uFall, uFallPow, uFallTint, uKs, uKsEdge, uKsBack, uKsBump, uKsSeed; uniform vec3 uKsSheen, uKsL; uniform vec4 uKsScales, uKsHeights;\n' + noise + '\n' + sh.fragmentShader
+    sh.fragmentShader = 'varying vec2 vKsUv; uniform float uFall, uFallPow, uFallTint, uKsGrain, uKsGrainSize, uKs, uKsEdge, uKsBack, uKsBump, uKsSeed; uniform vec3 uKsSheen, uKsL; uniform vec4 uKsScales, uKsHeights;\n' + noise + '\n' + sh.fragmentShader
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
        if (uKsBump > 0.0) { vec2 uv = vKsUv; float e = 1. / 608.; float h0 = ksH(uv), hx = ksH(uv + vec2(e, 0.)), hy = ksH(uv + vec2(0., e));
          normal = normalize(normal + vec3(-(hx - h0), -(hy - h0), 0.) / e * uKsBump * .15); }`)
@@ -92,6 +97,8 @@ export function createThreeCard(size) {
            float edge = 1. - exp(-tilt * uKsEdge * .8);                                  // edginess: how fast pile tilt turns into sheen
            float toward = tilt > 1e-4 ? dot(tn / tilt, normalize(Lv.xy + 1e-4)) : 0.;     // pile leaning toward the light catches it
            float sheenAmt = edge * (.5 + .5 * toward) + uKsBack * .6;                    // backscatter: the soft milky veil over the whole pile
+           float g = ksGrainAt(vKsUv);
+           if (uKsGrain > 0.) { outgoingLight *= 1. + (g - .5) * uKsGrain; sheenAmt *= .4 + g * 1.2; }   // fibre tips catch the sheen
            outgoingLight += uKs * uKsSheen * sheenAmt * (outgoingLight * 1.5 + .25); } }
        #include <opaque_fragment>`)
       .replace('#include <opaque_fragment>',
@@ -182,7 +189,7 @@ export function createThreeCard(size) {
       mat.clearcoat = m.coat; mat.clearcoatRoughness = m.coatRough;
       scene.environmentIntensity = m.env;
       fall.uKs.value = m.ks ?? 0; fall.uKsSheen.value.setScalar(m.ksSheen ?? .13); fall.uKsEdge.value = m.ksEdge ?? 10; fall.uKsBack.value = m.ksBack ?? .2;
-      fall.uKsBump.value = m.ksBump ?? 0; if (m.ksHeights) fall.uKsHeights.value.set(...m.ksHeights); if (m.ksScales) fall.uKsScales.value.set(...m.ksScales);
+      fall.uKsGrain.value = m.ksGrain ?? 0; fall.uKsGrainSize.value = m.ksGrainSize ?? 1.2; fall.uKsBump.value = m.ksBump ?? 0; if (m.ksHeights) fall.uKsHeights.value.set(...m.ksHeights); if (m.ksScales) fall.uKsScales.value.set(...m.ksScales);
       fall.uFall.value = m.fall ?? 0; fall.uFallPow.value = m.fallPow ?? 3; fall.uFallTint.value = m.fallTint ?? .5;
       mat.needsUpdate = true;
       const az = (s.az ?? 40) * Math.PI / 180, el = (s.el ?? 50) * Math.PI / 180;

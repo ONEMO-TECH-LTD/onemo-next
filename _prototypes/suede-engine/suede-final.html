@@ -112,7 +112,7 @@ const PRESETS={
 };
 const MATS=['Suede','Velvet','Faux leather','UV matte','UV gloss'];
 for(const n of [...MATS,'Suede · scan','Velvet · scan']){ const t={}; for(const k in M3[n]) if(k!=='scan') t['t_'+k]=M3[n][k]; PRESETS[n]={engine:'three',mat3:n,az:40,el:50,live:/Suede|Velvet|gloss/.test(n)?1:0,...t}; }   // fabrics + gloss read through moving light   // proven: three.js + Poly Haven
-const KEY='onemo-materials-v12';
+const KEY='onemo-materials-v13';
 let cards; try{ cards=JSON.parse(localStorage.getItem(KEY)); }catch(_){}
 if(!Array.isArray(cards)||cards.length!==ARTS.length) cards=ARTS.map((_,i)=>{ const m=MATS[i%MATS.length]; return {...PRESETS[m],mat:m}; });   // one material per card to start
 const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(cards)); }catch(_){} };
@@ -264,7 +264,7 @@ const sheet=document.getElementById('sheet');
 const CTL=[
   ['Look (stylised so it reads at card size)',[['t_soft','print softening',0,.5,.01],['t_lift','black lift',0,.25,.005],['t_blurPx','dye bleed (blur px)',0,2,.05],['t_punch','colour punch',-.3,.4,.01],
     ['t_detailGain','fibre visibility',1,12,.1],['t_detailTile','fibre size',.5,4,.05],['t_wash','nap / crush patches',0,1,.01],['t_washScale','patch size',1,6,.1],['t_haze','fuzz haze',0,.4,.005],['t_rim','velvet edge glow',0,.8,.01],['t_fall','pile fall-off glow',0,1.5,.01],['t_fallPow','fall-off softness',1,6,.1],['t_fallTint','fall-off colour from print',0,1,.01]]],
-  ['Your KeyShot velvet/suede (lux_velvet + noise bump)',[['t_ks','velvet lobe',0,2,.01],['t_ksSheen','sheen brightness',0,1,.01],['t_ksEdge','edginess',1,20,.1],['t_ksBack','backscatter',0,1,.01],['t_ksBump','noise bump',0,3,.01]]],
+  ['Your KeyShot velvet/suede (lux_velvet + noise bump)',[['t_ks','velvet lobe',0,2,.01],['t_ksSheen','sheen brightness',0,1,.01],['t_ksEdge','edginess',1,20,.1],['t_ksBack','backscatter',0,1,.01],['t_ksGrain','nap grain',0,1,.01],['t_ksGrainSize','grain size (px)',.6,4,.05],['t_ksBump','noise bump',0,3,.01]]],
   ['Proven material (three.js + Poly Haven scan)',[['t_detail','fibre detail (scan colour)',0,1,.01],['t_tile','fineness (scan repeat)',1,8,.25],['t_depth','surface depth',0,2,.01],['t_rough','roughness',.02,1,.01],['t_spec','specular',0,1,.01],
     ['t_sheen','sheen (fabric glow)',0,1,.01],['t_sheenRough','sheen softness',.1,1,.01],['t_sheenTint','sheen colour from print',0,1,.01],
     ['t_coat','gloss clear coat',0,1,.01],['t_coatRough','coat blur (lower = sharper)',0,.5,.005],['t_env','studio reflections',0,3,.01],['t_envRot','studio rotation °',0,360,1],['t_ao','fibre shadows (AO)',0,1,.01],['t_box','softbox (light spot)',0,15,.1],['t_key','key light',0,4,.01],['t_expo','exposure',.3,2.5,.01]]],
@@ -279,7 +279,7 @@ const CTL=[
 ];
 const SCAN=s=>s.engine==='three'&&M3[s.mat3]&&M3[s.mat3].scan;
 const FAB=s=>/Suede|Velvet/.test(s.mat3||'');
-const VIS={ t_fall:FAB, t_fallPow:s=>FAB(s)&&s.t_fall>0, t_fallTint:s=>FAB(s)&&s.t_fall>0, t_detail:s=>FAB(s)&&SCAN(s), t_detailGain:s=>FAB(s)&&SCAN(s)&&s.t_detail>0, t_detailTile:s=>FAB(s)&&SCAN(s)&&s.t_detail>0, t_haze:s=>FAB(s)&&SCAN(s), t_rim:s=>/Velvet/.test(s.mat3||''), t_ks:FAB, t_ksBump:FAB, t_ksSheen:s=>FAB(s)&&s.t_ks>0, t_ksEdge:s=>FAB(s)&&s.t_ks>0, t_ksBack:s=>FAB(s)&&s.t_ks>0, t_wash:SCAN, t_washScale:s=>SCAN(s)&&s.t_wash>0, t_ao:SCAN, t_tile:SCAN, t_depth:SCAN, t_sheenRough:s=>s.t_sheen>0, t_sheenTint:s=>s.t_sheen>0, t_coatRough:s=>s.t_coat>0, soften:s=>s.print, lift:s=>s.print, blur:s=>s.print,
+const VIS={ t_fall:FAB, t_fallPow:s=>FAB(s)&&s.t_fall>0, t_fallTint:s=>FAB(s)&&s.t_fall>0, t_detail:s=>FAB(s)&&SCAN(s), t_detailGain:s=>FAB(s)&&SCAN(s)&&s.t_detail>0, t_detailTile:s=>FAB(s)&&SCAN(s)&&s.t_detail>0, t_haze:s=>FAB(s)&&SCAN(s), t_rim:s=>/Velvet/.test(s.mat3||''), t_ks:FAB, t_ksBump:FAB, t_ksGrain:s=>FAB(s)&&s.t_ks>0, t_ksGrainSize:s=>FAB(s)&&s.t_ks>0&&s.t_ksGrain>0, t_ksSheen:s=>FAB(s)&&s.t_ks>0, t_ksEdge:s=>FAB(s)&&s.t_ks>0, t_ksBack:s=>FAB(s)&&s.t_ks>0, t_wash:SCAN, t_washScale:s=>SCAN(s)&&s.t_wash>0, t_ao:SCAN, t_tile:SCAN, t_depth:SCAN, t_sheenRough:s=>s.t_sheen>0, t_sheenTint:s=>s.t_sheen>0, t_coatRough:s=>s.t_coat>0, soften:s=>s.print, lift:s=>s.print, blur:s=>s.print,
   pnsrc:s=>s.pbr, ptile:s=>s.pbr&&s.pnsrc!=='flat', pnorm:s=>s.pbr&&s.pnsrc!=='flat', psheen:s=>s.pbr, pshrough:s=>s.pbr&&s.psheen>0, pshtint:s=>s.pbr&&s.psheen>0,
   pspec:s=>s.pbr, haze:s=>s.pbr, prough:s=>s.pbr&&s.pspec>0, pcoat:s=>s.pbr, pcoatr:s=>s.pbr&&s.pcoat>0, penv:s=>s.pbr&&s.pcoat>0, pkey:s=>s.pbr, pamb:s=>s.pbr, pexpo:s=>s.pbr,
   ndens:s=>s.proc, nstretch:s=>s.proc, ndir:s=>s.proc, nrelief:s=>s.proc, namt:s=>s.proc, wscale:s=>s.proc, wamt:s=>s.proc, tips:s=>s.proc, seed:s=>s.proc,
