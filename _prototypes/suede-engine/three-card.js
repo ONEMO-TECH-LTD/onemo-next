@@ -8,19 +8,19 @@ import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
 
 const P = 'public/pbr/';
 const SCANS = {
-  suede:   { nor: 'scuba_suede_nor_gl_1k.jpg',       rough: 'scuba_suede_rough_1k.jpg',       ao: 'scuba_suede_ao_1k.jpg' },
-  velvet:  { nor: 'velour_velvet_nor_gl_1k.jpg',     rough: 'velour_velvet_rough_1k.jpg',     ao: 'velour_velvet_ao_1k.jpg' },
+  suede:   { nor: 'scuba_suede_nor_gl_1k.jpg',       rough: 'scuba_suede_rough_1k.jpg',       ao: 'scuba_suede_ao_1k.jpg',   diff: 'scuba_suede_diff_1k.jpg' },
+  velvet:  { nor: 'velour_velvet_nor_gl_1k.jpg',     rough: 'velour_velvet_rough_1k.jpg',     ao: 'velour_velvet_ao_1k.jpg', diff: 'velour_velvet_diff_1k.jpg' },
   leather: { nor: 'fabric_leather_01_nor_gl_1k.jpg', rough: 'fabric_leather_01_rough_1k.jpg', ao: 'fabric_leather_01_ao_1k.jpg' },
 };
 
 /* The five materials, as three.js material settings. Values are the physical parameters, not looks
    faked on top: sheen for fabrics, clear coat for the gloss print. */
 export const MATERIALS = {
-  'Suede':        { scan: 'suede',   tile: 4, depth: 1.2, rough: 1,   sheen: 1, sheenRough: .8,  sheenTint: .25, coat: 0, coatRough: .05, spec: .3, env: 1,   key: 1.6, expo: 1, ao: .6, envRot: 90, tilt: 0 },
-  'Velvet':       { scan: 'velvet',  tile: 4, depth: .9,  rough: 1,   sheen: 1, sheenRough: .35, sheenTint: 1,   coat: 0, coatRough: .05, spec: .2, env: 1,   key: 1.6, expo: 1, ao: .6, envRot: 90, tilt: 0 },
-  'Faux leather': { scan: 'leather', tile: 2, depth: .8,  rough: .9,  sheen: 0, sheenRough: .5,  sheenTint: 0,   coat: 0, coatRough: .05, spec: .7, env: 1,   key: 1.4, expo: 1, ao: 0,  envRot: 90, tilt: 0 },
-  'UV matte':     { scan: null,      tile: 1, depth: 0,   rough: .65, sheen: 0, sheenRough: .5,  sheenTint: 0,   coat: 0, coatRough: .05, spec: .5, env: 1,   key: 1.2, expo: 1, ao: 0,  envRot: 90, tilt: 0 },
-  'UV gloss':     { scan: null,      tile: 1, depth: 0,   rough: .35, sheen: 0, sheenRough: .5,  sheenTint: 0,   coat: 1, coatRough: .04, spec: .5, env: 1.2, key: 1.2, expo: 1, ao: 0,  envRot: 90, tilt: 0 },
+  'Suede':        { detail: .9,  scan: 'suede',   tile: 4, depth: 1.2, rough: 1,   sheen: 1, sheenRough: .8,  sheenTint: .25, coat: 0, coatRough: .05, spec: .3, env: 1,   key: 1.6, expo: 1, ao: .6, envRot: 90, tilt: 0 },
+  'Velvet':       { detail: .8,  scan: 'velvet',  tile: 4, depth: .9,  rough: 1,   sheen: 1, sheenRough: .35, sheenTint: 1,   coat: 0, coatRough: .05, spec: .2, env: 1,   key: 1.6, expo: 1, ao: .6, envRot: 90, tilt: 0 },
+  'Faux leather': { detail: 0,  scan: 'leather', tile: 2, depth: .8,  rough: .9,  sheen: 0, sheenRough: .5,  sheenTint: 0,   coat: 0, coatRough: .05, spec: .7, env: 1,   key: 1.4, expo: 1, ao: 0,  envRot: 90, tilt: 0 },
+  'UV matte':     { detail: 0,  scan: null,      tile: 1, depth: 0,   rough: .65, sheen: 0, sheenRough: .5,  sheenTint: 0,   coat: 0, coatRough: .05, spec: .5, env: 1,   key: 1.2, expo: 1, ao: 0,  envRot: 90, tilt: 0 },
+  'UV gloss':     { detail: 0,  scan: null,      tile: 1, depth: 0,   rough: .35, sheen: 0, sheenRough: .5,  sheenTint: 0,   coat: 1, coatRough: .04, spec: .5, env: 1.2, key: 1.2, expo: 1, ao: 0,  envRot: 90, tilt: 0 },
 };
 
 export function createThreeCard(size) {
@@ -50,6 +50,22 @@ export function createThreeCard(size) {
   const scan = name => scanCache[name] || (scanCache[name] = Promise.all(['nor', 'rough', 'ao'].map(k => tex(P + SCANS[name][k], false)))
     .then(([nor, rough, ao]) => { for (const t of [nor, rough, ao]) { t.wrapS = t.wrapT = THREE.RepeatWrapping; } return { nor, rough, ao }; }));
   const art = url => artCache[url] || (artCache[url] = tex(url, true));
+  const img = url => new Promise(res => { const i = new Image(); i.onload = () => res(i); i.src = url; });
+  const greyCache = {};
+  // the scan's colour map turned into a neutral grey detail (mean = 50% grey), so it carries fibres, not the scan's colour
+  const grey = name => greyCache[name] || (greyCache[name] = img(P + SCANS[name].diff).then(im => {
+    const c = document.createElement('canvas'); c.width = c.height = 512; const g = c.getContext('2d'); g.drawImage(im, 0, 0, 512, 512);
+    const d = g.getImageData(0, 0, 512, 512), px = d.data; let sum = 0; const L = new Float32Array(512 * 512);
+    for (let i = 0; i < L.length; i++) { L[i] = .299 * px[i * 4] + .587 * px[i * 4 + 1] + .114 * px[i * 4 + 2]; sum += L[i]; }
+    const mean = sum / L.length; for (let i = 0; i < L.length; i++) { const v = Math.max(0, Math.min(255, 128 + (L[i] - mean))); px[i * 4] = px[i * 4 + 1] = px[i * 4 + 2] = v; }
+    g.putImageData(d, 0, 0); return c; }));
+  const composed = new THREE.CanvasTexture(document.createElement('canvas')); composed.colorSpace = THREE.SRGBColorSpace;
+  async function printOnFabric(a, name, tile, amt) {   // artwork with the fabric's fibre detail printed through it
+    const cv = composed.image; cv.width = cv.height = size; const g = cv.getContext('2d');
+    g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; g.drawImage(a.image, 0, 0, size, size);
+    const pat = g.createPattern(await grey(name), 'repeat'); pat.setTransform(new DOMMatrix().scale(size / 512 / tile));
+    g.globalCompositeOperation = 'overlay'; g.globalAlpha = amt; g.fillStyle = pat; g.fillRect(0, 0, size, size);
+    g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; composed.needsUpdate = true; return composed; }
 
   const pmrem = new THREE.PMREMGenerator(renderer);
   const envReady = new HDRLoader().loadAsync(P + 'studio_small_08_1k.hdr').then(hdr => {
@@ -65,7 +81,7 @@ export function createThreeCard(size) {
       const a = await art(artUrl);
       const sc = m.scan ? await scan(m.scan) : null;
       // base colour: the artwork (or the suede back)
-      mat.map = back ? null : a;
+      mat.map = back ? null : (sc && SCANS[m.scan].diff && m.detail > 0 ? await printOnFabric(a, m.scan, m.tile, m.detail) : a);
       mat.color.set(back ? 0x3d3d3d : 0xffffff);
       // surface from the scan, repeated finer by `tile`
       if (sc) { for (const t of [sc.nor, sc.rough, sc.ao]) t.repeat.set(m.tile, m.tile);
