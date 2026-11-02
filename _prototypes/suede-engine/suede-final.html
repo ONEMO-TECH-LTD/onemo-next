@@ -53,6 +53,15 @@
   .seg button.on { background:var(--ink); color:#fff; border-color:var(--ink); }
   .acts { display:flex; gap:6px; flex-wrap:wrap; margin-top:12px; }
   .who { font:700 12px/1.2 var(--font); margin-bottom:4px; }
+  /* phone: one scrolling row of dev switches; the panel is a bottom sheet that leaves the card visible */
+  @media (max-width:600px) {
+    .dev { flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; right:56px; max-width:none; border-radius:999px; font-size:10px; }
+    .dev::-webkit-scrollbar { display:none; }
+    .dev button { white-space:nowrap; padding:7px 9px; }
+    .sheet { left:0; right:0; top:auto; bottom:0; width:auto; max-height:38vh; border-radius:16px 16px 0 0; border-width:1px 0 0; padding:10px 14px calc(10px + env(safe-area-inset-bottom)); }
+    .ctl { grid-template-columns:86px 1fr 40px; margin:3px 0; }
+    .ctl input[type=range] { height:28px; }
+  }
 </style>
 </head>
 <body>
@@ -65,6 +74,7 @@
   <button id="tune" class="on">panel: ON</button><button id="tilt">phone tilt: OFF</button><button id="bgMove" class="on">bg motion: ON</button><button id="bgRes" class="on">bg sharp (2×): ON</button>
 </div>
 <div class="sheet open" id="sheet"></div>
+<script>if(matchMedia('(max-width:600px)').matches){ sheet.classList.remove('open'); tune.classList.remove('on'); tune.textContent='panel: OFF'; }   // phones start with the panel closed</script>
 
 <script type="module">
 import { createSurface } from './public/recipes/onemo-adaptive-surface.js';
