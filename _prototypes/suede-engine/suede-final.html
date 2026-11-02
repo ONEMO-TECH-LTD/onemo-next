@@ -125,7 +125,7 @@ const PRESETS={
 };
 const MATS=['Suede','Velvet','Faux leather','UV matte','UV gloss'];
 const BACKS=MATS.filter(m=>m!=='Velvet');   // the back is never velvet
-for(const n of [...MATS,'Suede · scan','Velvet · scan']){ const t={}; for(const k in M3[n]) if(k!=='scan'&&k!=='studio') t['t_'+k]=M3[n][k]; if(M3[n].studio) t.studio=M3[n].studio; t.t_amb??=.6; PRESETS[n]={engine:'three',mat3:n,az:40,el:50,live:0,dist:1.5,...t}; }   // fabrics + gloss read through moving light   // proven: three.js + Poly Haven
+for(const n of [...MATS,'Suede · scan','Velvet · scan']){ const t={}; for(const k in M3[n]) if(k!=='scan'&&k!=='studio') t['t_'+k]=M3[n][k]; if(M3[n].studio) t.studio=M3[n].studio; t.t_amb??=.6; PRESETS[n]={engine:'three',mat3:n,az:40,el:50,live:0,dist:1.5,rimMm:2.5,rimAng:70,lift:6,shadow:.5,...t}; }   // fabrics + gloss read through moving light   // proven: three.js + Poly Haven
 const KEY='onemo-materials';   // stable: never renamed again, so your settings survive page updates
 let cards; try{ cards=JSON.parse(localStorage.getItem(KEY)); if(!cards) for(let v=20;v>=11&&!cards;v--) cards=JSON.parse(localStorage.getItem('onemo-materials-v'+v)); }catch(_){}
 const fresh=i=>{ const m=MATS[i%MATS.length]; return {...PRESETS[m],mat:m,backMat:'Suede'}; };   // one material per card to start
@@ -244,12 +244,18 @@ let chain=Promise.resolve();
 const T3=createThreeCard(SZ);
 function face(canvas, i, back){ canvas.width=canvas.height=SZ; const ctx=canvas.getContext('2d');
   return { draw(){ chain=chain.then(async()=>{ const s=cards[i];
-    if(s.engine==='three'){ const bs=back&&s.backMat?{...PRESETS[s.backMat],live:s.live,az:s.az,el:s.el,studio:s.studio}:s;   // the back has its own material, never velvet
+    if(s.engine==='three'){ const bs=back&&s.backMat?{...PRESETS[s.backMat],live:s.live,az:s.az,el:s.el,studio:s.studio,rimMm:s.rimMm,rimAng:s.rimAng}:s;   // the back has its own material, never velvet
       let L=null, live=bs.live; if(st.tiltOn&&st.tilt){ const d=Math.PI/180, az=(bs.az??40)*d, el=(bs.el??50)*d, cl=v=>Math.max(-.95,Math.min(.95,v));
         L={x:cl(Math.cos(az)*Math.cos(el)+st.tilt.x), y:cl(Math.sin(az)*Math.cos(el)+st.tilt.y)}; live=1; } else if(bs.live) L=st.live;
-      await T3.render(ARTS[i],{...bs,live,liveL:L},back); ctx.drawImage(T3.canvas,0,0); }
+      await T3.render(ARTS[i],{...bs,live,liveL:L},back); ctx.drawImage(T3.canvas,0,0);
+      if(!back){ const d=Math.PI/180, lx=L?L.x:Math.cos((s.az??40)*d)*Math.cos((s.el??50)*d), ly=L?L.y:Math.sin((s.az??40)*d)*Math.cos((s.el??50)*d); floatShadow(i,lx,ly); } }
     else { await R3.render(ARTS[i],back,s); ctx.drawImage(R3.cv,0,0); } }); return chain; } }; }
 
+/* floating shadow: tight contact shadow + soft lifted one, both thrown away from the light */
+function floatShadow(i,lx,ly){ const s=cards[i], el=reel.children[i]?.querySelector('.turn'); if(!el) return;
+  const L=(s.lift??6)*304/68, k=s.shadow??.5, dx=-lx*L, dy=ly*L;   // mm → px at card size; screen y runs down
+  el.style.boxShadow=`${(dx*.15).toFixed(1)}px ${(dy*.15+1).toFixed(1)}px ${(2+L*.12).toFixed(1)}px rgba(10,13,18,${(.45*k).toFixed(2)}), `+
+    `${dx.toFixed(1)}px ${(dy+L*.35).toFixed(1)}px ${(L*2.2+6).toFixed(1)}px ${(-L*.35).toFixed(1)}px rgba(10,13,18,${(.6*k).toFixed(2)})`; }
 /* ── reel ───────────────────────────────────────────────────────────── */
 const reel=document.getElementById('reel'); const faces=[];
 ARTS.forEach((src,i)=>{ const el=document.createElement('section'); el.className='slide'; el.innerHTML=`
@@ -282,6 +288,7 @@ const sheet=document.getElementById('sheet');
 /* panel: current controls in sections; [title, controls, open by default]. Legacy sections only appear on an earlier version. */
 const CTL=[
   ['Light',[['t_key','light strength',0,6,.01],['t_amb','ambient fill',0,3,.01],['dist','light distance',.5,4,.05],['az','light angle °',0,360,1],['el','light height °',5,85,1],['t_expo','exposure',.3,2.5,.01],['studio','studio','seg',Object.keys(STUDIOS)],['t_env','studio light & reflections',0,3,.01],['t_envRot','studio rotation °',0,360,1],['live','light follows mouse/tilt','toggle']],1],
+  ['Edge & depth',[['rimMm','rim width (mm)',0,5,.1],['rimAng','rim curve °',0,85,1],['lift','float height (mm)',0,20,.5],['shadow','shadow strength',0,1,.01]],1],
   ['Print',[['t_soft','print softening',0,.5,.01],['t_lift','black lift',0,.25,.005],['t_punch','colour punch',-.3,.4,.01],['t_blurPx','dye bleed (blur px)',0,4,.05]],0],
   ['Nap, wash & highlights',[['t_ksSheen','highlights',0,1,.01],['t_ksGrainSize','nap size (px)',.6,6,.05],['t_ksGrain','nap strength',0,1,.01],['t_wash','wash (nap / crush patches)',0,1,.01],['t_washScale','wash size',1,12,.1],['t_washSeed','wash layout (reseed)',0,99,1],
     ['t_ksBack','backscatter (milky veil)',0,1,.01],['t_ks','velvet lobe',0,2,.01],['t_ksBump','noise bump',0,3,.01],['t_ksEdge','edginess',1,20,.1],['t_rim','velvet edge glow',0,.8,.01],['t_haze','fuzz haze',0,.4,.005],
@@ -321,7 +328,7 @@ function ctlHtml(s,[k,label,a,b,stp,inv]){
   const ui=inv?a+b-(s[k]??0):(s[k]??0), f=v=>(+v).toFixed(stp<.01?3:2);
   return `<div class="ctl"><span>${label}</span><small>${f(a)}</small><input type="range" data-k="${k}" data-inv="${inv?1:0}" data-a="${a}" data-b="${b}" min="${a}" max="${b}" step="${stp}" value="${ui}"><small>${f(b)}</small><input type="number" class="num" data-k="${k}" step="${stp}" value="${f(ui)}"></div>`; }
 function renderSheet(){ const i=idx(), s=cards[i];
-  const acts=k=>{ if(VIS[k]&&!VIS[k](s)) return false; const three=s.engine==='three', isT=k.startsWith('t_'), light=['az','el','live','studio','dist'].includes(k); return three ? (isT||light) : !isT; };   // only what acts on this card
+  const acts=k=>{ if(VIS[k]&&!VIS[k](s)) return false; const three=s.engine==='three', isT=k.startsWith('t_'), light=['az','el','live','studio','dist','rimMm','rimAng','lift','shadow'].includes(k); return three ? (isT||light) : !isT; };   // only what acts on this card
   const cur=MATS.includes(s.mat);
   let h=`<div class="who">${NAMES[i]} · card ${i+1}</div>
     <h4>Material</h4><div class="seg">${MATS.map(k=>`<button data-preset="${k}" class="${s.mat===k?'on':''}">${k}</button>`).join('')}</div>

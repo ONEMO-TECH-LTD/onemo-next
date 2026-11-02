@@ -76,7 +76,7 @@ export function createThreeCard(size) {
   const mat = new THREE.MeshPhysicalMaterial();
   const fall = { uFall: { value: 0 }, uFallPow: { value: 3 }, uFallTint: { value: .5 },
     uKs: { value: 0 }, uKsSheen: { value: new THREE.Color(.13, .13, .13) }, uKsEdge: { value: 10 }, uKsBack: { value: .2 }, uKsBump: { value: 0 },
-    uKsScales: { value: new THREE.Vector4(.5, .05, .006, .003) }, uKsHeights: { value: new THREE.Vector4(.1, .1, 1., .1) }, uKsL: { value: new THREE.Vector3(0, 0, 1) }, uKsSeed: { value: 3 }, uKsGrain: { value: 0 }, uKsGrainSize: { value: 1.2 }, uAntiTile: { value: 0 } };
+    uKsScales: { value: new THREE.Vector4(.5, .05, .006, .003) }, uKsHeights: { value: new THREE.Vector4(.1, .1, 1., .1) }, uKsL: { value: new THREE.Vector3(0, 0, 1) }, uKsSeed: { value: 3 }, uKsGrain: { value: 0 }, uKsGrainSize: { value: 1.2 }, uAntiTile: { value: 0 }, uRimW: { value: 0 }, uRimAng: { value: 1.2 }, uRimR: { value: 52 / 304 } };
   mat.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, fall);
     const noise = `
@@ -93,12 +93,18 @@ export function createThreeCard(size) {
       // KeyShot-style noise bump: 4 layers; a layer's 'scale' is its feature size as a fraction of the card (68 mm)
       float ksH(vec2 uv){ float h=0.; for(int k=0;k<4;k++){ float f=1./max(uKsScales[k],.001); h+=uKsHeights[k]*smoothstep(260.,140.,f)*kssn(uv*f+uKsSeed*float(k+1)*17.)/f; } return h; }`;
     sh.vertexShader = 'varying vec2 vKsUv;\n' + sh.vertexShader.replace('#include <uv_vertex>', '#include <uv_vertex>\n vKsUv = uv;');
-    sh.fragmentShader = 'varying vec2 vKsUv; uniform float uAntiTile, uFall, uFallPow, uFallTint, uKsGrain, uKsGrainSize, uKs, uKsEdge, uKsBack, uKsBump, uKsSeed; uniform vec3 uKsSheen, uKsL; uniform vec4 uKsScales, uKsHeights;\n' + noise + '\n' + sh.fragmentShader
+    sh.fragmentShader = 'varying vec2 vKsUv; uniform float uRimW, uRimAng, uRimR, uAntiTile, uFall, uFallPow, uFallTint, uKsGrain, uKsGrainSize, uKs, uKsEdge, uKsBack, uKsBump, uKsSeed; uniform vec3 uKsSheen, uKsL; uniform vec4 uKsScales, uKsHeights;\n' + noise + '\n' + sh.fragmentShader
       .replace('vec3 mapN = texture2D( normalMap, vNormalMapUv ).xyz * 2.0 - 1.0;', `vec3 mapN = texture2D( normalMap, vNormalMapUv ).xyz * 2.0 - 1.0;
        if (uAntiTile > 0.0) {   // anti-tiling: a rotated, rescaled second sample blended in by a soft mask, so no repeat lines up
          vec3 n2 = texture2D( normalMap, mat2(.6, .8, -.8, .6) * vNormalMapUv * 1.37 + vec2(.31, .67) ).xyz * 2.0 - 1.0;
          float w = smoothstep(-.35, .35, kssn(vKsUv * 2.5 + 7.)) * uAntiTile; mapN = normalize(mix(mapN, n2, w)); }`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+       if (uRimW > 0.0) {   // rounded rim: the outer uRimW of the card curves down like a real 2–3 mm slab, so light catches/loses the edge
+         vec2 q = vKsUv - .5, k = abs(q) - (.5 - uRimR); float d = length(max(k, 0.)) + min(max(k.x, k.y), 0.) - uRimR;   // rounded-rect distance (≤0 inside)
+         float t = clamp(1. + d / uRimW, 0., 1.);                                    // 0 on the flat face → 1 at the very edge
+         vec2 g = k.x > 0. && k.y > 0. ? normalize(k) : (k.x > k.y ? vec2(1., 0.) : vec2(0., 1.)); g *= sign(q);   // outward direction
+         float th = asin(t) * uRimAng / 1.5708;                                      // quarter-round profile, scaled to the rim angle
+         normal = normalize(normal * cos(th) + vec3(g, 0.) * sin(th)); }
        if (uKsBump > 0.0) { vec2 uv = vKsUv; float e = 1. / 608.; float h0 = ksH(uv), hx = ksH(uv + vec2(e, 0.)), hy = ksH(uv + vec2(0., e));
          normal = normalize(normal + vec3(-(hx - h0), -(hy - h0), 0.) / e * uKsBump * .15); }`)
       .replace('#include <opaque_fragment>', `{ if (uKs > 0.0) { vec3 Vv = normalize(vViewPosition); float nv = clamp(dot(normal, Vv), 0., 1.);
@@ -204,6 +210,7 @@ export function createThreeCard(size) {
       mat.clearcoat = m.coat; mat.clearcoatRoughness = m.coatRough;
       scene.environmentIntensity = m.env;
       fall.uKs.value = m.ks ?? 0; fall.uKsSheen.value.setScalar(m.ksSheen ?? .13); fall.uKsEdge.value = m.ksEdge ?? 10; fall.uKsBack.value = m.ksBack ?? .2;
+      fall.uRimW.value = (s.rimMm ?? 2.5) / 68; fall.uRimAng.value = (s.rimAng ?? 70) * Math.PI / 180;
       fall.uAntiTile.value = m.antiTile ?? 0; fall.uKsGrain.value = m.ksGrain ?? 0; fall.uKsGrainSize.value = m.ksGrainSize ?? 1.2; fall.uKsBump.value = m.ksBump ?? 0; if (m.ksHeights) fall.uKsHeights.value.set(...m.ksHeights); if (m.ksScales) fall.uKsScales.value.set(...m.ksScales);
       fall.uFall.value = m.fall ?? 0; fall.uFallPow.value = m.fallPow ?? 3; fall.uFallTint.value = m.fallTint ?? .5;
       mat.needsUpdate = true;
