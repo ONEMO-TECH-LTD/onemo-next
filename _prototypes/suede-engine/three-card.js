@@ -1,6 +1,6 @@
 /* Material card renderer — proven base, stylised to read at card size.
    Base: three.js MeshPhysicalMaterial (sheen, clearcoat, normal/roughness/AO maps) on a flat card,
-   lit by a real photographed studio (Poly Haven studio_small_08, CC0) plus one key light.
+   lit by a product-photography studio (Dan's GSG HDRIs from KeyShot "DS----", or Poly Haven studio_small_08) plus one key light.
    Suede / Velvet: Dan's KeyShot materials (lux_velvet lobe + noise bump), velvet surface = Dan's fabric pack Fabric_valvet_01.
    Comparison scans: ambientCG Leather039 (fine suede), Poly Haven velour_velvet, leather_red_02 (CC0, 1K).
    Stylisation (Dan, 2 Nov: "make it all stylised so it reads as suede and correct material"):
@@ -27,6 +27,10 @@ const DETAIL_SRC = { suede: 'suede', velvet: 'velvet', velvetTB: 'velvetTB', fab
    soft: print softening · lift: raises the darkest ink · blurPx: dye bleed · punch: + richer / - flatter colour
    detail/detailGain/detailTile: scan fibres over the print · wash/washScale: nap or crush patches
    haze: fuzz veil (after light) · rim: velvet edge glow (after light) */
+/* studios: Dan's product-photography HDRIs (GSG, from KeyShot's DS---- environments), downsized to 1024×512 */
+export const STUDIOS = { 'Three softboxes': 'GSG_HC008_A064_ThreeSoftboxesStudio1_1k.hdr', 'Softbox': 'GSG_HC008_A047_Softbox_1k.hdr', 'Softbox tent': 'GSG_HC008_A048_SoftboxTent1_1k.hdr',
+  'Overhead + strips': 'GSG_HC008_A034_OverheadAndStripesLarge_1k.hdr', 'Two umbrellas': 'GSG_HC008_A069_TwoUmbrellasLarge_1k.hdr', 'Poly Haven studio': 'studio_small_08_1k.hdr' };
+export const DEFAULT_STUDIO = 'Three softboxes';
 export const MATERIALS = {
   /* Dan's own KeyShot materials ("!!! --- DS"): MOD BACK SUEDE and MOD Velvet Black BRUSHED —
      lux_velvet (roughness .1, backscatter .2, edginess 10) over a noise bump; ks* = that velvet lobe, ksHeights = its noise layers */
@@ -44,7 +48,7 @@ export const MATERIALS = {
                     soft: .05, lift: .03, blurPx: 0,  punch: .04, detail: 0,   detailGain: 4, detailTile: 2,  wash: 0, washScale: 2.5, haze: 0, rim: 0 },
   'UV matte':     { antiTile: 1, roughMap: 0, scan: 'leather', tile: 3, depth: 0,   rough: .6,  spec: .6, sheen: 0, sheenRough: .5,  sheenTint: 0,   coat: 0, coatRough: .05, env: .8,  key: 1,   box: 6,   expo: 1,    ao: 0,   envRot: 90,
                     soft: .04, lift: .05, blurPx: 0,  punch: -.05, detail: 0,  detailGain: 4, detailTile: 2,  wash: 0,   washScale: 2, haze: 0,   rim: 0 },
-  'UV gloss':     { antiTile: 1, roughMap: 0, scan: 'leather', tile: 3, depth: 0,   rough: .08, spec: 1,  sheen: 0, sheenRough: .5,  sheenTint: 0,   coat: 0, coatRough: .02, env: .3,  key: 1,   box: 8,   expo: 1,    ao: 0,   envRot: 90,
+  'UV gloss':     { antiTile: 1, roughMap: 0, scan: 'leather', tile: 3, depth: 0,   rough: .08, spec: 1,  sheen: 0, sheenRough: .5,  sheenTint: 0,   coat: 0, coatRough: .02, env: 1.2, key: 1,   box: 0,   expo: 1,    ao: 0,   envRot: 270, studio: 'Softbox',
                     soft: 0,   lift: 0,   blurPx: 0,  punch: .14, detail: 0,   detailGain: 4, detailTile: 2,  wash: 0,   washScale: 2, haze: 0,   rim: 0 },
 };
 
@@ -171,16 +175,16 @@ export function createThreeCard(size) {
     const k = 255 / Math.max(d[0], d[1], d[2], 1) * .9; const mix = c => Math.round(c * k * .5 + 200 * .5); return `${mix(d[0])},${mix(d[1])},${mix(d[2])}`; }   // the print's hue, brightened and half toward a neutral pile white
 
   const pmrem = new THREE.PMREMGenerator(renderer);
-  const envReady = new HDRLoader().loadAsync(P + 'studio_small_08_1k.hdr').then(hdr => {
-    hdr.mapping = THREE.EquirectangularReflectionMapping;
-    scene.environment = pmrem.fromEquirectangular(hdr).texture; hdr.dispose(); });
+  const envCache = {};
+  const env = name => envCache[name] || (envCache[name] = new HDRLoader().loadAsync(P + (STUDIOS[name] || STUDIOS[DEFAULT_STUDIO])).then(hdr => {
+    hdr.mapping = THREE.EquirectangularReflectionMapping; const t = pmrem.fromEquirectangular(hdr).texture; hdr.dispose(); return t; }));
 
   return {
     canvas: out,
     /* s: per-card settings — material name + t_* overrides; back: render the plain back face */
     async render(artUrl, s, back) {
-      await envReady;
       const m = { ...MATERIALS[s.mat3] }; for (const k in s) if (k.startsWith('t_')) m[k.slice(2)] = s[k];
+      scene.environment = await env(s.studio || m.studio || DEFAULT_STUDIO);   // card's pick, else the material's default studio
       const a = await art(artUrl);
       let h = 0; for (const c of artUrl) h = (h * 31 + c.charCodeAt(0)) % 9973;
       m.seed = h + (m.washSeed ?? 0) * 131 + (back ? 4999 : 0);   // per artwork, per face, per reseed
