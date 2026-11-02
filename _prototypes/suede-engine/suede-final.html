@@ -74,11 +74,22 @@ const deg=Math.PI/180;
 
 /* ── per-card material settings ─────────────────────────────────────── */
 const PRESETS={
-  'Suede':{print:0,soften:0,lift:0,blur:0, fibres:0,fscale:4,relief:.2,fmix:.5,fsheen:.06, layer:'none',lamt:1,lscale:1, az:46,el:63,live:0, sheen:0, proc:0, pbr:1,pkey:1,pamb:.5,pexpo:1.43,print:1,soften:.12,lift:.06,blur:.5, pnsrc:'suede',ptile:3,pnorm:.15,psheen:.1,pshrough:.8,pshtint:0,pspec:0,prough:1,pcoat:0,pcoatr:.1,penv:0},
-  'Velvet':{print:0,soften:0,lift:0,blur:0, fibres:0,fscale:4,relief:.2,fmix:.5,fsheen:.06, layer:'none',lamt:1,lscale:1, az:46,el:63,live:0, sheen:0, proc:0, pbr:1,pkey:1,pamb:.5,pexpo:1.43,print:1,soften:.08,lift:.04,blur:.3, pnsrc:'suede',ptile:5,pnorm:.08,psheen:.75,pshrough:.45,pshtint:.6,pspec:0,prough:1,pcoat:0,pcoatr:.1,penv:0},
-  'Faux leather':{print:0,soften:0,lift:0,blur:0, fibres:0,fscale:4,relief:.2,fmix:.5,fsheen:.06, layer:'none',lamt:1,lscale:1, az:46,el:63,live:0, sheen:0, proc:0, pbr:1,pkey:1,pamb:.5,pexpo:1.43,print:1,soften:.05,lift:.03,blur:0, pnsrc:'leather',ptile:3,pnorm:.6,psheen:0,pshrough:.8,pshtint:0,pspec:1,prough:.42,pcoat:0,pcoatr:.1,penv:0},
-  'UV matte':{print:0,soften:0,lift:0,blur:0, fibres:0,fscale:4,relief:.2,fmix:.5,fsheen:.06, layer:'none',lamt:1,lscale:1, az:46,el:63,live:0, sheen:0, proc:0, pbr:1,pkey:1,pamb:.5,pexpo:1.43,print:0, pnsrc:'ink',ptile:1,pnorm:.15,psheen:0,pshrough:.8,pshtint:0,pspec:.6,prough:.7,pcoat:0,pcoatr:.1,penv:0},
-  'UV gloss':{print:0,soften:0,lift:0,blur:0, fibres:0,fscale:4,relief:.2,fmix:.5,fsheen:.06, layer:'none',lamt:1,lscale:1, az:46,el:63,live:0, sheen:0, proc:0, pbr:1,pkey:1,pamb:.5,pexpo:1.43,print:0, pnsrc:'flat',ptile:1,pnorm:0,psheen:0,pshrough:.8,pshtint:0,pspec:1,prough:.25,pcoat:1,pcoatr:.06,penv:.9},
+  /* tuned per material for a realistic read — light from the top right */
+  'Suede':{print:1,soften:.14,lift:.07,blur:.6, fibres:0,fscale:4,relief:.2,fmix:.5,fsheen:.06, layer:'none',lamt:1,lscale:1, live:0, sheen:0, az:40,el:48,
+    pbr:1,pnsrc:'suede',ptile:4,pnorm:.3,psheen:.35,pshrough:.75,pshtint:.2,pspec:0,prough:1,pcoat:0,pcoatr:.1,penv:0,pkey:1,pamb:.42,pexpo:1.35,
+    proc:1,ndens:150,nstretch:2,ndir:35,nrelief:.15,namt:.45,wscale:1.2,wamt:.45,tips:0,seed:7},
+  'Velvet':{print:1,soften:.04,lift:.02,blur:.4, fibres:0,fscale:4,relief:.2,fmix:.5,fsheen:.06, layer:'none',lamt:1,lscale:1, live:0, sheen:0, az:40,el:28,
+    pbr:1,pnsrc:'suede',ptile:7,pnorm:.14,psheen:3.2,pshrough:.3,pshtint:.85,pspec:0,prough:1,pcoat:0,pcoatr:.1,penv:0,pkey:1,pamb:.36,pexpo:1.3,
+    proc:1,ndens:190,nstretch:1.5,ndir:80,nrelief:.08,namt:.35,wscale:2,wamt:.3,tips:0,seed:11},
+  'Faux leather':{print:1,soften:.04,lift:.03,blur:0, fibres:0,fscale:4,relief:.2,fmix:.5,fsheen:.06, layer:'none',lamt:1,lscale:1, live:0, sheen:0, az:40,el:50,
+    pbr:1,pnsrc:'leather',ptile:2,pnorm:.5,psheen:0,pshrough:.8,pshtint:0,pspec:1.1,prough:.45,pcoat:0,pcoatr:.1,penv:0,pkey:1,pamb:.45,pexpo:1.3,
+    proc:0,ndens:150,nstretch:2,ndir:35,nrelief:.15,namt:0,wscale:1,wamt:0,tips:0,seed:7},
+  'UV matte':{print:0,soften:0,lift:.02,blur:0, fibres:0,fscale:4,relief:.2,fmix:.5,fsheen:.06, layer:'none',lamt:1,lscale:1, live:0, sheen:0, az:40,el:55,
+    pbr:1,pnsrc:'ink',ptile:1,pnorm:.12,psheen:0,pshrough:.8,pshtint:0,pspec:.55,prough:.72,pcoat:0,pcoatr:.1,penv:0,pkey:1,pamb:.5,pexpo:1.35,
+    proc:0,ndens:150,nstretch:2,ndir:35,nrelief:.15,namt:0,wscale:1,wamt:0,tips:0,seed:7},
+  'UV gloss':{print:0,soften:0,lift:0,blur:0, fibres:0,fscale:4,relief:.2,fmix:.5,fsheen:.06, layer:'none',lamt:1,lscale:1, live:0, sheen:0, az:40,el:55,
+    pbr:1,pnsrc:'flat',ptile:1,pnorm:0,psheen:0,pshrough:.8,pshtint:0,pspec:.3,prough:.25,pcoat:1,pcoatr:.26,penv:.85,pkey:1,pamb:.5,pexpo:1.35,
+    proc:0,ndens:150,nstretch:2,ndir:35,nrelief:.15,namt:0,wscale:1,wamt:0,tips:0,seed:7},
   A:{print:0,soften:0,lift:0,blur:0, fibres:0,fscale:1,relief:.45,fmix:.85,fsheen:.11, layer:'grain',lamt:1,lscale:1, az:46,el:63,live:0, sheen:.12},
   B:{print:1,soften:.12,lift:.06,blur:.5, fibres:0,fscale:1,relief:.45,fmix:.85,fsheen:.11, layer:'grain',lamt:1,lscale:1, az:46,el:63,live:0, sheen:.12},
   'B+fine fibres':{print:1,soften:.12,lift:.06,blur:.5, fibres:1,fscale:4,relief:.2,fmix:.5,fsheen:.06, layer:'grain',lamt:1,lscale:1, az:46,el:63,live:0, sheen:.12},
@@ -89,7 +100,7 @@ const PRESETS={
     proc:1,ndens:60,nstretch:3,ndir:35,nrelief:.45,namt:1,wscale:1,wamt:.35,tips:.1,seed:7},
 };
 const MATS=['Suede','Velvet','Faux leather','UV matte','UV gloss'];
-const KEY='onemo-materials-v1';
+const KEY='onemo-materials-v2';
 let cards; try{ cards=JSON.parse(localStorage.getItem(KEY)); }catch(_){}
 if(!Array.isArray(cards)||cards.length!==ARTS.length) cards=ARTS.map((_,i)=>{ const m=MATS[i%MATS.length]; return {...PRESETS[m],mat:m}; });   // one material per card to start
 const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(cards)); }catch(_){} };
@@ -240,24 +251,32 @@ const CTL=[
   ['Suede layer (overlay)',[['layer','layer','seg',['none','grain','archive']],['lamt','strength',0,1,.01],['lscale','scale',1,6,.25]]],
   ['Light',[['az','angle °',0,360,1],['el','height °',5,85,1],['live','light follows mouse/tilt','toggle'],['sheen','sheen',0,.3,.005]]],
 ];
+const VIS={ soften:s=>s.print, lift:s=>s.print, blur:s=>s.print,
+  pnsrc:s=>s.pbr, ptile:s=>s.pbr&&s.pnsrc!=='flat', pnorm:s=>s.pbr&&s.pnsrc!=='flat', psheen:s=>s.pbr, pshrough:s=>s.pbr&&s.psheen>0, pshtint:s=>s.pbr&&s.psheen>0,
+  pspec:s=>s.pbr, prough:s=>s.pbr&&s.pspec>0, pcoat:s=>s.pbr, pcoatr:s=>s.pbr&&s.pcoat>0, penv:s=>s.pbr&&s.pcoat>0, pkey:s=>s.pbr, pamb:s=>s.pbr, pexpo:s=>s.pbr,
+  ndens:s=>s.proc, nstretch:s=>s.proc, ndir:s=>s.proc, nrelief:s=>s.proc, namt:s=>s.proc, wscale:s=>s.proc, wamt:s=>s.proc, tips:s=>s.proc, seed:s=>s.proc,
+  fscale:s=>s.fibres, relief:s=>s.fibres, fmix:s=>s.fibres, fsheen:s=>s.fibres, lamt:s=>s.layer!=='none', lscale:s=>s.layer!=='none',
+  az:s=>s.pbr||s.fibres||s.proc, el:s=>s.pbr||s.fibres||s.proc };
 function renderSheet(){ const i=idx(), s=cards[i];
   let h=`<div class="who">${NAMES[i]} · card ${i+1}</div><h4>Material</h4><div class="seg">${MATS.map(k=>`<button data-preset="${k}" class="${s.mat===k?'on':''}">${k}</button>`).join('')}</div><h4>Earlier looks</h4><div class="seg">${Object.keys(PRESETS).filter(k=>!MATS.includes(k)).map(k=>`<button data-preset="${k}">${k}</button>`).join('')}</div>`;
-  for(const [title,list] of CTL){ h+=`<h4>${title}</h4>`; for(const [k,label,a,b,stp] of list){
+  for(const [title,list] of CTL){ h+=`<h4>${title}</h4>`; for(const [k,label,a,b,stp] of list){ if(VIS[k]&&!VIS[k](s)) continue;
     if(a==='toggle') h+=`<div class="seg"><button data-tog="${k}" class="${s[k]?'on':''}">${label}: ${s[k]?'ON':'OFF'}</button></div>`;
     else if(a==='seg') h+=`<div class="seg">${b.map(o=>`<button data-seg="${k}" data-v="${o}" class="${s[k]===o?'on':''}">${o}</button>`).join('')}</div>`;
     else h+=`<label class="ctl"><span>${label}</span><input type="range" data-k="${k}" min="${a}" max="${b}" step="${stp}" value="${s[k]??0}"><output>${(+(s[k]??0)).toFixed(stp<.01?3:2)}</output></label>`; } }
   h+=`<div class="acts"><button id="all">apply to all cards</button><button id="copy">copy spec</button></div>`;
   sheet.innerHTML=h;
-  sheet.querySelectorAll('input[type=range]').forEach(r=>r.oninput=()=>{ s[r.dataset.k]=+r.value; r.nextElementSibling.textContent=(+r.value).toFixed(+r.step<.01?3:2); save(); paintCard(i); });
-  sheet.querySelectorAll('[data-tog]').forEach(b=>b.onclick=()=>{ s[b.dataset.tog]=s[b.dataset.tog]?0:1; save(); renderSheet(); paintCard(i); });
-  sheet.querySelectorAll('[data-seg]').forEach(b=>b.onclick=()=>{ s[b.dataset.seg]=b.dataset.v; save(); renderSheet(); paintCard(i); });
+  const C=()=>cards[i];   // always the card's CURRENT settings — presets/apply-all replace the object
+  sheet.querySelectorAll('input[type=range]').forEach(r=>r.oninput=()=>{ C()[r.dataset.k]=+r.value; r.nextElementSibling.textContent=(+r.value).toFixed(+r.step<.01?3:2); save(); paintCard(i); });
+  sheet.querySelectorAll('[data-tog]').forEach(b=>b.onclick=()=>{ C()[b.dataset.tog]=C()[b.dataset.tog]?0:1; save(); renderSheet(); paintCard(i); });
+  sheet.querySelectorAll('[data-seg]').forEach(b=>b.onclick=()=>{ C()[b.dataset.seg]=b.dataset.v; save(); renderSheet(); paintCard(i); });
   sheet.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>{ cards[i]={...PRESETS[b.dataset.preset],mat:b.dataset.preset}; save(); renderSheet(); paintCard(i); });
-  sheet.querySelector('#all').onclick=()=>{ cards=cards.map(()=>({...s})); save(); painted.clear(); paintCard(idx()); paintCard(idx()+1); paintCard(idx()-1); };
-  sheet.querySelector('#copy').onclick=async e=>{ const t=JSON.stringify(s); try{ await navigator.clipboard.writeText(t); e.target.textContent='copied'; }catch(_){ prompt('Spec',t); } };
+  sheet.querySelector('#all').onclick=()=>{ const cur=C(); cards=cards.map(()=>({...cur})); save(); painted.clear(); paintCard(idx()); paintCard(idx()+1); paintCard(idx()-1); };
+  sheet.querySelector('#copy').onclick=async e=>{ const t=JSON.stringify(C()); try{ await navigator.clipboard.writeText(t); e.target.textContent='copied'; }catch(_){ prompt('Spec',t); } };
 }
 let lastIdx=-1; reel.addEventListener('scroll',()=>{ const i=idx(); if(i!==lastIdx){ lastIdx=i; if(sheet.classList.contains('open')) renderSheet(); } },{passive:true});
 document.getElementById('tune').onclick=e=>{ const on=sheet.classList.toggle('open'); e.target.classList.toggle('on',on); e.target.textContent=on?'panel: ON':'panel: OFF'; if(on) renderSheet(); };
 renderSheet();
+window.__dev={ cards:()=>cards, set:(i,o)=>{ Object.assign(cards[i],o); save(); paintCard(i); return chain; }, preset:(i,m)=>{ cards[i]={...PRESETS[m],mat:m}; save(); paintCard(i); return chain; }, idx };
 
 /* ── live light (only cards whose setting says so) ──────────────────── */
 let raf=0; const relight=()=>{ if(raf) return; raf=requestAnimationFrame(()=>{ raf=0; const i=idx(); if(cards[i].live) faces[i*2].draw(); }); };
