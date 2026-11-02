@@ -1,7 +1,7 @@
 /* Material card renderer — proven base, stylised to read at card size.
    Base: three.js MeshPhysicalMaterial (sheen, clearcoat, normal/roughness/AO maps) on a flat card,
    lit by a real photographed studio (Poly Haven studio_small_08, CC0) plus one key light.
-   Material scans: Poly Haven scuba_suede, velour_velvet, fabric_leather_01 (CC0, 1K).
+   Material scans: Poly Haven scuba_suede, velour_velvet, leather_red_02 (CC0, 1K).
    Stylisation (Dan, 2 Nov: "make it all stylised so it reads as suede and correct material"):
    before lighting the print is treated per material (soften, lift, punch, fibre detail, nap/crush patches);
    after lighting a fuzz haze and a velvet edge glow are added. Real fibres are sub-pixel at 304 px, so
@@ -14,7 +14,7 @@ const P = 'public/pbr/';
 const SCANS = {
   suede:   { nor: 'scuba_suede_nor_gl_1k.jpg',       rough: 'scuba_suede_rough_1k.jpg',       ao: 'scuba_suede_ao_1k.jpg',   diff: 'scuba_suede_diff_1k.jpg' },
   velvet:  { nor: 'velour_velvet_nor_gl_1k.jpg',     rough: 'velour_velvet_rough_1k.jpg',     ao: 'velour_velvet_ao_1k.jpg', diff: 'velour_velvet_diff_1k.jpg' },
-  leather: { nor: 'fabric_leather_01_nor_gl_1k.jpg', rough: 'fabric_leather_01_rough_1k.jpg', ao: 'fabric_leather_01_ao_1k.jpg' },
+  leather: { nor: 'leather_red_02_nor_gl_1k.jpg',    rough: 'leather_red_02_rough_1k.jpg',    ao: 'leather_red_02_ao_1k.jpg' },   // even fine pebble grain, no seams or creases
 };
 const DETAIL_SRC = { suede: 'suede', velvet: 'velvet', leather: 'suede' };   // leather has no colour map; its grain comes from the normal map
 
@@ -27,8 +27,8 @@ export const MATERIALS = {
                     soft: .18, lift: .08, blurPx: .6, punch: 0,   detail: .9, detailGain: 6, detailTile: 1.5, wash: .55, washScale: 3, haze: .14, rim: 0 },
   'Velvet':       { scan: 'velvet',  tile: 4, depth: .9,  rough: 1,   spec: .2, sheen: 1, sheenRough: .35, sheenTint: 1,   coat: 0, coatRough: .05, env: 1,   key: 1.6, expo: .95,  ao: .5,  envRot: 90,
                     soft: 0,   lift: .02, blurPx: .4, punch: .12, detail: .55, detailGain: 5, detailTile: 2,  wash: .75, washScale: 2, haze: .04, rim: .35 },
-  'Faux leather': { scan: 'leather', tile: 2, depth: 1.4, rough: .55, spec: .8, sheen: 0, sheenRough: .5,  sheenTint: 0,   coat: 0, coatRough: .05, env: 1,   key: 1.5, expo: 1,    ao: .35, envRot: 90,
-                    soft: .05, lift: .03, blurPx: 0,  punch: .04, detail: 0,   detailGain: 4, detailTile: 2,  wash: .25, washScale: 2.5, haze: 0, rim: 0 },
+  'Faux leather': { scan: 'leather', tile: 3, depth: 1.1, rough: .55, spec: .8, sheen: 0, sheenRough: .5,  sheenTint: 0,   coat: 0, coatRough: .05, env: 1,   key: 1.5, expo: 1,    ao: 0, envRot: 90,
+                    soft: .05, lift: .03, blurPx: 0,  punch: .04, detail: 0,   detailGain: 4, detailTile: 2,  wash: 0, washScale: 2.5, haze: 0, rim: 0 },
   'UV matte':     { scan: null,      tile: 1, depth: 0,   rough: .7,  spec: .4, sheen: 0, sheenRough: .5,  sheenTint: 0,   coat: 0, coatRough: .05, env: 1,   key: 1.2, expo: 1,    ao: 0,   envRot: 90,
                     soft: .04, lift: .05, blurPx: 0,  punch: -.05, detail: 0,  detailGain: 4, detailTile: 2,  wash: 0,   washScale: 2, haze: 0,   rim: 0 },
   'UV gloss':     { scan: null,      tile: 1, depth: 0,   rough: .3,  spec: .5, sheen: 0, sheenRough: .5,  sheenTint: 0,   coat: 1, coatRough: .03, env: 1.3, key: 1.3, expo: 1,    ao: 0,   envRot: 90,

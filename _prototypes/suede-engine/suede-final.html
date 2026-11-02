@@ -102,7 +102,7 @@ const PRESETS={
 };
 const MATS=['Suede','Velvet','Faux leather','UV matte','UV gloss'];
 for(const n of MATS){ const t={}; for(const k in M3[n]) if(k!=='scan') t['t_'+k]=M3[n][k]; PRESETS[n]={engine:'three',mat3:n,az:40,el:50,live:['Suede','Velvet','UV gloss'].includes(n)?1:0,...t}; }   // fabrics + gloss read through moving light   // proven: three.js + Poly Haven
-const KEY='onemo-materials-v8';
+const KEY='onemo-materials-v9';
 let cards; try{ cards=JSON.parse(localStorage.getItem(KEY)); }catch(_){}
 if(!Array.isArray(cards)||cards.length!==ARTS.length) cards=ARTS.map((_,i)=>{ const m=MATS[i%MATS.length]; return {...PRESETS[m],mat:m}; });   // one material per card to start
 const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(cards)); }catch(_){} };
