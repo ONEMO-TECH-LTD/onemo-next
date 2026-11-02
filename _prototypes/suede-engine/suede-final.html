@@ -66,8 +66,11 @@
   .seg { display:flex; gap:4px; flex-wrap:wrap; margin:4px 0; }
   .seg button, .acts button { border:1px solid rgba(0,0,0,.14); background:#fff; border-radius:999px; padding:6px 10px; font:inherit; cursor:pointer; text-transform:uppercase; }
   .seg button.on { background:var(--ink); color:#fff; border-color:var(--ink); }
-  .sheet details { border-top:1px solid rgba(0,0,0,.08); margin-top:8px; }
-  .sheet summary { cursor:pointer; padding:8px 0 4px; font:700 10px/1 var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--ink); }
+  .sheet .tabs { position:sticky; top:-12px; z-index:1; display:flex; gap:4px; overflow-x:auto; scrollbar-width:none; margin:6px -14px 4px; padding:8px 14px 6px; background:rgba(255,255,255,.97); border-bottom:1px solid rgba(0,0,0,.08); }
+  .sheet .tabs::-webkit-scrollbar { display:none; }
+  .sheet .tabs button { flex:0 0 auto; border:1px solid rgba(0,0,0,.14); background:#fff; border-radius:999px; padding:6px 10px; font:inherit; cursor:pointer; text-transform:uppercase; color:var(--ink); }
+  .sheet .tabs button.on { background:var(--ink); color:#fff; border-color:var(--ink); }
+  .stage { transition:transform .35s cubic-bezier(.3,.7,.3,1); }
   .sheet .ver { width:100%; margin:6px 0 2px; font:inherit; padding:6px 8px; border:1px solid rgba(0,0,0,.18); border-radius:8px; background:#fff; }
   .acts { display:flex; gap:6px; flex-wrap:wrap; margin-top:12px; }
   .who { font:700 12px/1.2 var(--font); margin-bottom:4px; }
@@ -78,6 +81,8 @@
   .lampline { position:fixed; z-index:3; height:1px; background:rgba(22,25,29,.35); transform-origin:0 50%; pointer-events:none; }
   /* phone: one scrolling row of dev switches; the panel is a bottom sheet that leaves the card visible */
   @media (max-width:600px) {
+    body.sheet-open .slide .stage { transform:translateY(-15vh); }   /* card slides up to stay visible above the panel */
+    body.sheet-open .matbar { opacity:0; pointer-events:none; }   /* the panel has the material buttons */
     .dev { flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; right:56px; max-width:none; border-radius:999px; font-size:10px; }
     .dev::-webkit-scrollbar { display:none; }
     .dev button { white-space:nowrap; padding:7px 9px; }
@@ -99,7 +104,7 @@
   <button id="tune" class="on">panel: ON</button><button id="tilt">phone tilt: OFF</button><button id="bgMove" class="on">bg motion: ON</button><button id="bgRes" class="on">bg sharp (2×): ON</button>
 </div>
 <div class="sheet open" id="sheet"></div>
-<script>if(matchMedia('(max-width:600px)').matches){ sheet.classList.remove('open'); tune.classList.remove('on'); tune.textContent='panel: OFF'; }   // phones start with the panel closed</script>
+<script>document.body.classList.add('sheet-open'); if(matchMedia('(max-width:600px)').matches){ document.body.classList.remove('sheet-open'); sheet.classList.remove('open'); tune.classList.remove('on'); tune.textContent='panel: OFF'; }   // phones start with the panel closed</script>
 
 <script type="module">
 import { createSurface } from './public/recipes/onemo-adaptive-surface.js';
@@ -138,18 +143,27 @@ const PRESETS={
 const MATS=['Suede','Velvet','Faux leather','UV matte','UV gloss'];
 const BACKS=MATS.filter(m=>m!=='Velvet');   // the back is never velvet
 for(const n of [...MATS,'Suede · scan','Velvet · scan']){ const t={}; for(const k in M3[n]) if(k!=='scan'&&k!=='studio') t['t_'+k]=M3[n][k]; if(M3[n].studio) t.studio=M3[n].studio; t.t_amb??=.6; PRESETS[n]={engine:'three',mat3:n,az:40,el:50,live:0,dist:1.5,rimMm:3,rimAng:60,rimSoft:.6,rimHi:.15,rimShade:.25,rimSheen:.3,...t}; }   // fabrics + gloss read through moving light   // proven: three.js + Poly Haven
-const KEY='onemo-materials';   // stable: never renamed again, so your settings survive page updates
+const KEY=/[?&]nosync/.test(location.search)?'onemo-test':'onemo-materials';   // tests use their own browser slot too   // stable: never renamed again, so your settings survive page updates
 let cards; try{ cards=JSON.parse(localStorage.getItem(KEY)); if(!cards) for(let v=20;v>=11&&!cards;v--) cards=JSON.parse(localStorage.getItem('onemo-materials-v'+v)); }catch(_){}
 /* grid: rows = artworks (swipe up/down), columns = materials (swipe left/right); card k = row*NM + col */
 const NM=MATS.length, ROW=k=>Math.floor(k/NM), COL=k=>k%NM;
 const fresh=k=>{ const m=MATS[COL(k)]; return {...PRESETS[m],mat:m,backMat:'Suede'}; };
 if(Array.isArray(cards)&&cards.length===ARTS.length){ const old=cards; cards=[]; old.forEach((c,i)=>{ const j=MATS.indexOf(c&&c.mat); if(j>=0) cards[i*NM+j]=c; }); }   // migrate the 6-card layout
 cards=ARTS.flatMap((_,i)=>MATS.map((m,j)=>{ const k=i*NM+j, c=Array.isArray(cards)&&cards[k]; return c&&c.mat&&PRESETS[c.mat] ? {...PRESETS[c.mat],backMat:'Suede',...c} : c||fresh(k); }));   // new controls get preset values, yours win
-const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(cards)); }catch(_){} };
+/* autosave: browser storage (instant) + a file on the Mac via the dev server (survives sessions, shared by phone and Mac) */
+const SYNC=!/[?&]nosync/.test(location.search);   // ?nosync = automated tests: never touch the saved calibration
+const EKEY=KEY+'-edited'; let edited=0; try{ edited=+localStorage.getItem(EKEY)||0; }catch(_){}
+let pushT=0; const pushSpec=()=>{ if(!SYNC||!edited) return; clearTimeout(pushT); pushT=setTimeout(()=>fetch('/__spec',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({v:1,saved:new Date().toISOString(),edited,cards,G})}).catch(()=>{}),600); };
+const touch=()=>{ edited=Date.now(); try{ localStorage.setItem(EKEY,String(edited)); }catch(_){} };
+const save=()=>{ touch(); try{ localStorage.setItem(KEY,JSON.stringify(cards)); }catch(_){} pushSpec(); };
 const GLOBAL_KEYS=['shLift','shadow','shBlur','shSpread','shDist','shContact'];   // shadow under the card: one setting for every card
 let G; try{ G=JSON.parse(localStorage.getItem('onemo-global')); }catch(_){}
 G={ shLift:6, shadow:.5, shBlur:.5, shSpread:0, shDist:1, shContact:1, ...(G||{}) };
-const saveG=()=>{ try{ localStorage.setItem('onemo-global',JSON.stringify(G)); }catch(_){} };
+const saveG=(seed)=>{ if(!seed) touch(); try{ localStorage.setItem('onemo-global',JSON.stringify(G)); }catch(_){} pushSpec(); };
+const LIGHT_KEYS=['az','el','dist','t_key','t_amb','t_expo'];   // the lamp: global for every card unless a card switches to local. Studio + reflections stay per material (they make gloss/leather/matte shine)
+for(const k in G.light||{}) if(!LIGHT_KEYS.includes(k)) delete G.light[k];   // drop studio/reflection keys from older saves
+if(!G.light){ const src=cards[0]; G.light={}; for(const k of LIGHT_KEYS) if(src[k]!==undefined) G.light[k]=src[k]; saveG(true); }   // seeded from Thriller · Suede
+const eff=s=>s.lightLocal?s:{...s,...G.light};   // the settings a card actually renders with
 const st={ live:null };
 
 /* ── one shared WebGL renderer, painting faces into plain 2D canvases ─ */
@@ -262,7 +276,7 @@ const R3=(()=>{ const cv=document.createElement('canvas'); cv.width=cv.height=SZ
 let chain=Promise.resolve();
 const T3=createThreeCard(SZ);
 function face(canvas, k, back){ canvas.width=canvas.height=SZ; const ctx=canvas.getContext('2d'), art=ARTS[ROW(k)];
-  return { draw(){ chain=chain.then(async()=>{ const s=cards[k];
+  return { draw(){ chain=chain.then(async()=>{ const s=eff(cards[k]);
     if(s.engine==='three'){ const bs=back&&s.backMat?{...PRESETS[s.backMat],live:s.live,az:s.az,el:s.el,studio:s.studio,rimMm:s.rimMm,rimAng:s.rimAng,rimSoft:s.rimSoft,rimHi:s.rimHi,rimShade:s.rimShade,rimSheen:s.rimSheen}:s;   // the back has its own material, never velvet
       let L=null, live=bs.live; if(st.tiltOn&&st.tilt){ const d=Math.PI/180, az=(bs.az??40)*d, el=(bs.el??50)*d, cl=v=>Math.max(-.95,Math.min(.95,v));
         L={x:cl(Math.cos(az)*Math.cos(el)+st.tilt.x), y:cl(Math.sin(az)*Math.cos(el)+st.tilt.y)}; live=1; } else if(bs.live) L=st.live;
@@ -318,7 +332,7 @@ bgRes.onclick=()=>{ const two=!bgRes.classList.contains('on'); bgRes.classList.t
 const sheet=document.getElementById('sheet');
 /* panel: current controls in sections; [title, controls, open by default]. Legacy sections only appear on an earlier version. */
 const CTL=[
-  ['Light',[['t_key','light strength',0,6,.01],['t_amb','ambient fill',0,3,.01],['dist','light distance',.5,4,.05],['az','light angle °',0,360,1],['el','light height °',5,85,1],['t_expo','exposure',.3,2.5,.01],['studio','studio','seg',Object.keys(STUDIOS)],['t_env','studio light & reflections',0,3,.01],['t_envRot','studio rotation °',0,360,1],['live','light follows mouse/tilt','toggle']],1],
+  ['Light',[['t_key','light strength',0,6,.01],['t_amb','ambient fill',0,3,.01],['dist','light distance',.5,4,.05],['az','light angle °',0,360,1],['el','light height °',5,85,1],['t_expo','exposure',.3,2.5,.01],['studio','studio (this material)','seg',Object.keys(STUDIOS)],['t_env','studio light & reflections (this material)',0,3,.01],['t_envRot','studio rotation ° (this material)',0,360,1],['live','light follows mouse/tilt','toggle']],1],
   ['Edge (rim)',[['rimMm','rim width (mm)',0,5,.1],['rimAng','rim curve °',0,85,1],['rimSoft','rim blend (soft start)',0,1,.01],['rimHi','rim highlight (light side)',0,1,.01],['rimShade','rim shade (far side)',0,1,.01],['rimSheen','rim fabric sheen',0,1,.01]],1],
   ['Shadow (all cards)',[['shLift','float height (mm)',0,20,.5],['shadow','shadow strength',0,1.5,.01],['shBlur','shadow softness',0,1.5,.01],['shSpread','shadow size',-1,1,.01],['shDist','shadow throw (from light)',0,3,.01],['shContact','contact shadow',0,2,.01]],0],
   ['Print',[['t_soft','print softening',0,.5,.01],['t_lift','black lift',0,.25,.005],['t_punch','colour punch',-.3,.4,.01],['t_blurPx','dye bleed (blur px)',0,4,.05]],0],
@@ -345,7 +359,7 @@ const VNAME={ 'Suede · scan':'v4 · Suede on ambientCG scan', 'Velvet · scan':
   '3D viewer suede':'v2 · 3D viewer suede (three.js sheen)', 'Shader suede':'v2 · generated shader suede',
   A:'v1 · A — Suede Studio grain', B:'v1 · B — printed on suede', 'B+fine fibres':'v1 · B + GSG fibres', E:'v1 · E — archive suede render' };
 const CURRENT='v5 · current — your KeyShot recipes + scans';
-let OPEN={}; try{ OPEN=JSON.parse(localStorage.getItem('onemo-panel-open'))||{}; }catch(_){}
+let TAB='Material'; try{ TAB=localStorage.getItem('onemo-panel-tab')||'Material'; }catch(_){}
 const SCAN=s=>s.engine==='three'&&M3[s.mat3]&&M3[s.mat3].scan;
 const FAB=s=>/Suede|Velvet/.test(s.mat3||'');
 const VIS={ t_sheen:s=>!(s.t_ks>0), t_rough:s=>!(s.t_ks>0), t_fall:s=>FAB(s)&&!(s.t_ks>0), t_fallPow:s=>FAB(s)&&!(s.t_ks>0)&&s.t_fall>0, t_fallTint:s=>FAB(s)&&!(s.t_ks>0)&&s.t_fall>0, t_detail:s=>FAB(s)&&SCAN(s), t_detailGain:s=>FAB(s)&&SCAN(s)&&s.t_detail>0, t_detailTile:s=>FAB(s)&&SCAN(s)&&s.t_detail>0, t_haze:s=>FAB(s)&&SCAN(s), t_rim:s=>/Velvet/.test(s.mat3||''), t_ks:FAB, t_ksBump:FAB, t_ksGrain:s=>FAB(s)&&s.t_ks>0, t_ksGrainSize:s=>FAB(s)&&s.t_ks>0&&s.t_ksGrain>0, t_ksSheen:s=>FAB(s)&&s.t_ks>0, t_ksEdge:s=>FAB(s)&&s.t_ks>0&&s.t_ksBump>0, t_ksBack:s=>FAB(s)&&s.t_ks>0, t_wash:FAB, t_washScale:s=>FAB(s)&&s.t_wash>0, t_washSeed:s=>FAB(s)&&s.t_wash>0, t_ao:s=>SCAN(s)&&s.t_depth>0, t_tile:s=>SCAN(s)&&s.t_depth>0, t_depth:SCAN, t_sheenRough:s=>s.t_sheen>0&&!(s.t_ks>0), t_sheenTint:s=>s.t_sheen>0&&!(s.t_ks>0), t_coatRough:s=>s.t_coat>0, soften:s=>s.print, lift:s=>s.print, blur:s=>s.print,
@@ -354,48 +368,70 @@ const VIS={ t_sheen:s=>!(s.t_ks>0), t_rough:s=>!(s.t_ks>0), t_fall:s=>FAB(s)&&!(
   ndens:s=>s.proc, nstretch:s=>s.proc, ndir:s=>s.proc, nrelief:s=>s.proc, namt:s=>s.proc, wscale:s=>s.proc, wamt:s=>s.proc, tips:s=>s.proc, seed:s=>s.proc,
   fscale:s=>s.fibres, relief:s=>s.fibres, fmix:s=>s.fibres, fsheen:s=>s.fibres, lamt:s=>s.layer!=='none', lscale:s=>s.layer!=='none',
   az:s=>s.engine==='three'||s.pbr||s.fibres||s.proc, el:s=>s.engine==='three'||s.pbr||s.fibres||s.proc };
+/* light write: global unless the card is local; global repaints every painted card that follows it */
+function setLight(k,key,v,lazyOthers){ if(!LIGHT_KEYS.includes(key)||cards[k].lightLocal) return false;
+  G.light[key]=v; saveG(); paintCard(k); if(!lazyOthers) for(const j of painted) if(j!==k&&!cards[j].lightLocal) paintCard(j); return true; }
 function ctlHtml(s,[k,label,a,b,stp,inv]){ if(GLOBAL_KEYS.includes(k)) s=G;
   if(a==='toggle') return `<div class="seg"><button data-tog="${k}" class="${s[k]?'on':''}">${label}: ${s[k]?'ON':'OFF'}</button></div>`;
   if(a==='seg') return `<div class="seg">${b.map(o=>`<button data-seg="${k}" data-v="${o}" class="${(s[k]??(k==='studio'?DEFAULT_STUDIO:undefined))===o?'on':''}">${o}</button>`).join('')}</div>`;
   const ui=inv?a+b-(s[k]??0):(s[k]??0), f=v=>(+v).toFixed(stp<.01?3:2);
   return `<div class="ctl"><span>${label}</span><small>${f(a)}</small><input type="range" data-k="${k}" data-inv="${inv?1:0}" data-a="${a}" data-b="${b}" min="${a}" max="${b}" step="${stp}" value="${ui}"><small>${f(b)}</small><input type="number" class="num" data-k="${k}" step="${stp}" value="${f(ui)}"></div>`; }
-function renderSheet(){ const i=idx(), s=cards[i];
+function renderSheet(){ const i=idx(), s=eff(cards[i]);
   const acts=k=>{ if(VIS[k]&&!VIS[k](s)) return false; const three=s.engine==='three', isT=k.startsWith('t_'), light=['az','el','live','studio','dist','rimMm','rimAng','rimSoft','rimHi','rimShade','rimSheen','shLift','shadow','shBlur','shSpread','shDist','shContact'].includes(k); return three ? (isT||light) : !isT; };   // only what acts on this card
   const cur=MATS.includes(s.mat);
-  let h=`<div class="who">${NAMES[ROW(i)]} · ${s.mat}</div>
-    <h4>Material</h4><div class="seg">${MATS.map(k=>`<button data-preset="${k}" class="${s.mat===k?'on':''}">${k}</button>`).join('')}</div>
+  const TABNAME={'Edge (rim)':'Edge','Shadow (all cards)':'Shadow','Nap, wash & highlights':'Nap & wash','Surface & reflections':'Surface'};
+  let mat=`<h4>Material</h4><div class="seg">${MATS.map(k=>`<button data-preset="${k}" class="${s.mat===k?'on':''}">${k}</button>`).join('')}</div>
     <select id="ver" class="ver"><option value="" ${cur?'selected':''}>${CURRENT}</option><optgroup label="Earlier versions">${Object.keys(PRESETS).filter(k=>!MATS.includes(k)).sort((x,y)=>(VNAME[y]||'').localeCompare(VNAME[x]||'')).map(k=>`<option value="${k}" ${s.mat===k?'selected':''}>${VNAME[k]||k}</option>`).join('')}</optgroup></select>
     <h4>Back material</h4><div class="seg">${BACKS.map(k=>`<button data-back="${k}" class="${(s.backMat||'Suede')===k?'on':''}">${k}</button>`).join('')}</div>`;
+  const olds=[]; try{ for(let v=20;v>=11;v--) if(localStorage.getItem('onemo-materials-v'+v)) olds.push('onemo-materials-v'+v); }catch(_){}
+  if(olds.length) mat+=`<h4>Recover an older save on this device</h4><select id="recover" class="ver"><option value="">choose…</option>${olds.map(k=>`<option value="${k}">${k.replace('onemo-materials-','save ')}</option>`).join('')}</select>`;
   const key=s.engine==='three' ? KEYCTL[FAB(s)?'fabric':'surface'].filter(acts) : [];
-  if(key.length) h+=`<h4>Key controls — ${s.mat}</h4>`+key.map(k=>ctlHtml(s,DEF[k])).join('');
-  for(const [title,list,open] of CTL){ const body=list.filter(c=>acts(c[0])&&!key.includes(c[0])).map(c=>ctlHtml(s,c)).join(''); if(!body) continue;
-    const o=OPEN[title]??!!open; h+=`<details data-sec="${title}" ${o?'open':''}><summary>${title}</summary>${body}</details>`; }
+  if(key.length) mat+=`<h4>Key controls — ${s.mat}</h4>`+key.map(k=>ctlHtml(s,DEF[k])).join('');
+  const tabs=[['Material',mat]];
+  for(const [title,list] of CTL){ let body=list.filter(c=>acts(c[0])&&!key.includes(c[0])).map(c=>ctlHtml(s,c)).join(''); if(!body) continue;
+    if(title==='Light'&&s.engine==='three') body=`<div class="seg"><button id="lightScope" class="${s.lightLocal?'':'on'}">${s.lightLocal?'light: LOCAL — this card only':'light: GLOBAL — all cards'}</button></div>`+body;
+    tabs.push([TABNAME[title]||title,body]); }
+  if(!tabs.some(([n])=>n===TAB)) TAB='Material';
+  let h=`<div class="who">${NAMES[ROW(i)]} · ${s.mat}</div><div class="tabs">${tabs.map(([n])=>`<button data-tab="${n}" class="${n===TAB?'on':''}">${n}</button>`).join('')}</div>`
+    +tabs.find(([n])=>n===TAB)[1];
   h+=`<div class="acts"><button id="all">apply to all artworks (this material)</button><button id="copy">copy spec</button></div>`;
   sheet.innerHTML=h;
   const C=()=>cards[i];   // always the card's CURRENT settings — presets/apply-all replace the object
   const store=(r,ui)=>{ const v=r.dataset.inv==='1' ? +r.dataset.a + +r.dataset.b - ui : ui;
     if(GLOBAL_KEYS.includes(r.dataset.k)){ G[r.dataset.k]=v; saveG(); for(const k in lastL) floatShadow(+k,...lastL[k]); return; }   // global: redraw every shadow, no re-render
+    if(setLight(i,r.dataset.k,v)) return;
     C()[r.dataset.k]=v; save(); paintCard(i); if(typeof placeLamp==='function') placeLamp(); };   // inverted controls store the opposite end
   sheet.querySelectorAll('input[type=range]').forEach(r=>{ const num=r.parentElement.querySelector('.num');
     r.oninput=()=>{ num.value=(+r.value).toFixed(+r.step<.01?3:2); store(r,+r.value); };
     num.onchange=()=>{ const v=+num.value; if(!isFinite(v)) return; r.value=v; store(r,v); };   // typed values may go past the slider's ends
   });
-  sheet.querySelectorAll('details').forEach(d=>d.ontoggle=()=>{ OPEN[d.dataset.sec]=d.open; try{ localStorage.setItem('onemo-panel-open',JSON.stringify(OPEN)); }catch(_){} if(typeof syncLamp==='function') syncLamp(); });
+  sheet.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ TAB=b.dataset.tab; try{ localStorage.setItem('onemo-panel-tab',TAB); }catch(_){} renderSheet(); sheet.scrollTop=0; });
   if(typeof syncLamp==='function') syncLamp();
   const pick=name=>{ const j=MATS.indexOf(name); if(j>=0&&MATS.includes(C().mat)){ tracks[ROW(i)].scrollTo({left:j*tracks[ROW(i)].clientWidth,behavior:'smooth'}); return; }   // current materials live in their own column
     cards[i]={...PRESETS[name],mat:name,backMat:C().backMat||'Suede'}; save(); renderSheet(); paintCard(i); };
   sheet.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>pick(b.dataset.preset));
-  sheet.querySelector('#ver').onchange=e=>{ if(e.target.value) pick(e.target.value); else if(!cur) pick(MATS[0]); };
+  const rec=sheet.querySelector('#recover'); if(rec) rec.onchange=e=>{ const k=e.target.value; if(!k) return; let old; try{ old=JSON.parse(localStorage.getItem(k)); }catch(_){}
+    if(!Array.isArray(old)) return; let n=0; old.forEach((c,r)=>{ const j=MATS.indexOf(c&&c.mat); if(j>=0&&r<ARTS.length){ cards[r*NM+j]={...PRESETS[c.mat],backMat:'Suede',...c}; n++; } });   // each old card back into its artwork × material
+    save(); painted.clear(); prefetch(); renderSheet(); e.target.outerHTML=`<p>Restored ${n} cards from ${k.replace('onemo-materials-','save ')}.</p>`; };
+  const ver=sheet.querySelector('#ver'); if(ver) ver.onchange=e=>{ if(e.target.value) pick(e.target.value); else if(!cur) pick(MATS[0]); };
   sheet.querySelectorAll('[data-tog]').forEach(b=>b.onclick=()=>{ C()[b.dataset.tog]=C()[b.dataset.tog]?0:1; save(); renderSheet(); paintCard(i); });
-  sheet.querySelectorAll('[data-seg]').forEach(b=>b.onclick=()=>{ C()[b.dataset.seg]=b.dataset.v; save(); renderSheet(); paintCard(i); });
+  sheet.querySelectorAll('[data-seg]').forEach(b=>b.onclick=()=>{ if(!setLight(i,b.dataset.seg,b.dataset.v)){ C()[b.dataset.seg]=b.dataset.v; save(); paintCard(i); } renderSheet(); });
+  const lt=sheet.querySelector('#lightScope'); if(lt) lt.onclick=()=>{ const c=C(); if(c.lightLocal) c.lightLocal=0; else { for(const k of LIGHT_KEYS) if(G.light[k]!==undefined) c[k]=G.light[k]; c.lightLocal=1; }   // going local starts from the global light
+    save(); renderSheet(); paintCard(i); if(window.__lampReady) placeLamp(); };
   sheet.querySelectorAll('[data-back]').forEach(b=>b.onclick=()=>{ C().backMat=b.dataset.back; save(); renderSheet(); paintCard(i); });
   sheet.querySelector('#all').onclick=()=>{ const cur=C(); cards=cards.map((c,k)=>COL(k)===COL(i)?{...cur}:c); save(); painted.clear(); prefetch(); };   // same material, every artwork
   sheet.querySelector('#copy').onclick=async e=>{ const t=JSON.stringify(C()); try{ await navigator.clipboard.writeText(t); e.target.textContent='copied'; }catch(_){ prompt('Spec',t); } };
 }
 
 let lastIdx=-1; reel.addEventListener('scroll',()=>{ const i=idx(); if(i!==lastIdx){ lastIdx=i; if(sheet.classList.contains('open')) renderSheet(); } },{passive:true});
-document.getElementById('tune').onclick=e=>{ const on=sheet.classList.toggle('open'); e.target.classList.toggle('on',on); e.target.textContent=on?'panel: ON':'panel: OFF'; if(on) renderSheet(); if(typeof syncLamp==='function') syncLamp(); };
+document.getElementById('tune').onclick=e=>{ const on=sheet.classList.toggle('open'); document.body.classList.toggle('sheet-open',on); setTimeout(()=>{ if(window.__lampReady) syncLamp(); },380); e.target.classList.toggle('on',on); e.target.textContent=on?'panel: ON':'panel: OFF'; if(on) renderSheet(); if(typeof syncLamp==='function') syncLamp(); };
 renderSheet();
+if(SYNC) fetch('/__spec').then(r=>r.json()).then(d=>{ if(!d||!Array.isArray(d.cards)||d.cards.length!==cards.length||(d.edited||0)<edited){ pushSpec(); return; }   // no file, or this device edited more recently: upload ours
+  if(JSON.stringify(d.cards)!==JSON.stringify(cards)) fetch('/__spec?backup',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({v:1,saved:new Date().toISOString(),device:navigator.userAgent,cards,G})}).catch(()=>{});   // keep this device's copy before switching to the shared one
+  cards=d.cards.map((c,k)=>c&&c.mat&&PRESETS[c.mat]?{...PRESETS[c.mat],backMat:'Suede',...c}:fresh(k)); Object.assign(G,d.G||{});
+  try{ localStorage.setItem(KEY,JSON.stringify(cards)); localStorage.setItem('onemo-global',JSON.stringify(G)); }catch(_){}
+  edited=d.edited||0; try{ localStorage.setItem(EKEY,String(edited)); }catch(_){}
+  painted.clear(); prefetch(); if(sheet.classList.contains('open')) renderSheet(); }).catch(()=>{});
 window.__dev={ cards:()=>cards, set:(i,o)=>{ Object.assign(cards[i],o); save(); paintCard(i); return chain; }, preset:(i,m)=>{ cards[i]={...PRESETS[m],mat:m}; save(); paintCard(i); return chain; }, idx };
 
 /* ── live light (only cards whose setting says so) ──────────────────── */
@@ -412,19 +448,20 @@ document.getElementById('tilt').onclick=async e=>{ try{ if(typeof DeviceOrientat
 const lamp=document.createElement('div'); lamp.className='lamp'; const lline=document.createElement('div'); lline.className='lampline'; document.body.append(lline,lamp);
 const cardBox=()=>cells[idx()].querySelector('.turn').getBoundingClientRect();
 const RAD=()=>cardBox().width*.95;   // handle at the card centre = light straight on; at this radius = grazing
-function placeLamp(){ const s=cards[idx()], b=cardBox(), cx=b.left+b.width/2, cy=b.top+b.height/2, r=Math.max(0,(90-(s.el??50))/80)*RAD(), a=(s.az??40)*Math.PI/180;
+function placeLamp(){ const s=eff(cards[idx()]), b=cardBox(), cx=b.left+b.width/2, cy=b.top+b.height/2, r=Math.max(0,(90-(s.el??50))/80)*RAD(), a=(s.az??40)*Math.PI/180;
   const x=cx+Math.cos(a)*r, y=cy-Math.sin(a)*r; lamp.style.left=x+'px'; lamp.style.top=y+'px';
   const dx=cx-x, dy=cy-y; lline.style.left=x+'px'; lline.style.top=y+'px'; lline.style.width=Math.hypot(dx,dy)+'px'; lline.style.transform=`rotate(${Math.atan2(dy,dx)}rad)`; }
 let dragging=false;
 lamp.onpointerdown=e=>{ dragging=true; lamp.setPointerCapture(e.pointerId); e.preventDefault(); };
 lamp.onpointermove=e=>{ if(!dragging) return; const i=idx(), b=cardBox(), dx=e.clientX-(b.left+b.width/2), dy=e.clientY-(b.top+b.height/2);
-  const r=Math.min(1,Math.hypot(dx,dy)/RAD()); Object.assign(cards[i],{ az:Math.round((Math.atan2(-dy,dx)*180/Math.PI+360)%360), el:Math.round(90-r*80), live:0 });
+  const r=Math.min(1,Math.hypot(dx,dy)/RAD()), az=Math.round((Math.atan2(-dy,dx)*180/Math.PI+360)%360), el=Math.round(90-r*80); cards[i].live=0;
+  if(cards[i].lightLocal) Object.assign(cards[i],{az,el}); else { G.light.az=az; G.light.el=el; }
   placeLamp(); if(!raf2){ raf2=requestAnimationFrame(()=>{ raf2=0; paintCard(i); }); } };
 let raf2=0;
-lamp.onpointerup=()=>{ if(!dragging) return; dragging=false; save(); if(sheet.classList.contains('open')) renderSheet(); };
+lamp.onpointerup=()=>{ if(!dragging) return; dragging=false; save(); saveG(); const i=idx(); if(!cards[i].lightLocal) for(const j of painted) if(j!==i&&!cards[j].lightLocal) paintCard(j); if(sheet.classList.contains('open')) renderSheet(); };
 reel.addEventListener('scroll',placeLamp,{passive:true}); addEventListener('resize',placeLamp); setTimeout(placeLamp,50);
 function syncLamp(){ if(!window.__lampReady) return;   // hoisted: renderSheet can call this before the handle exists
-  const d=sheet.querySelector('details[data-sec="Light"]'), on=sheet.classList.contains('open')&&!!d&&d.open;   // handle only while Light settings are open
+  const on=sheet.classList.contains('open')&&TAB==='Light';   // handle only while the Light tab is showing
   lamp.style.display=lline.style.display=on?'':'none'; if(on) placeLamp(); }
 window.__lampReady=true; syncLamp();
 </script>
