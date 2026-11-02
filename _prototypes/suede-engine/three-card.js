@@ -18,7 +18,7 @@ const SCANS = {
   suede:   { nor: 'acg_suede_Leather039_nor_gl_1k.jpg', rough: 'acg_suede_Leather039_rough_1k.jpg', ao: null, diff: 'acg_suede_Leather039_diff_1k.jpg' },   // ambientCG Leather039: photogrammetry fine suede (CC0)
   velvet:  { nor: 'velour_velvet_nor_gl_1k.jpg',     rough: 'velour_velvet_rough_1k.jpg',     ao: 'velour_velvet_ao_1k.jpg', diff: 'velour_velvet_diff_1k.jpg' },
   velvetTB:{ nor: 'twinbru_black_velvet_normal_1k.jpg', rough: 'twinbru_black_velvet_rough_1k.jpg', ao: null, diff: 'twinbru_black_velvet_diffuse_1k.jpg' },   // Twinbru Plain Black Velvet (manufacturer scan shipped with KeyShot)
-  fabVelvet:{ nor: 'fab_velvet_01_normal_1k.jpg', rough: 'fab_velvet_01_roughness_1k.jpg', ao: 'fab_velvet_01_ambientocclusion_1k.jpg', diff: 'fab_velvet_01_basecolor_1k.jpg' },   // Dan's fabric pack (juliosillet Materials_Fabric) Fabric_valvet_01
+  fabVelvet:{ nor: 'fab_velvet_01_normal_even_1k.png', rough: 'fab_velvet_01_roughness_1k.jpg', ao: 'fab_velvet_01_ambientocclusion_even_1k.jpg', diff: 'fab_velvet_01_basecolor_even_1k.jpg', washDiff: 'fab_velvet_01_basecolor_1k.jpg' },   // Dan's fabric pack (juliosillet Materials_Fabric) Fabric_valvet_01 — pile maps high-passed (even); its patches feed the wash only
   leather: { nor: 'leather_red_02_nor_gl_even_1k.png',    rough: 'leather_red_02_rough_1k.jpg',    ao: 'leather_red_02_ao_1k.jpg' },   // even fine pebble grain; normal map high-passed (patches broader than ~20 px removed) so the card reads as one even surface
 };
 const DETAIL_SRC = { suede: 'suede', velvet: 'velvet', velvetTB: 'velvetTB', fabVelvet: 'fabVelvet', leather: 'suede' };   // leather has no colour map; its grain comes from the normal map
@@ -37,9 +37,9 @@ export const MATERIALS = {
   'Suede':        { washSrc: 'suede', ks: 1, ksSheen: .22, ksEdge: 10, ksBack: .5, ksGrain: .35, ksGrainSize: 1.2, ksBump: 0, ksScales: [.5, .06, .0045, .0028], ksHeights: [.05, .08, 1, .4],
                     scan: null, tile: 1, depth: 0, rough: 1, spec: .15, sheen: 0, sheenRough: .8, sheenTint: 0, coat: 0, coatRough: .05, env: 1, key: 1.2, box: 2, expo: 1, ao: 0, envRot: 90,
                     soft: .12, lift: .06, blurPx: .4, punch: 0, detail: 0, detailGain: 3, detailTile: 1, wash: .2, washScale: 3, haze: 0, rim: 0 },
-  'Velvet':       { ks: 1, ksSheen: .3, ksEdge: 10, ksBack: .2, ksGrain: .2, ksGrainSize: 1.8, ksBump: .5, ksScales: [.35, .08, .006, .003], ksHeights: [.6, .2, 0, 0],
+  'Velvet':       { washBump: 1, ks: 1, ksSheen: .3, ksEdge: 10, ksBack: .2, ksGrain: .2, ksGrainSize: 1.8, ksBump: .5, ksScales: [.35, .08, .006, .003], ksHeights: [.6, .2, 0, 0],
                     scan: 'fabVelvet', tile: 2, depth: .8, rough: 1, spec: .1, sheen: 1, sheenRough: .35, sheenTint: .8, coat: 0, coatRough: .05, env: 1, key: 1.2, box: 2.5, expo: 1, ao: .5, envRot: 90,
-                    soft: 0, lift: .02, blurPx: .3, punch: .12, detail: .35, detailGain: 6, detailTile: 1, wash: .25, washScale: 2, haze: 0, rim: .12 },
+                    soft: 0, lift: .02, blurPx: .3, punch: .12, detail: .35, detailGain: 6, detailTile: 1, wash: .6,  washScale: 2, haze: 0, rim: .12 },
   'Suede · scan': { fall: .55, fallPow: 2.5, fallTint: .35, scan: 'suede',   tile: 2, depth: 1.0, rough: 1,   spec: .3, sheen: 1, sheenRough: .8,  sheenTint: .25, coat: 0, coatRough: .05, env: 1,   key: 1.2, box: 2.5, expo: 1,    ao: .4,  envRot: 90,
                     soft: .15, lift: .06, blurPx: .5, punch: 0,   detail: .35, detailGain: 3, detailTile: 1, wash: .4, washScale: 3, haze: .08, rim: 0 },
   'Velvet · scan': { fall: .9, fallPow: 2, fallTint: .8, scan: 'velvet',  tile: 4, depth: .8,  rough: 1,   spec: .2, sheen: 1, sheenRough: .35, sheenTint: 1,   coat: 0, coatRough: .05, env: 1,   key: 1.2, box: 3,   expo: .95,  ao: .4,  envRot: 90,
@@ -148,29 +148,32 @@ export function createThreeCard(size) {
     for (let i = 0; i < d.length; i += 4) { const L = .299 * d[i] + .587 * d[i + 1] + .114 * d[i + 2];
       for (let c = 0; c < 3; c++) d[i + c] = ((L + (d[i + c] - L) * sat) - 128) * con + 128; }   // Uint8Clamped clamps
     g.putImageData(im, 0, 0); };
+  const normalise = (g, w, h, spread) => { const im = g.getImageData(0, 0, w, h), d = im.data; let m = 0, v = 0, n = d.length / 4;   // level the wash: same contrast on every device and scan
+    for (let i = 0; i < d.length; i += 4) m += d[i]; m /= n; for (let i = 0; i < d.length; i += 4) v += (d[i] - m) ** 2; const sd = Math.sqrt(v / n) || 1;
+    for (let i = 0; i < d.length; i += 4) d[i] = d[i + 1] = d[i + 2] = 128 + (d[i] - m) / sd * spread; g.putImageData(im, 0, 0); };
   /* scan colour map → neutral grey detail (mean 50% grey), contrast multiplied by `gain` */
   const lumCache = {};
-  const lum = name => lumCache[name] || (lumCache[name] = img(P + SCANS[name].diff).then(im => {
+  const lum = (name, src = SCANS[name].diff) => lumCache[name + src] || (lumCache[name + src] = img(P + src).then(im => {
     const c = document.createElement('canvas'); c.width = c.height = 512; const g = c.getContext('2d'); g.drawImage(im, 0, 0, 512, 512);
     const px = g.getImageData(0, 0, 512, 512).data; const L = new Float32Array(512 * 512); let sum = 0;
     for (let i = 0; i < L.length; i++) { L[i] = .299 * px[i * 4] + .587 * px[i * 4 + 1] + .114 * px[i * 4 + 2]; sum += L[i]; }
     const mean = sum / L.length; for (let i = 0; i < L.length; i++) L[i] -= mean; return L; }));
   const greyCache = {};
-  const grey = async (name, gain) => { const k = name + gain; if (greyCache[k]) return greyCache[k];
-    const L = await lum(name); const c = document.createElement('canvas'); c.width = c.height = 512; const g = c.getContext('2d');
+  const grey = async (name, gain, src) => { const k = name + gain + (src || ''); if (greyCache[k]) return greyCache[k];
+    const L = await lum(name, src || SCANS[name].diff); const c = document.createElement('canvas'); c.width = c.height = 512; const g = c.getContext('2d');
     const d = g.createImageData(512, 512); for (let i = 0; i < L.length; i++) { const v = Math.max(0, Math.min(255, 128 + L[i] * gain)); d.data[i * 4] = d.data[i * 4 + 1] = d.data[i * 4 + 2] = v; d.data[i * 4 + 3] = 255; }
     g.putImageData(d, 0, 0); const c2 = document.createElement('canvas'); c2.width = c2.height = 512; const g2 = c2.getContext('2d');
     blurInto(g2, c, 1.2, 512, 512); return (greyCache[k] = c2); };   // soft fibres, not speckle
   /* nap / crush patches: the scan's own large-scale variation, blown up and smoothed */
   const washCache = {};
   const wash = async (name, scale, seed = 0) => { const k = name + scale + '|' + seed; if (washCache[k]) return washCache[k];
-    const src = await grey(name, 10); const small = document.createElement('canvas'); const n = Math.max(4, Math.round(24 / scale)); small.width = small.height = n;
+    const src = await grey(name, 10, SCANS[name].washDiff); const small = document.createElement('canvas'); const n = Math.max(4, Math.round(24 / scale)); small.width = small.height = n;
     const sg = small.getContext('2d'), rnd = i => { const x = Math.sin(seed * 12.9898 + i * 78.233) * 43758.5453; return x - Math.floor(x); };
     const pat = sg.createPattern(src, 'repeat');   // seed → where in the scan the patches come from, and their rotation
     pat.setTransform(new DOMMatrix().translate(n / 2, n / 2).rotate(rnd(1) * 360).translate(-rnd(2) * n, -rnd(3) * n).scale(n / 512));
     sg.fillStyle = pat; sg.fillRect(0, 0, n, n); const c = document.createElement('canvas'); c.width = c.height = size; const g = c.getContext('2d');
     const mid = document.createElement('canvas'); mid.width = mid.height = n * 6; const mg = mid.getContext('2d'); mg.imageSmoothingQuality = 'high'; mg.drawImage(small, 0, 0, n * 6, n * 6);
-    g.imageSmoothingQuality = 'high'; blurInto(g, mid, size / n * .35, size, size); tone(g, size, size, 1, 2.2); return (washCache[k] = c); };   // two-step upscale = soft patches
+    g.imageSmoothingQuality = 'high'; blurInto(g, mid, size / n * .35, size, size); normalise(g, size, size, 64); return (washCache[k] = c); };   // two-step upscale = soft patches
 
   const composed = new THREE.CanvasTexture(document.createElement('canvas')); composed.colorSpace = THREE.SRGBColorSpace;
   const printCache = new Map();   // print treatment depends only on art + print settings: relighting (handle, tilt) reuses it
@@ -186,7 +189,7 @@ export function createThreeCard(size) {
     if (ds && SCANS[ds].diff && m.detail > 0) { const pat = g.createPattern(await grey(ds, m.detailGain), 'repeat'); pat.setTransform(new DOMMatrix().scale(size / 512 / m.detailTile));
       g.globalCompositeOperation = 'overlay'; g.globalAlpha = m.detail; g.fillStyle = pat; g.fillRect(0, 0, size, size); g.globalAlpha = 1; }
     const wsrc = m.washSrc || ds;
-    if (wsrc && SCANS[wsrc].diff && m.wash > 0) { g.globalCompositeOperation = 'soft-light'; g.globalAlpha = m.wash; g.drawImage(await wash(wsrc, m.washScale, m.seed), 0, 0); g.globalAlpha = 1; }
+    if (!m.washBump && wsrc && SCANS[wsrc].diff && m.wash > 0) { g.globalCompositeOperation = 'overlay'; g.globalAlpha = m.wash; g.drawImage(await wash(wsrc, m.washScale, m.seed), 0, 0); g.globalAlpha = 1; }
     g.globalCompositeOperation = 'source-over';
     const copy = document.createElement('canvas'); copy.width = copy.height = size; copy.getContext('2d').drawImage(cv, 0, 0);
     printCache.set(key, copy); if (printCache.size > 16) printCache.delete(printCache.keys().next().value);
@@ -235,7 +238,9 @@ export function createThreeCard(size) {
       fall.uKs.value = m.ks ?? 0; fall.uKsSheen.value.setScalar(m.ksSheen ?? .13); fall.uKsEdge.value = m.ksEdge ?? 10; fall.uKsBack.value = m.ksBack ?? .2;
       fall.uRimW.value = (s.rimMm ?? 2.5) / 68; fall.uRimAng.value = (s.rimAng ?? 70) * Math.PI / 180;
       fall.uRimSoft.value = s.rimSoft ?? .6; fall.uRimHi.value = s.rimHi ?? .15; fall.uRimShade.value = s.rimShade ?? .25; fall.uRimSheen.value = s.rimSheen ?? .3;
-      fall.uAntiTile.value = m.antiTile ?? 0; fall.uKsGrain.value = m.ksGrain ?? 0; fall.uKsGrainSize.value = m.ksGrainSize ?? 1.2; fall.uKsBump.value = m.ksBump ?? 0; if (m.ksHeights) fall.uKsHeights.value.set(...m.ksHeights); if (m.ksScales) fall.uKsScales.value.set(...m.ksScales);
+      fall.uAntiTile.value = m.antiTile ?? 0; fall.uKsGrain.value = m.ksGrain ?? 0; fall.uKsGrainSize.value = m.ksGrainSize ?? 1.2; fall.uKsBump.value = m.ksBump ?? 0; if (m.ksHeights) fall.uKsHeights.value.set(...m.ksHeights); if (m.ksScales) fall.uKsScales.value.set(...m.ksScales); fall.uKsSeed.value = 3;
+      if (m.washBump) { const k = m.washScale / 2; fall.uKsHeights.value.x = m.wash; fall.uKsHeights.value.y = m.wash / 3;   // velvet wash = crush patches: strength, size, layout
+        fall.uKsScales.value.x = .35 * k; fall.uKsScales.value.y = .08 * k; fall.uKsSeed.value = 3 + (m.washSeed ?? 0) * 1.7; }
       fall.uFall.value = m.fall ?? 0; fall.uFallPow.value = m.fallPow ?? 3; fall.uFallTint.value = m.fallTint ?? .5;
       mat.needsUpdate = true;
       const az = (s.az ?? 40) * Math.PI / 180, el = (s.el ?? 50) * Math.PI / 180;
