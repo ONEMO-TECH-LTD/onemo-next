@@ -6,7 +6,7 @@
 <title>ONEMO shop · Effect reel</title>
 <link rel="stylesheet" href="public/recipes/tokens.css"/>
 <style>
-  :root { --ink:#16191d; --mut:#6b737c; --font:"Chillax","Satoshi",ui-sans-serif,system-ui,-apple-system,sans-serif; }
+  :root { --ink:#16191d; --mut:#6b737c; --font:"Chillax","Satoshi",ui-sans-serif,system-ui,-apple-system,sans-serif; --mono:ui-monospace,Menlo,monospace; }
   * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
   html,body { height:100%; overflow:hidden; background:#e8e8ec; color:var(--ink); font-family:var(--font); }
   #surface { position:fixed; inset:0; width:100%; height:100%; z-index:0; display:block; }
@@ -36,12 +36,23 @@
   .chip { align-self:flex-start; font:500 12px/1 var(--font); padding:4px 10px; border:1px solid rgba(22,25,29,.35); border-radius:999px; }
   .row { display:flex; justify-content:space-between; font:500 14px/1 var(--font); color:var(--mut); }
   .row b { color:var(--ink); font-weight:500; }
-  /* look switch — a dev control for choosing the recipe, not shop UI */
-  .look { position:fixed; z-index:4; left:12px; top:calc(8px + env(safe-area-inset-top)); display:flex; gap:4px; padding:4px;
-    background:rgba(255,255,255,.92); border:1px solid rgba(0,0,0,.1); border-radius:999px; font:500 11px/1 ui-monospace,Menlo,monospace; }
-  .look button { border:0; background:none; padding:8px 11px; border-radius:999px; cursor:pointer; font:inherit; color:var(--ink); text-transform:uppercase; }
-  .look button.on { background:var(--ink); color:#fff; }
-  .hint { position:fixed; z-index:4; left:14px; top:calc(52px + env(safe-area-inset-top)); text-align:left; font:500 10px/1.4 ui-monospace,Menlo,monospace; color:var(--mut); max-width:220px; }
+  /* dev controls — not shop UI */
+  .dev { position:fixed; z-index:5; left:12px; top:calc(8px + env(safe-area-inset-top)); display:flex; gap:4px; padding:4px; flex-wrap:wrap; max-width:calc(100vw - 24px);
+    background:rgba(255,255,255,.92); border:1px solid rgba(0,0,0,.1); border-radius:18px; font:500 11px/1 var(--mono); }
+  .dev button { border:0; background:none; padding:8px 11px; border-radius:999px; cursor:pointer; font:inherit; color:var(--ink); text-transform:uppercase; }
+  .dev button.on { background:var(--ink); color:#fff; }
+  .sheet { position:fixed; z-index:6; right:12px; top:calc(56px + env(safe-area-inset-top)); width:min(340px,calc(100vw - 24px)); max-height:calc(100vh - 80px); overflow:auto;
+    background:rgba(255,255,255,.96); border:1px solid rgba(0,0,0,.1); border-radius:16px; padding:12px 14px; font:500 11px/1.3 var(--mono); display:none; }
+  .sheet.open { display:block; }
+  .sheet h4 { font:700 10px/1 var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--mut); margin:12px 0 6px; }
+  .ctl { display:grid; grid-template-columns:96px 1fr 44px; align-items:center; gap:8px; margin:5px 0; }
+  .ctl input[type=range] { width:100%; accent-color:var(--ink); }
+  .ctl output { text-align:right; font-variant-numeric:tabular-nums; }
+  .seg { display:flex; gap:4px; flex-wrap:wrap; margin:4px 0; }
+  .seg button, .acts button { border:1px solid rgba(0,0,0,.14); background:#fff; border-radius:999px; padding:6px 10px; font:inherit; cursor:pointer; text-transform:uppercase; }
+  .seg button.on { background:var(--ink); color:#fff; border-color:var(--ink); }
+  .acts { display:flex; gap:6px; flex-wrap:wrap; margin-top:12px; }
+  .who { font:700 12px/1.2 var(--font); margin-bottom:4px; }
 </style>
 </head>
 <body>
@@ -50,94 +61,133 @@
   <div class="top"><button class="bag" aria-label="Bag"><svg viewBox="0 0 256 256" fill="none" stroke="currentColor" stroke-width="14" stroke-linejoin="round"><path d="M40 72h176l-12 144H52z"/><path d="M88 96V72a40 40 0 0 1 80 0v24"/></svg><i>1</i></button></div>
   <div class="reel" id="reel"></div>
 </div>
-<div class="look" id="look">
-  <button data-r="A">A spec</button><button data-r="B">B print</button><button data-r="C">C fibres</button><button data-r="D">D live</button><button data-r="E" class="on">E archive</button><button id="tilt">tilt</button><span style="width:1px;background:rgba(0,0,0,.15);margin:4px 2px"></span><button id="bgMove" class="on">bg moving</button><button id="bgRes" class="on">bg 2×</button>
+<div class="dev">
+  <button id="tune" class="on">tune this card</button><button id="tilt">tilt</button><button id="bgMove" class="on">bg moving</button><button id="bgRes" class="on">bg 2×</button>
 </div>
-<div class="hint">swipe up: next Effect · tap the Effect: turn it over · move the mouse or tilt: light</div>
+<div class="sheet open" id="sheet"></div>
 
 <script type="module">
 import { createSurface } from './public/recipes/onemo-adaptive-surface.js';
-const ARTS=[1,2,3,4,5,6].map(i=>`public/recipes/608/art${i}.jpg`);   // textures pre-sized to the card (608 = 304 @2x)
+const ARTS=[1,2,3,4,5,6].map(i=>`public/recipes/608/art${i}.jpg`);
 const NAMES=['Thriller','Anti-Aging Pill','Lipstick','The Hand','Diamond','Cinema'];
-const R={ A:{print:0,real:0,live:0}, B:{print:1,real:0,live:0}, C:{print:1,real:1,live:0}, D:{print:1,real:1,live:1}, E:{print:1,real:0,live:0,arch:1} };
-const st={ recipe:'E', light:{x:.31,y:.33}, live:null };
-const deg=Math.PI/180; st.light={x:Math.cos(46*deg)*Math.cos(63*deg), y:Math.sin(46*deg)*Math.cos(63*deg)};
+const deg=Math.PI/180;
 
+/* ── per-card material settings ─────────────────────────────────────── */
+const PRESETS={
+  A:{print:0,soften:0,lift:0,blur:0, fibres:0,fscale:1,relief:.45,fmix:.85,fsheen:.11, layer:'grain',lamt:1,lscale:1, az:46,el:63,live:0, sheen:.12},
+  B:{print:1,soften:.12,lift:.06,blur:.5, fibres:0,fscale:1,relief:.45,fmix:.85,fsheen:.11, layer:'grain',lamt:1,lscale:1, az:46,el:63,live:0, sheen:.12},
+  'B+fine fibres':{print:1,soften:.12,lift:.06,blur:.5, fibres:1,fscale:4,relief:.2,fmix:.5,fsheen:.06, layer:'grain',lamt:1,lscale:1, az:46,el:63,live:0, sheen:.12},
+  E:{print:1,soften:.12,lift:.06,blur:.5, fibres:0,fscale:1,relief:.45,fmix:.85,fsheen:.11, layer:'archive',lamt:1,lscale:1, az:46,el:63,live:0, sheen:.12},
+};
+const KEY='onemo-suede-cards-v1';
+let cards; try{ cards=JSON.parse(localStorage.getItem(KEY)); }catch(_){}
+if(!Array.isArray(cards)||cards.length!==ARTS.length) cards=ARTS.map(()=>({...PRESETS['B+fine fibres']}));
+const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(cards)); }catch(_){} };
+const st={ live:null };
+
+/* ── one shared WebGL renderer, painting faces into plain 2D canvases ─ */
 const VS=`attribute vec2 a; varying vec2 v; void main(){ v=vec2(a.x*.5+.5,.5-a.y*.5); gl_Position=vec4(a,0.,1.); }`;
 const FS=`precision highp float; varying vec2 v;
-uniform sampler2D ART,GRAIN,NRM,G2; uniform vec2 PX; uniform float PRINT,REAL,BACK,ARCH; uniform vec3 L;
+uniform sampler2D ART,GRAIN,NRM,ARCH; uniform vec2 PX;
+uniform float BACK,PRINT,SOFT,LIFT,BLUR,FIB,FSCALE,RELIEF,FMIX,FSHEEN,LAYER,LAMT,LSCALE,SHEEN; uniform vec3 L;
 vec3 ov(vec3 a,vec3 b){ return mix(2.*a*b,1.-2.*(1.-a)*(1.-b),step(.5,a)); }
 void main(){ vec3 c;
-  if(BACK>.5) c=ARCH>.5?vec3(168./255.):vec3(61./255.);
-  else if(PRINT>.5){ vec2 o=PX*.5; c=(texture2D(ART,v).rgb*4.+texture2D(ART,v+vec2(o.x,0)).rgb+texture2D(ART,v-vec2(o.x,0)).rgb+texture2D(ART,v+vec2(0,o.y)).rgb+texture2D(ART,v-vec2(0,o.y)).rgb)/8.;
-    float l=dot(c,vec3(.299,.587,.114)); c=mix(vec3(l),c,.88); c=.06+.94*c; }
+  if(BACK>.5) c=vec3(61./255.);
+  else if(PRINT>.5 && BLUR>0.){ vec2 o=PX*BLUR; c=(texture2D(ART,v).rgb*4.+texture2D(ART,v+vec2(o.x,0)).rgb+texture2D(ART,v-vec2(o.x,0)).rgb+texture2D(ART,v+vec2(0,o.y)).rgb+texture2D(ART,v-vec2(0,o.y)).rgb)/8.; }
   else c=texture2D(ART,v).rgb;
-  if(REAL>.5){ vec3 n=texture2D(NRM,v).rgb*2.-1.; n=normalize(vec3(n.xy*2.7,n.z)); vec3 Ld=normalize(L);
-    float d=max(dot(n,Ld),0.)/max(Ld.z,.05); c*=mix(1.,d,.85); c+=.11*pow(1.-n.z,1.2)*max(dot(normalize(n.xy+1e-4),normalize(Ld.xy+1e-4)),0.); }
-  c=ARCH>.5?ov(c,texture2D(G2,v).rgb):ov(c,texture2D(GRAIN,v).rgb);
-  float r=distance(v,vec2(.22,.22))/.66; c+=vec3(.12)*(1.-smoothstep(0.,1.,r));
+  if(PRINT>.5 && BACK<.5){ float l=dot(c,vec3(.299,.587,.114)); c=mix(c,vec3(l),SOFT); c=LIFT+(1.-LIFT)*c; }
+  if(FIB>.5){ vec3 n=texture2D(NRM,v*FSCALE).rgb*2.-1.; n=normalize(vec3(n.xy*RELIEF*6.,n.z)); vec3 Ld=normalize(L);
+    float d=max(dot(n,Ld),0.)/max(Ld.z,.05); c*=mix(1.,d,FMIX); c+=FSHEEN*pow(1.-n.z,1.2)*max(dot(normalize(n.xy+1e-4),normalize(Ld.xy+1e-4)),0.); }
+  if(LAYER>.5){ vec3 g = LAYER<1.5 ? texture2D(GRAIN,v*LSCALE).rgb : texture2D(ARCH,v*LSCALE).rgb; c=mix(c,ov(c,g),LAMT); }
+  float r=distance(v,vec2(.22,.22))/.66; c+=vec3(SHEEN)*(1.-smoothstep(0.,1.,r));
   gl_FragColor=vec4(clamp(c,0.,1.),1.); }`;
-const cache={}; const img=s=>cache[s]||(cache[s]=(async()=>{ const i=new Image(); i.src=s; await i.decode(); return i; })());   // decode off the main thread
-const fit=(im,s)=>{ const c=document.createElement('canvas'); c.width=c.height=s; const g=c.getContext('2d'); g.imageSmoothingQuality='high'; g.drawImage(im,0,0,s,s); return c; };
-
-// ONE shared WebGL renderer paints every card face into a plain 2D canvas (12 live GL contexts was the fps cost)
+const cache={}; const img=s=>cache[s]||(cache[s]=(async()=>{ const i=new Image(); i.src=s; await i.decode(); return i; })());
 const DPR=Math.min(2,devicePixelRatio||1), SZ=Math.round(304*DPR);
 const R3=(()=>{ const cv=document.createElement('canvas'); cv.width=cv.height=SZ; const gl=cv.getContext('webgl',{preserveDrawingBuffer:true});
-  const sh=(t,src)=>{ const o=gl.createShader(t); gl.shaderSource(o,src); gl.compileShader(o); return o; };
+  const sh=(t,src)=>{ const o=gl.createShader(t); gl.shaderSource(o,src); gl.compileShader(o); if(!gl.getShaderParameter(o,gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(o)); return o; };
   const p=gl.createProgram(); gl.attachShader(p,sh(gl.VERTEX_SHADER,VS)); gl.attachShader(p,sh(gl.FRAGMENT_SHADER,FS)); gl.linkProgram(p); gl.useProgram(p);
   gl.bindBuffer(gl.ARRAY_BUFFER,gl.createBuffer()); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
   const a=gl.getAttribLocation(p,'a'); gl.enableVertexAttribArray(a); gl.vertexAttribPointer(a,2,gl.FLOAT,false,0,0);
-  const U=n=>gl.getUniformLocation(p,n); const T={};
-  const mk=src=>{ const t=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,t); gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,gl.RGB,gl.UNSIGNED_BYTE,src);
-    [[gl.TEXTURE_MIN_FILTER,gl.LINEAR],[gl.TEXTURE_MAG_FILTER,gl.LINEAR],[gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE],[gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE]].forEach(([k,v])=>gl.texParameteri(gl.TEXTURE_2D,k,v)); return t; };
-  const bind=(u,n,t)=>{ gl.activeTexture(gl.TEXTURE0+u); gl.bindTexture(gl.TEXTURE_2D,t); gl.uniform1i(U(n),u); };
-  const shared=Promise.all([img('public/recipes/608/grain.jpg'),img('public/recipes/608/normal.png'),img('public/recipes/608/archive.jpg')]).then(([g,n,g2])=>{ T.g=mk(g); T.n=mk(n); T.g2=mk(g2); });
-  const art=src=>T[src]||(T[src]=img(src).then(i=>mk(i)));
-  return { cv, async render(src,back){ await shared; const at=await art(src); const r=R[st.recipe];
-    gl.useProgram(p); gl.viewport(0,0,SZ,SZ); bind(0,'ART',at); bind(1,'GRAIN',T.g); bind(2,'NRM',T.n); bind(3,'G2',T.g2);
-    gl.uniform2f(U('PX'),1/SZ,1/SZ); gl.uniform1f(U('PRINT'),r.print); gl.uniform1f(U('REAL'),r.real); gl.uniform1f(U('BACK'),back?1:0); gl.uniform1f(U('ARCH'),r.arch?1:0);
-    const li=(r.live&&st.live)||st.light; const z=Math.sqrt(Math.max(.05,1-li.x*li.x-li.y*li.y)); gl.uniform3f(U('L'),li.x,li.y,z); gl.drawArrays(gl.TRIANGLE_STRIP,0,4); } };
+  const U={}; const u=n=>U[n]||(U[n]=gl.getUniformLocation(p,n)); const T={};
+  // tiling textures are power-of-two with mipmaps, so a fine repeat averages instead of sparkling
+  const mk=(src,tile)=>{ const t=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,t); gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,gl.RGB,gl.UNSIGNED_BYTE,src);
+    if(tile){ gl.generateMipmap(gl.TEXTURE_2D); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.REPEAT); }
+    else { gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE); }
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR); return t; };
+  const bind=(i,n,t)=>{ gl.activeTexture(gl.TEXTURE0+i); gl.bindTexture(gl.TEXTURE_2D,t); gl.uniform1i(u(n),i); };
+  const shared=Promise.all([img('public/recipes/pot/grain.jpg'),img('public/recipes/pot/normal.png'),img('public/recipes/pot/archive.jpg')]).then(([g,n,ar])=>{ T.g=mk(g,1); T.n=mk(n,1); T.ar=mk(ar,1); });
+  const art=src=>T[src]||(T[src]=img(src).then(i=>mk(i,0)));
+  return { cv, async render(src,back,s){ await shared; const at=await art(src);
+    gl.useProgram(p); gl.viewport(0,0,SZ,SZ); bind(0,'ART',at); bind(1,'GRAIN',T.g); bind(2,'NRM',T.n); bind(3,'ARCH',T.ar);
+    gl.uniform2f(u('PX'),1/SZ,1/SZ); gl.uniform1f(u('BACK'),back?1:0); gl.uniform1f(u('PRINT'),s.print); gl.uniform1f(u('SOFT'),s.soften); gl.uniform1f(u('LIFT'),s.lift); gl.uniform1f(u('BLUR'),s.blur);
+    gl.uniform1f(u('FIB'),s.fibres); gl.uniform1f(u('FSCALE'),s.fscale); gl.uniform1f(u('RELIEF'),s.relief); gl.uniform1f(u('FMIX'),s.fmix); gl.uniform1f(u('FSHEEN'),s.fsheen);
+    gl.uniform1f(u('LAYER'),s.layer==='grain'?1:s.layer==='archive'?2:0); gl.uniform1f(u('LAMT'),s.lamt); gl.uniform1f(u('LSCALE'),s.lscale); gl.uniform1f(u('SHEEN'),s.sheen);
+    const fix={x:Math.cos(s.az*deg)*Math.cos(s.el*deg), y:Math.sin(s.az*deg)*Math.cos(s.el*deg)}; const li=(s.live&&st.live)||fix;
+    const z=Math.sqrt(Math.max(.05,1-li.x*li.x-li.y*li.y)); gl.uniform3f(u('L'),li.x,li.y,z); gl.drawArrays(gl.TRIANGLE_STRIP,0,4); } };
 })();
-let chain=Promise.resolve();   // one renderer → paint faces one after another
-function face(canvas, art, back){ canvas.width=canvas.height=SZ; const ctx=canvas.getContext('2d');
-  return { draw(){ chain=chain.then(async()=>{ await R3.render(art,back); ctx.drawImage(R3.cv,0,0); }); return chain; } }; }
+let chain=Promise.resolve();
+function face(canvas, i, back){ canvas.width=canvas.height=SZ; const ctx=canvas.getContext('2d');
+  return { draw(){ chain=chain.then(async()=>{ await R3.render(ARTS[i],back,cards[i]); ctx.drawImage(R3.cv,0,0); }); return chain; } }; }
 
+/* ── reel ───────────────────────────────────────────────────────────── */
 const reel=document.getElementById('reel'); const faces=[];
 ARTS.forEach((src,i)=>{ const el=document.createElement('section'); el.className='slide'; el.innerHTML=`
   <div class="stage"><div class="turn"><div class="flip"><div class="face f"><canvas></canvas></div><div class="face b"><canvas></canvas></div></div></div>
   <div class="dots"><b class="on"></b><b></b></div></div>
   <div class="info"><div class="name">${NAMES[i]}</div><span class="chip">Made to order</span><div class="row"><span>Mini · 68 mm</span><b>£ —</b></div></div>`;
-  reel.appendChild(el); const [cf,cb]=el.querySelectorAll('canvas'); const F=face(cf,src,false), B=face(cb,src,true); faces.push(F,B);
+  reel.appendChild(el); const [cf,cb]=el.querySelectorAll('canvas'); faces.push(face(cf,i,false),face(cb,i,true));
   const flip=el.querySelector('.flip'), dots=el.querySelectorAll('.dots b');
   el.querySelector('.turn').onclick=()=>{ flip.classList.add('d3'); requestAnimationFrame(()=>{ const on=flip.classList.toggle('back'); dots[0].classList.toggle('on',!on); dots[1].classList.toggle('on',on); }); };
   flip.addEventListener('transitionend',()=>{ if(!flip.classList.contains('back')) flip.classList.remove('d3'); });
 });
-// paint lazily: only cards near the screen; a card is painted once per look
-const painted=new Set(); const paintSlide=i=>{ if(i<0||i>=ARTS.length) return; const k=st.recipe+i; if(painted.has(k)) return; painted.add(k); faces[i*2].draw(); faces[i*2+1].draw(); };
-const io=new IntersectionObserver(es=>es.forEach(e=>{ if(e.isIntersecting){ const i=[...reel.children].indexOf(e.target); paintSlide(i); paintSlide(i+1); } }),{root:reel,rootMargin:'100% 0px'});
+const idx=()=>Math.round(reel.scrollTop/reel.clientHeight);
+const paintCard=i=>{ if(i<0||i>=ARTS.length) return; faces[i*2].draw(); faces[i*2+1].draw(); };
+const painted=new Set(); const lazy=i=>{ if(i<0||i>=ARTS.length||painted.has(i)) return; painted.add(i); paintCard(i); };
+const io=new IntersectionObserver(es=>es.forEach(e=>{ if(e.isIntersecting){ const i=[...reel.children].indexOf(e.target); lazy(i); lazy(i+1); } }),{root:reel,rootMargin:'100% 0px'});
 [...reel.children].forEach(el=>io.observe(el));
-const drawAll=()=>{ painted.clear(); const i=Math.round(reel.scrollTop/reel.clientHeight); paintSlide(i); paintSlide(i+1); paintSlide(i-1); };
 
-// background: the build's procedural surface — moving and taking the Effect's colours, at 1x; scroll blend once per frame
-// EXACT shop preset from the theme: snippets/onemo-background-config.liquid (branch session63-task/shop-adaptive-background)
+/* ── background: the theme's shop preset (snippets/onemo-background-config.liquid) ── */
 const SHOP_BG={"intensity":0.035,"grainSize":1.3,"grainSpeed":0.3,"gradientSpeed":0.5,"neutralSpeed":0.5,"neutralStops":{"top":"--sem-col-bg-app-primary","accent":"--sem-col-bg-control-vibrant","bottom":"--sem-col-bg-app-primary","dark":"--sem-col-bg-control-strong"},"animated":true,"lumaOnly":true,"gradientScale":1,"gradientRotation":0,"focusStrength":0,"maxPixelRatio":2,"mode":"adaptive"};
 const surface=createSurface({ ...SHOP_BG, canvas:document.getElementById('surface') });
-const idx=()=>Math.round(reel.scrollTop/reel.clientHeight);
 surface?.adoptImage(ARTS[0]);
 let sraf=0; reel.addEventListener('scroll',()=>{ if(sraf) return; sraf=requestAnimationFrame(()=>{ sraf=0; const t=reel.scrollTop/reel.clientHeight, i=Math.floor(t); surface?.blendImages(ARTS[Math.max(0,Math.min(5,i))],ARTS[Math.min(5,i+1)],t-i); }); },{passive:true});
 addEventListener('resize',()=>surface?.resize());
-// background A/B: motion and resolution, to feel what the engine costs
 const bgMove=document.getElementById('bgMove'), bgRes=document.getElementById('bgRes');
 bgMove.onclick=()=>{ const on=!bgMove.classList.contains('on'); bgMove.classList.toggle('on',on); bgMove.textContent=on?'bg moving':'bg still'; surface?.update({animated:on}); };
 bgRes.onclick=()=>{ const two=!bgRes.classList.contains('on'); bgRes.classList.toggle('on',two); bgRes.textContent=two?'bg 2×':'bg 1×'; surface?.update({maxPixelRatio:two?2:1}); surface?.resize(); };
 
-// look switch + light
-document.querySelectorAll('#look [data-r]').forEach(b=>b.onclick=()=>{ st.recipe=b.dataset.r; document.querySelectorAll('#look [data-r]').forEach(x=>x.classList.toggle('on',x===b)); drawAll(); });
-const near=()=>[faces[idx()*2]];   // live light repaints only the card on screen
-let raf=0; const relight=()=>{ if(raf) return; raf=requestAnimationFrame(()=>{ raf=0; near().forEach(f=>f.draw()); }); };
-addEventListener('pointermove',e=>{ if(st.recipe!=='D') return; st.live={x:(e.clientX/innerWidth-.5)*1.4, y:-(e.clientY/innerHeight-.5)*1.4}; relight(); });
+/* ── tuning sheet for the card on screen ────────────────────────────── */
+const sheet=document.getElementById('sheet');
+const CTL=[
+  ['Print on suede',[['print','print on','toggle'],['soften','soften',0,.4,.01],['lift','black lift',0,.2,.005],['blur','blur px',0,1.5,.05]]],
+  ['Real suede fibres (GSG scan)',[['fibres','fibres on','toggle'],['fscale','fibre scale',1,10,.25],['relief','relief',0,1,.01],['fmix','light mix',0,1,.01],['fsheen','fibre sheen',0,.3,.005]]],
+  ['Suede layer (overlay)',[['layer','layer','seg',['none','grain','archive']],['lamt','strength',0,1,.01],['lscale','scale',1,6,.25]]],
+  ['Light',[['az','angle °',0,360,1],['el','height °',5,85,1],['live','follow mouse/tilt','toggle'],['sheen','sheen',0,.3,.005]]],
+];
+function renderSheet(){ const i=idx(), s=cards[i];
+  let h=`<div class="who">${NAMES[i]} · card ${i+1}</div><h4>Start from</h4><div class="seg">${Object.keys(PRESETS).map(k=>`<button data-preset="${k}">${k}</button>`).join('')}</div>`;
+  for(const [title,list] of CTL){ h+=`<h4>${title}</h4>`; for(const [k,label,a,b,stp] of list){
+    if(a==='toggle') h+=`<div class="seg"><button data-tog="${k}" class="${s[k]?'on':''}">${label}</button></div>`;
+    else if(a==='seg') h+=`<div class="seg">${b.map(o=>`<button data-seg="${k}" data-v="${o}" class="${s[k]===o?'on':''}">${o}</button>`).join('')}</div>`;
+    else h+=`<label class="ctl"><span>${label}</span><input type="range" data-k="${k}" min="${a}" max="${b}" step="${stp}" value="${s[k]}"><output>${(+s[k]).toFixed(stp<.01?3:2)}</output></label>`; } }
+  h+=`<div class="acts"><button id="all">apply to all cards</button><button id="copy">copy spec</button></div>`;
+  sheet.innerHTML=h;
+  sheet.querySelectorAll('input[type=range]').forEach(r=>r.oninput=()=>{ s[r.dataset.k]=+r.value; r.nextElementSibling.textContent=(+r.value).toFixed(+r.step<.01?3:2); save(); paintCard(i); });
+  sheet.querySelectorAll('[data-tog]').forEach(b=>b.onclick=()=>{ s[b.dataset.tog]=s[b.dataset.tog]?0:1; save(); renderSheet(); paintCard(i); });
+  sheet.querySelectorAll('[data-seg]').forEach(b=>b.onclick=()=>{ s[b.dataset.seg]=b.dataset.v; save(); renderSheet(); paintCard(i); });
+  sheet.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>{ cards[i]={...PRESETS[b.dataset.preset]}; save(); renderSheet(); paintCard(i); });
+  sheet.querySelector('#all').onclick=()=>{ cards=cards.map(()=>({...s})); save(); painted.clear(); paintCard(idx()); paintCard(idx()+1); paintCard(idx()-1); };
+  sheet.querySelector('#copy').onclick=async e=>{ const t=JSON.stringify(s); try{ await navigator.clipboard.writeText(t); e.target.textContent='copied'; }catch(_){ prompt('Spec',t); } };
+}
+let lastIdx=-1; reel.addEventListener('scroll',()=>{ const i=idx(); if(i!==lastIdx){ lastIdx=i; if(sheet.classList.contains('open')) renderSheet(); } },{passive:true});
+document.getElementById('tune').onclick=e=>{ const on=sheet.classList.toggle('open'); e.target.classList.toggle('on',on); if(on) renderSheet(); };
+renderSheet();
+
+/* ── live light (only cards whose setting says so) ──────────────────── */
+let raf=0; const relight=()=>{ if(raf) return; raf=requestAnimationFrame(()=>{ raf=0; const i=idx(); if(cards[i].live) faces[i*2].draw(); }); };
+addEventListener('pointermove',e=>{ st.live={x:(e.clientX/innerWidth-.5)*1.4, y:-(e.clientY/innerHeight-.5)*1.4}; relight(); });
 document.getElementById('tilt').onclick=async e=>{ try{ if(typeof DeviceOrientationEvent!=='undefined'&&DeviceOrientationEvent.requestPermission) await DeviceOrientationEvent.requestPermission(); }catch(_){}
-  e.target.classList.add('on'); addEventListener('deviceorientation',ev=>{ if(st.recipe!=='D') return; st.live={x:Math.max(-.7,Math.min(.7,(ev.gamma||0)/45)), y:Math.max(-.7,Math.min(.7,((ev.beta||45)-45)/45))}; relight(); }); };
+  e.target.classList.add('on'); addEventListener('deviceorientation',ev=>{ st.live={x:Math.max(-.7,Math.min(.7,(ev.gamma||0)/45)), y:Math.max(-.7,Math.min(.7,((ev.beta||45)-45)/45))}; relight(); }); };
 </script>
 </body>
 </html>
