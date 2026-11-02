@@ -59,6 +59,11 @@
   .sheet .ver { width:100%; margin:6px 0 2px; font:inherit; padding:6px 8px; border:1px solid rgba(0,0,0,.18); border-radius:8px; background:#fff; }
   .acts { display:flex; gap:6px; flex-wrap:wrap; margin-top:12px; }
   .who { font:700 12px/1.2 var(--font); margin-bottom:4px; }
+  /* light handle: drag to place the light; it always shines on the card */
+  .lamp { position:fixed; z-index:4; width:26px; height:26px; margin:-13px 0 0 -13px; border-radius:50%; touch-action:none; cursor:grab;
+    background:radial-gradient(circle,#fff 0 35%,#ffe9a8 60%,rgba(255,220,120,.0) 72%); box-shadow:0 0 0 1.5px rgba(22,25,29,.55),0 0 18px 6px rgba(255,236,170,.55); }
+  .lamp.off { display:none; } .lamp:active { cursor:grabbing; }
+  .lampline { position:fixed; z-index:3; height:1px; background:rgba(22,25,29,.35); transform-origin:0 50%; pointer-events:none; }
   /* phone: one scrolling row of dev switches; the panel is a bottom sheet that leaves the card visible */
   @media (max-width:600px) {
     .dev { flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; right:56px; max-width:none; border-radius:999px; font-size:10px; }
@@ -79,7 +84,7 @@
   <div class="reel" id="reel"></div>
 </div>
 <div class="dev">
-  <button id="tune" class="on">panel: ON</button><button id="tilt">phone tilt: OFF</button><button id="bgMove" class="on">bg motion: ON</button><button id="bgRes" class="on">bg sharp (2×): ON</button>
+  <button id="tune" class="on">panel: ON</button><button id="tilt">phone tilt: OFF</button><button id="bgMove" class="on">bg motion: ON</button><button id="bgRes" class="on">bg sharp (2×): ON</button><button id="lampBtn" class="on">light handle: ON</button>
 </div>
 <div class="sheet open" id="sheet"></div>
 <script>if(matchMedia('(max-width:600px)').matches){ sheet.classList.remove('open'); tune.classList.remove('on'); tune.textContent='panel: OFF'; }   // phones start with the panel closed</script>
@@ -120,8 +125,8 @@ const PRESETS={
 };
 const MATS=['Suede','Velvet','Faux leather','UV matte','UV gloss'];
 const BACKS=MATS.filter(m=>m!=='Velvet');   // the back is never velvet
-for(const n of [...MATS,'Suede · scan','Velvet · scan']){ const t={}; for(const k in M3[n]) if(k!=='scan'&&k!=='studio') t['t_'+k]=M3[n][k]; if(M3[n].studio) t.studio=M3[n].studio; PRESETS[n]={engine:'three',mat3:n,az:40,el:50,live:/Suede|Velvet|gloss/.test(n)?1:0,...t}; }   // fabrics + gloss read through moving light   // proven: three.js + Poly Haven
-const KEY='onemo-materials-v18';
+for(const n of [...MATS,'Suede · scan','Velvet · scan']){ const t={}; for(const k in M3[n]) if(k!=='scan'&&k!=='studio') t['t_'+k]=M3[n][k]; if(M3[n].studio) t.studio=M3[n].studio; PRESETS[n]={engine:'three',mat3:n,az:40,el:50,live:0,dist:1.5,...t}; }   // fabrics + gloss read through moving light   // proven: three.js + Poly Haven
+const KEY='onemo-materials-v19';
 let cards; try{ cards=JSON.parse(localStorage.getItem(KEY)); }catch(_){}
 if(!Array.isArray(cards)||cards.length!==ARTS.length) cards=ARTS.map((_,i)=>{ const m=MATS[i%MATS.length]; return {...PRESETS[m],mat:m,backMat:'Suede'}; });   // one material per card to start
 const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(cards)); }catch(_){} };
@@ -273,7 +278,7 @@ bgRes.onclick=()=>{ const two=!bgRes.classList.contains('on'); bgRes.classList.t
 const sheet=document.getElementById('sheet');
 /* panel: current controls in sections; [title, controls, open by default]. Legacy sections only appear on an earlier version. */
 const CTL=[
-  ['Light',[['studio','studio','seg',Object.keys(STUDIOS)],['t_envRot','studio rotation °',0,360,1],['az','light angle °',0,360,1],['el','light height °',5,85,1],['live','light follows mouse/tilt','toggle'],['t_key','key light',0,4,.01],['t_expo','exposure',.3,2.5,.01]],1],
+  ['Light',[['studio','studio','seg',Object.keys(STUDIOS)],['t_envRot','studio rotation °',0,360,1],['az','light angle °',0,360,1],['dist','light distance',.5,4,.05],['el','light height °',5,85,1],['live','light follows mouse/tilt','toggle'],['t_key','key light',0,4,.01],['t_expo','exposure',.3,2.5,.01]],1],
   ['Print',[['t_soft','print softening',0,.5,.01],['t_lift','black lift',0,.25,.005],['t_punch','colour punch',-.3,.4,.01],['t_blurPx','dye bleed (blur px)',0,4,.05]],0],
   ['Nap, wash & highlights',[['t_ksSheen','highlights',0,1,.01],['t_ksGrainSize','nap size (px)',.6,6,.05],['t_ksGrain','nap strength',0,1,.01],['t_wash','wash (nap / crush patches)',0,1,.01],['t_washScale','wash size',1,12,.1],['t_washSeed','wash layout (reseed)',0,99,1],
     ['t_ksBack','backscatter (milky veil)',0,1,.01],['t_ks','velvet lobe',0,2,.01],['t_ksBump','noise bump',0,3,.01],['t_ksEdge','edginess',1,20,.1],['t_rim','velvet edge glow',0,.8,.01],['t_haze','fuzz haze',0,.4,.005],
@@ -306,14 +311,14 @@ const VIS={ t_sheen:s=>!(s.t_ks>0), t_rough:s=>!(s.t_ks>0), t_fall:s=>FAB(s)&&!(
   pspec:s=>s.pbr, haze:s=>s.pbr, prough:s=>s.pbr&&s.pspec>0, pcoat:s=>s.pbr, pcoatr:s=>s.pbr&&s.pcoat>0, penv:s=>s.pbr&&s.pcoat>0, pkey:s=>s.pbr, pamb:s=>s.pbr, pexpo:s=>s.pbr,
   ndens:s=>s.proc, nstretch:s=>s.proc, ndir:s=>s.proc, nrelief:s=>s.proc, namt:s=>s.proc, wscale:s=>s.proc, wamt:s=>s.proc, tips:s=>s.proc, seed:s=>s.proc,
   fscale:s=>s.fibres, relief:s=>s.fibres, fmix:s=>s.fibres, fsheen:s=>s.fibres, lamt:s=>s.layer!=='none', lscale:s=>s.layer!=='none',
-  az:s=>s.pbr||s.fibres||s.proc, el:s=>s.pbr||s.fibres||s.proc };
+  az:s=>s.engine==='three'||s.pbr||s.fibres||s.proc, el:s=>s.engine==='three'||s.pbr||s.fibres||s.proc };
 function ctlHtml(s,[k,label,a,b,stp,inv]){
   if(a==='toggle') return `<div class="seg"><button data-tog="${k}" class="${s[k]?'on':''}">${label}: ${s[k]?'ON':'OFF'}</button></div>`;
   if(a==='seg') return `<div class="seg">${b.map(o=>`<button data-seg="${k}" data-v="${o}" class="${(s[k]??(k==='studio'?DEFAULT_STUDIO:undefined))===o?'on':''}">${o}</button>`).join('')}</div>`;
   const ui=inv?a+b-(s[k]??0):(s[k]??0), f=v=>(+v).toFixed(stp<.01?3:2);
   return `<div class="ctl"><span>${label}</span><small>${f(a)}</small><input type="range" data-k="${k}" data-inv="${inv?1:0}" data-a="${a}" data-b="${b}" min="${a}" max="${b}" step="${stp}" value="${ui}"><small>${f(b)}</small><input type="number" class="num" data-k="${k}" step="${stp}" value="${f(ui)}"></div>`; }
 function renderSheet(){ const i=idx(), s=cards[i];
-  const acts=k=>{ if(VIS[k]&&!VIS[k](s)) return false; const three=s.engine==='three', isT=k.startsWith('t_'), light=['az','el','live','studio'].includes(k); return three ? (isT||light) : !isT; };   // only what acts on this card
+  const acts=k=>{ if(VIS[k]&&!VIS[k](s)) return false; const three=s.engine==='three', isT=k.startsWith('t_'), light=['az','el','live','studio','dist'].includes(k); return three ? (isT||light) : !isT; };   // only what acts on this card
   const cur=MATS.includes(s.mat);
   let h=`<div class="who">${NAMES[i]} · card ${i+1}</div>
     <h4>Material</h4><div class="seg">${MATS.map(k=>`<button data-preset="${k}" class="${s.mat===k?'on':''}">${k}</button>`).join('')}</div>
@@ -326,7 +331,7 @@ function renderSheet(){ const i=idx(), s=cards[i];
   h+=`<div class="acts"><button id="all">apply to all cards</button><button id="copy">copy spec</button></div>`;
   sheet.innerHTML=h;
   const C=()=>cards[i];   // always the card's CURRENT settings — presets/apply-all replace the object
-  const store=(r,ui)=>{ C()[r.dataset.k]= r.dataset.inv==='1' ? +r.dataset.a + +r.dataset.b - ui : ui; save(); paintCard(i); };   // inverted controls store the opposite end
+  const store=(r,ui)=>{ C()[r.dataset.k]= r.dataset.inv==='1' ? +r.dataset.a + +r.dataset.b - ui : ui; save(); paintCard(i); if(typeof placeLamp==='function') placeLamp(); };   // inverted controls store the opposite end
   sheet.querySelectorAll('input[type=range]').forEach(r=>{ const num=r.parentElement.querySelector('.num');
     r.oninput=()=>{ num.value=(+r.value).toFixed(+r.step<.01?3:2); store(r,+r.value); };
     num.onchange=()=>{ const v=+num.value; if(!isFinite(v)) return; r.value=v; store(r,v); };   // typed values may go past the slider's ends
@@ -352,6 +357,23 @@ let raf=0; const relight=()=>{ if(raf) return; raf=requestAnimationFrame(()=>{ r
 addEventListener('pointermove',e=>{ st.live={x:(e.clientX/innerWidth-.5)*1.4, y:-(e.clientY/innerHeight-.5)*1.4}; relight(); });
 document.getElementById('tilt').onclick=async e=>{ try{ if(typeof DeviceOrientationEvent!=='undefined'&&DeviceOrientationEvent.requestPermission) await DeviceOrientationEvent.requestPermission(); }catch(_){}
   e.target.classList.add('on'); e.target.textContent='phone tilt: ON'; addEventListener('deviceorientation',ev=>{ st.live={x:Math.max(-.7,Math.min(.7,(ev.gamma||0)/45)), y:Math.max(-.7,Math.min(.7,((ev.beta||45)-45)/45))}; relight(); }); };
+
+/* ── light handle ───────────────────────────────────────────────────── */
+const lamp=document.createElement('div'); lamp.className='lamp'; const lline=document.createElement('div'); lline.className='lampline'; document.body.append(lline,lamp);
+const cardBox=()=>document.querySelectorAll('.slide')[idx()].querySelector('.turn').getBoundingClientRect();
+const RAD=()=>cardBox().width*.95;   // handle at the card centre = light straight on; at this radius = grazing
+function placeLamp(){ const s=cards[idx()], b=cardBox(), cx=b.left+b.width/2, cy=b.top+b.height/2, r=Math.max(0,(90-(s.el??50))/80)*RAD(), a=(s.az??40)*Math.PI/180;
+  const x=cx+Math.cos(a)*r, y=cy-Math.sin(a)*r; lamp.style.left=x+'px'; lamp.style.top=y+'px';
+  const dx=cx-x, dy=cy-y; lline.style.left=x+'px'; lline.style.top=y+'px'; lline.style.width=Math.hypot(dx,dy)+'px'; lline.style.transform=`rotate(${Math.atan2(dy,dx)}rad)`; }
+let dragging=false;
+lamp.onpointerdown=e=>{ dragging=true; lamp.setPointerCapture(e.pointerId); e.preventDefault(); };
+lamp.onpointermove=e=>{ if(!dragging) return; const i=idx(), b=cardBox(), dx=e.clientX-(b.left+b.width/2), dy=e.clientY-(b.top+b.height/2);
+  const r=Math.min(1,Math.hypot(dx,dy)/RAD()); Object.assign(cards[i],{ az:Math.round((Math.atan2(-dy,dx)*180/Math.PI+360)%360), el:Math.round(90-r*80), live:0 });
+  placeLamp(); if(!raf2){ raf2=requestAnimationFrame(()=>{ raf2=0; faces[i*2].draw(); faces[i*2+1].draw(); }); } };
+let raf2=0;
+lamp.onpointerup=()=>{ if(!dragging) return; dragging=false; save(); if(sheet.classList.contains('open')) renderSheet(); };
+reel.addEventListener('scroll',placeLamp,{passive:true}); addEventListener('resize',placeLamp); setTimeout(placeLamp,50);
+const lampBtn=document.getElementById('lampBtn'); lampBtn.onclick=()=>{ const on=!lamp.classList.toggle('off'); lline.classList.toggle('lamp-off',!on); lline.style.display=on?'':'none'; lampBtn.classList.toggle('on',on); lampBtn.textContent=on?'light handle: ON':'light handle: OFF'; };
 </script>
 </body>
 </html>

@@ -65,7 +65,7 @@ export function createThreeCard(size) {
   scene.background = new THREE.Color(0x000000);
   const camera = new THREE.PerspectiveCamera(30, 1, .01, 10);
   camera.position.set(0, 0, 1 / (2 * Math.tan(15 * Math.PI / 180)));   // the card exactly fills the frame
-  const key = new THREE.DirectionalLight(0xffffff, 1.5);
+  const key = new THREE.PointLight(0xffffff, 1, 0, 2);   // physical fall-off: closer = brighter, tighter hotspot
   scene.add(key);
   /* the softbox: a rectangular area light near the card — a smooth, resolution-free light spot on matte,
      a satin glow on leather, a clean rectangular reflection on gloss */
@@ -207,9 +207,10 @@ export function createThreeCard(size) {
       mat.needsUpdate = true;
       const az = (s.az ?? 40) * Math.PI / 180, el = (s.el ?? 50) * Math.PI / 180;
       const lx = (s.live && s.liveL) ? s.liveL.x : Math.cos(az) * Math.cos(el), ly = (s.live && s.liveL) ? s.liveL.y : Math.sin(az) * Math.cos(el);
-      key.position.set(lx, ly, Math.sqrt(Math.max(.05, 1 - lx * lx - ly * ly)));
-      key.intensity = m.key; fall.uKsL.value.copy(key.position).normalize();
-      box.position.set(lx * 1.1, ly * 1.1, .9); box.lookAt(0, 0, 0); box.intensity = m.box ?? 0;
+      const dist = s.dist ?? 1.5, dir = new THREE.Vector3(lx, ly, Math.sqrt(Math.max(.05, 1 - lx * lx - ly * ly))).normalize();
+      key.position.copy(dir).multiplyScalar(dist);
+      key.intensity = m.key * 2.25; fall.uKsL.value.copy(dir);   // = the old directional brightness at the default distance 1.5
+      box.position.copy(dir).multiplyScalar(dist); box.lookAt(0, 0, 0); box.intensity = m.box ?? 0;   // the softbox sits with the lamp, aimed at the card
       scene.environmentRotation.set(-ly * .9, lx * .9 + m.envRot * Math.PI / 180, 0);
       renderer.toneMappingExposure = m.expo;
       renderer.render(scene, camera);
