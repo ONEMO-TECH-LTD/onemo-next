@@ -30,21 +30,21 @@ const DETAIL_SRC = { suede: 'suede', velvet: 'velvet', velvetTB: 'velvetTB', fab
 export const MATERIALS = {
   /* Dan's own KeyShot materials ("!!! --- DS"): MOD BACK SUEDE and MOD Velvet Black BRUSHED —
      lux_velvet (roughness .1, backscatter .2, edginess 10) over a noise bump; ks* = that velvet lobe, ksHeights = its noise layers */
-  'Suede':        { ks: 1, ksSheen: .22, ksEdge: 10, ksBack: .5, ksGrain: .35, ksGrainSize: 1.2, ksBump: 0, ksScales: [.5, .06, .0045, .0028], ksHeights: [.05, .08, 1, .4],
+  'Suede':        { washSrc: 'suede', ks: 1, ksSheen: .22, ksEdge: 10, ksBack: .5, ksGrain: .35, ksGrainSize: 1.2, ksBump: 0, ksScales: [.5, .06, .0045, .0028], ksHeights: [.05, .08, 1, .4],
                     scan: null, tile: 1, depth: 0, rough: 1, spec: .15, sheen: 0, sheenRough: .8, sheenTint: 0, coat: 0, coatRough: .05, env: 1, key: 1.2, box: 2, expo: 1, ao: 0, envRot: 90,
-                    soft: .12, lift: .06, blurPx: .4, punch: 0, detail: 0, detailGain: 3, detailTile: 1, wash: 0, washScale: 3, haze: 0, rim: 0 },
-  'Velvet':       { ks: 1, ksSheen: .3, ksEdge: 10, ksBack: .2, ksGrain: .12, ksGrainSize: 1.2, ksBump: .5, ksScales: [.35, .08, .006, .003], ksHeights: [.6, .2, 0, 0],
+                    soft: .12, lift: .06, blurPx: .4, punch: 0, detail: 0, detailGain: 3, detailTile: 1, wash: .2, washScale: 3, haze: 0, rim: 0 },
+  'Velvet':       { ks: 1, ksSheen: .3, ksEdge: 10, ksBack: .2, ksGrain: .2, ksGrainSize: 1.8, ksBump: .5, ksScales: [.35, .08, .006, .003], ksHeights: [.6, .2, 0, 0],
                     scan: 'fabVelvet', tile: 2, depth: .8, rough: 1, spec: .1, sheen: 1, sheenRough: .35, sheenTint: .8, coat: 0, coatRough: .05, env: 1, key: 1.2, box: 2.5, expo: 1, ao: .5, envRot: 90,
-                    soft: 0, lift: .02, blurPx: .3, punch: .12, detail: .2, detailGain: 3, detailTile: 1, wash: .25, washScale: 2, haze: 0, rim: .12 },
+                    soft: 0, lift: .02, blurPx: .3, punch: .12, detail: .35, detailGain: 6, detailTile: 1, wash: .25, washScale: 2, haze: 0, rim: .12 },
   'Suede · scan': { fall: .55, fallPow: 2.5, fallTint: .35, scan: 'suede',   tile: 2, depth: 1.0, rough: 1,   spec: .3, sheen: 1, sheenRough: .8,  sheenTint: .25, coat: 0, coatRough: .05, env: 1,   key: 1.2, box: 2.5, expo: 1,    ao: .4,  envRot: 90,
                     soft: .15, lift: .06, blurPx: .5, punch: 0,   detail: .35, detailGain: 3, detailTile: 1, wash: .4, washScale: 3, haze: .08, rim: 0 },
   'Velvet · scan': { fall: .9, fallPow: 2, fallTint: .8, scan: 'velvet',  tile: 4, depth: .8,  rough: 1,   spec: .2, sheen: 1, sheenRough: .35, sheenTint: 1,   coat: 0, coatRough: .05, env: 1,   key: 1.2, box: 3,   expo: .95,  ao: .4,  envRot: 90,
                     soft: 0,   lift: .02, blurPx: .4, punch: .12, detail: 0,   detailGain: 2.5, detailTile: 1.5, wash: .6, washScale: 2, haze: 0,   rim: .2 },
   'Faux leather': { antiTile: 1, roughMap: 0, scan: 'leather', tile: 3, depth: 1.4, rough: .5,  spec: .8, sheen: 0, sheenRough: .5,  sheenTint: 0,   coat: 0, coatRough: .05, env: .8,  key: 1.1, box: 5,   expo: 1,    ao: 0,   envRot: 90,
                     soft: .05, lift: .03, blurPx: 0,  punch: .04, detail: 0,   detailGain: 4, detailTile: 2,  wash: 0, washScale: 2.5, haze: 0, rim: 0 },
-  'UV matte':     { scan: null,      tile: 1, depth: 0,   rough: .55, spec: .6, sheen: 0, sheenRough: .5,  sheenTint: 0,   coat: 0, coatRough: .05, env: .8,  key: 1,   box: 6,   expo: 1,    ao: 0,   envRot: 90,
+  'UV matte':     { antiTile: 1, roughMap: 0, scan: 'leather', tile: 3, depth: 0,   rough: .6,  spec: .6, sheen: 0, sheenRough: .5,  sheenTint: 0,   coat: 0, coatRough: .05, env: .8,  key: 1,   box: 6,   expo: 1,    ao: 0,   envRot: 90,
                     soft: .04, lift: .05, blurPx: 0,  punch: -.05, detail: 0,  detailGain: 4, detailTile: 2,  wash: 0,   washScale: 2, haze: 0,   rim: 0 },
-  'UV gloss':     { scan: null,      tile: 1, depth: 0,   rough: .3,  spec: .5, sheen: 0, sheenRough: .5,  sheenTint: 0,   coat: 1, coatRough: .02, env: .3,  key: 1,   box: 8,   expo: 1,    ao: 0,   envRot: 90,
+  'UV gloss':     { antiTile: 1, roughMap: 0, scan: 'leather', tile: 3, depth: 0,   rough: .08, spec: 1,  sheen: 0, sheenRough: .5,  sheenTint: 0,   coat: 0, coatRough: .02, env: .3,  key: 1,   box: 8,   expo: 1,    ao: 0,   envRot: 90,
                     soft: 0,   lift: 0,   blurPx: 0,  punch: .14, detail: 0,   detailGain: 4, detailTile: 2,  wash: 0,   washScale: 2, haze: 0,   rim: 0 },
 };
 
@@ -137,9 +137,12 @@ export function createThreeCard(size) {
     g2.filter = 'blur(1.2px)'; g2.drawImage(c, 0, 0); return (greyCache[k] = c2); };   // soft fibres, not speckle
   /* nap / crush patches: the scan's own large-scale variation, blown up and smoothed */
   const washCache = {};
-  const wash = async (name, scale) => { const k = name + scale; if (washCache[k]) return washCache[k];
+  const wash = async (name, scale, seed = 0) => { const k = name + scale + '|' + seed; if (washCache[k]) return washCache[k];
     const src = await grey(name, 10); const small = document.createElement('canvas'); const n = Math.max(4, Math.round(24 / scale)); small.width = small.height = n;
-    small.getContext('2d').drawImage(src, 0, 0, n, n); const c = document.createElement('canvas'); c.width = c.height = size; const g = c.getContext('2d');
+    const sg = small.getContext('2d'), rnd = i => { const x = Math.sin(seed * 12.9898 + i * 78.233) * 43758.5453; return x - Math.floor(x); };
+    const pat = sg.createPattern(src, 'repeat');   // seed → where in the scan the patches come from, and their rotation
+    pat.setTransform(new DOMMatrix().translate(n / 2, n / 2).rotate(rnd(1) * 360).translate(-rnd(2) * n, -rnd(3) * n).scale(n / 512));
+    sg.fillStyle = pat; sg.fillRect(0, 0, n, n); const c = document.createElement('canvas'); c.width = c.height = size; const g = c.getContext('2d');
     g.imageSmoothingQuality = 'high'; g.filter = `blur(${size / n * .6}px) contrast(2.2)`; g.drawImage(small, -size * .1, -size * .1, size * 1.2, size * 1.2); return (washCache[k] = c); };
 
   const composed = new THREE.CanvasTexture(document.createElement('canvas')); composed.colorSpace = THREE.SRGBColorSpace;
@@ -151,7 +154,8 @@ export function createThreeCard(size) {
     const ds = DETAIL_SRC[m.scan];
     if (ds && SCANS[ds].diff && m.detail > 0) { const pat = g.createPattern(await grey(ds, m.detailGain), 'repeat'); pat.setTransform(new DOMMatrix().scale(size / 512 / m.detailTile));
       g.globalCompositeOperation = 'overlay'; g.globalAlpha = m.detail; g.fillStyle = pat; g.fillRect(0, 0, size, size); g.globalAlpha = 1; }
-    if (ds && SCANS[ds].diff && m.wash > 0) { g.globalCompositeOperation = 'soft-light'; g.globalAlpha = m.wash; g.drawImage(await wash(ds, m.washScale), 0, 0); g.globalAlpha = 1; }
+    const wsrc = m.washSrc || ds;
+    if (wsrc && SCANS[wsrc].diff && m.wash > 0) { g.globalCompositeOperation = 'soft-light'; g.globalAlpha = m.wash; g.drawImage(await wash(wsrc, m.washScale, m.seed), 0, 0); g.globalAlpha = 1; }
     g.globalCompositeOperation = 'source-over'; composed.needsUpdate = true; return composed; }
 
   async function stylisePost(m, back) {   // after lighting: fuzz veil and velvet edge glow
@@ -176,8 +180,10 @@ export function createThreeCard(size) {
     /* s: per-card settings — material name + t_* overrides; back: render the plain back face */
     async render(artUrl, s, back) {
       await envReady;
-      const m = { ...MATERIALS[s.mat3] }; for (const k in m) if (s['t_' + k] !== undefined) m[k] = s['t_' + k];
+      const m = { ...MATERIALS[s.mat3] }; for (const k in s) if (k.startsWith('t_')) m[k.slice(2)] = s[k];
       const a = await art(artUrl);
+      let h = 0; for (const c of artUrl) h = (h * 31 + c.charCodeAt(0)) % 9973;
+      m.seed = h + (m.washSeed ?? 0) * 131 + (back ? 4999 : 0);   // per artwork, per face, per reseed
       const sc = m.scan ? await scan(m.scan) : null;
       const printed = back ? null : await stylisePrint(a, m);
       mat.map = printed;
