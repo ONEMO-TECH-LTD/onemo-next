@@ -19,7 +19,8 @@
   .reel::-webkit-scrollbar { display:none; }
   .slide { height:100%; scroll-snap-align:start; scroll-snap-stop:always; display:flex; flex-direction:column; justify-content:space-between; padding:calc(54px + env(safe-area-inset-top)) 16px calc(22px + env(safe-area-inset-bottom)); }
   .stage { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; min-height:0; }
-  .track { width:calc(100% + 32px); margin:0 -16px; display:flex; overflow-x:auto; scroll-snap-type:x mandatory; scrollbar-width:none; overscroll-behavior-x:contain; padding:40px 0 24px; }
+  .track { width:calc(100% + 32px); margin:0 -16px; display:flex; overflow-x:auto; scroll-snap-type:x mandatory; scrollbar-width:none; overscroll-behavior-x:contain;
+    padding:130px 0 150px; margin-top:-90px; margin-bottom:-126px; }   /* a sideways scroller clips both axes: extra transparent room so big shadows aren't cut (net 40/24 as before) */
   .track::-webkit-scrollbar { display:none; }
   .cell { flex:0 0 100%; scroll-snap-align:center; scroll-snap-stop:always; display:flex; flex-direction:column; align-items:center; gap:14px; }
   .matbar { display:flex; gap:4px; flex-wrap:wrap; justify-content:center; }
