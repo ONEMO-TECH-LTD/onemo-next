@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>Suede 2D recipes — side by side</title>
+<style>
+  :root { --mono: ui-monospace,"SF Mono",Menlo,monospace; --ink:#16191d; --mut:#6b737c; --line:rgba(0,0,0,.12); }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { min-height:100vh; color:var(--ink); font-family:var(--mono); background:radial-gradient(130% 120% at 50% 20%, #eef0f2, #d7dbdf 85%); padding:24px 16px 40px; }
+  h1 { font-size:14px; letter-spacing:.06em; text-transform:uppercase; text-align:center; }
+  .sub { font-size:11px; color:var(--mut); text-align:center; margin:6px auto 22px; max-width:760px; line-height:1.5; }
+  .grid { display:flex; flex-wrap:wrap; gap:28px 22px; justify-content:center; }
+  .cell { width:min(304px,88vw); display:flex; flex-direction:column; gap:10px; }
+  .card { width:100%; aspect-ratio:1; border-radius:17%; overflow:hidden; box-shadow:0 26px 50px -18px rgba(10,13,18,.55); }
+  .card canvas { width:100%; height:100%; display:block; }
+  .tag { font-size:12px; font-weight:700; letter-spacing:.04em; }
+  .what { font-size:11px; color:var(--mut); line-height:1.45; }
+  .bar { position:sticky; top:8px; z-index:3; margin:0 auto 24px; max-width:980px; display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; justify-content:center;
+    background:rgba(255,255,255,.88); border:1px solid var(--line); border-radius:18px; padding:10px 14px; }
+  .bar label { font-size:10px; text-transform:uppercase; letter-spacing:.04em; display:flex; align-items:center; gap:6px; }
+  .bar input[type=range] { width:90px; accent-color:var(--ink); }
+  .arts { display:flex; gap:6px; }
+  .arts button { width:30px; height:30px; border-radius:7px; border:2px solid transparent; background-size:cover; cursor:pointer; }
+  .arts button.on { border-color:var(--ink); }
+  .btn { font-family:var(--mono); font-size:10px; text-transform:uppercase; border:1px solid var(--line); background:#fff; border-radius:999px; padding:7px 12px; cursor:pointer; }
+  .btn.on { background:var(--ink); color:#fff; }
+</style>
+</head>
+<body>
+<h1>Suede in 2D · four recipes, one artwork</h1>
+<p class="sub">Each card adds one thing to the one before. A is your Suede Studio spec (2 Nov). Move the mouse over D, or tap "tilt" on a phone, to move its light. Same card size as the shop feed (304).</p>
+
+<div class="bar">
+  <div class="arts" id="arts"></div>
+  <label class="btn" style="cursor:pointer">upload<input id="up" type="file" accept="image/*" hidden></label>
+  <label>print soften <input id="sat" type="range" min="0" max="40" value="12"></label>
+  <label>black lift <input id="lift" type="range" min="0" max="20" value="6"></label>
+  <label>print blur <input id="blur" type="range" min="0" max="15" value="5"></label>
+  <label>fibre relief <input id="relief" type="range" min="0" max="100" value="45"></label>
+  <label>sheen <input id="sheen" type="range" min="0" max="40" value="12"></label>
+  <button class="btn" id="back">back face</button>
+  <button class="btn" id="tilt">tilt (phone)</button>
+</div>
+
+<div class="grid">
+  <div class="cell"><div class="card"><canvas id="cA"></canvas></div><div class="tag">A · your spec</div><div class="what">Artwork + your nap and wash grain (fractal lit, density 13, size 1.55, detail 8, seed 32, light 46°/63°, relief 4.2, wash 30) at 100% overlay + 12% sheen. What the Figma card uses now.</div></div>
+  <div class="cell"><div class="card"><canvas id="cB"></canvas></div><div class="tag">B · A + printed on suede</div><div class="what">The art is treated as dye in fabric: colour softened, blacks lifted (suede can't print true black), a hair of blur. Grain unchanged.</div></div>
+  <div class="cell"><div class="card"><canvas id="cC"></canvas></div><div class="tag">C · B + real suede fibres</div><div class="what">Adds the real suede scan's fibre map (GSG SuedeBlack, the 3D viewer's material), lit once from your light angle. Your nap and wash stay on top.</div></div>
+  <div class="cell"><div class="card"><canvas id="cD"></canvas></div><div class="tag">D · C, relit live</div><div class="what">Same as C, but the light follows the mouse or the phone's tilt, so the fibres catch and lose light like real suede.</div></div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const ARTS=['art1','art2','art3','art4','art5','art6'].map(n=>`public/recipes/${n}.jpg`);
+const st={ art:ARTS[0], back:false, light:{x:Math.cos(46*Math.PI/180)*Math.cos(63*Math.PI/180), y:Math.sin(46*Math.PI/180)*Math.cos(63*Math.PI/180)}, live:null };
+
+const VS=`attribute vec2 a; varying vec2 v; void main(){ v=vec2(a.x*.5+.5, .5-a.y*.5); gl_Position=vec4(a,0.,1.); }`;
+const FS=`precision highp float; varying vec2 v;
+uniform sampler2D ART, GRAIN, NRM; uniform vec2 PX; uniform float PRINT, REAL, SAT, LIFT, BLUR, RELIEF, SHEEN, BACK; uniform vec3 L;
+vec3 ov(vec3 a, vec3 b){ return mix(2.*a*b, 1.-2.*(1.-a)*(1.-b), step(.5,a)); }
+void main(){
+  vec3 c;
+  if(BACK>.5){ c=vec3(61./255.); }
+  else if(PRINT>.5 && BLUR>0.){ vec2 o=PX*BLUR; c=(texture2D(ART,v).rgb*4.+texture2D(ART,v+vec2(o.x,0)).rgb+texture2D(ART,v-vec2(o.x,0)).rgb+texture2D(ART,v+vec2(0,o.y)).rgb+texture2D(ART,v-vec2(0,o.y)).rgb)/8.; }
+  else c=texture2D(ART,v).rgb;
+  if(PRINT>.5 && BACK<.5){ float l=dot(c,vec3(.299,.587,.114)); c=mix(vec3(l),c,1.-SAT); c=LIFT+(1.-LIFT)*c; }
+  if(REAL>.5){ vec3 n=texture2D(NRM,v).rgb*2.-1.; n=normalize(vec3(n.xy*RELIEF*6.,n.z)); vec3 Ld=normalize(L);
+    float d=max(dot(n,Ld),0.)/max(Ld.z,.05); c*=mix(1.,d,.85); c+=SHEEN*.9*pow(1.-n.z,1.2)*max(dot(normalize(n.xy+1e-4),normalize(Ld.xy+1e-4)),0.); }
+  vec3 g=texture2D(GRAIN,v).rgb; c=ov(c,g);
+  float r=distance(v,vec2(.22,.22))/0.66; c+=vec3(SHEEN)*(1.-smoothstep(0.,1.,r));
+  gl_FragColor=vec4(clamp(c,0.,1.),1.);
+}`;
+const imgCache={}; const loadImg=src=>imgCache[src]||(imgCache[src]=new Promise(r=>{ const i=new Image(); i.crossOrigin='anonymous'; i.onload=()=>r(i); i.src=src; }));
+
+function makeCard(id, opts){
+  const cv=$(id), dpr=Math.min(2,devicePixelRatio||1); const gl=cv.getContext('webgl',{premultipliedAlpha:false,preserveDrawingBuffer:true});
+  const sh=(t,s)=>{ const o=gl.createShader(t); gl.shaderSource(o,s); gl.compileShader(o); if(!gl.getShaderParameter(o,gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(o)); return o; };
+  const p=gl.createProgram(); gl.attachShader(p,sh(gl.VERTEX_SHADER,VS)); gl.attachShader(p,sh(gl.FRAGMENT_SHADER,FS)); gl.linkProgram(p); gl.useProgram(p);
+  const b=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,b); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+  const al=gl.getAttribLocation(p,'a'); gl.enableVertexAttribArray(al); gl.vertexAttribPointer(al,2,gl.FLOAT,false,0,0);
+  const U=n=>gl.getUniformLocation(p,n); const tex={};
+  const setTex=(unit,name,img)=>{ let t=tex[name]; if(!t){ t=tex[name]=gl.createTexture(); }
+    gl.activeTexture(gl.TEXTURE0+unit); gl.bindTexture(gl.TEXTURE_2D,t); gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,gl.RGB,gl.UNSIGNED_BYTE,img);
+    for(const [k,vv] of [[gl.TEXTURE_MIN_FILTER,gl.LINEAR],[gl.TEXTURE_MAG_FILTER,gl.LINEAR],[gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE],[gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D,k,vv);
+    gl.uniform1i(U(name),unit); };
+  // downscale big maps to the card's pixel size first (mip-like), so 2048px grain/fibres average instead of aliasing
+  const fit=(img)=>{ const s=Math.round(cv.clientWidth*dpr); const c=document.createElement('canvas'); c.width=c.height=s; const g=c.getContext('2d'); g.imageSmoothingQuality='high'; g.drawImage(img,0,0,s,s); return c; };
+  return { async draw(){ const s=Math.round(cv.clientWidth*dpr); if(cv.width!==s){ cv.width=cv.height=s; } gl.viewport(0,0,s,s);
+      const [art,grain,nrm]=await Promise.all([loadImg(st.art),loadImg('public/recipes/grain-dan-spec.png'),loadImg('public/recipes/suede-normal.png')]);
+      if(this._art!==st.art){ setTex(0,'ART',fit(art)); this._art=st.art; }
+      if(!this._g){ setTex(1,'GRAIN',fit(grain)); setTex(2,'NRM',fit(nrm)); this._g=1; }
+      gl.uniform2f(U('PX'),1/s,1/s); gl.uniform1f(U('PRINT'),opts.print?1:0); gl.uniform1f(U('REAL'),opts.real?1:0);
+      gl.uniform1f(U('SAT'),$('sat').value/100); gl.uniform1f(U('LIFT'),$('lift').value/100); gl.uniform1f(U('BLUR'),$('blur').value/10);
+      gl.uniform1f(U('RELIEF'),$('relief').value/100); gl.uniform1f(U('SHEEN'),$('sheen').value/100); gl.uniform1f(U('BACK'),st.back?1:0);
+      const li=(opts.live&&st.live)||st.light; const z=Math.sqrt(Math.max(.05,1-li.x*li.x-li.y*li.y)); gl.uniform3f(U('L'),li.x,li.y,z);
+      gl.drawArrays(gl.TRIANGLE_STRIP,0,4); } };
+}
+const cards=[makeCard('cA',{}),makeCard('cB',{print:1}),makeCard('cC',{print:1,real:1}),makeCard('cD',{print:1,real:1,live:1})];
+const drawAll=()=>cards.forEach(c=>c.draw()); const drawD=()=>cards[3].draw();
+
+ARTS.forEach((a,i)=>{ const bt=document.createElement('button'); bt.style.backgroundImage=`url(${a})`; if(!i) bt.classList.add('on');
+  bt.onclick=()=>{ st.art=a; document.querySelectorAll('#arts button').forEach(x=>x.classList.toggle('on',x===bt)); drawAll(); }; $('arts').appendChild(bt); });
+$('up').onchange=e=>{ const f=e.target.files[0]; if(!f) return; st.art=URL.createObjectURL(f); drawAll(); };
+['sat','lift','blur','relief','sheen'].forEach(id=>$(id).oninput=drawAll);
+$('back').onclick=()=>{ st.back=!st.back; $('back').classList.toggle('on',st.back); drawAll(); };
+const dCard=$('cD');
+dCard.addEventListener('pointermove',e=>{ const r=dCard.getBoundingClientRect(); st.live={x:((e.clientX-r.left)/r.width-.5)*1.4, y:-((e.clientY-r.top)/r.height-.5)*1.4}; drawD(); });
+dCard.addEventListener('pointerleave',()=>{ st.live=null; drawD(); });
+$('tilt').onclick=async()=>{ try{ if(typeof DeviceOrientationEvent!=='undefined'&&DeviceOrientationEvent.requestPermission) await DeviceOrientationEvent.requestPermission(); }catch(_){}
+  $('tilt').classList.add('on'); addEventListener('deviceorientation',e=>{ st.live={x:Math.max(-.7,Math.min(.7,(e.gamma||0)/45)), y:Math.max(-.7,Math.min(.7,((e.beta||45)-45)/45))}; drawD(); }); };
+addEventListener('resize',drawAll); drawAll();
+</script>
+</body>
+</html>
