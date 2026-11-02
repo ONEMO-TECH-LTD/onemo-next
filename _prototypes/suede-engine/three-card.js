@@ -76,7 +76,7 @@ export function createThreeCard(size) {
       mat.sheenColor.setRGB(1, 1, 1); mat.sheenColorMap = (!back && m.sheenTint > 0) ? a : null;   // velvet: the sheen takes the print's colour
       if (mat.sheenColorMap) mat.sheenColor.setScalar(m.sheenTint); else mat.sheenColor.setScalar(1);
       mat.clearcoat = m.coat; mat.clearcoatRoughness = m.coatRough;
-      mat.envMapIntensity = m.env;
+      scene.environmentIntensity = m.env;   // envMapIntensity only affects material.envMap, not scene.environment
       mat.needsUpdate = true;
       // light: key light from the card's angle/height; the studio turns with it
       const az = (s.az ?? 40) * Math.PI / 180, el = (s.el ?? 50) * Math.PI / 180;
