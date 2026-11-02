@@ -137,7 +137,7 @@ const PRESETS={
 };
 const MATS=['Suede','Velvet','Faux leather','UV matte','UV gloss'];
 const BACKS=MATS.filter(m=>m!=='Velvet');   // the back is never velvet
-for(const n of [...MATS,'Suede · scan','Velvet · scan']){ const t={}; for(const k in M3[n]) if(k!=='scan'&&k!=='studio') t['t_'+k]=M3[n][k]; if(M3[n].studio) t.studio=M3[n].studio; t.t_amb??=.6; PRESETS[n]={engine:'three',mat3:n,az:40,el:50,live:0,dist:1.5,rimMm:3,rimAng:60,rimSoft:.6,rimHi:.15,rimShade:.25,rimSheen:.3,lift:6,shadow:.5,shBlur:.5,shSpread:0,shDist:1,shContact:1,...t}; }   // fabrics + gloss read through moving light   // proven: three.js + Poly Haven
+for(const n of [...MATS,'Suede · scan','Velvet · scan']){ const t={}; for(const k in M3[n]) if(k!=='scan'&&k!=='studio') t['t_'+k]=M3[n][k]; if(M3[n].studio) t.studio=M3[n].studio; t.t_amb??=.6; PRESETS[n]={engine:'three',mat3:n,az:40,el:50,live:0,dist:1.5,rimMm:3,rimAng:60,rimSoft:.6,rimHi:.15,rimShade:.25,rimSheen:.3,...t}; }   // fabrics + gloss read through moving light   // proven: three.js + Poly Haven
 const KEY='onemo-materials';   // stable: never renamed again, so your settings survive page updates
 let cards; try{ cards=JSON.parse(localStorage.getItem(KEY)); if(!cards) for(let v=20;v>=11&&!cards;v--) cards=JSON.parse(localStorage.getItem('onemo-materials-v'+v)); }catch(_){}
 /* grid: rows = artworks (swipe up/down), columns = materials (swipe left/right); card k = row*NM + col */
@@ -146,6 +146,10 @@ const fresh=k=>{ const m=MATS[COL(k)]; return {...PRESETS[m],mat:m,backMat:'Sued
 if(Array.isArray(cards)&&cards.length===ARTS.length){ const old=cards; cards=[]; old.forEach((c,i)=>{ const j=MATS.indexOf(c&&c.mat); if(j>=0) cards[i*NM+j]=c; }); }   // migrate the 6-card layout
 cards=ARTS.flatMap((_,i)=>MATS.map((m,j)=>{ const k=i*NM+j, c=Array.isArray(cards)&&cards[k]; return c&&c.mat&&PRESETS[c.mat] ? {...PRESETS[c.mat],backMat:'Suede',...c} : c||fresh(k); }));   // new controls get preset values, yours win
 const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(cards)); }catch(_){} };
+const GLOBAL_KEYS=['shLift','shadow','shBlur','shSpread','shDist','shContact'];   // shadow under the card: one setting for every card
+let G; try{ G=JSON.parse(localStorage.getItem('onemo-global')); }catch(_){}
+G={ shLift:6, shadow:.5, shBlur:.5, shSpread:0, shDist:1, shContact:1, ...(G||{}) };
+const saveG=()=>{ try{ localStorage.setItem('onemo-global',JSON.stringify(G)); }catch(_){} };
 const st={ live:null };
 
 /* ── one shared WebGL renderer, painting faces into plain 2D canvases ─ */
@@ -267,8 +271,9 @@ function face(canvas, k, back){ canvas.width=canvas.height=SZ; const ctx=canvas.
     else { await R3.render(art,back,s); ctx.drawImage(R3.cv,0,0); } }); return chain; } }; }
 
 /* floating shadow: tight contact shadow + soft lifted one, both thrown away from the light */
-function floatShadow(k,lx,ly){ const s=cards[k], el=cells[k]; if(!el) return; const [soft,contact]=[el.querySelector('.sh2'),el.querySelector('.sh1')];
-  const L=(s.lift??6)*304/68, kS=s.shadow??.5, dx=-lx*L*(s.shDist??1), dy=ly*L*(s.shDist??1)+L*.3;   // mm → px at card size; screen y runs down
+const lastL={};
+function floatShadow(k,lx,ly){ const s=G, el=cells[k]; if(!el) return; lastL[k]=[lx,ly]; const [soft,contact]=[el.querySelector('.sh2'),el.querySelector('.sh1')];
+  const L=(s.shLift??6)*304/68, kS=s.shadow??.5, dx=-lx*L*(s.shDist??1), dy=ly*L*(s.shDist??1)+L*.3;   // mm → px at card size; screen y runs down
   soft.style.transform=`translate(${dx.toFixed(1)}px,${dy.toFixed(1)}px) scale(${(1+(s.shSpread??0)*.12).toFixed(3)})`;
   soft.style.filter=`blur(${Math.min(48,(6+L*.45)*(s.shBlur??.5)*2).toFixed(1)}px)`; soft.style.opacity=Math.min(.95,.6*kS).toFixed(2);
   contact.style.transform=`translate(${(dx*.12).toFixed(1)}px,${(dy*.12+1).toFixed(1)}px)`;
@@ -315,7 +320,7 @@ const sheet=document.getElementById('sheet');
 const CTL=[
   ['Light',[['t_key','light strength',0,6,.01],['t_amb','ambient fill',0,3,.01],['dist','light distance',.5,4,.05],['az','light angle °',0,360,1],['el','light height °',5,85,1],['t_expo','exposure',.3,2.5,.01],['studio','studio','seg',Object.keys(STUDIOS)],['t_env','studio light & reflections',0,3,.01],['t_envRot','studio rotation °',0,360,1],['live','light follows mouse/tilt','toggle']],1],
   ['Edge (rim)',[['rimMm','rim width (mm)',0,5,.1],['rimAng','rim curve °',0,85,1],['rimSoft','rim blend (soft start)',0,1,.01],['rimHi','rim highlight (light side)',0,1,.01],['rimShade','rim shade (far side)',0,1,.01],['rimSheen','rim fabric sheen',0,1,.01]],1],
-  ['Shadow',[['lift','float height (mm)',0,20,.5],['shadow','shadow strength',0,1.5,.01],['shBlur','shadow softness',0,1.5,.01],['shSpread','shadow size',-1,1,.01],['shDist','shadow throw (from light)',0,3,.01],['shContact','contact shadow',0,2,.01]],0],
+  ['Shadow (all cards)',[['shLift','float height (mm)',0,20,.5],['shadow','shadow strength',0,1.5,.01],['shBlur','shadow softness',0,1.5,.01],['shSpread','shadow size',-1,1,.01],['shDist','shadow throw (from light)',0,3,.01],['shContact','contact shadow',0,2,.01]],0],
   ['Print',[['t_soft','print softening',0,.5,.01],['t_lift','black lift',0,.25,.005],['t_punch','colour punch',-.3,.4,.01],['t_blurPx','dye bleed (blur px)',0,4,.05]],0],
   ['Nap, wash & highlights',[['t_ksSheen','highlights',0,1,.01],['t_ksGrainSize','nap size (px)',.6,6,.05],['t_ksGrain','nap strength',0,1,.01],['t_wash','wash (nap / crush patches)',0,1,.01],['t_washScale','wash size',1,12,.1],['t_washSeed','wash layout (reseed)',0,99,1],
     ['t_ksBack','backscatter (milky veil)',0,1,.01],['t_ks','velvet lobe',0,2,.01],['t_ksBump','brushed patches (bump)',0,3,.01],['t_ksEdge','edginess',1,20,.1],['t_rim','velvet edge glow',0,.8,.01],['t_haze','fuzz haze',0,.4,.005],
@@ -349,13 +354,13 @@ const VIS={ t_sheen:s=>!(s.t_ks>0), t_rough:s=>!(s.t_ks>0), t_fall:s=>FAB(s)&&!(
   ndens:s=>s.proc, nstretch:s=>s.proc, ndir:s=>s.proc, nrelief:s=>s.proc, namt:s=>s.proc, wscale:s=>s.proc, wamt:s=>s.proc, tips:s=>s.proc, seed:s=>s.proc,
   fscale:s=>s.fibres, relief:s=>s.fibres, fmix:s=>s.fibres, fsheen:s=>s.fibres, lamt:s=>s.layer!=='none', lscale:s=>s.layer!=='none',
   az:s=>s.engine==='three'||s.pbr||s.fibres||s.proc, el:s=>s.engine==='three'||s.pbr||s.fibres||s.proc };
-function ctlHtml(s,[k,label,a,b,stp,inv]){
+function ctlHtml(s,[k,label,a,b,stp,inv]){ if(GLOBAL_KEYS.includes(k)) s=G;
   if(a==='toggle') return `<div class="seg"><button data-tog="${k}" class="${s[k]?'on':''}">${label}: ${s[k]?'ON':'OFF'}</button></div>`;
   if(a==='seg') return `<div class="seg">${b.map(o=>`<button data-seg="${k}" data-v="${o}" class="${(s[k]??(k==='studio'?DEFAULT_STUDIO:undefined))===o?'on':''}">${o}</button>`).join('')}</div>`;
   const ui=inv?a+b-(s[k]??0):(s[k]??0), f=v=>(+v).toFixed(stp<.01?3:2);
   return `<div class="ctl"><span>${label}</span><small>${f(a)}</small><input type="range" data-k="${k}" data-inv="${inv?1:0}" data-a="${a}" data-b="${b}" min="${a}" max="${b}" step="${stp}" value="${ui}"><small>${f(b)}</small><input type="number" class="num" data-k="${k}" step="${stp}" value="${f(ui)}"></div>`; }
 function renderSheet(){ const i=idx(), s=cards[i];
-  const acts=k=>{ if(VIS[k]&&!VIS[k](s)) return false; const three=s.engine==='three', isT=k.startsWith('t_'), light=['az','el','live','studio','dist','rimMm','rimAng','rimSoft','rimHi','rimShade','rimSheen','lift','shadow','shBlur','shSpread','shDist','shContact'].includes(k); return three ? (isT||light) : !isT; };   // only what acts on this card
+  const acts=k=>{ if(VIS[k]&&!VIS[k](s)) return false; const three=s.engine==='three', isT=k.startsWith('t_'), light=['az','el','live','studio','dist','rimMm','rimAng','rimSoft','rimHi','rimShade','rimSheen','shLift','shadow','shBlur','shSpread','shDist','shContact'].includes(k); return three ? (isT||light) : !isT; };   // only what acts on this card
   const cur=MATS.includes(s.mat);
   let h=`<div class="who">${NAMES[ROW(i)]} · ${s.mat}</div>
     <h4>Material</h4><div class="seg">${MATS.map(k=>`<button data-preset="${k}" class="${s.mat===k?'on':''}">${k}</button>`).join('')}</div>
@@ -368,7 +373,9 @@ function renderSheet(){ const i=idx(), s=cards[i];
   h+=`<div class="acts"><button id="all">apply to all artworks (this material)</button><button id="copy">copy spec</button></div>`;
   sheet.innerHTML=h;
   const C=()=>cards[i];   // always the card's CURRENT settings — presets/apply-all replace the object
-  const store=(r,ui)=>{ C()[r.dataset.k]= r.dataset.inv==='1' ? +r.dataset.a + +r.dataset.b - ui : ui; save(); paintCard(i); if(typeof placeLamp==='function') placeLamp(); };   // inverted controls store the opposite end
+  const store=(r,ui)=>{ const v=r.dataset.inv==='1' ? +r.dataset.a + +r.dataset.b - ui : ui;
+    if(GLOBAL_KEYS.includes(r.dataset.k)){ G[r.dataset.k]=v; saveG(); for(const k in lastL) floatShadow(+k,...lastL[k]); return; }   // global: redraw every shadow, no re-render
+    C()[r.dataset.k]=v; save(); paintCard(i); if(typeof placeLamp==='function') placeLamp(); };   // inverted controls store the opposite end
   sheet.querySelectorAll('input[type=range]').forEach(r=>{ const num=r.parentElement.querySelector('.num');
     r.oninput=()=>{ num.value=(+r.value).toFixed(+r.step<.01?3:2); store(r,+r.value); };
     num.onchange=()=>{ const v=+num.value; if(!isFinite(v)) return; r.value=v; store(r,v); };   // typed values may go past the slider's ends
