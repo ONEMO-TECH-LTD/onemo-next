@@ -1,7 +1,7 @@
 /* Material card renderer — proven base, stylised to read at card size.
    Base: three.js MeshPhysicalMaterial (sheen, clearcoat, normal/roughness/AO maps) on a flat card,
    lit by a real photographed studio (Poly Haven studio_small_08, CC0) plus one key light.
-   Material scans: Poly Haven scuba_suede, velour_velvet, leather_red_02 (CC0, 1K).
+   Material scans: ambientCG Leather039 (fine suede), Poly Haven velour_velvet, leather_red_02 (CC0, 1K).
    Stylisation (Dan, 2 Nov: "make it all stylised so it reads as suede and correct material"):
    before lighting the print is treated per material (soften, lift, punch, fibre detail, nap/crush patches);
    after lighting a fuzz haze and a velvet edge glow are added. Real fibres are sub-pixel at 304 px, so
@@ -9,10 +9,12 @@
    One shared renderer paints a card on demand; nothing runs continuously. */
 import * as THREE from 'three';
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
+import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
+RectAreaLightUniformsLib.init();
 
 const P = 'public/pbr/';
 const SCANS = {
-  suede:   { nor: 'scuba_suede_nor_gl_1k.jpg',       rough: 'scuba_suede_rough_1k.jpg',       ao: 'scuba_suede_ao_1k.jpg',   diff: 'scuba_suede_diff_1k.jpg' },
+  suede:   { nor: 'acg_suede_Leather039_nor_gl_1k.jpg', rough: 'acg_suede_Leather039_rough_1k.jpg', ao: null, diff: 'acg_suede_Leather039_diff_1k.jpg' },   // ambientCG Leather039: photogrammetry fine suede (CC0)
   velvet:  { nor: 'velour_velvet_nor_gl_1k.jpg',     rough: 'velour_velvet_rough_1k.jpg',     ao: 'velour_velvet_ao_1k.jpg', diff: 'velour_velvet_diff_1k.jpg' },
   leather: { nor: 'leather_red_02_nor_gl_1k.jpg',    rough: 'leather_red_02_rough_1k.jpg',    ao: 'leather_red_02_ao_1k.jpg' },   // even fine pebble grain, no seams or creases
 };
@@ -23,15 +25,15 @@ const DETAIL_SRC = { suede: 'suede', velvet: 'velvet', leather: 'suede' };   // 
    detail/detailGain/detailTile: scan fibres over the print · wash/washScale: nap or crush patches
    haze: fuzz veil (after light) · rim: velvet edge glow (after light) */
 export const MATERIALS = {
-  'Suede':        { scan: 'suede',   tile: 3, depth: 1.2, rough: 1,   spec: .3, sheen: 1, sheenRough: .8,  sheenTint: .25, coat: 0, coatRough: .05, env: 1,   key: 1.6, expo: 1,    ao: .5,  envRot: 90,
-                    soft: .18, lift: .08, blurPx: .6, punch: 0,   detail: .9, detailGain: 6, detailTile: 1.5, wash: .55, washScale: 3, haze: .14, rim: 0 },
-  'Velvet':       { scan: 'velvet',  tile: 4, depth: .9,  rough: 1,   spec: .2, sheen: 1, sheenRough: .35, sheenTint: 1,   coat: 0, coatRough: .05, env: 1,   key: 1.6, expo: .95,  ao: .5,  envRot: 90,
-                    soft: 0,   lift: .02, blurPx: .4, punch: .12, detail: .55, detailGain: 5, detailTile: 2,  wash: .75, washScale: 2, haze: .04, rim: .35 },
-  'Faux leather': { scan: 'leather', tile: 3, depth: 1.1, rough: .55, spec: .8, sheen: 0, sheenRough: .5,  sheenTint: 0,   coat: 0, coatRough: .05, env: 1,   key: 1.5, expo: 1,    ao: 0, envRot: 90,
+  'Suede':        { fall: .55, fallPow: 2.5, fallTint: .35, scan: 'suede',   tile: 2, depth: 1.0, rough: 1,   spec: .3, sheen: 1, sheenRough: .8,  sheenTint: .25, coat: 0, coatRough: .05, env: 1,   key: 1.2, box: 2.5, expo: 1,    ao: .4,  envRot: 90,
+                    soft: .15, lift: .06, blurPx: .5, punch: 0,   detail: .35, detailGain: 3, detailTile: 1, wash: .4, washScale: 3, haze: .08, rim: 0 },
+  'Velvet':       { fall: .9, fallPow: 2, fallTint: .8, scan: 'velvet',  tile: 4, depth: .8,  rough: 1,   spec: .2, sheen: 1, sheenRough: .35, sheenTint: 1,   coat: 0, coatRough: .05, env: 1,   key: 1.2, box: 3,   expo: .95,  ao: .4,  envRot: 90,
+                    soft: 0,   lift: .02, blurPx: .4, punch: .12, detail: 0,   detailGain: 2.5, detailTile: 1.5, wash: .6, washScale: 2, haze: 0,   rim: .2 },
+  'Faux leather': { scan: 'leather', tile: 3, depth: 1.1, rough: .5,  spec: .8, sheen: 0, sheenRough: .5,  sheenTint: 0,   coat: 0, coatRough: .05, env: .8,  key: 1.1, box: 5,   expo: 1,    ao: 0,   envRot: 90,
                     soft: .05, lift: .03, blurPx: 0,  punch: .04, detail: 0,   detailGain: 4, detailTile: 2,  wash: 0, washScale: 2.5, haze: 0, rim: 0 },
-  'UV matte':     { scan: null,      tile: 1, depth: 0,   rough: .7,  spec: .4, sheen: 0, sheenRough: .5,  sheenTint: 0,   coat: 0, coatRough: .05, env: 1,   key: 1.2, expo: 1,    ao: 0,   envRot: 90,
+  'UV matte':     { scan: null,      tile: 1, depth: 0,   rough: .55, spec: .6, sheen: 0, sheenRough: .5,  sheenTint: 0,   coat: 0, coatRough: .05, env: .8,  key: 1,   box: 6,   expo: 1,    ao: 0,   envRot: 90,
                     soft: .04, lift: .05, blurPx: 0,  punch: -.05, detail: 0,  detailGain: 4, detailTile: 2,  wash: 0,   washScale: 2, haze: 0,   rim: 0 },
-  'UV gloss':     { scan: null,      tile: 1, depth: 0,   rough: .3,  spec: .5, sheen: 0, sheenRough: .5,  sheenTint: 0,   coat: 1, coatRough: .03, env: 1.3, key: 1.3, expo: 1,    ao: 0,   envRot: 90,
+  'UV gloss':     { scan: null,      tile: 1, depth: 0,   rough: .3,  spec: .5, sheen: 0, sheenRough: .5,  sheenTint: 0,   coat: 1, coatRough: .02, env: .3,  key: 1,   box: 8,   expo: 1,    ao: 0,   envRot: 90,
                     soft: 0,   lift: 0,   blurPx: 0,  punch: .14, detail: 0,   detailGain: 4, detailTile: 2,  wash: 0,   washScale: 2, haze: 0,   rim: 0 },
 };
 
@@ -50,7 +52,19 @@ export function createThreeCard(size) {
   camera.position.set(0, 0, 1 / (2 * Math.tan(15 * Math.PI / 180)));   // the card exactly fills the frame
   const key = new THREE.DirectionalLight(0xffffff, 1.5);
   scene.add(key);
+  /* the softbox: a rectangular area light near the card — a smooth, resolution-free light spot on matte,
+     a satin glow on leather, a clean rectangular reflection on gloss */
+  const box = new THREE.RectAreaLight(0xffffff, 6, .55, .38);
+  scene.add(box);
   const mat = new THREE.MeshPhysicalMaterial();
+  const fall = { uFall: { value: 0 }, uFallPow: { value: 3 }, uFallTint: { value: .5 } };
+  mat.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, fall);
+    sh.fragmentShader = 'uniform float uFall, uFallPow, uFallTint;\n' + sh.fragmentShader.replace('#include <opaque_fragment>',
+      `{ vec3 Vv = normalize(vViewPosition); float fo = pow(1.0 - clamp(dot(normal, Vv), 0.0, 1.0), uFallPow);   // piled-fabric fall-off
+         vec3 pile = mix(vec3(1.0), diffuseColor.rgb * 1.6 + 0.15, uFallTint);
+         outgoingLight = mix(outgoingLight, pile * (outgoingLight + 0.12), clamp(fo * uFall, 0.0, 1.0)); }
+       #include <opaque_fragment>`); };
   const card = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
   scene.add(card);
 
@@ -59,8 +73,8 @@ export function createThreeCard(size) {
     t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
     t.anisotropy = renderer.capabilities.getMaxAnisotropy(); res(t); }));
   const scanCache = {}, artCache = {};
-  const scan = name => scanCache[name] || (scanCache[name] = Promise.all(['nor', 'rough', 'ao'].map(k => tex(P + SCANS[name][k], false)))
-    .then(([nor, rough, ao]) => { for (const t of [nor, rough, ao]) { t.wrapS = t.wrapT = THREE.RepeatWrapping; } return { nor, rough, ao }; }));
+  const scan = name => scanCache[name] || (scanCache[name] = Promise.all(['nor', 'rough', 'ao'].map(k => SCANS[name][k] ? tex(P + SCANS[name][k], false) : null))
+    .then(([nor, rough, ao]) => { for (const t of [nor, rough, ao]) if (t) { t.wrapS = t.wrapT = THREE.RepeatWrapping; } return { nor, rough, ao }; }));
   const art = url => artCache[url] || (artCache[url] = tex(url, true));
   const img = url => new Promise(res => { const i = new Image(); i.onload = () => res(i); i.src = url; });
 
@@ -75,7 +89,8 @@ export function createThreeCard(size) {
   const grey = async (name, gain) => { const k = name + gain; if (greyCache[k]) return greyCache[k];
     const L = await lum(name); const c = document.createElement('canvas'); c.width = c.height = 512; const g = c.getContext('2d');
     const d = g.createImageData(512, 512); for (let i = 0; i < L.length; i++) { const v = Math.max(0, Math.min(255, 128 + L[i] * gain)); d.data[i * 4] = d.data[i * 4 + 1] = d.data[i * 4 + 2] = v; d.data[i * 4 + 3] = 255; }
-    g.putImageData(d, 0, 0); return (greyCache[k] = c); };
+    g.putImageData(d, 0, 0); const c2 = document.createElement('canvas'); c2.width = c2.height = 512; const g2 = c2.getContext('2d');
+    g2.filter = 'blur(1.2px)'; g2.drawImage(c, 0, 0); return (greyCache[k] = c2); };   // soft fibres, not speckle
   /* nap / crush patches: the scan's own large-scale variation, blown up and smoothed */
   const washCache = {};
   const wash = async (name, scale) => { const k = name + scale; if (washCache[k]) return washCache[k];
@@ -123,8 +138,8 @@ export function createThreeCard(size) {
       const printed = back ? null : await stylisePrint(a, m);
       mat.map = printed;
       mat.color.set(back ? 0x3d3d3d : 0xffffff);
-      if (sc) { for (const t of [sc.nor, sc.rough, sc.ao]) t.repeat.set(m.tile, m.tile);
-        mat.normalMap = sc.nor; mat.normalScale.set(m.depth, m.depth); mat.roughnessMap = sc.rough; mat.aoMap = m.ao > 0 ? sc.ao : null; mat.aoMapIntensity = m.ao; }
+      if (sc) { for (const t of [sc.nor, sc.rough, sc.ao]) if (t) t.repeat.set(m.tile, m.tile);
+        mat.normalMap = sc.nor; mat.normalScale.set(m.depth, m.depth); mat.roughnessMap = sc.rough; mat.aoMap = m.ao > 0 && sc.ao ? sc.ao : null; mat.aoMapIntensity = m.ao; }
       else { mat.normalMap = null; mat.roughnessMap = null; mat.aoMap = null; }
       mat.roughness = m.rough; mat.metalness = 0; mat.specularIntensity = m.spec;
       mat.sheen = m.sheen; mat.sheenRoughness = m.sheenRough;
@@ -132,11 +147,13 @@ export function createThreeCard(size) {
       mat.sheenColor.setScalar(mat.sheenColorMap ? m.sheenTint : 1);
       mat.clearcoat = m.coat; mat.clearcoatRoughness = m.coatRough;
       scene.environmentIntensity = m.env;
+      fall.uFall.value = m.fall ?? 0; fall.uFallPow.value = m.fallPow ?? 3; fall.uFallTint.value = m.fallTint ?? .5;
       mat.needsUpdate = true;
       const az = (s.az ?? 40) * Math.PI / 180, el = (s.el ?? 50) * Math.PI / 180;
       const lx = (s.live && s.liveL) ? s.liveL.x : Math.cos(az) * Math.cos(el), ly = (s.live && s.liveL) ? s.liveL.y : Math.sin(az) * Math.cos(el);
       key.position.set(lx, ly, Math.sqrt(Math.max(.05, 1 - lx * lx - ly * ly)));
       key.intensity = m.key;
+      box.position.set(lx * 1.1, ly * 1.1, .9); box.lookAt(0, 0, 0); box.intensity = m.box ?? 0;
       scene.environmentRotation.set(-ly * .9, lx * .9 + m.envRot * Math.PI / 180, 0);
       renderer.toneMappingExposure = m.expo;
       renderer.render(scene, camera);
