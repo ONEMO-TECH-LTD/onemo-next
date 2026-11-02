@@ -118,9 +118,11 @@ const io=new IntersectionObserver(es=>es.forEach(e=>{ if(e.isIntersecting){ cons
 [...reel.children].forEach(el=>io.observe(el));
 const drawAll=()=>{ painted.clear(); const i=Math.round(reel.scrollTop/reel.clientHeight); paintSlide(i); paintSlide(i+1); paintSlide(i-1); };
 
-// background: the build's procedural surface, NEUTRAL and STILL — drawn once, not animated, no per-scroll colour work
-const surface=createSurface({ canvas:document.getElementById('surface'), mode:'neutral', animated:false, maxPixelRatio:1 });
+// background: the build's procedural surface — moving and taking the Effect's colours, at 1x; scroll blend once per frame
+const surface=createSurface({ canvas:document.getElementById('surface'), mode:'adaptive', animated:true, maxPixelRatio:1 });
 const idx=()=>Math.round(reel.scrollTop/reel.clientHeight);
+surface?.adoptImage(ARTS[0]);
+let sraf=0; reel.addEventListener('scroll',()=>{ if(sraf) return; sraf=requestAnimationFrame(()=>{ sraf=0; const t=reel.scrollTop/reel.clientHeight, i=Math.floor(t); surface?.blendImages(ARTS[Math.max(0,Math.min(5,i))],ARTS[Math.min(5,i+1)],t-i); }); },{passive:true});
 addEventListener('resize',()=>surface?.resize());
 
 // look switch + light
