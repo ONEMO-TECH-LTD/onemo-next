@@ -78,10 +78,12 @@ const PRESETS={
   B:{print:1,soften:.12,lift:.06,blur:.5, fibres:0,fscale:1,relief:.45,fmix:.85,fsheen:.11, layer:'grain',lamt:1,lscale:1, az:46,el:63,live:0, sheen:.12},
   'B+fine fibres':{print:1,soften:.12,lift:.06,blur:.5, fibres:1,fscale:4,relief:.2,fmix:.5,fsheen:.06, layer:'grain',lamt:1,lscale:1, az:46,el:63,live:0, sheen:.12},
   E:{print:1,soften:.12,lift:.06,blur:.5, fibres:0,fscale:1,relief:.45,fmix:.85,fsheen:.11, layer:'archive',lamt:1,lscale:1, az:46,el:63,live:0, sheen:.12},
+  'Shader suede':{print:1,soften:.12,lift:.06,blur:.5, fibres:0,fscale:4,relief:.2,fmix:.5,fsheen:.06, layer:'none',lamt:1,lscale:1, az:46,el:63,live:0, sheen:.12,
+    proc:1,ndens:60,nstretch:3,ndir:35,nrelief:.45,namt:1,wscale:1,wamt:.35,tips:.1,seed:7},
 };
-const KEY='onemo-suede-cards-v1';
+const KEY='onemo-suede-cards-v2';
 let cards; try{ cards=JSON.parse(localStorage.getItem(KEY)); }catch(_){}
-if(!Array.isArray(cards)||cards.length!==ARTS.length) cards=ARTS.map(()=>({...PRESETS['B+fine fibres']}));
+if(!Array.isArray(cards)||cards.length!==ARTS.length) cards=ARTS.map(()=>({...PRESETS['Shader suede']}));
 const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(cards)); }catch(_){} };
 const st={ live:null };
 
@@ -90,7 +92,19 @@ const VS=`attribute vec2 a; varying vec2 v; void main(){ v=vec2(a.x*.5+.5,.5-a.y
 const FS=`precision highp float; varying vec2 v;
 uniform sampler2D ART,GRAIN,NRM,ARCH; uniform vec2 PX;
 uniform float BACK,PRINT,SOFT,LIFT,BLUR,FIB,FSCALE,RELIEF,FMIX,FSHEEN,LAYER,LAMT,LSCALE,SHEEN; uniform vec3 L;
+uniform float PROC,NDENS,NSTRETCH,NDIR,NRELIEF,NAMT,WSCALE,WAMT,TIPS,SEED; uniform float SZPX;
 vec3 ov(vec3 a,vec3 b){ return mix(2.*a*b,1.-2.*(1.-a)*(1.-b),step(.5,a)); }
+/* 2D simplex noise (Ashima / Gustavson, MIT) */
+vec3 m289(vec3 x){return x-floor(x*(1./289.))*289.;} vec2 m289(vec2 x){return x-floor(x*(1./289.))*289.;} vec3 perm(vec3 x){return m289(((x*34.)+1.)*x);}
+float sn(vec2 v){ const vec4 C=vec4(.211324865405187,.366025403784439,-.577350269189626,.024390243902439);
+  vec2 i=floor(v+dot(v,C.yy)); vec2 x0=v-i+dot(i,C.xx); vec2 i1=(x0.x>x0.y)?vec2(1.,0.):vec2(0.,1.); vec4 x12=x0.xyxy+C.xxzz; x12.xy-=i1; i=m289(i);
+  vec3 p=perm(perm(i.y+vec3(0.,i1.y,1.))+i.x+vec3(0.,i1.x,1.)); vec3 m=max(.5-vec3(dot(x0,x0),dot(x12.xy,x12.xy),dot(x12.zw,x12.zw)),0.); m=m*m; m=m*m;
+  vec3 x=2.*fract(p*C.www)-1.; vec3 h=abs(x)-.5; vec3 ox=floor(x+.5); vec3 a0=x-ox; m*=1.79284291400159-.85373472095314*(a0*a0+h*h);
+  vec3 g; g.x=a0.x*x0.x+h.x*x0.y; g.yz=a0.yz*x12.xz+h.yz*x12.yw; return 130.*dot(m,g); }
+float hash(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7))+SEED)*43758.5453); }
+/* nap height: fibres = fine noise stretched along the nap direction, 3 octaves */
+float nap(vec2 px){ float c=cos(NDIR),s=sin(NDIR); vec2 q=mat2(c,-s,s,c)*px; q.x/=max(NSTRETCH,1.); q*=NDENS/100.; q+=SEED*7.;
+  return .55*sn(q)+.3*sn(q*2.03+11.)+.15*sn(q*4.11+23.); }
 void main(){ vec3 c;
   if(BACK>.5) c=vec3(61./255.);
   else if(PRINT>.5 && BLUR>0.){ vec2 o=PX*BLUR; c=(texture2D(ART,v).rgb*4.+texture2D(ART,v+vec2(o.x,0)).rgb+texture2D(ART,v-vec2(o.x,0)).rgb+texture2D(ART,v+vec2(0,o.y)).rgb+texture2D(ART,v-vec2(0,o.y)).rgb)/8.; }
@@ -98,6 +112,14 @@ void main(){ vec3 c;
   if(PRINT>.5 && BACK<.5){ float l=dot(c,vec3(.299,.587,.114)); c=mix(c,vec3(l),SOFT); c=LIFT+(1.-LIFT)*c; }
   if(FIB>.5){ vec3 n=texture2D(NRM,v*FSCALE).rgb*2.-1.; n=normalize(vec3(n.xy*RELIEF*6.,n.z)); vec3 Ld=normalize(L);
     float d=max(dot(n,Ld),0.)/max(Ld.z,.05); c*=mix(1.,d,FMIX); c+=FSHEEN*pow(1.-n.z,1.2)*max(dot(normalize(n.xy+1e-4),normalize(Ld.xy+1e-4)),0.); }
+  if(PROC>.5){ vec2 px=v*SZPX; float e=1.;
+    float h=nap(px), hx=nap(px+vec2(e,0.)), hy=nap(px+vec2(0.,e));
+    vec3 n=normalize(vec3((h-hx)*NRELIEF*4.,(h-hy)*NRELIEF*4.,1.)); vec3 Ld=normalize(L);
+    float lit=max(dot(n,Ld),0.)/max(Ld.z,.05);                                   // fibres catch or lose the light
+    float w=sn(px*(.0035/max(WSCALE,.1))+SEED*3.)*.6+sn(px*(.009/max(WSCALE,.1))+SEED*5.)*.4; // wash: big soft patches
+    float tip=step(1.-.015*TIPS,hash(floor(px*.9)))*TIPS;                        // sparse bright fibre tips
+    float g=.5+(lit-1.)*.5+h*.08+w*WAMT*.5+tip*.25;                               // one grey value, .5 = neutral
+    c=mix(c,ov(c,vec3(clamp(g,0.,1.))),NAMT); }
   if(LAYER>.5){ vec3 g = LAYER<1.5 ? texture2D(GRAIN,v*LSCALE).rgb : texture2D(ARCH,v*LSCALE).rgb; c=mix(c,ov(c,g),LAMT); }
   float r=distance(v,vec2(.22,.22))/.66; c+=vec3(SHEEN)*(1.-smoothstep(0.,1.,r));
   gl_FragColor=vec4(clamp(c,0.,1.),1.); }`;
@@ -122,6 +144,9 @@ const R3=(()=>{ const cv=document.createElement('canvas'); cv.width=cv.height=SZ
     gl.uniform2f(u('PX'),1/SZ,1/SZ); gl.uniform1f(u('BACK'),back?1:0); gl.uniform1f(u('PRINT'),s.print); gl.uniform1f(u('SOFT'),s.soften); gl.uniform1f(u('LIFT'),s.lift); gl.uniform1f(u('BLUR'),s.blur);
     gl.uniform1f(u('FIB'),s.fibres); gl.uniform1f(u('FSCALE'),s.fscale); gl.uniform1f(u('RELIEF'),s.relief); gl.uniform1f(u('FMIX'),s.fmix); gl.uniform1f(u('FSHEEN'),s.fsheen);
     gl.uniform1f(u('LAYER'),s.layer==='grain'?1:s.layer==='archive'?2:0); gl.uniform1f(u('LAMT'),s.lamt); gl.uniform1f(u('LSCALE'),s.lscale); gl.uniform1f(u('SHEEN'),s.sheen);
+    gl.uniform1f(u('PROC'),s.proc||0); gl.uniform1f(u('NDENS'),s.ndens??60); gl.uniform1f(u('NSTRETCH'),s.nstretch??3); gl.uniform1f(u('NDIR'),(s.ndir??35)*deg);
+    gl.uniform1f(u('NRELIEF'),s.nrelief??.6); gl.uniform1f(u('NAMT'),s.namt??1); gl.uniform1f(u('WSCALE'),s.wscale??1); gl.uniform1f(u('WAMT'),s.wamt??.35);
+    gl.uniform1f(u('TIPS'),s.tips??.3); gl.uniform1f(u('SEED'),s.seed??7); gl.uniform1f(u('SZPX'),SZ);
     const fix={x:Math.cos(s.az*deg)*Math.cos(s.el*deg), y:Math.sin(s.az*deg)*Math.cos(s.el*deg)}; const li=(s.live&&st.live)||fix;
     const z=Math.sqrt(Math.max(.05,1-li.x*li.x-li.y*li.y)); gl.uniform3f(u('L'),li.x,li.y,z); gl.drawArrays(gl.TRIANGLE_STRIP,0,4); } };
 })();
@@ -160,6 +185,7 @@ bgRes.onclick=()=>{ const two=!bgRes.classList.contains('on'); bgRes.classList.t
 const sheet=document.getElementById('sheet');
 const CTL=[
   ['Print on suede',[['print','print on','toggle'],['soften','soften',0,.4,.01],['lift','black lift',0,.2,.005],['blur','blur px',0,1.5,.05]]],
+  ['Shader suede (generated per pixel)',[['proc','shader suede on','toggle'],['ndens','nap fineness',10,200,1],['nstretch','fibre length',1,8,.1],['ndir','nap direction °',0,180,1],['nrelief','nap relief',0,2,.01],['namt','nap strength',0,1,.01],['wscale','wash size',.3,4,.05],['wamt','wash depth',0,1,.01],['tips','fibre tips',0,1,.01],['seed','seed',0,50,1]]],
   ['Real suede fibres (GSG scan)',[['fibres','fibres on','toggle'],['fscale','fibre scale',1,10,.25],['relief','relief',0,1,.01],['fmix','light mix',0,1,.01],['fsheen','fibre sheen',0,.3,.005]]],
   ['Suede layer (overlay)',[['layer','layer','seg',['none','grain','archive']],['lamt','strength',0,1,.01],['lscale','scale',1,6,.25]]],
   ['Light',[['az','angle °',0,360,1],['el','height °',5,85,1],['live','follow mouse/tilt','toggle'],['sheen','sheen',0,.3,.005]]],
@@ -169,7 +195,7 @@ function renderSheet(){ const i=idx(), s=cards[i];
   for(const [title,list] of CTL){ h+=`<h4>${title}</h4>`; for(const [k,label,a,b,stp] of list){
     if(a==='toggle') h+=`<div class="seg"><button data-tog="${k}" class="${s[k]?'on':''}">${label}</button></div>`;
     else if(a==='seg') h+=`<div class="seg">${b.map(o=>`<button data-seg="${k}" data-v="${o}" class="${s[k]===o?'on':''}">${o}</button>`).join('')}</div>`;
-    else h+=`<label class="ctl"><span>${label}</span><input type="range" data-k="${k}" min="${a}" max="${b}" step="${stp}" value="${s[k]}"><output>${(+s[k]).toFixed(stp<.01?3:2)}</output></label>`; } }
+    else h+=`<label class="ctl"><span>${label}</span><input type="range" data-k="${k}" min="${a}" max="${b}" step="${stp}" value="${s[k]??0}"><output>${(+(s[k]??0)).toFixed(stp<.01?3:2)}</output></label>`; } }
   h+=`<div class="acts"><button id="all">apply to all cards</button><button id="copy">copy spec</button></div>`;
   sheet.innerHTML=h;
   sheet.querySelectorAll('input[type=range]').forEach(r=>r.oninput=()=>{ s[r.dataset.k]=+r.value; r.nextElementSibling.textContent=(+r.value).toFixed(+r.step<.01?3:2); save(); paintCard(i); });
