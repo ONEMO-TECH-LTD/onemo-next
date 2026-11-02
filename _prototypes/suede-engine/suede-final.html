@@ -62,7 +62,7 @@
   <div class="reel" id="reel"></div>
 </div>
 <div class="dev">
-  <button id="tune" class="on">tune this card</button><button id="tilt">tilt</button><button id="bgMove" class="on">bg moving</button><button id="bgRes" class="on">bg 2×</button>
+  <button id="tune" class="on">panel: ON</button><button id="tilt">phone tilt: OFF</button><button id="bgMove" class="on">bg motion: ON</button><button id="bgRes" class="on">bg sharp (2×): ON</button>
 </div>
 <div class="sheet open" id="sheet"></div>
 
@@ -74,6 +74,11 @@ const deg=Math.PI/180;
 
 /* ── per-card material settings ─────────────────────────────────────── */
 const PRESETS={
+  'Suede':{print:0,soften:0,lift:0,blur:0, fibres:0,fscale:4,relief:.2,fmix:.5,fsheen:.06, layer:'none',lamt:1,lscale:1, az:46,el:63,live:0, sheen:0, proc:0, pbr:1,pkey:1,pamb:.5,pexpo:1.43,print:1,soften:.12,lift:.06,blur:.5, pnsrc:'suede',ptile:3,pnorm:.15,psheen:.1,pshrough:.8,pshtint:0,pspec:0,prough:1,pcoat:0,pcoatr:.1,penv:0},
+  'Velvet':{print:0,soften:0,lift:0,blur:0, fibres:0,fscale:4,relief:.2,fmix:.5,fsheen:.06, layer:'none',lamt:1,lscale:1, az:46,el:63,live:0, sheen:0, proc:0, pbr:1,pkey:1,pamb:.5,pexpo:1.43,print:1,soften:.08,lift:.04,blur:.3, pnsrc:'suede',ptile:5,pnorm:.08,psheen:.75,pshrough:.45,pshtint:.6,pspec:0,prough:1,pcoat:0,pcoatr:.1,penv:0},
+  'Faux leather':{print:0,soften:0,lift:0,blur:0, fibres:0,fscale:4,relief:.2,fmix:.5,fsheen:.06, layer:'none',lamt:1,lscale:1, az:46,el:63,live:0, sheen:0, proc:0, pbr:1,pkey:1,pamb:.5,pexpo:1.43,print:1,soften:.05,lift:.03,blur:0, pnsrc:'leather',ptile:3,pnorm:.6,psheen:0,pshrough:.8,pshtint:0,pspec:1,prough:.42,pcoat:0,pcoatr:.1,penv:0},
+  'UV matte':{print:0,soften:0,lift:0,blur:0, fibres:0,fscale:4,relief:.2,fmix:.5,fsheen:.06, layer:'none',lamt:1,lscale:1, az:46,el:63,live:0, sheen:0, proc:0, pbr:1,pkey:1,pamb:.5,pexpo:1.43,print:0, pnsrc:'ink',ptile:1,pnorm:.15,psheen:0,pshrough:.8,pshtint:0,pspec:.6,prough:.7,pcoat:0,pcoatr:.1,penv:0},
+  'UV gloss':{print:0,soften:0,lift:0,blur:0, fibres:0,fscale:4,relief:.2,fmix:.5,fsheen:.06, layer:'none',lamt:1,lscale:1, az:46,el:63,live:0, sheen:0, proc:0, pbr:1,pkey:1,pamb:.5,pexpo:1.43,print:0, pnsrc:'flat',ptile:1,pnorm:0,psheen:0,pshrough:.8,pshtint:0,pspec:1,prough:.25,pcoat:1,pcoatr:.06,penv:.9},
   A:{print:0,soften:0,lift:0,blur:0, fibres:0,fscale:1,relief:.45,fmix:.85,fsheen:.11, layer:'grain',lamt:1,lscale:1, az:46,el:63,live:0, sheen:.12},
   B:{print:1,soften:.12,lift:.06,blur:.5, fibres:0,fscale:1,relief:.45,fmix:.85,fsheen:.11, layer:'grain',lamt:1,lscale:1, az:46,el:63,live:0, sheen:.12},
   'B+fine fibres':{print:1,soften:.12,lift:.06,blur:.5, fibres:1,fscale:4,relief:.2,fmix:.5,fsheen:.06, layer:'grain',lamt:1,lscale:1, az:46,el:63,live:0, sheen:.12},
@@ -83,9 +88,10 @@ const PRESETS={
   'Shader suede':{print:1,soften:.12,lift:.06,blur:.5, fibres:0,fscale:4,relief:.2,fmix:.5,fsheen:.06, layer:'none',lamt:1,lscale:1, az:46,el:63,live:0, sheen:.12,
     proc:1,ndens:60,nstretch:3,ndir:35,nrelief:.45,namt:1,wscale:1,wamt:.35,tips:.1,seed:7},
 };
-const KEY='onemo-suede-cards-v3';
+const MATS=['Suede','Velvet','Faux leather','UV matte','UV gloss'];
+const KEY='onemo-materials-v1';
 let cards; try{ cards=JSON.parse(localStorage.getItem(KEY)); }catch(_){}
-if(!Array.isArray(cards)||cards.length!==ARTS.length) cards=ARTS.map(()=>({...PRESETS['3D viewer suede']}));
+if(!Array.isArray(cards)||cards.length!==ARTS.length) cards=ARTS.map((_,i)=>{ const m=MATS[i%MATS.length]; return {...PRESETS[m],mat:m}; });   // one material per card to start
 const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(cards)); }catch(_){} };
 const st={ live:null };
 
@@ -104,6 +110,15 @@ float sn(vec2 v){ const vec4 C=vec4(.211324865405187,.366025403784439,-.57735026
   vec3 x=2.*fract(p*C.www)-1.; vec3 h=abs(x)-.5; vec3 ox=floor(x+.5); vec3 a0=x-ox; m*=1.79284291400159-.85373472095314*(a0*a0+h*h);
   vec3 g; g.x=a0.x*x0.x+h.x*x0.y; g.yz=a0.yz*x12.xz+h.yz*x12.yw; return 130.*dot(m,g); }
 uniform float PBR,PNSCALE,PNORM,PSHEEN,PSHROUGH,PAMB,PKEY,PEXPO,PTILE;
+uniform float PNSRC,PSHTINT,PSPEC,PROUGH,PCOAT,PCOATR,PENV;
+float D_GGX(float a,float nh){ float a2=a*a; float d=nh*nh*(a2-1.)+1.; return a2/(3.14159*d*d); }
+float V_SmithGGX(float a,float nv,float nl){ float a2=a*a; return .5/max(nl*sqrt(nv*nv*(1.-a2)+a2)+nv*sqrt(nl*nl*(1.-a2)+a2),1e-4); }
+vec3 F_Schlick(vec3 f0,float vh){ return f0+(1.-f0)*pow(clamp(1.-vh,0.,1.),5.); }
+vec2 h22(vec2 p){ p=vec2(dot(p,vec2(127.1,311.7)),dot(p,vec2(269.5,183.3))); return fract(sin(p)*43758.5453); }
+/* leather pebble grain: rounded cells with creases between them */
+float leather(vec2 x){ vec2 n=floor(x), f=fract(x); float d1=8., d2=8.;
+  for(int j=-1;j<=1;j++) for(int i=-1;i<=1;i++){ vec2 g=vec2(float(i),float(j)); vec2 o=h22(n+g); vec2 r=g+o-f; float d=dot(r,r); if(d<d1){ d2=d1; d1=d; } else if(d<d2) d2=d; }
+  float cell=1.-smoothstep(0.,.55,sqrt(d1)); float crease=smoothstep(0.,.12,sqrt(d2)-sqrt(d1)); return cell*.6+crease*.4; }
 float D_Charlie(float r,float nh){ float a=r*r, ia=1./a, c2=nh*nh, s2=max(1.-c2,.0078125); return (2.+ia)*pow(s2,ia*.5)/6.2831853; }
 float V_Neubelt(float nv,float nl){ return clamp(1./(4.*(nl+nv-nl*nv)),0.,1.); }
 vec3 neutralTM(vec3 c){ const float sc=.8-.04, ds=.15; float x=min(c.r,min(c.g,c.b)); float off=x<.08?x-6.25*x*x:.04; c-=off; float pk=max(c.r,max(c.g,c.b)); if(pk<sc) return c;
@@ -120,12 +135,25 @@ void main(){ vec3 c;
   if(PRINT>.5 && BACK<.5){ float l=dot(c,vec3(.299,.587,.114)); c=mix(c,vec3(l),SOFT); c=LIFT+(1.-LIFT)*c; }
   if(FIB>.5){ vec3 n=texture2D(NRM,v*FSCALE).rgb*2.-1.; n=normalize(vec3(n.xy*RELIEF*6.,n.z)); vec3 Ld=normalize(L);
     float d=max(dot(n,Ld),0.)/max(Ld.z,.05); c*=mix(1.,d,FMIX); c+=FSHEEN*pow(1.-n.z,1.2)*max(dot(normalize(n.xy+1e-4),normalize(Ld.xy+1e-4)),0.); }
-  if(PBR>.5){ vec3 nt=texture2D(NRM,v*PTILE).rgb*2.-1.; vec3 n=normalize(vec3(nt.xy*PNORM,nt.z));
-    vec3 Ld=normalize(L), V=vec3(0.,0.,1.), H=normalize(Ld+V);
-    float nl=max(dot(n,Ld),0.), nv=max(dot(n,V),1e-3), nh=max(dot(n,H),0.);
+  if(PBR>.5){
+    vec3 n=vec3(0.,0.,1.); vec2 px=v*SZPX;
+    if(PNSRC<.5){ vec3 nt=texture2D(NRM,v*PTILE).rgb*2.-1.; n=normalize(vec3(nt.xy*PNORM,nt.z)); }                 // suede / velvet: real GSG fibres
+    else if(PNSRC<1.5){ vec2 q=px*PTILE*.08; float e=.02; float h=leather(q), hx=leather(q+vec2(e,0.)), hy=leather(q+vec2(0.,e));
+      n=normalize(vec3((h-hx)/e*PNORM*.05,(h-hy)/e*PNORM*.05,1.)); }                                                 // faux leather: pebble grain
+    else if(PNSRC<2.5){ vec2 q=px*PTILE*.5; n=normalize(vec3((h22(floor(q)).xy-.5)*PNORM*.4,1.)); }                     // UV print: faint ink texture
+    vec3 P=vec3(v.x-.5,.5-v.y,0.);                       // the card point, card width = 1
+    vec3 V=normalize(vec3(0.,0.,1.8)-P);                 // seen from ~1.8 card widths away, so highlights form a spot
+    vec3 Ld=normalize(normalize(L)*2.2-P);               // light as a lamp near the card, so its highlight has a place
+    vec3 H=normalize(Ld+V);
+    float nl=clamp(dot(n,Ld),0.,1.), nv=clamp(dot(n,V),1e-3,1.), nh=clamp(dot(n,H),0.,1.), vh=clamp(dot(V,H),0.,1.);
     vec3 alb=srgb2lin(c);
-    vec3 col=alb*nl*PKEY + alb*PAMB                                  // Lambert key light + ambient (viewer: ambient .5, studio env)
-            + vec3(PSHEEN)*D_Charlie(PSHROUGH,nh)*V_Neubelt(nv,nl)*nl*PKEY*3.14159; // Charlie sheen — the suede fuzz
+    vec3 col=alb*(nl*PKEY+PAMB);                                                                                         // matte base
+    vec3 shc=mix(vec3(1.),alb,PSHTINT)*PSHEEN;
+    col+=shc*D_Charlie(PSHROUGH,nh)*V_Neubelt(nv,nl)*nl*PKEY*3.14159;                                                    // fabric sheen (suede / velvet)
+    float ar=max(PROUGH*PROUGH,.002); col+=F_Schlick(vec3(.04),vh)*D_GGX(ar,nh)*V_SmithGGX(ar,nv,nl)*nl*PKEY*3.14159*PSPEC; // leather / ink highlight
+    vec3 R=reflect(-V,n); float env=mix(.15,1.,smoothstep(-.3,.9,R.y))+.8*exp(-((R.x-.35)*6.)*((R.x-.35)*6.))*smoothstep(0.,.6,R.y); // studio: bright top + soft-box streak
+    float fc=.04+.96*pow(clamp(1.-nv,0.,1.),5.); float cr=max(PCOATR*PCOATR,.002);
+    col=col*(1.-fc*PCOAT)+PCOAT*(F_Schlick(vec3(.04),vh).x*D_GGX(cr,nh)*V_SmithGGX(cr,nv,nl)*nl*PKEY*3.14159+fc*env*PENV); // UV gloss clear coat
     c=lin2srgb(neutralTM(col*PEXPO)); }
   if(PROC>.5){ vec2 px=v*SZPX; float e=1.;
     float h=nap(px), hx=nap(px+vec2(e,0.)), hy=nap(px+vec2(0.,e));
@@ -164,6 +192,8 @@ const R3=(()=>{ const cv=document.createElement('canvas'); cv.width=cv.height=SZ
     gl.uniform1f(u('TIPS'),s.tips??.3); gl.uniform1f(u('SEED'),s.seed??7); gl.uniform1f(u('SZPX'),SZ);
     gl.uniform1f(u('PBR'),s.pbr||0); gl.uniform1f(u('PTILE'),s.ptile??3); gl.uniform1f(u('PNORM'),s.pnorm??.15); gl.uniform1f(u('PSHEEN'),s.psheen??.1);
     gl.uniform1f(u('PSHROUGH'),s.pshrough??.8); gl.uniform1f(u('PAMB'),s.pamb??.5); gl.uniform1f(u('PKEY'),s.pkey??1.); gl.uniform1f(u('PEXPO'),s.pexpo??1.43);
+    gl.uniform1f(u('PNSRC'),{suede:0,leather:1,ink:2,flat:3}[s.pnsrc||'suede']); gl.uniform1f(u('PSHTINT'),s.pshtint??0); gl.uniform1f(u('PSPEC'),s.pspec??0);
+    gl.uniform1f(u('PROUGH'),s.prough??.6); gl.uniform1f(u('PCOAT'),s.pcoat??0); gl.uniform1f(u('PCOATR'),s.pcoatr??.1); gl.uniform1f(u('PENV'),s.penv??0);
     const fix={x:Math.cos(s.az*deg)*Math.cos(s.el*deg), y:Math.sin(s.az*deg)*Math.cos(s.el*deg)}; const li=(s.live&&st.live)||fix;
     const z=Math.sqrt(Math.max(.05,1-li.x*li.x-li.y*li.y)); gl.uniform3f(u('L'),li.x,li.y,z); gl.drawArrays(gl.TRIANGLE_STRIP,0,4); } };
 })();
@@ -176,14 +206,14 @@ const reel=document.getElementById('reel'); const faces=[];
 ARTS.forEach((src,i)=>{ const el=document.createElement('section'); el.className='slide'; el.innerHTML=`
   <div class="stage"><div class="turn"><div class="flip"><div class="face f"><canvas></canvas></div><div class="face b"><canvas></canvas></div></div></div>
   <div class="dots"><b class="on"></b><b></b></div></div>
-  <div class="info"><div class="name">${NAMES[i]}</div><span class="chip">Made to order</span><div class="row"><span>Mini · 68 mm</span><b>£ —</b></div></div>`;
+  <div class="info"><div class="name">${NAMES[i]}</div><span class="chip" data-mat>Made to order</span><div class="row"><span>Mini · 68 mm</span><b>£ —</b></div></div>`;
   reel.appendChild(el); const [cf,cb]=el.querySelectorAll('canvas'); faces.push(face(cf,i,false),face(cb,i,true));
   const flip=el.querySelector('.flip'), dots=el.querySelectorAll('.dots b');
   el.querySelector('.turn').onclick=()=>{ flip.classList.add('d3'); requestAnimationFrame(()=>{ const on=flip.classList.toggle('back'); dots[0].classList.toggle('on',!on); dots[1].classList.toggle('on',on); }); };
   flip.addEventListener('transitionend',()=>{ if(!flip.classList.contains('back')) flip.classList.remove('d3'); });
 });
 const idx=()=>Math.round(reel.scrollTop/reel.clientHeight);
-const paintCard=i=>{ if(i<0||i>=ARTS.length) return; faces[i*2].draw(); faces[i*2+1].draw(); };
+const paintCard=i=>{ if(i<0||i>=ARTS.length) return; faces[i*2].draw(); faces[i*2+1].draw(); const ch=reel.children[i]?.querySelector('[data-mat]'); if(ch) ch.textContent=(cards[i].mat||'Custom')+' · made to order'; };
 const painted=new Set(); const lazy=i=>{ if(i<0||i>=ARTS.length||painted.has(i)) return; painted.add(i); paintCard(i); };
 const io=new IntersectionObserver(es=>es.forEach(e=>{ if(e.isIntersecting){ const i=[...reel.children].indexOf(e.target); lazy(i); lazy(i+1); } }),{root:reel,rootMargin:'100% 0px'});
 [...reel.children].forEach(el=>io.observe(el));
@@ -195,23 +225,25 @@ surface?.adoptImage(ARTS[0]);
 let sraf=0; reel.addEventListener('scroll',()=>{ if(sraf) return; sraf=requestAnimationFrame(()=>{ sraf=0; const t=reel.scrollTop/reel.clientHeight, i=Math.floor(t); surface?.blendImages(ARTS[Math.max(0,Math.min(5,i))],ARTS[Math.min(5,i+1)],t-i); }); },{passive:true});
 addEventListener('resize',()=>surface?.resize());
 const bgMove=document.getElementById('bgMove'), bgRes=document.getElementById('bgRes');
-bgMove.onclick=()=>{ const on=!bgMove.classList.contains('on'); bgMove.classList.toggle('on',on); bgMove.textContent=on?'bg moving':'bg still'; surface?.update({animated:on}); };
-bgRes.onclick=()=>{ const two=!bgRes.classList.contains('on'); bgRes.classList.toggle('on',two); bgRes.textContent=two?'bg 2×':'bg 1×'; surface?.update({maxPixelRatio:two?2:1}); surface?.resize(); };
+bgMove.onclick=()=>{ const on=!bgMove.classList.contains('on'); bgMove.classList.toggle('on',on); bgMove.textContent=on?'bg motion: ON':'bg motion: OFF'; surface?.update({animated:on}); };
+bgRes.onclick=()=>{ const two=!bgRes.classList.contains('on'); bgRes.classList.toggle('on',two); bgRes.textContent=two?'bg sharp (2×): ON':'bg sharp (2×): OFF'; surface?.update({maxPixelRatio:two?2:1}); surface?.resize(); };
 
 /* ── tuning sheet for the card on screen ────────────────────────────── */
 const sheet=document.getElementById('sheet');
 const CTL=[
-  ['Print on suede',[['print','print on','toggle'],['soften','soften',0,.4,.01],['lift','black lift',0,.2,.005],['blur','blur px',0,1.5,.05]]],
-  ['3D viewer suede (three.js sheen material, ported)',[['pbr','3D viewer suede on','toggle'],['ptile','fibre fineness',1,10,.25],['pnorm','normal scale',0,1,.01],['psheen','sheen colour',0,1,.01],['pshrough','sheen roughness',.3,1,.01],['pkey','key light',0,2,.01],['pamb','ambient',0,1.5,.01],['pexpo','exposure',.5,2.5,.01]]],
-  ['Shader suede (generated per pixel)',[['proc','shader suede on','toggle'],['ndens','nap fineness',10,200,1],['nstretch','fibre length',1,8,.1],['ndir','nap direction °',0,180,1],['nrelief','nap relief',0,2,.01],['namt','nap strength',0,1,.01],['wscale','wash size',.3,4,.05],['wamt','wash depth',0,1,.01],['tips','fibre tips',0,1,.01],['seed','seed',0,50,1]]],
-  ['Real suede fibres (GSG scan)',[['fibres','fibres on','toggle'],['fscale','fibre scale',1,10,.25],['relief','relief',0,1,.01],['fmix','light mix',0,1,.01],['fsheen','fibre sheen',0,.3,.005]]],
+  ['Print on suede',[['print','print on suede','toggle'],['soften','soften',0,.4,.01],['lift','black lift',0,.2,.005],['blur','blur px',0,1.5,.05]]],
+  ['Material (physically based)',[['pbr','material','toggle'],['pnsrc','surface','seg',['suede','leather','ink','flat']],['ptile','fineness',1,10,.25],['pnorm','surface depth',0,1,.01],
+    ['psheen','sheen (fabric glow)',0,1.5,.01],['pshrough','sheen softness',.3,1,.01],['pshtint','sheen tint',0,1,.01],['pspec','highlight',0,2,.01],['prough','roughness',.05,1,.01],
+    ['pcoat','gloss coat',0,1,.01],['pcoatr','coat sharpness',.02,.4,.005],['penv','coat reflection',0,2,.01],['pkey','key light',0,2,.01],['pamb','ambient',0,1.5,.01],['pexpo','exposure',.5,2.5,.01]]],
+  ['Shader suede (generated per pixel)',[['proc','shader suede','toggle'],['ndens','nap fineness',10,200,1],['nstretch','fibre length',1,8,.1],['ndir','nap direction °',0,180,1],['nrelief','nap relief',0,2,.01],['namt','nap strength',0,1,.01],['wscale','wash size',.3,4,.05],['wamt','wash depth',0,1,.01],['tips','fibre tips',0,1,.01],['seed','seed',0,50,1]]],
+  ['Real suede fibres (GSG scan)',[['fibres','GSG fibres','toggle'],['fscale','fibre scale',1,10,.25],['relief','relief',0,1,.01],['fmix','light mix',0,1,.01],['fsheen','fibre sheen',0,.3,.005]]],
   ['Suede layer (overlay)',[['layer','layer','seg',['none','grain','archive']],['lamt','strength',0,1,.01],['lscale','scale',1,6,.25]]],
-  ['Light',[['az','angle °',0,360,1],['el','height °',5,85,1],['live','follow mouse/tilt','toggle'],['sheen','sheen',0,.3,.005]]],
+  ['Light',[['az','angle °',0,360,1],['el','height °',5,85,1],['live','light follows mouse/tilt','toggle'],['sheen','sheen',0,.3,.005]]],
 ];
 function renderSheet(){ const i=idx(), s=cards[i];
-  let h=`<div class="who">${NAMES[i]} · card ${i+1}</div><h4>Start from</h4><div class="seg">${Object.keys(PRESETS).map(k=>`<button data-preset="${k}">${k}</button>`).join('')}</div>`;
+  let h=`<div class="who">${NAMES[i]} · card ${i+1}</div><h4>Material</h4><div class="seg">${MATS.map(k=>`<button data-preset="${k}" class="${s.mat===k?'on':''}">${k}</button>`).join('')}</div><h4>Earlier looks</h4><div class="seg">${Object.keys(PRESETS).filter(k=>!MATS.includes(k)).map(k=>`<button data-preset="${k}">${k}</button>`).join('')}</div>`;
   for(const [title,list] of CTL){ h+=`<h4>${title}</h4>`; for(const [k,label,a,b,stp] of list){
-    if(a==='toggle') h+=`<div class="seg"><button data-tog="${k}" class="${s[k]?'on':''}">${label}</button></div>`;
+    if(a==='toggle') h+=`<div class="seg"><button data-tog="${k}" class="${s[k]?'on':''}">${label}: ${s[k]?'ON':'OFF'}</button></div>`;
     else if(a==='seg') h+=`<div class="seg">${b.map(o=>`<button data-seg="${k}" data-v="${o}" class="${s[k]===o?'on':''}">${o}</button>`).join('')}</div>`;
     else h+=`<label class="ctl"><span>${label}</span><input type="range" data-k="${k}" min="${a}" max="${b}" step="${stp}" value="${s[k]??0}"><output>${(+(s[k]??0)).toFixed(stp<.01?3:2)}</output></label>`; } }
   h+=`<div class="acts"><button id="all">apply to all cards</button><button id="copy">copy spec</button></div>`;
@@ -219,19 +251,19 @@ function renderSheet(){ const i=idx(), s=cards[i];
   sheet.querySelectorAll('input[type=range]').forEach(r=>r.oninput=()=>{ s[r.dataset.k]=+r.value; r.nextElementSibling.textContent=(+r.value).toFixed(+r.step<.01?3:2); save(); paintCard(i); });
   sheet.querySelectorAll('[data-tog]').forEach(b=>b.onclick=()=>{ s[b.dataset.tog]=s[b.dataset.tog]?0:1; save(); renderSheet(); paintCard(i); });
   sheet.querySelectorAll('[data-seg]').forEach(b=>b.onclick=()=>{ s[b.dataset.seg]=b.dataset.v; save(); renderSheet(); paintCard(i); });
-  sheet.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>{ cards[i]={...PRESETS[b.dataset.preset]}; save(); renderSheet(); paintCard(i); });
+  sheet.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>{ cards[i]={...PRESETS[b.dataset.preset],mat:b.dataset.preset}; save(); renderSheet(); paintCard(i); });
   sheet.querySelector('#all').onclick=()=>{ cards=cards.map(()=>({...s})); save(); painted.clear(); paintCard(idx()); paintCard(idx()+1); paintCard(idx()-1); };
   sheet.querySelector('#copy').onclick=async e=>{ const t=JSON.stringify(s); try{ await navigator.clipboard.writeText(t); e.target.textContent='copied'; }catch(_){ prompt('Spec',t); } };
 }
 let lastIdx=-1; reel.addEventListener('scroll',()=>{ const i=idx(); if(i!==lastIdx){ lastIdx=i; if(sheet.classList.contains('open')) renderSheet(); } },{passive:true});
-document.getElementById('tune').onclick=e=>{ const on=sheet.classList.toggle('open'); e.target.classList.toggle('on',on); if(on) renderSheet(); };
+document.getElementById('tune').onclick=e=>{ const on=sheet.classList.toggle('open'); e.target.classList.toggle('on',on); e.target.textContent=on?'panel: ON':'panel: OFF'; if(on) renderSheet(); };
 renderSheet();
 
 /* ── live light (only cards whose setting says so) ──────────────────── */
 let raf=0; const relight=()=>{ if(raf) return; raf=requestAnimationFrame(()=>{ raf=0; const i=idx(); if(cards[i].live) faces[i*2].draw(); }); };
 addEventListener('pointermove',e=>{ st.live={x:(e.clientX/innerWidth-.5)*1.4, y:-(e.clientY/innerHeight-.5)*1.4}; relight(); });
 document.getElementById('tilt').onclick=async e=>{ try{ if(typeof DeviceOrientationEvent!=='undefined'&&DeviceOrientationEvent.requestPermission) await DeviceOrientationEvent.requestPermission(); }catch(_){}
-  e.target.classList.add('on'); addEventListener('deviceorientation',ev=>{ st.live={x:Math.max(-.7,Math.min(.7,(ev.gamma||0)/45)), y:Math.max(-.7,Math.min(.7,((ev.beta||45)-45)/45))}; relight(); }); };
+  e.target.classList.add('on'); e.target.textContent='phone tilt: ON'; addEventListener('deviceorientation',ev=>{ st.live={x:Math.max(-.7,Math.min(.7,(ev.gamma||0)/45)), y:Math.max(-.7,Math.min(.7,((ev.beta||45)-45)/45))}; relight(); }); };
 </script>
 </body>
 </html>
