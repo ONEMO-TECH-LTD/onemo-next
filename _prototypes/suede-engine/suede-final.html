@@ -166,6 +166,8 @@ const saveG=(seed)=>{ if(!seed) touch(); try{ localStorage.setItem('onemo-global
 const LIGHT_KEYS=GROUPS.light;   // the lamp. Studio + reflections stay per material (they make gloss/leather/matte shine)
 for(const k in G.light||{}) if(!LIGHT_KEYS.includes(k)) delete G.light[k];   // drop studio/reflection keys from older saves
 for(const g of ['light','rim']) if(!G[g]){ const src=cards[0]; G[g]={}; for(const k of GROUPS[g]) if(src[k]!==undefined) G[g][k]=src[k]; saveG(true); }   // seeded from Thriller · Suede (your current)
+const NOSYNC=new Set([...GROUPS.light,...GROUPS.rim,...GROUPS.shadow,'lightLocal','rimLocal','shadowLocal','live']);   // light/rim/shadow have their own global switch
+function syncCol(k){ const src=cards[k]; for(let j=COL(k); j<cards.length; j+=NM) if(j!==k){ const c=cards[j]; for(const key in src) if(!NOSYNC.has(key)) c[key]=src[key]; } }   // same material → same settings on every artwork
 const eff=s=>{ const o={...s}; for(const g in GROUPS) if(!s[g+'Local']) Object.assign(o,G[g]); return o; };   // the settings a card actually renders with
 const st={ live:null };
 
@@ -313,6 +315,7 @@ ARTS.forEach((src,i)=>{ const el=document.createElement('section'); el.className
 });
 const row=()=>Math.round(reel.scrollTop/reel.clientHeight), col=i=>Math.round(tracks[i].scrollLeft/tracks[i].clientWidth);
 const idx=()=>{ const r=row(); return r*NM+col(r); };   // the card on screen
+const paintCol=k=>{ for(const j of painted) if(j!==k&&COL(j)===COL(k)) paintCard(j); };
 const paintCard=k=>{ if(k<0||k>=cards.length) return; faces[k*2].draw(); faces[k*2+1].draw(); };
 const painted=new Set(); const lazy=k=>{ if(k<0||k>=cards.length||painted.has(k)) return; painted.add(k); paintCard(k); };
 const prefetch=()=>{ const r=row(), c=col(r); lazy(r*NM+c); lazy(r*NM+c+ (c<NM-1?1:0)); if(c>0) lazy(r*NM+c-1); if(r>0) lazy((r-1)*NM+col(r-1)); if(r<ARTS.length-1) lazy((r+1)*NM+col(r+1)); };
@@ -402,12 +405,12 @@ function renderSheet(){ const i=idx(), s=eff(cards[i]);
   if(!tabs.some(([n])=>n===TAB)) TAB='Material';
   let h=`<div class="who">${NAMES[ROW(i)]} · ${s.mat}</div><div class="tabs">${tabs.map(([n])=>`<button data-tab="${n}" class="${n===TAB?'on':''}">${n}</button>`).join('')}</div>`
     +tabs.find(([n])=>n===TAB)[1];
-  h+=`<div class="acts"><button id="all">apply to all artworks (this material)</button><button id="copy">copy spec</button></div>`;
+  h+=`<div class="acts"><button id="copy">copy spec</button></div>`;
   sheet.innerHTML=h;
   const C=()=>cards[i];   // always the card's CURRENT settings — presets/apply-all replace the object
   const store=(r,ui)=>{ const v=r.dataset.inv==='1' ? +r.dataset.a + +r.dataset.b - ui : ui;
     if(setShared(i,r.dataset.k,v)) return;
-    C()[r.dataset.k]=v; save(); paintCard(i); if(typeof placeLamp==='function') placeLamp(); };   // inverted controls store the opposite end
+    C()[r.dataset.k]=v; syncCol(i); save(); paintCard(i); paintCol(i); if(typeof placeLamp==='function') placeLamp(); };   // inverted controls store the opposite end
   sheet.querySelectorAll('input[type=range]').forEach(r=>{ const num=r.parentElement.querySelector('.num');
     r.oninput=()=>{ num.value=(+r.value).toFixed(+r.step<.01?3:2); store(r,+r.value); };
     num.onchange=()=>{ const v=+num.value; if(!isFinite(v)) return; r.value=v; store(r,v); };   // typed values may go past the slider's ends
@@ -415,31 +418,32 @@ function renderSheet(){ const i=idx(), s=eff(cards[i]);
   sheet.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ TAB=b.dataset.tab; try{ localStorage.setItem('onemo-panel-tab',TAB); }catch(_){} renderSheet(); sheet.scrollTop=0; });
   if(typeof syncLamp==='function') syncLamp();
   const pick=name=>{ const j=MATS.indexOf(name); if(j>=0&&MATS.includes(C().mat)){ tracks[ROW(i)].scrollTo({left:j*tracks[ROW(i)].clientWidth,behavior:'smooth'}); return; }   // current materials live in their own column
-    cards[i]={...PRESETS[name],mat:name,backMat:C().backMat||'Suede'}; save(); renderSheet(); paintCard(i); };
+    cards[i]={...PRESETS[name],mat:name,backMat:C().backMat||'Suede'}; syncCol(i); save(); renderSheet(); paintCard(i); paintCol(i); };
   sheet.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>pick(b.dataset.preset));
   const rec=sheet.querySelector('#recover'); if(rec) rec.onchange=e=>{ const k=e.target.value; if(!k) return; let old; try{ old=JSON.parse(localStorage.getItem(k)); }catch(_){}
     if(!Array.isArray(old)) return; let n=0; old.forEach((c,r)=>{ const j=MATS.indexOf(c&&c.mat); if(j>=0&&r<ARTS.length){ cards[r*NM+j]={...PRESETS[c.mat],backMat:'Suede',...c}; n++; } });   // each old card back into its artwork × material
     save(); painted.clear(); prefetch(); renderSheet(); e.target.outerHTML=`<p>Restored ${n} cards from ${k.replace('onemo-materials-','save ')}.</p>`; };
   const ver=sheet.querySelector('#ver'); if(ver) ver.onchange=e=>{ if(e.target.value) pick(e.target.value); else if(!cur) pick(MATS[0]); };
-  sheet.querySelectorAll('[data-tog]').forEach(b=>b.onclick=()=>{ C()[b.dataset.tog]=C()[b.dataset.tog]?0:1; save(); renderSheet(); paintCard(i); });
-  sheet.querySelectorAll('[data-seg]').forEach(b=>b.onclick=()=>{ if(!setLight(i,b.dataset.seg,b.dataset.v)){ C()[b.dataset.seg]=b.dataset.v; save(); paintCard(i); } renderSheet(); });
+  sheet.querySelectorAll('[data-tog]').forEach(b=>b.onclick=()=>{ C()[b.dataset.tog]=C()[b.dataset.tog]?0:1; syncCol(i); save(); renderSheet(); paintCard(i); paintCol(i); });
+  sheet.querySelectorAll('[data-seg]').forEach(b=>b.onclick=()=>{ if(!setLight(i,b.dataset.seg,b.dataset.v)){ C()[b.dataset.seg]=b.dataset.v; syncCol(i); save(); paintCard(i); paintCol(i); } renderSheet(); });
   sheet.querySelectorAll('[data-scope]').forEach(b=>b.onclick=()=>{ const g=b.dataset.scope, c=C(), f=g+'Local';
     if(c[f]) c[f]=0; else { for(const k of GROUPS[g]) if(G[g][k]!==undefined) c[k]=G[g][k]; c[f]=1; }   // going local starts from the global values
     save(); renderSheet(); paintCard(i); if(window.__lampReady) placeLamp(); });
-  sheet.querySelectorAll('[data-back]').forEach(b=>b.onclick=()=>{ C().backMat=b.dataset.back; save(); renderSheet(); paintCard(i); });
-  sheet.querySelector('#all').onclick=()=>{ const cur=C(); cards=cards.map((c,k)=>COL(k)===COL(i)?{...cur}:c); save(); painted.clear(); prefetch(); };   // same material, every artwork
+  sheet.querySelectorAll('[data-back]').forEach(b=>b.onclick=()=>{ C().backMat=b.dataset.back; syncCol(i); save(); renderSheet(); paintCard(i); paintCol(i); });
   sheet.querySelector('#copy').onclick=async e=>{ const t=JSON.stringify(C()); try{ await navigator.clipboard.writeText(t); e.target.textContent='copied'; }catch(_){ prompt('Spec',t); } };
 }
 
 let lastIdx=-1; reel.addEventListener('scroll',()=>{ const i=idx(); if(i!==lastIdx){ lastIdx=i; if(sheet.classList.contains('open')) renderSheet(); } },{passive:true});
 document.getElementById('tune').onclick=e=>{ const on=sheet.classList.toggle('open'); document.body.classList.toggle('sheet-open',on); setTimeout(()=>{ if(window.__lampReady) syncLamp(); },380); e.target.classList.toggle('on',on); e.target.textContent=on?'panel: ON':'panel: OFF'; if(on) renderSheet(); if(typeof syncLamp==='function') syncLamp(); };
 renderSheet();
-if(SYNC) fetch('/__spec').then(r=>r.json()).then(d=>{ if(!d||!Array.isArray(d.cards)||d.cards.length!==cards.length||(d.edited||0)<edited){ pushSpec(); return; }   // no file, or this device edited more recently: upload ours
+function rowToAll(){ if(G.matSync) return; for(let c=0;c<NM;c++) syncCol(c); G.matSync=1; save(); saveG(); painted.clear(); prefetch(); if(sheet.classList.contains('open')) renderSheet(); }   // Thriller row → every artwork, once
+if(!SYNC) rowToAll();
+if(SYNC) fetch('/__spec').then(r=>r.json()).then(d=>{ if(!d||!Array.isArray(d.cards)||d.cards.length!==cards.length||(d.edited||0)<edited){ pushSpec(); rowToAll(); return; }   // no file, or this device edited more recently: upload ours
   if(JSON.stringify(d.cards)!==JSON.stringify(cards)) fetch('/__spec?backup',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({v:1,saved:new Date().toISOString(),device:navigator.userAgent,cards,G})}).catch(()=>{});   // keep this device's copy before switching to the shared one
   cards=d.cards.map((c,k)=>c&&c.mat&&PRESETS[c.mat]?{...PRESETS[c.mat],backMat:'Suede',...c}:fresh(k)); Object.assign(G,d.G||{});
   try{ localStorage.setItem(KEY,JSON.stringify(cards)); localStorage.setItem('onemo-global',JSON.stringify(G)); }catch(_){}
   edited=d.edited||0; try{ localStorage.setItem(EKEY,String(edited)); }catch(_){}
-  painted.clear(); prefetch(); if(sheet.classList.contains('open')) renderSheet(); }).catch(()=>{});
+  painted.clear(); prefetch(); if(sheet.classList.contains('open')) renderSheet(); rowToAll(); }).catch(()=>rowToAll());
 window.__dev={ cards:()=>cards, set:(i,o)=>{ Object.assign(cards[i],o); save(); paintCard(i); return chain; }, preset:(i,m)=>{ cards[i]={...PRESETS[m],mat:m}; save(); paintCard(i); return chain; }, idx };
 
 /* ── live light (only cards whose setting says so) ──────────────────── */
