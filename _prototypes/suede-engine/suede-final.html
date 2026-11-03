@@ -161,7 +161,7 @@ const GROUP_OF=k=>Object.keys(GROUPS).find(g=>GROUPS[g].includes(k));
 const GNAME={ light:'light', rim:'rim', shadow:'shadow' };
 let G; try{ G=JSON.parse(localStorage.getItem('onemo-global')); }catch(_){}
 G=G||{};
-if(!G.shadow){ G.shadow={ shLift:6, shadow:.5, shBlur:.5, shSpread:0, shDist:1, shContact:1 }; for(const k of GROUPS.shadow) if(G[k]!==undefined){ G.shadow[k]=G[k]; delete G[k]; } }   // shadow was top-level: keep your values
+if(!G.shadow||typeof G.shadow!=='object'){ const sh={ shLift:6, shadow:.5, shBlur:.5, shSpread:0, shDist:1, shContact:1 }; for(const k of GROUPS.shadow) if(G[k]!==undefined&&typeof G[k]!=='object'){ sh[k]=G[k]; delete G[k]; } G.shadow=sh; }   // shadow used to be top-level (its strength key is also called 'shadow'): keep your values
 const saveG=(seed)=>{ if(!seed) touch(); try{ localStorage.setItem('onemo-global',JSON.stringify(G)); }catch(_){} pushSpec(); };
 const LIGHT_KEYS=GROUPS.light;   // the lamp. Studio + reflections stay per material (they make gloss/leather/matte shine)
 for(const k in G.light||{}) if(!LIGHT_KEYS.includes(k)) delete G.light[k];   // drop studio/reflection keys from older saves
@@ -342,7 +342,7 @@ const CTL=[
   ['Nap, wash & highlights',[['t_ksSheen','highlights',0,1,.01],['t_ksGrainSize','nap size (px)',.6,6,.05],['t_ksGrain','nap strength',0,1,.01],['t_wash','wash (nap / crush patches)',0,1,.01],['t_washScale','wash size',1,12,.1],['t_washSeed','wash layout (reseed)',0,99,1],
     ['t_ksBack','backscatter (milky veil)',0,1,.01],['t_ks','velvet lobe',0,2,.01],['t_ksBump','brushed patches (bump)',0,3,.01],['t_ksEdge','edginess',1,20,.1],['t_rim','velvet edge glow',0,.8,.01],['t_haze','fuzz haze',0,.4,.005],
     ['t_detail','fibre detail (scan mottling)',0,1,.01],['t_detailGain','fibre visibility',1,30,.1],['t_detailTile','fibre size',.25,6,.05,'inv'],['t_fall','pile fall-off glow',0,1.5,.01],['t_fallPow','fall-off softness',1,6,.1,'inv'],['t_fallTint','fall-off colour from print',0,1,.01]],0],
-  ['Surface & reflections',[['t_depth','grain depth',0,2,.01],['t_rough','reflection softness',.02,1,.01],['t_spec','highlight strength',0,2,.01],['t_box','softbox (light spot)',0,15,.1],['t_tile','grain fineness',1,8,.25],['t_ao','grain shadows (AO)',0,1,.01],
+  ['Surface & reflections',[['t_depth','grain depth',0,4,.01],['t_rough','reflection softness',.02,1,.01],['t_spec','highlight strength',0,2,.01],['t_box','softbox (light spot)',0,15,.1],['t_tile','grain fineness',1,8,.25],['t_ao','grain shadows (AO)',0,1,.01],
     ['t_sheen','sheen (fabric glow)',0,1,.01],['t_sheenRough','sheen softness',.1,1,.01],['t_sheenTint','sheen colour from print',0,1,.01],['t_coat','clear coat',0,1,.01],['t_coatRough','coat sharpness',0,.5,.005,'inv']],0],
   ['Print on suede',[['print','print on suede','toggle'],['soften','soften',0,.4,.01],['lift','black lift',0,.2,.005],['blur','blur px',0,1.5,.05]],1],
   ['Material (physically based)',[['pbr','material lighting','toggle'],['pnsrc','surface','seg',['suede','leather','ink','flat']],['ptile','fineness',1,10,.25],['pnorm','surface depth',0,1,.01],

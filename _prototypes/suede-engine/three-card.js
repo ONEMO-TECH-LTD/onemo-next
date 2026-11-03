@@ -67,8 +67,8 @@ export function createThreeCard(size) {
   camera.position.set(0, 0, 1 / (2 * Math.tan(15 * Math.PI / 180)));   // the card exactly fills the frame
   const key = new THREE.PointLight(0xffffff, 1, 0, 2);   // physical fall-off: closer = brighter, tighter hotspot
   scene.add(key);
-  const fill = new THREE.AmbientLight(0xffffff, 0);   // ambient fill: lifts the shadow side evenly, no direction
-  scene.add(fill);
+  const fill = new THREE.HemisphereLight(0xffffff, 0x3a3a3a, 0);   // fill: soft sky light from above-front — lifts shadows but, unlike flat ambient, still follows the surface so grain survives
+  fill.position.set(0, .8, .6); scene.add(fill);
   /* the softbox: a rectangular area light near the card — a smooth, resolution-free light spot on matte,
      a satin glow on leather, a clean rectangular reflection on gloss */
   const box = new THREE.RectAreaLight(0xffffff, 6, .55, .38);
